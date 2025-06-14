@@ -1,0 +1,10 @@
+[package]
+name = "camera-discovery"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+udev = "0.9"
+anyhow = "1"
+
+[workspace] 

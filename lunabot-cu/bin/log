@@ -1,0 +1,3 @@
+#!/bin/bash
+# A small shortcut to be able to extract your structured log.
+RUST_BACKTRACE=1 cargo run --features=logreader --bin lunabot-logreader logs/lunabot.copper extract-log target/debug/cu29_log_index

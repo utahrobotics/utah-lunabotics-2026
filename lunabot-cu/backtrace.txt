@@ -1,0 +1,28 @@
+#0  __pthread_kill_implementation (no_tid=0, signo=6, threadid=<optimized out>) at ./nptl/pthread_kill.c:44
+#1  __pthread_kill_internal (signo=6, threadid=<optimized out>) at ./nptl/pthread_kill.c:78
+#2  __GI___pthread_kill (threadid=<optimized out>, signo=signo@entry=6) at ./nptl/pthread_kill.c:89
+#3  0x00007ffff7a4527e in __GI_raise (sig=sig@entry=6) at ../sysdeps/posix/raise.c:26
+#4  0x00007ffff7a288ff in __GI_abort () at ./stdlib/abort.c:79
+#5  0x000055555615bcba in std::sys::pal::unix::abort_internal () at library/std/src/sys/pal/unix/mod.rs:366
+#6  0x0000555556159e23 in std::panicking::rust_panic_with_hook () at library/std/src/panicking.rs:37
+#7  0x0000555556159a06 in std::panicking::begin_panic_handler::{closure#0} () at library/std/src/panicking.rs:699
+#8  0x00005555561584e9 in std::sys::backtrace::__rust_end_short_backtrace<std::panicking::begin_panic_handler::{closure_env#0}, !> () at library/std/src/sys/backtrace.rs:168
+#9  0x00005555561596cd in std::panicking::begin_panic_handler () at library/std/src/panicking.rs:697
+#10 0x000055555617c9ed in core::panicking::panic_nounwind_fmt::runtime () at library/core/src/panicking.rs:117
+#11 core::panicking::panic_nounwind_fmt () at library/core/src/intrinsics/mod.rs:3196
+#12 0x000055555617ca82 in core::panicking::panic_nounwind () at library/core/src/panicking.rs:226
+#13 0x0000555555e203ad in core::slice::raw::from_raw_parts::precondition_check (data=0x0, size=1, align=1, len=0) at /home/matthew_a/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ub_checks.rs:68
+#14 0x0000555555e20660 in core::slice::raw::from_raw_parts<u8> (data=0x0, len=0) at /home/matthew_a/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ub_checks.rs:75
+#15 alloc::vec::Vec<u8, alloc::alloc::Global>::as_slice<u8, alloc::alloc::Global> (self=0x555556249688) at /home/matthew_a/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:1600
+#16 alloc::vec::{impl#8}::deref<u8, alloc::alloc::Global> (self=0x555556249688) at /home/matthew_a/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3299
+#17 alloc::vec::{impl#11}::clone<u8, alloc::alloc::Global> (self=0x555556249688) at /home/matthew_a/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:3320
+#18 0x00005555559131ef in std::sys::os_str::bytes::{impl#7}::clone (self=0x555556249688) at /home/matthew_a/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/sys/os_str/bytes.rs:92
+#19 std::ffi::os_str::{impl#10}::clone (self=0x555556249688) at /home/matthew_a/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/ffi/os_str.rs:699
+#20 std::path::{impl#30}::clone (self=0x555556249688) at /home/matthew_a/.rustup/toolchains/nightly-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/path.rs:1748
+#21 0x00005555559025fd in lunabot::tasks::{impl#6}::process (self=0x7fffffffd008, _clock=0x7fffffffcfd8, input=0x555556249648, output=0x5555562496a0) at src/tasks.rs:119
+#22 0x00005555558f383f in lunabot::default::{impl#4}::run_one_iteration (self=0x7fffffffcef0) at src/main.rs:11
+#23 0x00005555558ffaff in lunabot::default::{impl#4}::run (self=0x7fffffffcef0) at src/main.rs:11
+#24 0x0000555555910781 in lunabot::main () at src/main.rs:32
+Warning: 'set logging off', an alias for the command 'set logging enabled', is deprecated.
+Use 'set logging enabled off'.
+
