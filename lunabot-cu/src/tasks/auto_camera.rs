@@ -212,7 +212,6 @@ mod linux_impl {
             }
 
             // Open device using its path (e.g. /dev/video4)
-            debug!("V4L: Opening device at {}", dev_path);
             let dev = Device::with_path(dev_path)
                 .map_err(|e| CuError::new_with_cause("Failed to open camera", e))?;
 
@@ -351,7 +350,7 @@ mod linux_impl {
 
             self.settled_format = Some(cuformat);
             self.stream = Some(stream);
-
+            info!("V4L: Opened stream on device {}", dev_path);
             Ok(())
         }
     }

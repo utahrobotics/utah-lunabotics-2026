@@ -16,5 +16,5 @@
             },
         ),
     ],
-    monitor:(type:"cu_consolemon::CuConsoleMon")
+    monitor:(type:"cu_consolemon::CuConsoleMon"),
 )

@@ -22,7 +22,7 @@ default = []
 logreader = ["dep:cu29-export"]
 
 [dependencies]
-cu29 = {  git = "https://github.com/matthewashton-k/copper-rs", features = ["log-level-debug"] }
+cu29 = {  git = "https://github.com/matthewashton-k/copper-rs", features = ["log-level-info", "log-level-error"] }
 bincode = { version = "2.0.1", features = ["derive", "serde"] }
 cu29-helpers = { git = "https://github.com/matthewashton-k/copper-rs" }
 cu29-export = { git = "https://github.com/matthewashton-k/copper-rs" , optional = true }
