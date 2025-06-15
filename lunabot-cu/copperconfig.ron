@@ -8,11 +8,23 @@
             path:"camera_configs/camera_template.ron",
             params:{
                 "id":"front",
-                "port":"pci-0000:35:00.0-usb-0:1:1.0",
-                "fx":2600,
-                "fy":2600,
-                "cx":900,
-                "cy":520,
+                "port":"pci-0000:00:14.0-usb-0:3:1.0",
+                "fx":1513.93,
+                "fy":1513.93,
+                "cx":946.84,
+                "cy":557.819,
+            },
+        ),
+
+        (
+            path:"camera_configs/camera_template.ron",
+            params:{
+                "id":"side",
+                "port":"pci-0000:00:14.0-usb-0:2:1.0",
+                "fx":1513.93,
+                "fy":1513.93,
+                "cx":946.84,
+                "cy":557.819,
             },
         ),
     ],
