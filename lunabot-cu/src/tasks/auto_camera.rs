@@ -146,25 +146,10 @@ mod linux_impl {
         }
 
         fn process(&mut self, clock: &RobotClock, input: Self::Input, output: Self::Output) -> CuResult<()> {
-            // 1. If we haven't opened the camera yet, check for a new device event or periodically retry
-            static mut RETRY_COUNTER: u32 = 0;
-            if self.stream.is_none() {
-                let mut tried_open = false;
+            if self.stream.is_none() && self.last_frame_time.is_none() {
                 if let Some(dev) = input.payload() {
                     if dev.port.to_string() == self.desired_port {
-                        debug!("V4L: detected desired camera. Opening...");
                         self.open_stream(&dev.dev_path, clock)?;
-                        tried_open = true;
-                    }
-                }
-                // If no device event, periodically retry open_stream with the last known dev_path
-                unsafe {
-                    RETRY_COUNTER += 1;
-                    if !tried_open && RETRY_COUNTER % 30 == 0 {
-                        if let Some(dev) = input.payload() {
-                            debug!("V4L: Periodic retry to open camera at {}", dev.dev_path.clone());
-                            let _ = self.open_stream(&dev.dev_path, clock);
-                        }
                     }
                 }
             }
@@ -174,10 +159,10 @@ mod linux_impl {
             if let Some(stream) = self.stream.as_mut() {
                 let frame = stream.next();
                 if let Ok((handle, meta)) = frame {
-                    debug!("V4L: Received frame with metadata");
+                    // debug!("V4L: Received frame with metadata");
                     if meta.bytesused != 0 {
                         if let Some(ref fmt) = self.settled_format {
-                            debug!("V4L: Frame format: {}", fmt.pixel_format);
+                            // debug!("V4L: Frame format: {}", fmt.pixel_format);
                             let cutime = cutime_from_v4ltime(self.v4l_clock_time_offset_ns, meta.timestamp);
                             let image = CuImage::new(*fmt, handle.clone());
                             output.set_payload(image);
@@ -201,6 +186,10 @@ mod linux_impl {
                 self.v4l_clock_time_offset_ns = 0; // reset clock offset
                 self.last_frame_time = None; // reset last frame time
             }
+            if self.last_frame_time.is_none() {
+                return Err("No frames received yet".into());
+            }
+            
             Ok(())
         }
 
