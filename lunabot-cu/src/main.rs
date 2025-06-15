@@ -6,6 +6,7 @@ use cu29_helpers::basic_copper_setup;
 use std::thread::sleep;
 use std::time::Duration;
 use std::path::{Path,PathBuf};
+use crate::tasks::*;
 
 const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 

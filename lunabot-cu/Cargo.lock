@@ -338,6 +338,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9555578bc9e57714c812a1f84e4fc5b4d21fcb063490c624de019f7464c91268"
 
 [[package]]
+name = "cfg_aliases"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
+
+[[package]]
 name = "chrono"
 version = "0.4.41"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -647,8 +653,7 @@ dependencies = [
 [[package]]
 name = "cu-apriltag"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "caa8e1e705bc58ef6958df31fdf3bcfd3efe30dd770984f3557ae0c63deb570f"
+source = "git+https://github.com/matthewashton-k/copper-rs#f1bb659396fd82e39af10cd9671806e2fb4479c4"
 dependencies = [
  "apriltag",
  "apriltag-sys",
@@ -663,8 +668,7 @@ dependencies = [
 [[package]]
 name = "cu-consolemon"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "068ba6acb2bec9f7079199e261e244ed45c25246be520d66586101903fcf23d6"
+source = "git+https://github.com/matthewashton-k/copper-rs#f1bb659396fd82e39af10cd9671806e2fb4479c4"
 dependencies = [
  "ansi-to-tui",
  "chrono",
@@ -686,8 +690,7 @@ dependencies = [
 [[package]]
 name = "cu-sensor-payloads"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d5f1eb25ab430bb726cf277f76d17a409ed33f88ef3a2d8c8d39dca1a068540b"
+source = "git+https://github.com/matthewashton-k/copper-rs#f1bb659396fd82e39af10cd9671806e2fb4479c4"
 dependencies = [
  "bincode 2.0.1",
  "cu29",
@@ -700,8 +703,7 @@ dependencies = [
 [[package]]
 name = "cu-spatial-payloads"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c9e8fdaa7b9affc11211cadd191b32613d6717f4ad94791c9b5cd1ebe93df4e"
+source = "git+https://github.com/matthewashton-k/copper-rs#f1bb659396fd82e39af10cd9671806e2fb4479c4"
 dependencies = [
  "bincode 2.0.1",
  "serde",
@@ -709,10 +711,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "cu-v4l"
+version = "0.8.0"
+source = "git+https://github.com/matthewashton-k/copper-rs#f1bb659396fd82e39af10cd9671806e2fb4479c4"
+dependencies = [
+ "cu-sensor-payloads",
+ "cu29",
+ "libc",
+ "nix 0.30.1",
+ "v4l",
+]
+
+[[package]]
 name = "cu29"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "533627e37034b47c6856c00f676b386c8bd98e74e8043d2dab539178cceeba3e"
+source = "git+https://github.com/matthewashton-k/copper-rs#f1bb659396fd82e39af10cd9671806e2fb4479c4"
 dependencies = [
  "bincode 2.0.1",
  "cu29-clock",
@@ -730,8 +743,7 @@ dependencies = [
 [[package]]
 name = "cu29-clock"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61fd1a72421e837db025242946432a87ec0fd4591ef11cd36cb5e81effa80f39"
+source = "git+https://github.com/matthewashton-k/copper-rs#f1bb659396fd82e39af10cd9671806e2fb4479c4"
 dependencies = [
  "bincode 2.0.1",
  "quanta",
@@ -741,8 +753,7 @@ dependencies = [
 [[package]]
 name = "cu29-derive"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8980d3ddc8e83f745c509cca071b0f0f0b13350cbdac3984a79049130784e8b4"
+source = "git+https://github.com/matthewashton-k/copper-rs#f1bb659396fd82e39af10cd9671806e2fb4479c4"
 dependencies = [
  "convert_case 0.8.0",
  "cu29-runtime",
@@ -759,8 +770,7 @@ dependencies = [
 [[package]]
 name = "cu29-export"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f0385c3f9fada4810ff7fff80afa2e60d863b6624b72c987dfed90125c731162"
+source = "git+https://github.com/matthewashton-k/copper-rs#f1bb659396fd82e39af10cd9671806e2fb4479c4"
 dependencies = [
  "bincode 2.0.1",
  "clap",
@@ -770,8 +780,7 @@ dependencies = [
 [[package]]
 name = "cu29-helpers"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dbb5061f3c2d43ca4bc6618268ba439928629ecf3cf6b885e2d4b32b897c7b96"
+source = "git+https://github.com/matthewashton-k/copper-rs#f1bb659396fd82e39af10cd9671806e2fb4479c4"
 dependencies = [
  "cu29-clock",
  "cu29-log",
@@ -785,8 +794,7 @@ dependencies = [
 [[package]]
 name = "cu29-intern-strs"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "57d1fe25a3f8464d6aed6c9d0a9431b22142d44aaff68278f4a02573f727157c"
+source = "git+https://github.com/matthewashton-k/copper-rs#f1bb659396fd82e39af10cd9671806e2fb4479c4"
 dependencies = [
  "byteorder",
  "cu29-traits",
@@ -796,8 +804,7 @@ dependencies = [
 [[package]]
 name = "cu29-log"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ea812828ce2ca6f8cd93e369a7be591fae6d32a3be9ce4570e0d73075694bd9"
+source = "git+https://github.com/matthewashton-k/copper-rs#f1bb659396fd82e39af10cd9671806e2fb4479c4"
 dependencies = [
  "bincode 2.0.1",
  "cu29-clock",
@@ -811,8 +818,7 @@ dependencies = [
 [[package]]
 name = "cu29-log-derive"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fe00a1744852c4b4fab4b4ac319ba922a24d61ea80d5b02ad82b42f77e3f16b0"
+source = "git+https://github.com/matthewashton-k/copper-rs#f1bb659396fd82e39af10cd9671806e2fb4479c4"
 dependencies = [
  "cu29-log",
  "quote",
@@ -823,8 +829,7 @@ dependencies = [
 [[package]]
 name = "cu29-log-runtime"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6063a21486e4c6d64e6adff5143920ccd0c49b112f7195c71b18f09b1cd4a13d"
+source = "git+https://github.com/matthewashton-k/copper-rs#f1bb659396fd82e39af10cd9671806e2fb4479c4"
 dependencies = [
  "bincode 2.0.1",
  "cu29-clock",
@@ -837,8 +842,7 @@ dependencies = [
 [[package]]
 name = "cu29-runtime"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c78e4786feb433d38db59b364ac1c9f4a3ade01e39c69261416d0d770678cb7d"
+source = "git+https://github.com/matthewashton-k/copper-rs#f1bb659396fd82e39af10cd9671806e2fb4479c4"
 dependencies = [
  "arrayvec",
  "bincode 2.0.1",
@@ -865,8 +869,7 @@ dependencies = [
 [[package]]
 name = "cu29-soa-derive"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3da2d51213b71dda30c1cc2ec8f99a0ec57dec413cb9071cb15851c690aaa40e"
+source = "git+https://github.com/matthewashton-k/copper-rs#f1bb659396fd82e39af10cd9671806e2fb4479c4"
 dependencies = [
  "quote",
  "syn 2.0.103",
@@ -876,8 +879,7 @@ dependencies = [
 [[package]]
 name = "cu29-traits"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "28b2ac9bda02a2e96d06cb0cf39286b0204365b048d729125c38e27e79acbf78"
+source = "git+https://github.com/matthewashton-k/copper-rs#f1bb659396fd82e39af10cd9671806e2fb4479c4"
 dependencies = [
  "bincode 2.0.1",
  "serde",
@@ -886,8 +888,7 @@ dependencies = [
 [[package]]
 name = "cu29-unifiedlog"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43b02528c38327787386aa5db35d2943c566cd83fadb531e0098f76a976a0ed8"
+source = "git+https://github.com/matthewashton-k/copper-rs#f1bb659396fd82e39af10cd9671806e2fb4479c4"
 dependencies = [
  "bincode 2.0.1",
  "cu29-traits",
@@ -898,8 +899,7 @@ dependencies = [
 [[package]]
 name = "cu29-value"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e49e7becc4645c3280643cc47246f7bfb85851e6c968a41cf397098f6b1ff2a8"
+source = "git+https://github.com/matthewashton-k/copper-rs#f1bb659396fd82e39af10cd9671806e2fb4479c4"
 dependencies = [
  "bincode 2.0.1",
  "cu29-clock",
@@ -1796,7 +1796,7 @@ dependencies = [
  "libc",
  "local-ip-address",
  "mach2",
- "nix",
+ "nix 0.26.4",
  "num_cpus",
  "os-release",
  "pciid-parser",
@@ -1933,10 +1933,13 @@ dependencies = [
  "cu-consolemon",
  "cu-sensor-payloads",
  "cu-spatial-payloads",
+ "cu-v4l",
  "cu29",
  "cu29-export",
  "cu29-helpers",
  "image",
+ "libc",
+ "nix 0.30.1",
  "ron 0.8.1",
  "serde",
  "udev",
@@ -2071,6 +2074,18 @@ dependencies = [
  "cfg-if 1.0.1",
  "libc",
  "memoffset",
+]
+
+[[package]]
+name = "nix"
+version = "0.30.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74523f3a35e05aba87a1d978330aef40f67b0304ac79c1c00b294c9830543db6"
+dependencies = [
+ "bitflags 2.9.1",
+ "cfg-if 1.0.1",
+ "cfg_aliases",
+ "libc",
 ]
 
 [[package]]
@@ -3978,7 +3993,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b1641b26d4dec61337c35a1b1aaf9e3cba8f46f0b43636c609ab0291a648040a"
 dependencies = [
  "gethostname",
- "nix",
+ "nix 0.26.4",
  "winapi",
  "winapi-wsapoll",
  "x11rb-protocol",
@@ -3990,7 +4005,7 @@ version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "82d6c3f9a0fb6701fab8f6cea9b0c0bd5d6876f1f89f7fada07e558077c344bc"
 dependencies = [
- "nix",
+ "nix 0.26.4",
 ]
 
 [[package]]

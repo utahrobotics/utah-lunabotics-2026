@@ -22,21 +22,24 @@ default = []
 logreader = ["dep:cu29-export"]
 
 [dependencies]
-cu29 = {  version = "0.8", features = ["log-level-debug"] }
+cu29 = {  git = "https://github.com/matthewashton-k/copper-rs", features = ["log-level-debug"] }
 bincode = { version = "2.0.1", features = ["derive", "serde"] }
-cu29-helpers = { version = "0.8"  }
-cu29-export = { version = "0.8" , optional = true }
+cu29-helpers = { git = "https://github.com/matthewashton-k/copper-rs" }
+cu29-export = { git = "https://github.com/matthewashton-k/copper-rs" , optional = true }
 # Add Copper official component crates for milestone 1
-cu-apriltag = "0.8"
-cu-consolemon = "0.8"
-cu-sensor-payloads = "0.8"
-cu-spatial-payloads = "0.8"
+cu-apriltag = { git = "https://github.com/matthewashton-k/copper-rs" }
+cu-consolemon = { git = "https://github.com/matthewashton-k/copper-rs" }
+cu-sensor-payloads = { git = "https://github.com/matthewashton-k/copper-rs" }
+cu-spatial-payloads = { git = "https://github.com/matthewashton-k/copper-rs" }
 image = { version = "0.24", default-features = false, features = ["jpeg"] }
 v4l = "0.14"
 udev = "0.9"
 crossbeam-channel = "0.5"
 anyhow = "1"
 serde = { version = "1", features = ["derive"] }
+cu-v4l = { git = "https://github.com/matthewashton-k/copper-rs" }
+libc = "0.2.173"
+nix = "0.30.1"
 
 [build-dependencies]
 ron = "0.8"

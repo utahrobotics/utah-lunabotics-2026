@@ -1,0 +1,43 @@
+(
+    tasks: [
+        (
+            id: "cam_{{id}}",
+            type: "crate::tasks::V4lAutoCam",
+            config: {
+                "device_port": "{{port}}",
+                "width": 3280,
+                "height": 2160,
+                "fps": 30,
+                "fourcc": "NV12",
+                "buffers": 4,
+                "timeout_ms": 500,
+                // Intrinsics
+                "fx": {{fx}},
+                "fy": {{fy}},
+                "cx": {{cx}},
+                "cy": {{cy}},
+            },
+        ),
+        (
+            id: "tags_cam_{{id}}",
+            type: "cu_apriltag::AprilTags",
+            config: {
+                "tag_family": "tag16h5",
+                "tag_size": 0.14,
+                "fx": {{fx}},
+                "fy": {{fy}},
+                "cx": {{cx}},
+                "cy": {{cy}},
+            },
+        ),
+        (
+            id: "tag_sink_{{id}}",
+            type: "crate::tasks::DetectionLogger",
+        ),
+    ],
+    cnx: [
+        (src: "udev_monitor", dst: "cam_{{id}}", msg: "crate::tasks::NewDevice"),
+        (src: "cam_{{id}}", dst: "tags_cam_{{id}}", msg: "cu_sensor_payloads::CuImage<Vec<u8>>"),
+        (src: "tags_cam_{{id}}", dst: "tag_sink_{{id}}", msg: "cu_apriltag::AprilTagDetections"),
+    ],
+) 
