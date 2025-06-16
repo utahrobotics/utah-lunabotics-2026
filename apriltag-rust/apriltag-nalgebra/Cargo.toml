@@ -1,0 +1,18 @@
+[package]
+name = "apriltag-nalgebra"
+version = "0.1.0"
+edition = "2021"
+description = "Conversion from/to nalgebra crate types for apriltag"
+authors = ["jerry73204 <jerry73204@gmail.com>"]
+documentation = "https://docs.rs/apriltag-nalgebra"
+homepage = "https://github.com/jerry73204/apriltag-rust"
+repository = "https://github.com/jerry73204/apriltag-rust.git"
+readme = "README.md"
+license = "BSD-2-Clause"
+
+[dependencies]
+apriltag = { version = "0.5.0", path = "../apriltag" }
+nalgebra = "0.32.1"
+
+[dev-dependencies]
+nalgebra = { version = "0.32.1", features = ["rand"] }

@@ -118,9 +118,7 @@ checksum = "e16d2d3311acee920a9eb8d33b8cbc1787ce4a264e85f964c2404b969bdcd487"
 
 [[package]]
 name = "apriltag"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e3278ce87faf6559bf159b5d5920de622f39dfe7c035387a6e70854e3dfcfa55"
+version = "0.5.0"
 dependencies = [
  "apriltag-sys",
  "libc",
@@ -131,9 +129,7 @@ dependencies = [
 
 [[package]]
 name = "apriltag-sys"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "168f741d3e5f434b54fa6fa857e35093b631900addbb3fb452715a2a67cd14c2"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "cc",

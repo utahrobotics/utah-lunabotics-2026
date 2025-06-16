@@ -1,0 +1,36 @@
+[package]
+name = "apriltag-sys"
+version = "0.4.0"
+description = "Rust bindings for AprilTag library"
+authors = ["jerry73204 <jerry73204@gmail.com>", "Andrew Straw <strawman@astraw.com>"]
+edition = "2021"
+documentation = "https://docs.rs/apriltag-sys"
+homepage = "https://github.com/jerry73204/apriltag-rust"
+repository = "https://github.com/jerry73204/apriltag-rust.git"
+readme = "README.md"
+license = "BSD-2-Clause"
+
+[dependencies]
+
+[build-dependencies]
+bindgen = { version = "0.63.0", optional = true }
+cc = { version = "1.0.78", features = ["parallel"] }
+glob = "0.3.1"
+cmake = "0.1.49"
+pkg-config = "0.3.26"
+once_cell = "1.17.0"
+anyhow = "1.0.68"
+itertools = "0.10.5"
+
+[dev-dependencies]
+image = "0.24.5"
+
+[features]
+default = []
+buildtime-bindgen = ["bindgen"]
+
+# The source location and build method (cmake, direct cc, link system library)
+# is selected by environment variable. Cargo features are not used because these
+# are additive and can set by the package(s) that depend on apriltag-sys. (By
+# this same logic, we should remove buildtime-bindgen feature and make it an
+# environment variable.)
