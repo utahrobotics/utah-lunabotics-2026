@@ -1,3 +1,4 @@
+#![feature(let_chains)]
 pub mod tasks;
 
 use cu29::prelude::*;

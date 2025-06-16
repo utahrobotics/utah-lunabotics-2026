@@ -174,6 +174,7 @@ mod linux_impl {
                         }
                     } else {
                         debug!("V4L: Received empty frame, skipping");
+                        return Err("Received empty frame from V4L stream".into());
                     }
                     let idx = stream.last_dequeued_index();
                     stream.requeue(idx).map_err(|e| CuError::new_with_cause("could not requeue buffer", e))?;

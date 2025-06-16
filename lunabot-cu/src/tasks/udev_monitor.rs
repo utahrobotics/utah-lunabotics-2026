@@ -71,7 +71,7 @@ impl<'cl> CuSrcTask<'cl> for UdevMonitor {
                 continue;
             }
             let Some(udev_index) = device.attribute_value("index") else {
-                info!("No udev_index for camera {path_str}");
+                info!("No udev_index for camera {}", path_str);
                 continue;
             };
             if udev_index.to_str() != Some("0") {

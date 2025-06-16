@@ -1,2 +1,3 @@
 target/
 *.copper
+logs/

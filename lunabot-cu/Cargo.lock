@@ -620,6 +620,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "crossbeam-deque"
+version = "0.8.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9dd111b7b7f7d55b72c0a6ae361660ee5853c9af73f70c3c2ef6858b950e2e51"
+dependencies = [
+ "crossbeam-epoch",
+ "crossbeam-utils",
+]
+
+[[package]]
+name = "crossbeam-epoch"
+version = "0.9.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5b82ac4a3c2ca9c3460964f020e1402edd5753411d7737aa39c3714ad1b5420e"
+dependencies = [
+ "crossbeam-utils",
+]
+
+[[package]]
 name = "crossbeam-utils"
 version = "0.8.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -653,7 +672,6 @@ dependencies = [
 [[package]]
 name = "cu-apriltag"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs#60e28ca7c9e785e599b2d233bd695c012c92e2f8"
 dependencies = [
  "apriltag",
  "apriltag-sys",
@@ -662,13 +680,13 @@ dependencies = [
  "cu-sensor-payloads",
  "cu-spatial-payloads",
  "cu29",
+ "jpeg-decoder",
  "serde",
 ]
 
 [[package]]
 name = "cu-consolemon"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs#60e28ca7c9e785e599b2d233bd695c012c92e2f8"
 dependencies = [
  "ansi-to-tui",
  "chrono",
@@ -690,7 +708,6 @@ dependencies = [
 [[package]]
 name = "cu-sensor-payloads"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs#60e28ca7c9e785e599b2d233bd695c012c92e2f8"
 dependencies = [
  "bincode 2.0.1",
  "cu29",
@@ -703,7 +720,6 @@ dependencies = [
 [[package]]
 name = "cu-spatial-payloads"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs#60e28ca7c9e785e599b2d233bd695c012c92e2f8"
 dependencies = [
  "bincode 2.0.1",
  "serde",
@@ -713,7 +729,6 @@ dependencies = [
 [[package]]
 name = "cu-v4l"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs#60e28ca7c9e785e599b2d233bd695c012c92e2f8"
 dependencies = [
  "cu-sensor-payloads",
  "cu29",
@@ -725,7 +740,6 @@ dependencies = [
 [[package]]
 name = "cu29"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs#60e28ca7c9e785e599b2d233bd695c012c92e2f8"
 dependencies = [
  "bincode 2.0.1",
  "cu29-clock",
@@ -743,7 +757,6 @@ dependencies = [
 [[package]]
 name = "cu29-clock"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs#60e28ca7c9e785e599b2d233bd695c012c92e2f8"
 dependencies = [
  "bincode 2.0.1",
  "quanta",
@@ -753,7 +766,6 @@ dependencies = [
 [[package]]
 name = "cu29-derive"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs#60e28ca7c9e785e599b2d233bd695c012c92e2f8"
 dependencies = [
  "convert_case 0.8.0",
  "cu29-runtime",
@@ -770,7 +782,6 @@ dependencies = [
 [[package]]
 name = "cu29-export"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs#60e28ca7c9e785e599b2d233bd695c012c92e2f8"
 dependencies = [
  "bincode 2.0.1",
  "clap",
@@ -780,7 +791,6 @@ dependencies = [
 [[package]]
 name = "cu29-helpers"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs#60e28ca7c9e785e599b2d233bd695c012c92e2f8"
 dependencies = [
  "cu29-clock",
  "cu29-log",
@@ -794,7 +804,6 @@ dependencies = [
 [[package]]
 name = "cu29-intern-strs"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs#60e28ca7c9e785e599b2d233bd695c012c92e2f8"
 dependencies = [
  "byteorder",
  "cu29-traits",
@@ -804,7 +813,6 @@ dependencies = [
 [[package]]
 name = "cu29-log"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs#60e28ca7c9e785e599b2d233bd695c012c92e2f8"
 dependencies = [
  "bincode 2.0.1",
  "cu29-clock",
@@ -818,7 +826,6 @@ dependencies = [
 [[package]]
 name = "cu29-log-derive"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs#60e28ca7c9e785e599b2d233bd695c012c92e2f8"
 dependencies = [
  "cu29-log",
  "quote",
@@ -829,7 +836,6 @@ dependencies = [
 [[package]]
 name = "cu29-log-runtime"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs#60e28ca7c9e785e599b2d233bd695c012c92e2f8"
 dependencies = [
  "bincode 2.0.1",
  "cu29-clock",
@@ -842,7 +848,6 @@ dependencies = [
 [[package]]
 name = "cu29-runtime"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs#60e28ca7c9e785e599b2d233bd695c012c92e2f8"
 dependencies = [
  "arrayvec",
  "bincode 2.0.1",
@@ -869,7 +874,6 @@ dependencies = [
 [[package]]
 name = "cu29-soa-derive"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs#60e28ca7c9e785e599b2d233bd695c012c92e2f8"
 dependencies = [
  "quote",
  "syn 2.0.103",
@@ -879,7 +883,6 @@ dependencies = [
 [[package]]
 name = "cu29-traits"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs#60e28ca7c9e785e599b2d233bd695c012c92e2f8"
 dependencies = [
  "bincode 2.0.1",
  "serde",
@@ -888,7 +891,6 @@ dependencies = [
 [[package]]
 name = "cu29-unifiedlog"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs#60e28ca7c9e785e599b2d233bd695c012c92e2f8"
 dependencies = [
  "bincode 2.0.1",
  "cu29-traits",
@@ -899,7 +901,6 @@ dependencies = [
 [[package]]
 name = "cu29-value"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs#60e28ca7c9e785e599b2d233bd695c012c92e2f8"
 dependencies = [
  "bincode 2.0.1",
  "cu29-clock",
@@ -1734,6 +1735,9 @@ name = "jpeg-decoder"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f5d4a7da358eff58addd2877a45865158f0d78c911d43a5784ceb7bbf52833b0"
+dependencies = [
+ "rayon",
+]
 
 [[package]]
 name = "js-sys"
@@ -2555,6 +2559,26 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c6df7ab838ed27997ba19a4664507e6f82b41fe6e20be42929332156e5e85146"
 dependencies = [
  "bitflags 2.9.1",
+]
+
+[[package]]
+name = "rayon"
+version = "1.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b418a60154510ca1a002a752ca9714984e21e4241e804d32555251faf8b78ffa"
+dependencies = [
+ "either",
+ "rayon-core",
+]
+
+[[package]]
+name = "rayon-core"
+version = "1.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1465873a3dfdaa8ae7cb14b4383657caab0b3e8a0aa9ae8e04b044854c8dfce2"
+dependencies = [
+ "crossbeam-deque",
+ "crossbeam-utils",
 ]
 
 [[package]]
