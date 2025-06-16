@@ -19,7 +19,7 @@ impl<'cl> CuSinkTask<'cl> for DetectionLogger {
         if let Some(dets) = input.payload() {
             for (id, pose, _) in dets.filtered_by_decision_margin(50.0) {
                 //TODO: poses still are garbage from that one godforsaken bug
-                info!("Detected tag {} with pose: {}", id, pose);
+                info!("[{}] Detected tag {} with pose: {}",&dets.camera_id, id, pose);
             }
         }
         Ok(())

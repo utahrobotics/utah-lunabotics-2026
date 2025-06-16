@@ -35,6 +35,7 @@ const FAMILY: &str = "tag16h5";
 
 #[derive(Default, Debug, Clone, Encode)]
 pub struct AprilTagDetections {
+    pub camera_id: Box<String>,
     pub ids: CuArrayVec<usize, MAX_DETECTIONS>,
     pub poses: CuArrayVec<CuPose<f32>, MAX_DETECTIONS>,
     pub decision_margins: CuArrayVec<f32, MAX_DETECTIONS>,
@@ -45,10 +46,12 @@ impl Decode<()> for AprilTagDetections {
         let ids = CuArrayVec::<usize, MAX_DETECTIONS>::decode(decoder)?;
         let poses = CuArrayVec::<CuPose<f32>, MAX_DETECTIONS>::decode(decoder)?;
         let decision_margins = CuArrayVec::<f32, MAX_DETECTIONS>::decode(decoder)?;
+        let camera_id: Box<String> = Box::decode(decoder)?;
         Ok(AprilTagDetections {
             ids,
             poses,
             decision_margins,
+            camera_id
         })
     }
 }
@@ -59,7 +62,8 @@ impl Serialize for AprilTagDetections {
         let CuArrayVec(ids) = &self.ids;
         let CuArrayVec(poses) = &self.poses;
         let CuArrayVec(decision_margins) = &self.decision_margins;
-        let mut tup = serializer.serialize_tuple(ids.len())?;
+        let camera_id= &self.camera_id;
+        let mut tup = serializer.serialize_tuple(ids.len() + 1)?;
 
         ids.iter()
             .zip(poses.iter())
@@ -68,7 +72,7 @@ impl Serialize for AprilTagDetections {
             .for_each(|(id, pose, margin)| {
                 tup.serialize_element(&(id, pose, margin)).unwrap();
             });
-
+        tup.serialize_element(camera_id)?;
         tup.end()
     }
 }
@@ -84,7 +88,7 @@ impl<'de> Deserialize<'de> for AprilTagDetections {
             type Value = AprilTagDetections;
 
             fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
-                formatter.write_str("a tuple of (id, pose, decision_margin)")
+                formatter.write_str("a tuple of (id, pose, decision_margin) and camera_id")
             }
 
             fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
@@ -92,19 +96,25 @@ impl<'de> Deserialize<'de> for AprilTagDetections {
                 A: serde::de::SeqAccess<'de>,
             {
                 let mut detections = AprilTagDetections::new();
-                while let Some((id, pose, decision_margin)) = seq.next_element()? {
-                    let CuArrayVec(ids) = &mut detections.ids;
-                    ids.push(id);
-                    let CuArrayVec(poses) = &mut detections.poses;
-                    poses.push(pose);
-                    let CuArrayVec(decision_margins) = &mut detections.decision_margins;
-                    decision_margins.push(decision_margin);
+                for _ in 0..MAX_DETECTIONS {
+                    if let Some((id, pose, decision_margin)) = seq.next_element()? {
+                        let CuArrayVec(ids) = &mut detections.ids;
+                        ids.push(id);
+                        let CuArrayVec(poses) = &mut detections.poses;
+                        poses.push(pose);
+                        let CuArrayVec(decision_margins) = &mut detections.decision_margins;
+                        decision_margins.push(decision_margin);
+                    } else {
+                        break;
+                    }
                 }
+                let camera_id = seq.next_element()?.ok_or_else(|| serde::de::Error::invalid_length(MAX_DETECTIONS, &self))?;
+                detections.camera_id = camera_id;
                 Ok(detections)
             }
         }
 
-        deserializer.deserialize_tuple(MAX_DETECTIONS, AprilTagDetectionsVisitor)
+        deserializer.deserialize_tuple(MAX_DETECTIONS + 1, AprilTagDetectionsVisitor)
     }
 }
 
@@ -201,9 +211,12 @@ impl<'cl> CuTask<'cl> for AprilTags {
     }
 }
 
+pub type ImageWithId = (Box<String>, CuImage<Vec<u8>>);
+
 #[cfg(not(windows))]
 impl<'cl> CuTask<'cl> for AprilTags {
-    type Input = input_msg!('cl, CuImage<Vec<u8>>);
+    // camera_id, image
+    type Input = input_msg!('cl, ImageWithId);
     type Output = output_msg!('cl, AprilTagDetections);
 
     fn new(_config: Option<&ComponentConfig>) -> CuResult<Self>
@@ -260,7 +273,8 @@ impl<'cl> CuTask<'cl> for AprilTags {
         output: Self::Output,
     ) -> CuResult<()> {
         let mut result = AprilTagDetections::new();
-        if let Some(payload) = input.payload() {
+        if let Some((cam_id, payload)) = input.payload() {
+            result.camera_id = cam_id.clone();
             // Fast grayscale conversion / extraction based on pixel format
             let pixel_format = std::str::from_utf8(&payload.format.pixel_format)
                 .unwrap_or("")
@@ -276,7 +290,6 @@ impl<'cl> CuTask<'cl> for AprilTags {
                     let height = payload.format.height as usize;
                     let src_stride = payload.format.stride as usize;
 
-                    // Ensure scratch buffer is big enough and has deterministic capacity
                     let required = width * height;
                     if self.scratch.len() < required {
                         self.scratch.resize(required, 0);
@@ -294,7 +307,6 @@ impl<'cl> CuTask<'cl> for AprilTags {
                         }
                     });
 
-                    // Build an apriltag image on top of the scratch buffer (zero-copy)
                     image_from_raw_parts(
                         self.scratch.as_mut_ptr(),
                         payload.format.width,
@@ -304,7 +316,6 @@ impl<'cl> CuTask<'cl> for AprilTags {
                 }
                 // MJPEG / JPEG – decode compressed bitstream to grayscale.
                 "MJPG" | "JPEG" | "JPG" => {
-                    // Acquire JPEG bytes
                     let jpeg_bytes = payload.buffer_handle.with_inner(|raw| raw.to_vec());
 
                     let mut decoder = JpegDecoder::new(Cursor::new(jpeg_bytes));
@@ -346,13 +357,13 @@ impl<'cl> CuTask<'cl> for AprilTags {
                             }
                         }
                         other => {
-                            println!(
-                                "[cu_apriltag] Unsupported JPEG pixel format {:?}, skipping.",
-                                other
-                            );
-                            output.metadata.tov = input.metadata.tov;
-                            output.set_payload(result);
-                            return Ok(());
+                            return Err(CuError::new_with_cause(
+                                "Unsupported JPEG pixel format",
+                                std::io::Error::new(
+                                    std::io::ErrorKind::Other,
+                                    format!("Unsupported JPEG pixel format: {other:?}"),
+                                ),
+                            ));
                         }
                     }
 
@@ -365,11 +376,6 @@ impl<'cl> CuTask<'cl> for AprilTags {
                 }
                 // Unsupported / unrecognised formats – skip detection gracefully.
                 other => {
-                    println!(
-                        "[cu_apriltag] Unsupported pixel format '{other}', skipping detection."
-                    );
-                    output.metadata.tov = input.metadata.tov;
-                    output.set_payload(result);
                     return Err(CuError::new_with_cause(
                         "Unsupported pixel format", 
                         std::io::Error::new(std::io::ErrorKind::Other, 

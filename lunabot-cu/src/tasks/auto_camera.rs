@@ -37,6 +37,7 @@ mod linux_impl {
     use std::ops::Deref;
     use std::time::Duration;
     use bincode::de;
+    use cu_apriltag::ImageWithId;
     use v4l::video::Capture;
 
     use crate::tasks::udev_monitor::NewDevice;
@@ -44,7 +45,6 @@ mod linux_impl {
     use cu29::prelude::*;
     use cu_sensor_payloads::{CuImage, CuImageBufferFormat};
     use cu29::cutask::CuMsg;
-
     use nix::time::{clock_gettime, ClockId};
 
     pub use v4l::buffer::Type;
@@ -75,6 +75,7 @@ mod linux_impl {
         req_buffers: u32,
         req_timeout: Duration,
         last_frame_time: Option<Instant>,
+        camera_id: Box<String>
     }
 
     impl Freezable for V4lAutoCam {}
@@ -85,7 +86,7 @@ mod linux_impl {
     }
 
     impl<'cl> CuTask<'cl> for V4lAutoCam {
-        type Output = output_msg!('cl, CuImage<Vec<u8>>);
+        type Output = output_msg!('cl, ImageWithId);
         type Input = input_msg!('cl, NewDevice); // will have the camera port and device path 
 
         fn new(config: Option<&ComponentConfig>) -> CuResult<Self>
@@ -100,6 +101,7 @@ mod linux_impl {
             let mut req_fourcc: Option<String> = None;
             let mut req_buffers: u32 = 4;
             let mut req_timeout: Duration = Duration::from_millis(500); // default 500ms
+            let mut camera_id = Box::new(String::default());
 
             if let Some(cfg) = config {
                 if let Some(port) = cfg.get::<String>("device_port") {
@@ -123,6 +125,9 @@ mod linux_impl {
                 if let Some(timeout) = cfg.get::<u32>("timeout_ms") {
                     req_timeout = Duration::from_millis(timeout as u64);
                 }
+                if let Some(id) = cfg.get::<String>("camera_id") {
+                    camera_id = Box::new(id);
+                }
             }
 
             Ok(Self {
@@ -137,6 +142,7 @@ mod linux_impl {
                 req_buffers,
                 req_timeout,
                 last_frame_time: None,
+                camera_id
             })
         }
 
@@ -165,7 +171,7 @@ mod linux_impl {
                             // debug!("V4L: Frame format: {}", fmt.pixel_format);
                             let cutime = cutime_from_v4ltime(self.v4l_clock_time_offset_ns, meta.timestamp);
                             let image = CuImage::new(*fmt, handle.clone());
-                            output.set_payload(image);
+                            output.set_payload((self.camera_id.clone(), image));
                             output.metadata.tov = Tov::Time(cutime);
                             self.last_frame_time = Some(Instant::now());
                         } else {
@@ -226,7 +232,7 @@ mod linux_impl {
             }
 
             // Choose fourcc
-            let mut fourcc: FourCC = if let Some(ref fourcc_str) = self.req_fourcc {
+            let fourcc: FourCC = if let Some(ref fourcc_str) = self.req_fourcc {
                 if fourcc_str.len() != 4 {
                     return Err("Invalid fourcc provided".into());
                 }
