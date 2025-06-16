@@ -9,19 +9,29 @@ pub struct DetectionLogger;
 impl Freezable for DetectionLogger {}
 
 impl<'cl> CuSinkTask<'cl> for DetectionLogger {
-    type Input = input_msg!('cl, AprilTagDetections);
+    // one detections struct per camera
+    type Input = (input_msg!('cl, AprilTagDetections),input_msg!('cl, AprilTagDetections));
 
     fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
         Ok(Self)
     }
 
     fn process(&mut self, _clock: &RobotClock, input: Self::Input) -> CuResult<()> {
-        if let Some(dets) = input.payload() {
+        let (input1, input2) = input;
+
+        if let Some(dets) = input1.payload() {
             for (id, pose, _) in dets.filtered_by_decision_margin(50.0) {
                 //TODO: poses still are garbage from that one godforsaken bug
                 info!("[{}] Detected tag {} with pose: {}",&dets.camera_id, id, pose);
             }
         }
+        if let Some(dets) = input2.payload() {
+            for (id, pose, _) in dets.filtered_by_decision_margin(50.0) {
+                //TODO: poses still are garbage from that one godforsaken bug
+                info!("[{}] Detected tag {} with pose: {}",&dets.camera_id, id, pose);
+            }
+        }
+        
         Ok(())
     }
     

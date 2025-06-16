@@ -468,7 +468,7 @@ mod tests {
         config.set("family", "tag16h5".to_string());
 
         let mut task = AprilTags::new(Some(&config))?;
-        let input = CuMsg::<CuImage<Vec<u8>>>::new(Some(cuimage));
+        let input = CuMsg::<ImageWithId>::new(Some((Box::new(String::new()), cuimage)));
         let mut output = CuMsg::<AprilTagDetections>::default();
 
         let clock = RobotClock::new();
