@@ -1,0 +1,44 @@
+[package]
+name = "cu-wt901"
+description = "This is a driver for the WT901 IMU."
+
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[package.metadata.cargo-machete]
+ignored = ["cu29-log", "cu29-log-runtime"]  # proc macro
+
+[dependencies]
+cu29 = { workspace = true }
+cu29-log = { workspace = true }
+cu29-log-derive = { workspace = true }
+cu29-log-runtime = { workspace = true } # needed
+cu29-traits = { workspace = true }
+bincode = { workspace = true }
+serde = { workspace = true }
+uom = { workspace = true }
+tempfile = { workspace = true }
+
+[dev-dependencies]
+cu29-derive = { workspace = true }
+cu29-unifiedlog = { workspace = true }  # needed
+cu29-traits = { workspace = true }
+cu29-helpers = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+embedded-hal = "1"
+linux-embedded-hal = "0.4.0"
+i2cdev = "0.6.1"
+
+[build-dependencies]
+cfg_aliases = "0.2.1"
+
+[features]
+default = []
+mock = []

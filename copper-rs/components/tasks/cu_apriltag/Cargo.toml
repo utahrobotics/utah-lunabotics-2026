@@ -1,0 +1,28 @@
+[package]
+name = "cu-apriltag"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+homepage.workspace = true
+repository.workspace = true
+description = "AprilTag detection and pose for Copper"
+
+[dependencies]
+bincode = { workspace = true }
+cu29 = { workspace = true }
+serde = { workspace = true }
+arrayvec = "0.7.6"
+cu-spatial-payloads = { path = "../../payloads/cu_spatial_payloads", version = "0.8.0" }
+cu-sensor-payloads = { path = "../../payloads/cu_sensor_payloads", version = "0.8.0" }
+jpeg-decoder = "0.3.0"
+
+[target.'cfg(unix)'.dependencies]
+apriltag = { path = "../../../../apriltag-rust/apriltag" }
+apriltag-sys = { path = "../../../../apriltag-rust/apriltag-sys"}
+
+[dev-dependencies]
+image = "0.25.6"
+anyhow = "1.0.98"

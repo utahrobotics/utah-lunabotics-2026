@@ -1,0 +1,34 @@
+[package]
+name = "cu29-log-derive"
+description = "This is part of the text logging macros Copper. It cannot be used independently from the copper project."
+documentation = "https://docs.rs/cu29-log-derive"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[lib]
+name = "cu29_log_derive"
+path = "src/lib.rs"
+proc-macro = true
+
+[dependencies]
+cu29-log = { workspace = true }
+syn = { workspace = true }
+quote = { workspace = true }
+rkv = { version = "0.19.0", features = ["lmdb"] }
+
+[features]
+default = []
+# enables a more verbose build log showing the index generation.
+macro_debug = []
+# Log level features to control compile-time log level filtering
+log-level-debug = []
+log-level-info = []
+log-level-warning = []
+log-level-error = []
+log-level-critical = []
