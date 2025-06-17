@@ -2,21 +2,28 @@
     tasks: [
         (
             id: "cam_{{id}}",
-            type: "crate::tasks::V4lAutoCam",
+            type: "crate::tasks::GstAutoCam",
             config: {
                 "camera_id": "{{id}}",
                 "device_port": "{{port}}",
-                "width": 3280,
-                "height": 2160,
-                "fps": 30,
-                "fourcc": "NV12",
-                "buffers": 4,
+                // A pipeline template where {device} will be replaced at runtime with /dev/videoN
+                "pipeline": "v4l2src device={device} ! videoconvert ! appsink name=copper",
+                "caps": "video/x-raw, format=GRAY8, width=1920, height=1080",
                 "timeout_ms": 500,
                 // Intrinsics
                 "fx": {{fx}},
                 "fy": {{fy}},
                 "cx": {{cx}},
                 "cy": {{cy}},
+            },
+        ),
+        (
+            id: "thres_cam_{{id}}",
+            type: "cu_dynthreshold::DynThreshold",
+            config: {
+                "width": 1920,
+                "height": 1080,
+                "block_radius": 100,
             },
         ),
         (
@@ -38,7 +45,8 @@
     ],
     cnx: [
         (src: "udev_monitor", dst: "cam_{{id}}", msg: "crate::tasks::NewDevice"),
-        (src: "cam_{{id}}", dst: "tags_cam_{{id}}", msg: "cu_apriltag::ImageWithId"),
+        (src: "cam_{{id}}", dst: "thres_cam_{{id}}", msg: "cu_gstreamer::CuGstBuffer"),
+        (src: "thres_cam_{{id}}", dst: "tags_cam_{{id}}", msg: "cu_sensor_payloads::CuImage<Vec<u8>>"),
         (src: "tags_cam_{{id}}", dst: "tag_sink", msg: "cu_apriltag::AprilTagDetections"),
     ],
 ) 

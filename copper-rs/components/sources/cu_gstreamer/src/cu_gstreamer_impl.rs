@@ -56,6 +56,8 @@ pub struct CuGStreamer<const N: usize> {
     pipeline: Pipeline,
     circular_buffer: Arc<Mutex<CircularBuffer<N, CuGstBuffer>>>,
     _appsink: AppSink,
+    last_frame_time: Option<std::time::Instant>,
+    frame_timeout: Option<std::time::Duration>,
 }
 
 impl<const N: usize> Freezable for CuGStreamer<N> {}
@@ -97,6 +99,9 @@ impl<'cl, const N: usize> CuSrcTask<'cl> for CuGStreamer<N> {
             .dynamic_cast::<Pipeline>()
             .map_err(|_| CuError::from("Failed to cast pipeline to gstreamer::Pipeline."))?;
 
+        // Optional timeout when no frame is received (ms)
+        let frame_timeout = config.get::<u32>("timeout_ms").map(|ms| std::time::Duration::from_millis(ms as u64));
+
         let appsink = pipeline.by_name("copper").ok_or::<CuError>("Failed to get find the \"appsink\" element in the pipeline string, be sure you have an appsink name=copper to feed this task.".into())?;
         let appsink = appsink
             .dynamic_cast::<AppSink>()
@@ -133,6 +138,8 @@ impl<'cl, const N: usize> CuSrcTask<'cl> for CuGStreamer<N> {
             pipeline,
             circular_buffer,
             _appsink: appsink,
+            last_frame_time: None,
+            frame_timeout,
         };
         Ok(s)
     }
@@ -143,6 +150,7 @@ impl<'cl, const N: usize> CuSrcTask<'cl> for CuGStreamer<N> {
         self.pipeline
             .set_state(gstreamer::State::Playing)
             .map_err(|e| CuError::new_with_cause("Failed to start the gstreamer pipeline.", e))?;
+        self.last_frame_time = None;
         debug!("Gstreamer: Starting pipeline OK.");
         Ok(())
     }
@@ -153,9 +161,20 @@ impl<'cl, const N: usize> CuSrcTask<'cl> for CuGStreamer<N> {
             // TODO: do precise timing metadata from gstreamer
             new_msg.metadata.tov = clock.now().into();
             new_msg.set_payload(buffer);
+            self.last_frame_time = Some(std::time::Instant::now());
         } else {
             debug!("Gstreamer: Empty circular buffer, sending no payload.");
             new_msg.clear_payload();
+        }
+
+        // If requested, return an error when no frame arrived for longer than the timeout.
+        if let (Some(timeout), Some(last)) = (self.frame_timeout, self.last_frame_time) {
+            if last.elapsed() > timeout {
+                return Err("No frames received in the configured timeout".into());
+            }
+        }
+        if self.last_frame_time.is_none() {
+            return Err("No frames received yet".into());
         }
         Ok(())
     }
@@ -166,6 +185,58 @@ impl<'cl, const N: usize> CuSrcTask<'cl> for CuGStreamer<N> {
             .map_err(|e| CuError::new_with_cause("Failed to stop the gstreamer pipeline.", e))?;
         self.circular_buffer.lock().unwrap().clear();
         Ok(())
+    }
+}
+
+impl<const N: usize> CuGStreamer<N> {
+    /// Create a CuGStreamer instance directly from a pipeline & caps string, without needing a ComponentConfig.
+    pub fn create_with_pipeline_and_caps(pipeline_str: &str, caps_str: &str, timeout: Option<std::time::Duration>) -> CuResult<Self> {
+        if !gstreamer::INITIALIZED.load(std::sync::atomic::Ordering::SeqCst) {
+            gstreamer::init().map_err(|e| CuError::new_with_cause("Failed to initialize gstreamer.", e))?;
+        }
+
+        let pipeline = parse::launch(pipeline_str)
+            .map_err(|e| CuError::new_with_cause("Failed to parse pipeline.", e))?;
+        let pipeline = pipeline
+            .dynamic_cast::<Pipeline>()
+            .map_err(|_| CuError::from("Failed to cast pipeline to gstreamer::Pipeline."))?;
+
+        let appsink = pipeline.by_name("copper").ok_or::<CuError>("Failed to find \"appsink\" element named copper in pipeline.".into())?;
+        let appsink = appsink
+            .dynamic_cast::<AppSink>()
+            .map_err(|_| CuError::from("Failed to cast appsink to gstreamer::AppSink."))?;
+        let caps = Caps::from_str(caps_str)
+            .map_err(|e| CuError::new_with_cause("Failed to create caps for appsink.", e))?;
+        appsink.set_caps(Some(&caps));
+
+        // Same buffering & callback logic as in new()
+        let circular_buffer = Arc::new(Mutex::new(CircularBuffer::new()));
+        appsink.set_callbacks(
+            AppSinkCallbacks::builder()
+                .new_sample({
+                    let circular_buffer = circular_buffer.clone();
+                    move |appsink| {
+                        let sample = appsink
+                            .pull_sample()
+                            .map_err(|_| gstreamer::FlowError::Eos)?;
+                        let buffer: &BufferRef = sample.buffer().ok_or(gstreamer::FlowError::Error)?;
+                        circular_buffer
+                            .lock()
+                            .unwrap()
+                            .push_back(CuGstBuffer(buffer.to_owned()));
+                        Ok(FlowSuccess::Ok)
+                    }
+                })
+                .build(),
+        );
+
+        Ok(Self {
+            pipeline,
+            circular_buffer,
+            _appsink: appsink,
+            last_frame_time: None,
+            frame_timeout: timeout,
+        })
     }
 }
 

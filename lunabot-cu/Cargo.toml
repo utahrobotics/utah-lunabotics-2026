@@ -38,6 +38,7 @@ serde = { version = "1", features = ["derive"] }
 libc = "0.2.173"
 nix = "0.30.1"
 cu29-runtime = { path = "../copper-rs/core/cu29_runtime", features = ["jemalloc"] }
+cu-dynthreshold = { path = "../copper-rs/components/tasks/cu_dynthreshold" }
 
 nalgebra = { version = "0.32", features = [
     "serde-serialize",
@@ -49,6 +50,7 @@ nalgebra = { version = "0.32", features = [
 v4l = "0.14"
 udev = "0.9"
 cu-v4l = { path = "../copper-rs/components/sources/cu_v4l" }
+cu-gstreamer = { path = "../copper-rs/components/sources/cu_gstreamer" }
 
 [build-dependencies]
 ron = "0.8"

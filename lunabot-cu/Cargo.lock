@@ -364,6 +364,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "circular-buffer"
+version = "1.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "23bdce1da528cadbac4654b5632bfcd8c6c63e25b1d42cea919a95958790b51d"
+
+[[package]]
 name = "clang-sys"
 version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -708,6 +714,25 @@ dependencies = [
  "ratatui",
  "tui-nodes",
  "tui-widgets",
+]
+
+[[package]]
+name = "cu-dynthreshold"
+version = "0.8.0"
+dependencies = [
+ "cu-sensor-payloads",
+ "cu29",
+]
+
+[[package]]
+name = "cu-gstreamer"
+version = "0.8.0"
+dependencies = [
+ "bincode 2.0.1",
+ "cfg_aliases",
+ "circular-buffer",
+ "cu29",
+ "tempfile",
 ]
 
 [[package]]
@@ -1961,6 +1986,8 @@ dependencies = [
  "crossbeam-channel",
  "cu-apriltag",
  "cu-consolemon",
+ "cu-dynthreshold",
+ "cu-gstreamer",
  "cu-sensor-payloads",
  "cu-spatial-payloads",
  "cu-v4l",
