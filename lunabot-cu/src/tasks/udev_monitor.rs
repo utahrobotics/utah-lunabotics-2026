@@ -4,8 +4,10 @@ use cu29::{clock::RobotClock, config::ComponentConfig, cutask::{CuSrcTask, Freez
 use cu29::cutask::CuMsg;
 use cu29::prelude::*;
 use serde::{Deserialize, Serialize};
+#[cfg(target_os = "linux")]
 use udev::{EventType, Udev};
 
+#[cfg(target_os = "linux")]
 pub struct UdevMonitor {
     monitor_socket: Option<udev::MonitorSocket>,
     initial_enumerated: Vec<NewDevice>,
@@ -23,8 +25,10 @@ impl Default for NewDevice {
     }
 }
 
+#[cfg(target_os = "linux")]
 impl Freezable for UdevMonitor {}
 
+#[cfg(target_os = "linux")]
 impl<'cl> CuSrcTask<'cl> for UdevMonitor {
     type Output = output_msg!('cl, NewDevice);
 
@@ -118,7 +122,7 @@ impl<'cl> CuSrcTask<'cl> for UdevMonitor {
 
         if let Some(monitor_socket) = &self.monitor_socket {
             // Create an iterator from the socket and fetch the next event if any.
-            if let Some(event) = monitor_socket.iter().next() { // blocking call, todo make non-blocking
+            if let Some(event) = monitor_socket.iter().next() {
                 info!("got udev event");
                 match event.event_type() {
                     EventType::Add => {
@@ -157,4 +161,30 @@ impl<'cl> CuSrcTask<'cl> for UdevMonitor {
         }
         Ok(())
     }
+}
+
+// Non-Linux stub -----------------------------------------------------------
+#[cfg(not(target_os = "linux"))]
+#[derive(Default)]
+pub struct UdevMonitor;
+
+#[cfg(not(target_os = "linux"))]
+impl Freezable for UdevMonitor {}
+
+#[cfg(not(target_os = "linux"))]
+impl<'cl> CuSrcTask<'cl> for UdevMonitor {
+    type Output = output_msg!('cl, NewDevice);
+
+    fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> where Self: Sized {
+        Ok(Self)
+    }
+
+    fn start(&mut self, _clock: &RobotClock) -> CuResult<()> { Ok(()) }
+
+    fn process(&mut self, _clock: &RobotClock, _output: Self::Output) -> CuResult<()> {
+        // No-op stub – never emits new devices.
+        Ok(())
+    }
+
+    fn stop(&mut self, _clock: &RobotClock) -> CuResult<()> { Ok(()) }
 }

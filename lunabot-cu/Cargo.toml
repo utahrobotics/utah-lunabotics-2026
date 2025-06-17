@@ -32,12 +32,9 @@ cu-consolemon = { path = "../copper-rs/components/monitors/cu_consolemon" }
 cu-sensor-payloads = { path = "../copper-rs/components/payloads/cu_sensor_payloads" }
 cu-spatial-payloads = { path = "../copper-rs/components/payloads/cu_spatial_payloads" }
 image = { version = "0.24", default-features = false, features = ["jpeg"] }
-v4l = "0.14"
-udev = "0.9"
 crossbeam-channel = "0.5"
 anyhow = "1"
 serde = { version = "1", features = ["derive"] }
-cu-v4l = { path = "../copper-rs/components/sources/cu_v4l" }
 libc = "0.2.173"
 nix = "0.30.1"
 cu29-runtime = { path = "../copper-rs/core/cu29_runtime", features = ["jemalloc"] }
@@ -46,6 +43,12 @@ nalgebra = { version = "0.32", features = [
     "serde-serialize",
     "convert-bytemuck",
 ] }
+
+# Linux-only dependencies
+[target.'cfg(target_os = "linux")'.dependencies]
+v4l = "0.14"
+udev = "0.9"
+cu-v4l = { path = "../copper-rs/components/sources/cu_v4l" }
 
 [build-dependencies]
 ron = "0.8"

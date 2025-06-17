@@ -3,29 +3,37 @@
 mod empty_impl {
     use cu29::prelude::*;
     use cu_sensor_payloads::CuImage;
+    use cu_apriltag::ImageWithId;
+    use crate::tasks::udev_monitor::NewDevice;
 
-    pub struct V4l {}
+    // Dummy implementation that compiles on non-Linux targets but does nothing.
+    #[derive(Default)]
+    pub struct V4lAutoCam;
 
     impl Freezable for V4lAutoCam {}
 
-    impl<'cl> CuSrcTask<'cl> for V4lAutoCam {
-        type Output = output_msg!('cl, CuImage<Vec<u8>>);
+    impl<'cl> CuTask<'cl> for V4lAutoCam {
+        // Mirror the Linux signature so the rest of the codebase compiles, but never outputs data.
+        type Output = output_msg!('cl, ImageWithId);
+        type Input = input_msg!('cl, NewDevice);
 
-        fn new(_config: Option<&ComponentConfig>) -> CuResult<Self>
-        where
-            Self: Sized,
-        {
-            Ok(Self {})
+        fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> where Self: Sized {
+            Ok(Self)
         }
 
-        fn process(&mut self, _clock: &RobotClock, _new_msg: Self::Output) -> CuResult<()> {
+        fn start(&mut self, _clock: &RobotClock) -> CuResult<()> { Ok(()) }
+
+        fn process(&mut self, _clock: &RobotClock, _input: Self::Input, _output: Self::Output) -> CuResult<()> {
+            // No-op on non-Linux platforms.
             Ok(())
         }
+
+        fn stop(&mut self, _clock: &RobotClock) -> CuResult<()> { Ok(()) }
     }
 }
 
 #[cfg(not(target_os = "linux"))]
-pub use empty_impl::V4l;
+pub use empty_impl::V4lAutoCam;
 
 #[cfg(target_os = "linux")]
 pub use linux_impl::V4lAutoCam;

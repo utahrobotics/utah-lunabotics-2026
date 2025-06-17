@@ -1,3 +1,4 @@
+#[cfg(target_os = "linux")]
 pub mod v4lstream;
 pub mod udev_monitor;
 pub mod april_detection_logger;
