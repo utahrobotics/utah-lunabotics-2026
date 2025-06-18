@@ -201,7 +201,6 @@ impl<const N: usize> CuAutoGStreamer<N> {
                             .lock()
                             .unwrap()
                             .push_back(CuGstBuffer(buffer.to_owned()));
-                        info!("GStreamer: Pushed buffer to circular buffer");
                         Ok(FlowSuccess::Ok)
                     }
                 )
