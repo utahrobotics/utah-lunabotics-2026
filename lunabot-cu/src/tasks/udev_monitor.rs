@@ -116,6 +116,7 @@ impl<'cl> CuSrcTask<'cl> for UdevMonitor {
         // first pop off the initial enumerated devices
         if !self.initial_enumerated.is_empty() {
             let device = self.initial_enumerated.pop().unwrap();
+            info!("udev_monitor: Found device {}", &device.dev_path);
             output.set_payload(device);
             return Ok(());
         }

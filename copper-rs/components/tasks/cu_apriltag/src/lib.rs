@@ -33,6 +33,8 @@ const CY: f64 = 520.0;
 #[cfg(not(windows))]
 const FAMILY: &str = "tag16h5";
 
+pub type ImageWithId = (Box<String>, CuImage<Vec<u8>>);
+
 #[derive(Default, Debug, Clone, Encode)]
 pub struct AprilTagDetections {
     pub camera_id: Box<String>,
@@ -144,6 +146,7 @@ pub struct AprilTags {
     detector: Detector,
     tag_params: TagParams,
     scratch: Vec<u8>,
+    camera_id: Box<String>,
 }
 
 #[cfg(not(unix))]
@@ -211,12 +214,12 @@ impl<'cl> CuTask<'cl> for AprilTags {
     }
 }
 
-pub type ImageWithId = (Box<String>, CuImage<Vec<u8>>);
+// pub type ImageWithId = (Box<String>, CuImage<Vec<u8>>);
 
 #[cfg(not(windows))]
 impl<'cl> CuTask<'cl> for AprilTags {
     // camera_id, image
-    type Input = input_msg!('cl, ImageWithId);
+    type Input = input_msg!('cl, CuImage<Vec<u8>>);
     type Output = output_msg!('cl, AprilTagDetections);
 
     fn new(_config: Option<&ComponentConfig>) -> CuResult<Self>
@@ -244,10 +247,16 @@ impl<'cl> CuTask<'cl> for AprilTags {
                 .add_family_bits(family, bits_corrected as usize)
                 .build()
                 .unwrap();
+            let camera_id = if let Some(id) = config.get::<String>("camera_id") {
+                Box::new(id)
+            } else {
+                Box::new(String::new())
+            };
             return Ok(Self {
                 detector,
                 tag_params,
                 scratch: Vec::new(),
+                camera_id,
             });
         }
         Ok(Self {
@@ -263,6 +272,7 @@ impl<'cl> CuTask<'cl> for AprilTags {
                 tagsize: TAG_SIZE,
             },
             scratch: Vec::new(),
+            camera_id: Box::new(String::new()),
         })
     }
 
@@ -273,8 +283,10 @@ impl<'cl> CuTask<'cl> for AprilTags {
         output: Self::Output,
     ) -> CuResult<()> {
         let mut result = AprilTagDetections::new();
-        if let Some((cam_id, payload)) = input.payload() {
-            result.camera_id = cam_id.clone();
+        if let Some(payload) = input.payload() {
+            // Set camera ID either from config or leave empty
+            result.camera_id = self.camera_id.clone();
+            let payload = payload;
             // Fast grayscale conversion / extraction based on pixel format
             let pixel_format = std::str::from_utf8(&payload.format.pixel_format)
                 .unwrap_or("")
@@ -468,7 +480,7 @@ mod tests {
         config.set("family", "tag16h5".to_string());
 
         let mut task = AprilTags::new(Some(&config))?;
-        let input = CuMsg::<ImageWithId>::new(Some((Box::new(String::new()), cuimage)));
+        let input = CuMsg::<CuImage<Vec<u8>>>::new(Some(cuimage));
         let mut output = CuMsg::<AprilTagDetections>::default();
 
         let clock = RobotClock::new();
