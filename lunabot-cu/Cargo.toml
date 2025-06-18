@@ -31,6 +31,7 @@ cu-apriltag = { path = "../copper-rs/components/tasks/cu_apriltag" }
 cu-consolemon = { path = "../copper-rs/components/monitors/cu_consolemon" }
 cu-sensor-payloads = { path = "../copper-rs/components/payloads/cu_sensor_payloads" }
 cu-spatial-payloads = { path = "../copper-rs/components/payloads/cu_spatial_payloads" }
+cu-dynthreshold = { path = "../copper-rs/components/tasks/cu_dynthreshold", features = ["gst"] }
 image = { version = "0.24", default-features = false, features = ["jpeg"] }
 crossbeam-channel = "0.5"
 anyhow = "1"
@@ -43,6 +44,10 @@ nalgebra = { version = "0.32", features = [
     "serde-serialize",
     "convert-bytemuck",
 ] }
+gstreamer = "0.23.6"
+circular-buffer = "1.1.0"
+gstreamer-app = "0.23.5"
+cu-gstreamer = { path = "../copper-rs/components/sources/cu_gstreamer", features = ["gst"] }
 
 # Linux-only dependencies
 [target.'cfg(target_os = "linux")'.dependencies]
