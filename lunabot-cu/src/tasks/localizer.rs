@@ -41,36 +41,36 @@ impl<'cl> CuSinkTask<'cl> for CuLocalizer {
         let mut isometry = self.root_node.get_global_isometry();
         
         // Check for NaN/infinite values and return error if found
-        if isometry.translation.x.is_nan()
-            || isometry.translation.y.is_nan()
-            || isometry.translation.z.is_nan()
-        {
+            if isometry.translation.x.is_nan()
+                || isometry.translation.y.is_nan()
+                || isometry.translation.z.is_nan()
+            {
             return Err(CuError::new_with_cause(
                 "Robot origin is NaN",
                 std::io::Error::new(std::io::ErrorKind::InvalidData, "Robot origin contains NaN values")
             ));
-        } else if isometry.translation.x.is_infinite()
-            || isometry.translation.y.is_infinite()
-            || isometry.translation.z.is_infinite()
-        {
+            } else if isometry.translation.x.is_infinite()
+                || isometry.translation.y.is_infinite()
+                || isometry.translation.z.is_infinite()
+            {
             return Err(CuError::new_with_cause(
                 "Robot origin is infinite",
                 std::io::Error::new(std::io::ErrorKind::InvalidData, "Robot origin contains infinite values")
             ));
-        } else if isometry.rotation.w.is_nan()
-            || isometry.rotation.i.is_nan()
-            || isometry.rotation.j.is_nan()
-            || isometry.rotation.k.is_nan()
-        {
+            } else if isometry.rotation.w.is_nan()
+                || isometry.rotation.i.is_nan()
+                || isometry.rotation.j.is_nan()
+                || isometry.rotation.k.is_nan()
+            {
             return Err(CuError::new_with_cause(
                 "Robot rotation is NaN",
                 std::io::Error::new(std::io::ErrorKind::InvalidData, "Robot rotation contains NaN values")
             ));
-        } else if isometry.rotation.w.is_infinite()
-            || isometry.rotation.i.is_infinite()
-            || isometry.rotation.j.is_infinite()
-            || isometry.rotation.k.is_infinite()
-        {
+            } else if isometry.rotation.w.is_infinite()
+                || isometry.rotation.i.is_infinite()
+                || isometry.rotation.j.is_infinite()
+                || isometry.rotation.k.is_infinite()
+            {
             return Err(CuError::new_with_cause(
                 "Robot rotation is infinite",
                 std::io::Error::new(std::io::ErrorKind::InvalidData, "Robot rotation contains infinite values")
