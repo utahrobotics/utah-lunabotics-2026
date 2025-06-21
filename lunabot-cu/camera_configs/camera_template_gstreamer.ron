@@ -4,7 +4,7 @@
             id: "cam_{{id}}",
             type: "crate::tasks::CuDefaultAutoGStreamer",
             config: {
-                "camera_id": "{{id}}",
+                "camera_id": "cam_{{id}}",
                 "device_port": "{{port}}",
                 "pipeline": "v4l2src device=<devpath> ! video/x-raw,width={{width}},height={{height}} ! videoconvert ! tee name=t ! queue ! videoconvert ! video/x-raw,format=GRAY8 ! appsink name=copper t. ! queue ! videoconvert ! video/x-raw,format=NV12 ! vaapih264enc bitrate=2000 ! rtph264pay ! udpsink host={{udp_host}} port={{udp_port}} sync=false",
                 "caps": "video/x-raw, format=GRAY8, width={{width}}, height={{height}}",
@@ -12,7 +12,7 @@
             },
         ),
         (
-            id: "thres{{id}}",
+            id: "thres_{{id}}",
             type: "cu_dynthreshold::DynThreshold",
             config: {
                 "width": {{width}},
@@ -30,7 +30,7 @@
                 "fy": {{fy}},
                 "cx": {{cx}},
                 "cy": {{cy}},
-                "camera_id": "{{id}}",
+                "camera_id": "cam_{{id}}",
             },
         ),
         (
@@ -39,14 +39,17 @@
         ),
         (
             id: "localizer",
-            type: "crate::tasks::CuLocalizer"
+            type: "crate::tasks::CuLocalizer",
+            config: {
+                "layout_path": "../robot-layout/lunabot.ron"
+            }
         )
     ],
     cnx: [
         (src: "udev_monitor", dst: "cam_{{id}}", msg: "crate::tasks::NewDevice"),
-        (src: "cam_{{id}}", dst: "thres{{id}}", msg: "crate::tasks::CuGstBuffer"),
-        (src: "thres{{id}}", dst: "detector_cam_{{id}}", msg: "cu_sensor_payloads::CuImage<Vec<u8>>"),
+        (src: "cam_{{id}}", dst: "thres_{{id}}", msg: "crate::tasks::CuGstBuffer"),
+        (src: "thres_{{id}}", dst: "detector_cam_{{id}}", msg: "cu_sensor_payloads::CuImage<Vec<u8>>"),
         (src: "detector_cam_{{id}}", dst: "detection_handler", msg: "cu_apriltag::AprilTagDetections"),
-        (src: "detection_handler", dst: "localizer", msg: "cu_spatial_payloads::Transform3D<f64>")
+        (src: "detection_handler", dst: "localizer", msg: "Box<std::collections::HashMap<String, cu_spatial_payloads::Transform3D<f64>>>")
     ],
 )

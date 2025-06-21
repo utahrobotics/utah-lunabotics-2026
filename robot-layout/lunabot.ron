@@ -8,12 +8,12 @@
             euler: [0.0, 0.0, 90.0]
         },
         {
-            name: Some("low_right_camera"),
+            name: Some("cam_side"), //used to be low_right_camera
             origin: [0.231, 0.0, -0.055],
             euler: [0.0, 0.0, -90.0]
         },
         {
-            name: Some("back_camera"),
+            name: Some("cam_back"),
             origin: [0.0, 0.0, 0.475],
             euler: [0.0, 0.0, 180.0]
         },

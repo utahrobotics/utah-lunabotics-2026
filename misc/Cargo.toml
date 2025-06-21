@@ -6,7 +6,7 @@ members = ["rerun-types-wrapper", "simple-motion", "cakap2"]
 
 
 [workspace.dependencies]
-nalgebra = { version = "0.32", features = [
+nalgebra = { version = "0.33", features = [
     "serde-serialize",
     "convert-bytemuck",
 ] }

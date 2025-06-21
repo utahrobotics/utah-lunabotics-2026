@@ -82,6 +82,19 @@ impl<T: Copy + Debug + Default> Default for Transform3D<T> {
     }
 }
 
+// Extension trait to add cast method to Transform3D
+pub trait Transform3DCast {
+    fn cast(&self) -> Transform3D<f64>;
+}
+
+impl Transform3DCast for Transform3D<f32> {
+    fn cast(&self) -> Transform3D<f64> {
+        Transform3D {
+            mat: self.mat.map(|row| row.map(|val| val as f64))
+        }
+    }
+}
+
 #[cfg(feature = "faer")]
 mod faer_integration {
     use super::Transform3D;
