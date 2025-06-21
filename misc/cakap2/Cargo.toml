@@ -1,0 +1,10 @@
+[package]
+name = "cakap2"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+fxhash.workspace = true
+indexmap.workspace = true
+thiserror = "2.0.11"
+# num-prime = "0.4.4"

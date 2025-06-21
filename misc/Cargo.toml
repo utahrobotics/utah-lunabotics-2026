@@ -1,0 +1,17 @@
+[workspace]
+resolver = "3"
+members = ["rerun-types-wrapper", "simple-motion", "cakap2"]
+
+
+
+
+[workspace.dependencies]
+nalgebra = { version = "0.32", features = [
+    "serde-serialize",
+    "convert-bytemuck",
+] }
+serde = { version = "1", features = ["derive"] }
+crossbeam = "0.8"
+ron = "0.8"
+fxhash = "0.2.1"
+indexmap = "2.9.0"

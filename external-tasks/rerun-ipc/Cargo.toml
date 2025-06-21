@@ -1,0 +1,11 @@
+[package]
+name = "rerun-ipc"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+rerun = { version = "0.23.2", features = ["nasm", "sdk"], default-features = false }
+cu29-runtime.workspace = true
+cu29.workspace = true
+serde.workspace = true
+bincode = { workspace = true, features = ["serde"] }

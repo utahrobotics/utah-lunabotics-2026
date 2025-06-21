@@ -1,8 +1,12 @@
-#![feature(let_chains)]
+#![feature(let_chains, try_blocks, f16)]
 pub mod tasks;
+pub mod rerun_viz;
+pub mod utils;
+pub mod common;
 
 use cu29::prelude::*;
 use cu29_helpers::basic_copper_setup;
+use simple_motion::{ChainBuilder, NodeSerde};
 use std::thread::sleep;
 use std::time::Duration;
 use std::path::{Path,PathBuf};
@@ -22,8 +26,12 @@ fn main() {
     }
     let copper_ctx =
         basic_copper_setup(&PathBuf::from(&logger_path), PREALLOCATED_STORAGE_SIZE, true, None).expect("Failed to setup logger.");
+
     info!("Logger created at {}.", logger_path);
     info!("Creating application... ");
+    info!("Initializing rerun viz... ");
+    rerun_viz::init_rerun(rerun_viz::RerunViz::Viz(rerun_viz::Level::All)).expect("Failed to initialize rerun viz.");
+
     let mut application = LunabotApplicationBuilder::new()
             .with_context(&copper_ctx)
             .build()
