@@ -1,0 +1,18 @@
+[package]
+name = "cu_cursive_consolemon"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+keywords.workspace = true
+categories.workspace = true
+homepage.workspace = true
+repository.workspace = true
+
+[dependencies]
+cursive = "0.21.1"
+cu29 = { workspace = true }
+compact_str = "0.6"
+color-eyre = "0.6"
+ansi-to-tui = "6.0"
+num_cpus = "1.16"

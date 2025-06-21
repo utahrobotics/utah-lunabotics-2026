@@ -28,7 +28,8 @@ cu29-helpers = { path = "../copper-rs/core/cu29_helpers" }
 cu29-export = { path = "../copper-rs/core/cu29_export" , optional = true }
 # Add Copper official component crates for milestone 1
 cu-apriltag = { path = "../copper-rs/components/tasks/cu_apriltag" }
-cu-consolemon = { path = "../copper-rs/components/monitors/cu_consolemon" }
+# cu-consolemon = { path = "../copper-rs/components/monitors/cu_consolemon" }
+cu_cursive_consolemon = {path = "../copper-rs/components/monitors/cu_cursive_consolemon"}
 cu-sensor-payloads = { path = "../copper-rs/components/payloads/cu_sensor_payloads" }
 cu-spatial-payloads = { path = "../copper-rs/components/payloads/cu_spatial_payloads" }
 cu-dynthreshold = { path = "../copper-rs/components/tasks/cu_dynthreshold", features = ["gst"] }
