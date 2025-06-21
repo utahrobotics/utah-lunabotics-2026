@@ -6,3 +6,6 @@ debug:
 
 discover-cameras:
 	cd camera-discovery && cargo run
+
+check:
+	cd lunabot-cu && cargo check

@@ -6,15 +6,19 @@
             config: {
                 "camera_id": "{{id}}",
                 "device_port": "{{port}}",
-                "pipeline": "v4l2src device=<devpath> ! image/jpeg,width=640,height=480 ! jpegdec ! videoconvert ! video/x-raw,format=GRAY8 ! appsink name=copper",
-                "caps": "video/x-raw, format=GRAY8, width=640, height=480",
-                "timeout_ms": 500, // assume device has been disconnected after 500 ms and exit pipeline/ wait for new device 
+                "pipeline": "v4l2src device=<devpath> ! video/x-raw,width={{width}},height={{height}} ! videoconvert ! tee name=t ! queue ! videoconvert ! video/x-raw,format=GRAY8 ! appsink name=copper t. ! queue ! videoconvert ! video/x-raw,format=NV12 ! vaapih264enc bitrate=2000 ! rtph264pay ! udpsink host={{udp_host}} port={{udp_port}} sync=false",
+                "caps": "video/x-raw, format=GRAY8, width={{width}}, height={{height}}",
+                "timeout_ms": 600,
             },
         ),
         (
             id: "thres{{id}}",
             type: "cu_dynthreshold::DynThreshold",
-            config: {"width": 640, "height": 480, "block_radius": 100}
+            config: {
+                "width": {{width}},
+                "height": {{height}},
+                "block_radius": 100
+            }
         ),
         (
             id: "detector_cam_{{id}}",
@@ -40,4 +44,4 @@
         (src: "thres{{id}}", dst: "detector_cam_{{id}}", msg: "cu_sensor_payloads::CuImage<Vec<u8>>"),
         (src: "detector_cam_{{id}}", dst: "tag_sink", msg: "cu_apriltag::AprilTagDetections"),
     ],
-) 
+)

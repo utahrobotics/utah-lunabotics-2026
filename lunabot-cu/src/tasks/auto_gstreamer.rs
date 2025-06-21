@@ -1,15 +1,9 @@
 use cu29::prelude::*;
 use gstreamer::prelude::*;
 
-use bincode::de::Decoder;
-use bincode::enc::Encoder;
-use bincode::error::{DecodeError, EncodeError};
-use bincode::{Decode, Encode};
 use circular_buffer::CircularBuffer;
-use gstreamer::{parse, Buffer, BufferRef, Caps, FlowSuccess, Pipeline};
+use gstreamer::{parse, BufferRef, Caps, FlowSuccess, Pipeline};
 use gstreamer_app::{AppSink, AppSinkCallbacks};
-use std::fmt::Debug;
-use std::ops::{Deref, DerefMut};
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -95,14 +89,11 @@ impl<'cl, const N: usize> CuTask<'cl> for CuAutoGStreamer<N> {
         })
     }
 
-    // Nothing to do here – the pipeline is created lazily once the device is present.
     fn start(&mut self, _clock: &RobotClock) -> CuResult<()> {
         Ok(())
     }
 
-    // -------------------------------------------------------------------------------------
-    // Pre-process: build pipeline if a matching device was discovered in the previous cycle
-    // -------------------------------------------------------------------------------------
+
     fn preprocess(&mut self, _clock: &RobotClock) -> CuResult<()> {
         if self.pipeline.is_none() {
             if let Some(dev_path) = self.pending_dev_path.take() {
@@ -112,12 +103,8 @@ impl<'cl, const N: usize> CuTask<'cl> for CuAutoGStreamer<N> {
         Ok(())
     }
 
-    // -------------------------------------------------------------------------------------
-    // Main processing: forward newest buffer and handle timeout logic
-    // -------------------------------------------------------------------------------------
     fn process(&mut self, clock: &RobotClock, input: Self::Input, output: Self::Output) -> CuResult<()> {
-        // 1) If we have no pipeline and receive a udev event, remember the dev-path so that
-        //    `preprocess` can build the pipeline on the next iteration.
+
         if self.pipeline.is_none() {
             if let Some(dev) = input.payload() {
                 if *dev.port == self.desired_port {
@@ -125,11 +112,9 @@ impl<'cl, const N: usize> CuTask<'cl> for CuAutoGStreamer<N> {
                     self.pending_dev_path = Some(dev.dev_path.to_string());
                 }
             }
-            // No pipeline yet – indicate to the runtime that we are waiting.
             return Err("No frames received yet".into());
         }
 
-        // Scope to limit the lifetime of the mutex guard so we can later mutably borrow `self`.
         {
             let mut cb = self.circular_buffer.lock().unwrap();
             if let Some(buffer) = cb.pop_front() {
@@ -140,7 +125,6 @@ impl<'cl, const N: usize> CuTask<'cl> for CuAutoGStreamer<N> {
             }
         }
 
-        // 3) No buffer – check for timeout (lock released).
         if let Some(last) = self.last_frame_time {
             if last.elapsed() > self.req_timeout {
                 info!(
@@ -166,7 +150,6 @@ impl<const N: usize> CuAutoGStreamer<N> {
     fn open_pipeline(&mut self, dev_path: &str) -> CuResult<()> {
         info!("GStreamer: Opening pipeline for device {}", dev_path);
 
-        // Replace placeholder and parse.
         let pipeline_str = self.pipeline_template.replace("<devpath>", dev_path);
         let pipeline = parse::launch(&pipeline_str)
             .map_err(|e| CuError::new_with_cause("Failed to parse pipeline", e))?;
@@ -174,7 +157,6 @@ impl<const N: usize> CuAutoGStreamer<N> {
             .dynamic_cast::<Pipeline>()
             .map_err(|_| CuError::from("Parsed element is not a Pipeline"))?;
 
-        // Retrieve & configure appsink.
         let appsink = pipeline
             .by_name("copper")
             .ok_or("Appsink element named 'copper' not found in pipeline")?
@@ -184,7 +166,6 @@ impl<const N: usize> CuAutoGStreamer<N> {
             .map_err(|e| CuError::new_with_cause("Failed to parse caps", e))?;
         appsink.set_caps(Some(&caps));
 
-        // (Re-)initialise circular buffer.
         self.circular_buffer.lock().unwrap().clear();
         let circular_buffer = self.circular_buffer.clone();
 
@@ -228,5 +209,3 @@ impl<const N: usize> CuAutoGStreamer<N> {
         self.last_frame_time = None;
     }
 }
-
-// No test here, see the integration tests.
