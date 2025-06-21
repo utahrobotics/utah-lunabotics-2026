@@ -22,33 +22,50 @@ default = []
 logreader = ["dep:cu29-export"]
 
 [dependencies]
+
+# copper
 cu29 = {  path = "../copper-rs/core/cu29", features = ["log-level-info", "log-level-error"] }
 bincode = { version = "2.0.1", features = ["derive", "serde"] }
 cu29-helpers = { path = "../copper-rs/core/cu29_helpers" }
 cu29-export = { path = "../copper-rs/core/cu29_export" , optional = true }
-# Add Copper official component crates for milestone 1
 cu-apriltag = { path = "../copper-rs/components/tasks/cu_apriltag" }
 # cu-consolemon = { path = "../copper-rs/components/monitors/cu_consolemon" }
 cu_cursive_consolemon = {path = "../copper-rs/components/monitors/cu_cursive_consolemon"}
 cu-sensor-payloads = { path = "../copper-rs/components/payloads/cu_sensor_payloads" }
-cu-spatial-payloads = { path = "../copper-rs/components/payloads/cu_spatial_payloads" }
+cu-spatial-payloads = { path = "../copper-rs/components/payloads/cu_spatial_payloads", features = ["nalgebra"]}
 cu-dynthreshold = { path = "../copper-rs/components/tasks/cu_dynthreshold", features = ["gst"] }
+cu29-runtime = { path = "../copper-rs/core/cu29_runtime", features = ["jemalloc"] }
+cu-gstreamer = { path = "../copper-rs/components/sources/cu_gstreamer", features = ["gst"] }
+
+
+
 image = { version = "0.24", default-features = false, features = ["jpeg"] }
 crossbeam-channel = "0.5"
 anyhow = "1"
 serde = { version = "1", features = ["derive"] }
 libc = "0.2.173"
 nix = "0.30.1"
-cu29-runtime = { path = "../copper-rs/core/cu29_runtime", features = ["jemalloc"] }
-
+bytemuck = "1.14"
 nalgebra = { version = "0.32", features = [
     "serde-serialize",
     "convert-bytemuck",
 ] }
+
+crossbeam = "0.8"
 gstreamer = "0.23.6"
 circular-buffer = "1.1.0"
 gstreamer-app = "0.23.5"
-cu-gstreamer = { path = "../copper-rs/components/sources/cu_gstreamer", features = ["gst"] }
+
+rerun = { version = "0.23.2", features = ["nasm", "sdk"], default-features = false }
+chrono = "0.4.41"
+
+# RON deserialization at runtime
+ron = "0.8"
+spin_sleep = "1.3.2"
+
+# misc
+simple-motion = { path = "../misc/simple-motion" }
+cakap2 = { path = "../misc/cakap2" }
 
 # Linux-only dependencies
 [target.'cfg(target_os = "linux")'.dependencies]
@@ -59,4 +76,3 @@ cu-v4l = { path = "../copper-rs/components/sources/cu_v4l" }
 [build-dependencies]
 ron = "0.8"
 serde = { version = "1", features = ["derive"] }
-

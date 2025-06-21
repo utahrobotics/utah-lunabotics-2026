@@ -1,0 +1,34 @@
+{
+    "free_origin": [0.0, 0.0, 0.0],
+    "free_euler": [0.0, 0.0, 0.0],
+    "children": [
+        {
+            "name": "depth_camera",
+            "origin": [0.0, 0.3, -0.2163],
+            "euler": [0.0, 0.0, 0.0]
+        },
+        {
+            "name": "back_camera",
+            "origin": [0, 0.33385, 0.025],
+            "euler": [0.0, 0.0, 180.0]
+        },
+        {
+            "name": "left_camera",
+            "origin": [-0.2413, 0.33385, 0.025],
+            "euler": [0.0, 0.0, 90.0]
+        },
+        {
+            "name": "right_camera",
+            "origin": [0.2413, 0.33385, 0.025],
+            "euler": [0.0, 0.0, -90.0]
+        },
+        {
+            "name": "imu_21",
+            "euler": [0.0, -90.0, 180.0]
+        },
+        {
+            "name": "imu_42",
+            "euler": [0.0, 90.0, 0.0]
+        }
+    ]
+}
