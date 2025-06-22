@@ -1,4 +1,4 @@
-#![feature(let_chains, try_blocks, f16)]
+#![feature(let_chains, try_blocks, f16, result_flattening)]
 pub mod tasks;
 pub mod rerun_viz;
 pub mod utils;

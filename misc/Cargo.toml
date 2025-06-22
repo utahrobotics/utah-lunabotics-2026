@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["rerun-types-wrapper", "simple-motion", "cakap2"]
+members = ["rerun-types-wrapper", "simple-motion", "cakap2", "tasker"]
 
 
 
@@ -15,3 +15,6 @@ crossbeam = "0.8"
 ron = "0.8"
 fxhash = "0.2.1"
 indexmap = "2.9.0"
+tokio = { version = "1", features = ["full"] }
+parking_lot = "0.12.2"
+cu29 = {path = "../copper-rs/core/cu29"}
