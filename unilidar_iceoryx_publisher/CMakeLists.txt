@@ -9,15 +9,23 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(iceoryx_hoofs REQUIRED)
 #find_package(unitree_lidar_sdk REQUIRED)
 
-# For iceoryx2, we might need to find it manually since it might not have cmake config
-# Let's check what's actually available first
-set(ICEORYX2_FFI_ROOT "$ENV{HOME}/iceoryx2/target/ffi/install")
+# iceoryx2 C++ FFI paths (built by `cargo build -p iceoryx2-ffi --features cxx-ffi`)
+set(ICEORYX2_SRC_ROOT "$ENV{HOME}/iceoryx2")
+
+# Header and library directories
+set(ICEORYX2_INCLUDE_DIR "${ICEORYX2_SRC_ROOT}/iceoryx2-ffi/cxx/include")
+set(ICEORYX2_LIB_DIR     "${ICEORYX2_SRC_ROOT}/target/ffi/build/iceoryx2-ffi/cxx")
 
 # Include iceoryx2 headers manually
-include_directories(${ICEORYX2_FFI_ROOT}/include)
+set(ICEORYX2_C_INCLUDE_DIR "${ICEORYX2_SRC_ROOT}/target/ffi/build/rust/native/release/iceoryx2-ffi-cbindgen/include")
 
-# Library directories  
-link_directories(${ICEORYX2_FFI_ROOT}/lib)
+include_directories(
+    ${ICEORYX2_INCLUDE_DIR}
+    ${ICEORYX2_C_INCLUDE_DIR}
+)
+
+# Library directories
+link_directories(${ICEORYX2_LIB_DIR})
 
 # Unilidar SDK paths
 set(UNILIDAR_SDK_ROOT "${CMAKE_SOURCE_DIR}/../unilidar_sdk2/unitree_lidar_sdk")
