@@ -227,8 +227,11 @@ UnilidarIceoryxPublisher_IS_TOP_LEVEL:STATIC=ON
 //Value Computed by CMake
 UnilidarIceoryxPublisher_SOURCE_DIR:STATIC=/home/matthew_a/lunabotics-cu/unilidar_iceoryx_publisher
 
+//The directory containing a CMake configuration file for iceoryx2-cxx.
+iceoryx2-cxx_DIR:PATH=/home/matthew_a/iceoryx2/iceoryx2-ffi/cxx/cmake
+
 //The directory containing a CMake configuration file for iceoryx_hoofs.
-iceoryx_hoofs_DIR:PATH=/home/matthew_a/iceoryx2/target/iceoryx/install/lib/cmake/iceoryx_hoofs
+iceoryx_hoofs_DIR:PATH=iceoryx_hoofs_DIR-NOTFOUND
 
 //The directory containing a CMake configuration file for iceoryx_platform.
 iceoryx_platform_DIR:PATH=/home/matthew_a/iceoryx2/target/iceoryx/install/lib/cmake/iceoryx_platform
@@ -385,4 +388,5 @@ CMAKE_UNAME:INTERNAL=/usr/bin/uname
 CMAKE_VERBOSE_MAKEFILE-ADVANCED:INTERNAL=1
 //linker supports push/pop state
 _CMAKE_LINKER_PUSHPOP_STATE_SUPPORTED:INTERNAL=TRUE
+iceoryx2-cxx_FOUND_PRINTED:INTERNAL=true
 

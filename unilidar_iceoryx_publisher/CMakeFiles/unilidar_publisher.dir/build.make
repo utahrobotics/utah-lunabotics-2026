@@ -92,9 +92,11 @@ unilidar_publisher_EXTERNAL_OBJECTS =
 
 unilidar_publisher: CMakeFiles/unilidar_publisher.dir/src/main.cpp.o
 unilidar_publisher: CMakeFiles/unilidar_publisher.dir/build.make
-unilidar_publisher: /home/matthew_a/iceoryx2/target/iceoryx/install/lib/libiceoryx_hoofs.so.2.95.5
+unilidar_publisher: /home/matthew_a/iceoryx2/target/ffi/build/iceoryx2-ffi/cxx/libiceoryx2_cxx.a
+unilidar_publisher: /home/matthew_a/iceoryx2/target/ffi/build/rust/native/release/libiceoryx2_ffi.a
+unilidar_publisher: /home/matthew_a/iceoryx2/target/iceoryx/build/hoofs/libiceoryx_hoofs.so
+unilidar_publisher: /home/matthew_a/iceoryx2/target/iceoryx/build/platform/libiceoryx_platform.so
 unilidar_publisher: ../unilidar_sdk2/unitree_lidar_sdk/lib/x86_64/libunilidar_sdk2.a
-unilidar_publisher: /home/matthew_a/iceoryx2/target/iceoryx/install/lib/libiceoryx_platform.so.2.95.5
 unilidar_publisher: CMakeFiles/unilidar_publisher.dir/link.txt
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/home/matthew_a/lunabotics-cu/unilidar_iceoryx_publisher/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking CXX executable unilidar_publisher"
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/unilidar_publisher.dir/link.txt --verbose=$(VERBOSE)

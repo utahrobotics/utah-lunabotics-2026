@@ -1,8 +1,12 @@
 (
     tasks:[
         (id:"udev_monitor", type:"crate::tasks::UdevMonitor", config:{}),
+        (id:"l2_pointcloud", type:"crate::tasks::sources::PointCloudIceoryxReceiver", config:{}),
+        (id:"l2_pointcloud_sink", type:"crate::tasks::L2PointCloudSink", config:{}),
     ],
-    cnx:[],
+    cnx:[
+        (src:"l2_pointcloud", dst:"l2_pointcloud_sink", msg:"crate::tasks::PointCloudPayload"),
+    ],
     includes:[
         (
             path:"camera_configs/camera_template_gstreamer.ron",
@@ -36,7 +40,7 @@
             },
         ),
     ],
-    monitor:(type:"cu_cursive_consolemon::CuCursiveConsoleMon"),
+    // monitor:(type:"cu_cursive_consolemon::CuCursiveConsoleMon"),
     logging:(
         enable_task_logging:true,
         section_size_mib:8,
