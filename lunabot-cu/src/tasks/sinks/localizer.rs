@@ -1,9 +1,10 @@
 use cu29::{clock::RobotClock, config::ComponentConfig, cutask::{CuMsg, CuSinkTask, Freezable}, input_msg, prelude::*, CuResult};
 use cu_spatial_payloads::Transform3D;
-use nalgebra::{Isometry3, UnitQuaternion, Vector3};
+use nalgebra::{Isometry3, UnitQuaternion, Vector3, UnitVector3};
 use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
-use crate::{common::ImuMsg, rerun_viz, utils::{lerp, swing_twist_decomposition}, ROOT_NODE};
+use crate::{common::ImuMsg, rerun_viz, utils::{lerp, lerp_value, swing_twist_decomposition}, ROOT_NODE};
 use std::collections::HashMap;
+use std::time::{Duration, Instant};
 
 // Constants from the old localizer
 const ACCELEROMETER_LERP_SPEED: f64 = 150.0;
@@ -11,6 +12,7 @@ const LOCALIZATION_DELTA: f64 = 1.0 / 60.0;
 
 pub struct CuLocalizer {
     pub root_node: StaticNode,
+    last_rerun_log: Instant,
 }
 
 impl Freezable for CuLocalizer {}
@@ -24,7 +26,8 @@ impl<'cl> CuSinkTask<'cl> for CuLocalizer {
     {
         if let Some(root_node) = ROOT_NODE.get() {
             return Ok(Self {
-                root_node: root_node.clone()
+                root_node: root_node.clone(),
+                last_rerun_log: Instant::now(),
             })
         } else {
             return Err(
@@ -80,6 +83,53 @@ impl<'cl> CuSinkTask<'cl> for CuLocalizer {
                 std::io::Error::new(std::io::ErrorKind::InvalidData, "Robot rotation contains infinite values")
             ));
         }
+
+        // IMU-based orientation adjustment (down-axis alignment and gyro integration)
+
+        let mut down_axis = -Vector3::y_axis();
+        let mut angular_velocity_opt: Option<Vector3<f64>> = None;
+
+        // Acquire IMU data if available
+        if let Some(imu_msg) = input.0.payload() {
+
+            let acceleration = Vector3::new(
+                imu_msg.linear_acceleration[0] as f64,
+                imu_msg.linear_acceleration[1] as f64,
+                imu_msg.linear_acceleration[2] as f64,
+            );
+
+            let tmp_angular_velocity = Vector3::new(
+                imu_msg.angular_velocity[0] as f64,
+                imu_msg.angular_velocity[1] as f64,
+                imu_msg.angular_velocity[2] as f64,
+            );
+
+            if tmp_angular_velocity.x.is_finite()
+                && tmp_angular_velocity.y.is_finite()
+                && tmp_angular_velocity.z.is_finite()
+            {
+                angular_velocity_opt = Some(tmp_angular_velocity);
+            }
+
+            // Align down axis using accelerometer data
+            if acceleration.x.is_finite()
+                && acceleration.y.is_finite()
+                && acceleration.z.is_finite()
+            {
+                let acceleration_world = UnitVector3::new_normalize(isometry.transform_vector(&acceleration));
+
+                let angle = down_axis.angle(&acceleration_world)
+                    * lerp_value(LOCALIZATION_DELTA, ACCELEROMETER_LERP_SPEED);
+
+                if angle > 0.001 {
+                    let cross = UnitVector3::new_normalize(down_axis.cross(&acceleration_world));
+                    isometry.append_rotation_wrt_center_mut(&UnitQuaternion::from_axis_angle(&cross, -angle));
+                }
+            }
+        }
+
+        // Update down_axis after possible adjustment
+        down_axis = isometry.rotation * down_axis;
 
         // Process camera-specific apriltag input if available
         if let Some(camera_transforms) = input.1.payload() {
@@ -164,25 +214,35 @@ impl<'cl> CuSinkTask<'cl> for CuLocalizer {
                 // Update the robot isometry
                 self.root_node.set_isometry(isometry);
                 
-                // Log to rerun (same pattern as the old localizer)
-                if let Some(recorder) = rerun_viz::RECORDER.get() {
-                    if let Err(e) = recorder.recorder.log(
-                        rerun_viz::ROBOT_STRUCTURE,
-                        &rerun::Transform3D::from_translation_rotation(
-                            isometry.translation.vector.cast::<f32>().data.0[0],
-                            rerun::Quaternion::from_xyzw(
-                                isometry.rotation.as_vector().cast::<f32>().data.0[0],
-                            ),
+            }
+        } else if let Some(angular_velocity) = angular_velocity_opt {
+            isometry.append_rotation_wrt_center_mut(&UnitQuaternion::from_axis_angle(
+                &down_axis,
+                -angular_velocity.y * LOCALIZATION_DELTA,
+            ));
+        }
+        // Log to rerun (same pattern as the old localizer)
+        if self.last_rerun_log.elapsed() >= Duration::from_secs_f64(1.0 / 60.0) {
+            self.last_rerun_log = Instant::now();
+            if let Some(recorder) = rerun_viz::RECORDER.get() {
+                if let Err(e) = recorder.recorder.log(
+                    rerun_viz::ROBOT_STRUCTURE,
+                    &rerun::Transform3D::from_translation_rotation(
+                        isometry.translation.vector.cast::<f32>().data.0[0],
+                        rerun::Quaternion::from_xyzw(
+                            isometry.rotation.as_vector().cast::<f32>().data.0[0],
                         ),
-                    ) {
-                        return Err(CuError::new_with_cause(
-                            &format!("Failed to log robot transform: {e}"),
-                            std::io::Error::new(std::io::ErrorKind::Other, "Rerun logging failed")
-                        ));
-                    }
+                    ),
+                ) {
+                    return Err(CuError::new_with_cause(
+                        &format!("Failed to log robot transform: {e}"),
+                        std::io::Error::new(std::io::ErrorKind::Other, "Rerun logging failed"),
+                    ));
                 }
             }
         }
+        // Update the robot isometry
+        self.root_node.set_isometry(isometry);
 
         Ok(())
     }
