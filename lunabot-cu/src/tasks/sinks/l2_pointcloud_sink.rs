@@ -1,11 +1,14 @@
 use cu29::{clock::RobotClock, config::ComponentConfig, cutask::{CuSinkTask, Freezable}, prelude::*, CuResult};
-use rerun::{Points3D, Transform3D};
+use rerun::{components::RotationQuat, Points3D, Transform3D};
 
 use cu_sensor_payloads::Distance;
-use crate::tasks::PointCloudPayload;
+use simple_motion::StaticNode;
+use crate::{tasks::PointCloudPayload, ROOT_NODE};
 use crate::rerun_viz;
 
-pub struct L2PointCloudSink {}
+pub struct L2PointCloudSink {
+    lidar_node: StaticNode,
+}
 
 impl Freezable for L2PointCloudSink {}
 
@@ -13,13 +16,16 @@ impl<'cl> CuSinkTask<'cl> for L2PointCloudSink {
     type Input = input_msg!('cl, PointCloudPayload);
 
     fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
-        Ok(Self {})
+
+        Ok(Self {
+            lidar_node: ROOT_NODE.get().unwrap().clone().get_node_with_name("l2_front").unwrap()
+        })
     }
 
     fn process(&mut self, _clock: &RobotClock, new_msg: Self::Input) -> CuResult<()> {
         if let Some(payload) = new_msg.payload() {
             info!("Received {} points", payload.len());
-            
+            let iso = self.lidar_node.get_global_isometry();
             // Only log to rerun if we have points and rerun is available
             if !payload.is_empty() {
                 if let Some(recorder_data) = rerun_viz::RECORDER.get() {
@@ -40,6 +46,18 @@ impl<'cl> CuSinkTask<'cl> for L2PointCloudSink {
                         positions.push([x, y, z]);
 
                         colors.push([0,255,0]);
+                    }
+
+                    if let Err(e) = recorder_data.recorder.log(
+                        "lidar/pointcloud",
+                        &rerun::Transform3D::from_translation_rotation(
+                            iso.translation.vector.cast::<f32>().data.0[0],
+                            rerun::Quaternion::from_xyzw(
+                                iso.rotation.as_vector().cast::<f32>().data.0[0]
+                            )
+                        )
+                    ) {
+                        warning!("failed to log pointcloud transformation: {}", e.to_string());
                     }
 
                     // Log the point cloud to Rerun

@@ -17,7 +17,6 @@ pub struct PointCloudIceoryxReceiver {
     node: iceoryx2::node::Node<ipc::Service>,
     service: Option<PortFactory<ipc::Service, IceoryxPointCloud, ()>>,
     subscriber: Option<Subscriber<ipc::Service, IceoryxPointCloud, ()>>,
-    lidar_node: StaticNode,
 }
 
 impl Freezable for PointCloudIceoryxReceiver {}
@@ -44,8 +43,6 @@ impl<'cl> CuSrcTask<'cl> for PointCloudIceoryxReceiver {
             node,
             service: None,
             subscriber: None,
-            lidar_node: ROOT_NODE.get().unwrap().clone().get_node_with_name("l2_front").unwrap()
-
         })
     }
 
@@ -75,10 +72,6 @@ impl<'cl> CuSrcTask<'cl> for PointCloudIceoryxReceiver {
             .ok_or_else(|| CuError::from("PointCloudIceoryxReceiver: subscriber missing"))?;
 
         let mut payload = PointCloudPayload::default();
-
-        // Use the lidar's global pose so point clouds move with the robot.
-        let lidar_iso = self.lidar_node.get_global_isometry();
-
         while let Some(sample) = subscriber.receive().map_err(|e| {
             CuError::new_with_cause("PointCloudIceoryxReceiver: receive", e)
         })? {
@@ -92,13 +85,11 @@ impl<'cl> CuSrcTask<'cl> for PointCloudIceoryxReceiver {
                 // robot base frame using the kinematic chain.
 
                 let local_point = Point3::new(-(p.y as f64), p.z as f64, -(p.x as f64));
-                let transformed = lidar_iso.transform_point(&local_point);
-
                 payload.push(PointCloud::new(
                     clock.now(),
-                    transformed.x as f32,
-                    transformed.y as f32,
-                    transformed.z as f32,
+                    local_point.x as f32,
+                    local_point.y as f32,
+                    local_point.z as f32,
                     p.intensity,
                     Some(p.ring as u8),
                 ));
