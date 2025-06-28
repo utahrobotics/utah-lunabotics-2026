@@ -23,6 +23,11 @@
             euler: [0.0, 0.0, 0.0]
         },
         {
+            name: Some("l2_front"),
+            origin: [0.0, 0.0, -0.475],
+            euler: [0.0, 0.0, -180.0]
+        },
+        {
             name: Some("v3_board"),
             origin: [0,0,0],
             euler: [0.0, 0.0, 0.0],

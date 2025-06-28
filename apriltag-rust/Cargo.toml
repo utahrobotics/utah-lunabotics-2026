@@ -1,8 +1,0 @@
-[workspace]
-resolver = "2"
-members = [
-    "apriltag",
-    "apriltag-sys",
-    "apriltag-nalgebra",
-    "apriltag-image",
-]

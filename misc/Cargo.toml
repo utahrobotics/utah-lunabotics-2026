@@ -17,4 +17,4 @@ fxhash = "0.2.1"
 indexmap = "2.9.0"
 tokio = { version = "1", features = ["full"] }
 parking_lot = "0.12.2"
-cu29 = {path = "../copper-rs/core/cu29"}
+cu29 = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu29", features = ["log-level-info", "log-level-error"] }

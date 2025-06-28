@@ -2,7 +2,7 @@ use cu29::{clock::RobotClock, config::ComponentConfig, cutask::{CuMsg, CuSinkTas
 use cu_spatial_payloads::Transform3D;
 use nalgebra::{Isometry3, UnitQuaternion, Vector3};
 use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
-use crate::{common::ImuMsg, rerun_viz, utils::{lerp, swing_twist_decomposition}};
+use crate::{common::ImuMsg, rerun_viz, utils::{lerp, swing_twist_decomposition}, ROOT_NODE};
 use std::collections::HashMap;
 
 // Constants from the old localizer
@@ -22,14 +22,18 @@ impl<'cl> CuSinkTask<'cl> for CuLocalizer {
     fn new(config: Option<&ComponentConfig>) -> CuResult<Self>
         where Self: Sized 
     {
-        let layout_path: String = config.unwrap().get("layout_path").unwrap();
-        let robot_chain = NodeSerde::from_reader(
-            std::fs::File::open(layout_path).expect("Failed to read robot chain"),
-        ).expect("Failed to parse robot chain");
-        let robot_chain = ChainBuilder::from(robot_chain).finish_static();
-        Ok(CuLocalizer {
-            root_node: robot_chain,
-        })
+        if let Some(root_node) = ROOT_NODE.get() {
+            return Ok(Self {
+                root_node: root_node.clone()
+            })
+        } else {
+            return Err(
+                CuError::new_with_cause(
+                    "no root node found", 
+                    std::io::Error::other("no root node found")
+                )
+            )
+        }
     }
 
     fn process(

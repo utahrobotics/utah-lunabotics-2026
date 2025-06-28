@@ -24,18 +24,17 @@ logreader = ["dep:cu29-export"]
 [dependencies]
 
 # copper
-cu29 = {  path = "../copper-rs/core/cu29", features = ["log-level-info", "log-level-error"] }
+cu29 = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu29", features = ["log-level-info", "log-level-error"] }
 bincode = { version = "2.0.1", features = ["derive", "serde"] }
-cu29-helpers = { path = "../copper-rs/core/cu29_helpers" }
-cu29-export = { path = "../copper-rs/core/cu29_export" , optional = true }
-cu-apriltag = { path = "../copper-rs/components/tasks/cu_apriltag" }
-# cu-consolemon = { path = "../copper-rs/components/monitors/cu_consolemon" }
-cu_cursive_consolemon = {path = "../copper-rs/components/monitors/cu_cursive_consolemon"}
-cu-sensor-payloads = { path = "../copper-rs/components/payloads/cu_sensor_payloads" }
-cu-spatial-payloads = { path = "../copper-rs/components/payloads/cu_spatial_payloads", features = ["nalgebra"]}
-cu-dynthreshold = { path = "../copper-rs/components/tasks/cu_dynthreshold", features = ["gst"] }
-cu29-runtime = { path = "../copper-rs/core/cu29_runtime", features = ["jemalloc"] }
-cu-gstreamer = { path = "../copper-rs/components/sources/cu_gstreamer", features = ["gst"] }
+cu29-helpers = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu29-helpers" }
+cu29-export = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu29-export", optional = true }
+cu-apriltag = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu-apriltag" }
+cu_cursive_consolemon = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu_cursive_consolemon" }
+cu-sensor-payloads = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu-sensor-payloads" }
+cu-spatial-payloads = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu-spatial-payloads", features = ["nalgebra"]}
+cu-dynthreshold = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu-dynthreshold", features = ["gst"] }
+cu29-runtime = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu29-runtime", features = ["jemalloc"] }
+cu-gstreamer = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu-gstreamer", features = ["gst"] }
 
 
 
@@ -77,7 +76,6 @@ tasker = { path = "../misc/tasker"}
 [target.'cfg(target_os = "linux")'.dependencies]
 v4l = "0.14"
 udev = "0.9"
-cu-v4l = { path = "../copper-rs/components/sources/cu_v4l" }
 
 [build-dependencies]
 ron = "0.8"
