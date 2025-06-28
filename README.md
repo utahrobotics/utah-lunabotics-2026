@@ -35,6 +35,11 @@ The system is built on the [Copper framework](https://github.com/copper-project/
    # Automatically pulled from git in Cargo.toml
    https://github.com/matthewashton-k/copper-rs.git
    ```
+3. LAPACK/openblas libraries:
+
+```bash
+sudo apt update && sudo apt install -y liblapack-dev libblas-dev libopenblas-dev
+```
 
 ### Optional Dependencies
 
