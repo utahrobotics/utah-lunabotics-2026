@@ -18,6 +18,7 @@
 #include <unistd.h>
 #include <cstring>
 #include <vector>
+#include <limits>
 
 using namespace iox2;
 
@@ -47,15 +48,29 @@ struct FrameAccumulator {
             first_frame_time = cloud.stamp;
         }
         
-        // Add points with adjusted timestamps for temporal coherence
-        double time_offset = cloud.stamp - first_frame_time;
+        // Find the time range within this cloud for normalization to [0,1] range
+        double min_time = std::numeric_limits<double>::max();
+        double max_time = std::numeric_limits<double>::lowest();
+        for (const auto &point : cloud.points) {
+            min_time = std::min(min_time, static_cast<double>(point.time));
+            max_time = std::max(max_time, static_cast<double>(point.time));
+        }
+        
+        double time_range = max_time - min_time;
+        if (time_range <= 0.0) time_range = 1.0; // Avoid division by zero
+        
         for (const auto &point : cloud.points) {
             PointXYZIR p;
             p.x = point.x;
             p.y = point.y;
             p.z = point.z;
+
             p.intensity = point.intensity;
-            p.time = point.time + time_offset * 1000.0;  // Convert to milliseconds
+            
+            // Normalize timestamp to [0,1] range for KISS-ICP deskewing
+            // This ensures proper motion compensation within each accumulated frame
+            p.time = (point.time - min_time) / time_range;
+            
             p.ring = static_cast<std::uint16_t>(point.ring);
             accumulated_points.push_back(p);
         }
@@ -82,10 +97,20 @@ static IceoryxPointCloud toIceoryxPointCloud(const std::vector<PointXYZIR> &poin
 
 // Original conversion function for single frames
 static IceoryxPointCloud toIceoryxPointCloudSingle(const PointCloudUnitree &src) {
-    IceoryxPointCloud dst{}; // zero-initialise all fields
+    IceoryxPointCloud dst{};
 
-    // Cap publish_count if the incoming cloud is larger than our fixed array
     dst.publish_count = std::min<std::size_t>(src.points.size(), MAX_POINTS_PER_CLOUD);
+
+    // Find time range for normalization to [0,1] range for KISS-ICP deskewing
+    double min_time = std::numeric_limits<double>::max();
+    double max_time = std::numeric_limits<double>::lowest();
+    for (std::size_t i = 0; i < dst.publish_count; ++i) {
+        min_time = std::min(min_time, static_cast<double>(src.points[i].time));
+        max_time = std::max(max_time, static_cast<double>(src.points[i].time));
+    }
+    
+    double time_range = max_time - min_time;
+    if (time_range <= 0.0) time_range = 1.0; 
 
     for (std::size_t i = 0; i < dst.publish_count; ++i) {
         const auto &p_src = src.points[i];
@@ -94,11 +119,10 @@ static IceoryxPointCloud toIceoryxPointCloudSingle(const PointCloudUnitree &src)
         p_dst.y           = p_src.y;
         p_dst.z           = p_src.z;
         p_dst.intensity   = p_src.intensity;
-        p_dst.time        = p_src.time;
+        p_dst.time        = (p_src.time - min_time) / time_range;
         p_dst.ring        = static_cast<std::uint16_t>(p_src.ring);
     }
 
-    // The remaining entries of dst.points are already zero due to the initialisation above.
     return dst;
 }
 
