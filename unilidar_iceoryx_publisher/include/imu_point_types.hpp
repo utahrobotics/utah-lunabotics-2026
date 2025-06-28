@@ -3,6 +3,7 @@
 #include <cstdint>
 
 struct ImuMsg {
+    static constexpr const char* IOX2_TYPE_NAME = "ImuMsg";
     float quaternion[4];
     float angular_velocity[3];
     float linear_acceleration[3];
@@ -21,5 +22,5 @@ struct PointXYZIR {
 struct IceoryxPointCloud {
     static constexpr const char* IOX2_TYPE_NAME = "IceoryxPointCloud";
     uint64_t publish_count;
-    PointXYZIR points[6000];
+    PointXYZIR points[60000];  // Increased to support accumulated frames
 };

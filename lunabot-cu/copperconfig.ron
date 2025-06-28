@@ -3,9 +3,11 @@
         (id:"udev_monitor", type:"crate::tasks::UdevMonitor", config:{}),
         (id:"l2_pointcloud", type:"crate::tasks::sources::PointCloudIceoryxReceiver", config:{}),
         (id:"l2_pointcloud_sink", type:"crate::tasks::L2PointCloudSink", config:{}),
+        (id:"l2_imu", type:"crate::tasks::sources::ImuIceoryxReceiver", config:{}),
     ],
     cnx:[
         (src:"l2_pointcloud", dst:"l2_pointcloud_sink", msg:"crate::tasks::PointCloudPayload"),
+        (src:"l2_imu", dst:"localizer", msg:"crate::common::point_types::ImuMsg"),
     ],
     includes:[
         (

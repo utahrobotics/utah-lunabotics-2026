@@ -8,9 +8,7 @@ use cu29::cutask::CuMsg;
 
 use crate::common::point_types::{IceoryxPointCloud, PointXYZIR, MAX_POINT_CLOUD_POINTS};
 
-const MAX_POINTS: usize = MAX_POINT_CLOUD_POINTS; // capacity of one aggregate message matches cloud definition
-
-pub type PointCloudPayload = PointCloudSoa<MAX_POINTS>;
+pub type PointCloudPayload = PointCloudSoa<MAX_POINT_CLOUD_POINTS>;
 
 pub struct PointCloudIceoryxReceiver {
     service_name: ServiceName,
@@ -78,8 +76,7 @@ impl<'cl> CuSrcTask<'cl> for PointCloudIceoryxReceiver {
             let cloud: &IceoryxPointCloud = &*sample;
             info!("Received {} points in cloud", cloud.publish_count);
 
-            let mut count = 0;
-            for idx in 0..cloud.publish_count.min(MAX_POINTS as u64) {
+            for idx in 0..cloud.publish_count.min(MAX_POINT_CLOUD_POINTS as u64) {
                 let p: PointXYZIR = cloud.points[idx as usize];
                 payload.push(PointCloud::new(
                     clock.now(),
@@ -89,9 +86,7 @@ impl<'cl> CuSrcTask<'cl> for PointCloudIceoryxReceiver {
                     p.intensity,
                     Some(p.ring as u8),
                 ));
-                count += 1;
             }
-
         }
 
         if !payload.is_empty() {

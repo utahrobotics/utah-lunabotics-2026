@@ -1,10 +1,8 @@
 pub mod sources;
 pub mod april_detection_handler;
 pub mod auto_gstreamer;
-pub mod localizer;
 pub mod sinks;
 pub use april_detection_handler::AprilDetectionHandler;
 pub use auto_gstreamer::*;
-pub use localizer::*;
 pub use sources::*;
 pub use sinks::*;

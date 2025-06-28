@@ -23,7 +23,7 @@ pub struct PointXYZIR {
     pub ring: u16,
 }
 
-pub const MAX_POINT_CLOUD_POINTS: usize = 6000;
+pub const MAX_POINT_CLOUD_POINTS: usize = 60000;
 
 
 #[repr(C)]
@@ -41,4 +41,13 @@ impl Default for IceoryxPointCloud {
             points: [PointXYZIR::default(); MAX_POINT_CLOUD_POINTS],
         }
     }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Encode, Decode, ZeroCopySend)]
+#[type_name("ImuMsg")]
+pub struct ImuMsg {
+    pub quaternion: [f32; 4],
+    pub angular_velocity: [f32; 3],
+    pub linear_acceleration: [f32; 3],
 }
