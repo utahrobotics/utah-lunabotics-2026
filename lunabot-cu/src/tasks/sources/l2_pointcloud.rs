@@ -80,9 +80,9 @@ impl<'cl> CuSrcTask<'cl> for PointCloudIceoryxReceiver {
                 let p: PointXYZIR = cloud.points[idx as usize];
                 payload.push(PointCloud::new(
                     clock.now(),
-                    p.x,
-                    p.y,
+                    -p.y,
                     p.z,
+                    -p.x,
                     p.intensity,
                     Some(p.ring as u8),
                 ));

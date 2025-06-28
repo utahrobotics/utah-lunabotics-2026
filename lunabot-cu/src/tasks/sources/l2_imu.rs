@@ -68,7 +68,7 @@ impl<'cl> CuSrcTask<'cl> for ImuIceoryxReceiver {
         if let Some(sample) = subscriber.receive().map_err(|e| {
             CuError::new_with_cause("ImuIceoryxReceiver: receive", e)
         })? {
-            let imu_msg: &ImuMsg = &*sample;
+            let mut imu_msg: &ImuMsg = &*sample;
             info!("Received IMU message");
             new_msg.set_payload(*imu_msg);
         } else {

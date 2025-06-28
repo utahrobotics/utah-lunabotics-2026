@@ -112,7 +112,7 @@ int main() {
 
     const std::string port     = "/dev/ttyACM0";
     const uint32_t    baudrate = 4'000'000;
-    const uint16_t    cloud_scan_num = 36;  // Increase from default 18 to 36
+    const uint16_t    cloud_scan_num = 144;  // Increase from default 18 to 36
     const bool        use_system_timestamp = true;
     const float       range_min = 0.1f;     // Slightly higher minimum to filter noise
     const float       range_max = 150.0f;   // Increase maximum range

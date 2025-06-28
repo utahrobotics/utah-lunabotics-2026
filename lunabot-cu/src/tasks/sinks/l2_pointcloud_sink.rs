@@ -1,11 +1,17 @@
 use cu29::{clock::RobotClock, config::ComponentConfig, cutask::{CuSinkTask, Freezable}, prelude::*, CuResult};
-use rerun::Points3D;
+use rerun::{Points3D, Transform3D};
+use std::f64::consts::PI;
+
 use cu_sensor_payloads::Distance;
-
+use simple_motion::StaticNode;
 use crate::tasks::PointCloudPayload;
+use crate::ROOT_NODE;
 use crate::rerun_viz;
+use nalgebra::{UnitQuaternion, Vector3};
 
-pub struct L2PointCloudSink;
+pub struct L2PointCloudSink {
+    node: StaticNode
+}
 
 impl Freezable for L2PointCloudSink {}
 
@@ -13,7 +19,9 @@ impl<'cl> CuSinkTask<'cl> for L2PointCloudSink {
     type Input = input_msg!('cl, PointCloudPayload);
 
     fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
-        Ok(Self)
+        Ok(Self {
+            node: ROOT_NODE.get().unwrap().clone().get_node_with_name("l2_front").unwrap()
+        })
     }
 
     fn process(&mut self, _clock: &RobotClock, new_msg: Self::Input) -> CuResult<()> {
@@ -34,20 +42,23 @@ impl<'cl> CuSinkTask<'cl> for L2PointCloudSink {
                         let Distance(z_length) = payload.z[i];
                         
                         let x = x_length.value;
-                        let y = z_length.value;
-                        let z = y_length.value;
+                        let y = y_length.value;
+                        let z = z_length.value;
                         
                         positions.push([x, y, z]);
 
-                        colors.push([0,0,255]); // Grayscale
+                        colors.push([0,255,0]);
                     }
-                    
+
+                    let isometry = self.node.get_isometry_from_base();
+
+
                     // Log the point cloud to Rerun
                     if let Err(e) = recorder_data.recorder.log(
                         "lidar/pointcloud",
                         &Points3D::new(positions)
                             .with_colors(colors)
-                            .with_radii([0.01f32]) // Small fixed radius for all points
+                            .with_radii([0.01f32])
                     ) {
                         warning!("Failed to log point cloud to Rerun: {}", format!("{:?}", e));
                     }
