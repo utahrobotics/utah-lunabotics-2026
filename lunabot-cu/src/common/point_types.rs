@@ -23,7 +23,7 @@ pub struct PointXYZIR {
     pub ring: u16,
 }
 
-pub const MAX_POINT_CLOUD_POINTS: usize = 60000;
+pub const MAX_POINT_CLOUD_POINTS: usize = 130000;
 
 
 #[repr(C)]

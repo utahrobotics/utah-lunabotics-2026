@@ -24,11 +24,11 @@ using namespace iox2;
 constexpr iox::units::Duration CYCLE_TIME = iox::units::Duration::fromMilliseconds(10);
 
 // Helper constants  
-constexpr std::size_t MAX_POINTS_PER_CLOUD = 60000;  // Increased to accommodate accumulated frames
+constexpr std::size_t MAX_POINTS_PER_CLOUD = 130000;  // Increased to accommodate accumulated frames
 
 // Frame accumulation parameters (similar to Point LIO's con_frame mechanism)
 constexpr bool ACCUMULATE_FRAMES = false;   // Set to true to enable frame accumulation
-constexpr int ACCUMULATION_COUNT = 3;      // Number of frames to accumulate (adjust as needed)
+constexpr int ACCUMULATION_COUNT = 2;      // Number of frames to accumulate (adjust as needed)
 
 // Frame accumulation state
 struct FrameAccumulator {
@@ -112,7 +112,7 @@ int main() {
 
     const std::string port     = "/dev/ttyACM0";
     const uint32_t    baudrate = 4'000'000;
-    const uint16_t    cloud_scan_num = 144;  // Increase from default 18 to 36
+    const uint16_t    cloud_scan_num = 200;  // Increase from default 18 to 36
     const bool        use_system_timestamp = true;
     const float       range_min = 0.1f;     // Slightly higher minimum to filter noise
     const float       range_max = 150.0f;   // Increase maximum range
