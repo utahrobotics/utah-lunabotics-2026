@@ -78,7 +78,7 @@ The primary configuration file defines:
 
 ### Template System with Includes
 
-The configuration uses a powerful **template system** to instantiate multiple similar components:
+The configuration uses a **template system** to instantiate multiple similar components:
 
 #### Camera Template (`camera_configs/camera_template_gstreamer.ron`)
 
@@ -259,3 +259,7 @@ To enable it, uncomment the monitor line in `copperconfig.ron`:
     // ... rest of config ...
 )
 ```
+
+
+## Configuring
+TODO
