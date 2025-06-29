@@ -50,6 +50,9 @@ nalgebra = { version = "0.33", features = [
     "serde-serialize",
     "convert-bytemuck",
 ] }
+kiss-icp-core = {path = "../kiss-icp-rs/core"}
+kiss-icp-ops = {path = "../kiss-icp-rs/ops", features = ["openblas"]}
+rayon = "1.10"
 
 crossbeam = "0.8"
 gstreamer = "0.23.6"

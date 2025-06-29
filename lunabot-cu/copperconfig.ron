@@ -4,10 +4,49 @@
         (id:"l2_pointcloud", type:"crate::tasks::sources::PointCloudIceoryxReceiver", config:{}),
         (id:"l2_pointcloud_sink", type:"crate::tasks::L2PointCloudSink", config:{}),
         (id:"l2_imu", type:"crate::tasks::sources::ImuIceoryxReceiver", config:{}),
+        // KISS ICP Configuration Parameters:
+        // 
+        // Point Cloud Preprocessing:
+        // - voxel_size: Size of voxels for downsampling (larger = faster, less precise)
+        // - max_range: Maximum lidar range to consider (meters)
+        // - min_range: Minimum lidar range to consider (meters) 
+        // - max_points_per_voxel: Limit points per voxel (higher = more detail, slower)
+        //
+        // ICP Algorithm:
+        // - initial_threshold: Starting correspondence distance threshold
+        // - min_motion_th: Minimum motion before updating thresholds
+        // - max_iterations: Maximum ICP iterations per frame
+        // - convergence_tolerance: ICP convergence tolerance (lower = more precise)
+        //
+        // Adaptive Thresholding:
+        // - min_threshold: Minimum adaptive threshold (prevents too-tight matching)
+        // - max_threshold: Maximum adaptive threshold (prevents too-loose matching)
+        //
+        // Motion Compensation:
+        // - enable_deskewing: Apply motion compensation using per-point timestamps (recommended: true)
+        //
+        // Visualization:
+        // - map_log_interval_secs: How often to log the accumulated map to Rerun (seconds)
+        (id:"kiss_icp", type:"crate::tasks::KissIcp", config:{ 
+            "voxel_size": 0.2,
+            "max_range": 100.0,
+            "min_range": 0.0,
+            "max_points_per_voxel": 20,
+            "initial_threshold": 2.0,
+            "min_motion_th": 0.1,
+            "max_iterations": 500,
+            "convergence_tolerance": 0.000001,
+            "min_threshold": 0.05,
+            "max_threshold": 5.0,
+            "enable_deskewing": true,
+            "map_log_interval_secs": 1.0,
+        }),
     ],
     cnx:[
         (src:"l2_pointcloud", dst:"l2_pointcloud_sink", msg:"crate::tasks::PointCloudPayload"),
         (src:"l2_imu", dst:"localizer", msg:"crate::common::point_types::ImuMsg"),
+        (src:"l2_pointcloud", dst: "kiss_icp", msg:"crate::tasks::PointCloudPayload"),
+        (src:"kiss_icp", dst:"localizer", msg:"cu_spatial_payloads::Transform3D<f64>")
     ],
     includes:[
         (

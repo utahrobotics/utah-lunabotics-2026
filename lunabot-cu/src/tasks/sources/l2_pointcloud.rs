@@ -1,3 +1,5 @@
+
+use bincode::{Decode, Encode};
 use cu29::{clock::RobotClock, config::ComponentConfig, cutask::{CuSrcTask, Freezable}, output_msg, prelude::*, CuError, CuResult};
 use cu_sensor_payloads::{PointCloud, PointCloudSoa};
 use iceoryx2::node::NodeBuilder;
@@ -9,9 +11,38 @@ use crate::ROOT_NODE;
 use simple_motion::StaticNode;
 use crate::common::point_types::{IceoryxPointCloud, PointXYZIR, MAX_POINT_CLOUD_POINTS};
 use nalgebra::Point3;
+// timestamps are normalized to [0,1] range for KISS-ICP deskewing
 
-pub type PointCloudPayload = PointCloudSoa<MAX_POINT_CLOUD_POINTS>;
+#[derive(Debug, Clone)]
+pub struct PointCloudPayload {
+    pub points: PointCloudSoa<MAX_POINT_CLOUD_POINTS>,
+    pub timestamps: [f32; MAX_POINT_CLOUD_POINTS],
+}
 
+impl Default for PointCloudPayload {
+    fn default() -> Self {
+        Self {
+            points: PointCloudSoa::default(),
+            timestamps: [0.0; MAX_POINT_CLOUD_POINTS],
+        }
+    }
+}
+
+impl Encode for PointCloudPayload {
+    fn encode<E: bincode::enc::Encoder>(&self, encoder: &mut E) -> Result<(), bincode::error::EncodeError> {
+        self.points.encode(encoder)?;
+        self.timestamps.encode(encoder)?;
+        Ok(())
+    }
+}
+
+impl Decode<()> for PointCloudPayload {
+    fn decode<D: bincode::de::Decoder<Context = ()>>(decoder: &mut D) -> Result<Self, bincode::error::DecodeError> {
+        let points = PointCloudSoa::decode(decoder)?;
+        let timestamps = <[f32; MAX_POINT_CLOUD_POINTS]>::decode(decoder)?;
+        Ok(Self { points, timestamps })
+    }
+}
 pub struct PointCloudIceoryxReceiver {
     service_name: ServiceName,
     node: iceoryx2::node::Node<ipc::Service>,
@@ -80,12 +111,9 @@ impl<'cl> CuSrcTask<'cl> for PointCloudIceoryxReceiver {
 
             for idx in 0..cloud.publish_count.min(MAX_POINT_CLOUD_POINTS as u64) {
                 let p: PointXYZIR = cloud.points[idx as usize];
-                // First convert the L2 coordinate system to the lidar coordinate system
-                // used in the rest of the robot code, then transform that point into the
-                // robot base frame using the kinematic chain.
-
+                // Convert L2 coordinate system to lidar coordinate system
                 let local_point = Point3::new(-(p.y as f64), p.z as f64, -(p.x as f64));
-                payload.push(PointCloud::new(
+                payload.points.push(PointCloud::new(
                     clock.now(),
                     local_point.x as f32,
                     local_point.y as f32,
@@ -93,10 +121,11 @@ impl<'cl> CuSrcTask<'cl> for PointCloudIceoryxReceiver {
                     p.intensity,
                     Some(p.ring as u8),
                 ));
+                payload.timestamps[idx as usize] = p.time;
             }
         }
 
-        if !payload.is_empty() {
+        if !payload.points.is_empty() {
             new_msg.set_payload(payload);
         } else {
             new_msg.clear_payload();

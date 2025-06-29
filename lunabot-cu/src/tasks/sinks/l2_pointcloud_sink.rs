@@ -24,20 +24,20 @@ impl<'cl> CuSinkTask<'cl> for L2PointCloudSink {
 
     fn process(&mut self, _clock: &RobotClock, new_msg: Self::Input) -> CuResult<()> {
         if let Some(payload) = new_msg.payload() {
-            info!("Received {} points", payload.len());
+            info!("Received {} points", payload.points.len());
             let iso = self.lidar_node.get_global_isometry();
             // Only log to rerun if we have points and rerun is available
-            if !payload.is_empty() {
+            if !payload.points.is_empty() {
                 if let Some(recorder_data) = rerun_viz::RECORDER.get() {
                     // Extract positions and intensities from the point cloud
-                    let mut positions = Vec::with_capacity(payload.len());
-                    let mut colors = Vec::with_capacity(payload.len());
+                    let mut positions = Vec::with_capacity(payload.points.len());
+                    let mut colors = Vec::with_capacity(payload.points.len());
                     
-                    for i in 0..payload.len() {
+                    for i in 0..payload.points.len() {
                         // Convert Distance to meters (f32)
-                        let Distance(x_length) = payload.x[i];
-                        let Distance(y_length) = payload.y[i];
-                        let Distance(z_length) = payload.z[i];
+                        let Distance(x_length) = payload.points.x[i];
+                        let Distance(y_length) = payload.points.y[i];
+                        let Distance(z_length) = payload.points.z[i];
                         
                         let x = x_length.value;
                         let y = y_length.value;

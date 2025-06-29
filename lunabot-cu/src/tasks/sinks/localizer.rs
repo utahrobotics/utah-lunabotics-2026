@@ -18,8 +18,8 @@ pub struct CuLocalizer {
 impl Freezable for CuLocalizer {}
 
 impl<'cl> CuSinkTask<'cl> for CuLocalizer {
-    /// HashMap of camera IDs to estimated observer isometry from apriltags
-    type Input = input_msg!('cl, ImuMsg, Box<HashMap<String, Transform3D<f64>>>);
+    /// Imu data from l2, isometry from kiss_icp, and a HashMap of camera IDs to estimated observer isometry from apriltags
+    type Input = input_msg!('cl, ImuMsg, Transform3D<f64>, Box<HashMap<String, Transform3D<f64>>>);
 
     fn new(config: Option<&ComponentConfig>) -> CuResult<Self>
         where Self: Sized 
@@ -131,8 +131,11 @@ impl<'cl> CuSinkTask<'cl> for CuLocalizer {
         // Update down_axis after possible adjustment
         down_axis = isometry.rotation * down_axis;
 
-        // Process camera-specific apriltag input if available
-        if let Some(camera_transforms) = input.1.payload() {
+        // Localization hierarchy: AprilTags (primary) -> KISS ICP (backup) -> IMU only
+        let mut pose_updated = false;
+
+        // Process camera-specific apriltag input if available (PRIMARY)
+        if let Some(camera_transforms) = input.2.payload() {
             let mut all_observer_isometries = Vec::new();
             
             // Process each camera's detections
@@ -211,17 +214,41 @@ impl<'cl> CuSinkTask<'cl> for CuLocalizer {
                     ));
                 }
                 
-                // Update the robot isometry
-                self.root_node.set_isometry(isometry);
+                // Mark that pose was updated by AprilTags
+                pose_updated = true;
                 
             }
-        } else if let Some(angular_velocity) = angular_velocity_opt {
-            isometry.append_rotation_wrt_center_mut(&UnitQuaternion::from_axis_angle(
-                &down_axis,
-                -angular_velocity.y * LOCALIZATION_DELTA,
-            ));
         }
-        // Log to rerun (same pattern as the old localizer)
+        
+        if !pose_updated {
+            if let Some(kiss_icp_transform) = input.1.payload() {
+                let kiss_icp_iso: Isometry3<f64> = kiss_icp_transform.into();
+                
+
+                isometry.translation.vector = lerp(
+                    isometry.translation.vector,
+                    kiss_icp_iso.translation.vector,
+                    LOCALIZATION_DELTA,
+                    ACCELEROMETER_LERP_SPEED * 0.5,
+                );
+
+                // for now no rotation updates from KISS ICP
+
+                pose_updated = true;
+            }
+        }
+        
+        if !pose_updated {
+            if let Some(angular_velocity) = angular_velocity_opt {
+                isometry.append_rotation_wrt_center_mut(&UnitQuaternion::from_axis_angle(
+                    &down_axis,
+                    -angular_velocity.y * LOCALIZATION_DELTA,
+                ));
+            }
+        }
+        
+        self.root_node.set_isometry(isometry);
+        
         if self.last_rerun_log.elapsed() >= Duration::from_secs_f64(1.0 / 60.0) {
             self.last_rerun_log = Instant::now();
             if let Some(recorder) = rerun_viz::RECORDER.get() {
@@ -241,8 +268,6 @@ impl<'cl> CuSinkTask<'cl> for CuLocalizer {
                 }
             }
         }
-        // Update the robot isometry
-        self.root_node.set_isometry(isometry);
 
         Ok(())
     }
