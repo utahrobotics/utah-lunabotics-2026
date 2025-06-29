@@ -135,7 +135,7 @@ impl<'cl> CuSrcTask<'cl> for ImuIceoryxReceiver {
             //     lin_robot.z as f32,
             // ];
 
-            new_msg.set_payload(*imu_raw);
+            // new_msg.set_payload(*imu_raw);
         } else {
             new_msg.clear_payload();
         }

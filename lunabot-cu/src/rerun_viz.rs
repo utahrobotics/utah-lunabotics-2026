@@ -109,7 +109,7 @@ pub fn init_rerun(rerun_viz: RerunViz) -> Result<(), CuError> {
         }
     };
     let result: RecordingStreamResult<()> = try {
-        recorder.log_static("/", &ViewCoordinates::RIGHT_HAND_Y_UP())?;
+        recorder.log_static("/", &ViewCoordinates::RIGHT_HAND_Z_UP())?;
         recorder.log_static(
             format!("{ROBOT_STRUCTURE}/xyz"),
             &rerun::Arrows3D::from_vectors([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
@@ -135,20 +135,7 @@ pub fn init_rerun(rerun_viz: RerunViz) -> Result<(), CuError> {
         if let Err(e) = recorder.log_static(format!("{ROBOT_STRUCTURE}/mesh"), &asset) {
             return Err(CuError::new_with_cause("Failed to log robot structure mesh", e));
         }
-        let rotation = UnitQuaternion::from_axis_angle(&Vector3::y_axis(), PI / 2.0)
-            * UnitQuaternion::from_axis_angle(&Vector3::x_axis(), -PI / 2.0);
 
-        let translation = rerun::Vec3D::new(-0.20, 0.0, 0.50); // not actual measurements, just to make mesh look centered
-        
-        if let Err(e) = recorder.log(
-            format!("{ROBOT_STRUCTURE}/mesh"),
-            &rerun::Transform3D::from_translation_rotation(
-                translation,
-                rerun::Quaternion::from_xyzw(rotation.as_vector().cast::<f32>().data.0[0]),
-            ),
-        ) {
-            return Err(CuError::new_with_cause("Failed to log mesh transform", e));
-        }
         Ok(())
     });
     Ok(())

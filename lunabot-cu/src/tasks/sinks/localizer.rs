@@ -232,7 +232,25 @@ impl<'cl> CuSinkTask<'cl> for CuLocalizer {
                     ACCELEROMETER_LERP_SPEED * 0.5,
                 );
 
-                // for now no rotation updates from KISS ICP
+                // Use KISS ICP rotation as well
+                if kiss_icp_iso.rotation.w.is_finite()
+                    && kiss_icp_iso.rotation.i.is_finite()
+                    && kiss_icp_iso.rotation.j.is_finite()
+                    && kiss_icp_iso.rotation.k.is_finite()
+                {
+                    let dot_product = isometry.rotation.coords.dot(&kiss_icp_iso.rotation.coords);
+                    let target_quat = if dot_product < 0.0 {
+                        UnitQuaternion::new_normalize(-kiss_icp_iso.rotation.into_inner())
+                    } else {
+                        kiss_icp_iso.rotation
+                    };
+                    isometry.rotation = UnitQuaternion::new_normalize(lerp(
+                        isometry.rotation.into_inner(),
+                        target_quat.into_inner(),
+                        LOCALIZATION_DELTA,
+                        ACCELEROMETER_LERP_SPEED * 0.5,
+                    ));
+                }
 
                 pose_updated = true;
             }

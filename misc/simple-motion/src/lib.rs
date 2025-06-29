@@ -1,3 +1,17 @@
+//! Simple Motion Crate - Robot Kinematic Chain Library
+//!
+//! # Coordinate System Convention
+//! This crate uses a right-handed coordinate system with the following convention:
+//! - **+X axis**: Forward (robot's forward direction)
+//! - **+Y axis**: Left (robot's left direction)
+//! - **+Z axis**: Up (robot's upward direction)
+//!
+//! # Euler Angle Convention
+//! Euler angles are applied in the order: Yaw-Pitch-Roll (ZYX extrinsic)
+//! - **Roll**: Rotation around X-axis (forward axis)
+//! - **Pitch**: Rotation around Y-axis (left axis)
+//! - **Yaw**: Rotation around Z-axis (up axis)
+
 use std::{collections::VecDeque, ops::Deref, sync::Arc};
 
 use crossbeam::atomic::AtomicCell;
@@ -649,10 +663,12 @@ impl Default for RotationRestrictionSerde {
 }
 
 fn from_euler_angles(roll: f64, pitch: f64, yaw: f64) -> UnitQuaternion<f64> {
-    let mut current = UnitQuaternion::from_scaled_axis(Vector3::y() * yaw);
-    let pitch_axis = current * Vector3::x();
+    // New coordinate system: +X forward, +Y left, +Z up
+    // Roll around X (forward), Pitch around Y (left), Yaw around Z (up)
+    let mut current = UnitQuaternion::from_scaled_axis(Vector3::z() * yaw);
+    let pitch_axis = current * Vector3::y();
     current = UnitQuaternion::from_scaled_axis(pitch_axis * pitch) * current;
-    let roll_axis = current * Vector3::z();
+    let roll_axis = current * Vector3::x();
     UnitQuaternion::from_scaled_axis(roll_axis * roll) * current
 }
 

@@ -1,4 +1,5 @@
 use cu29::{clock::RobotClock, config::ComponentConfig, cutask::{CuSinkTask, Freezable}, prelude::*, CuResult};
+use nalgebra::Isometry3;
 use rerun::{components::RotationQuat, Points3D, Transform3D};
 
 use cu_sensor_payloads::Distance;
@@ -25,7 +26,6 @@ impl<'cl> CuSinkTask<'cl> for L2PointCloudSink {
     fn process(&mut self, _clock: &RobotClock, new_msg: Self::Input) -> CuResult<()> {
         if let Some(payload) = new_msg.payload() {
             info!("Received {} points", payload.points.len());
-            let iso = self.lidar_node.get_global_isometry();
             // Only log to rerun if we have points and rerun is available
             if !payload.points.is_empty() {
                 if let Some(recorder_data) = rerun_viz::RECORDER.get() {
@@ -47,19 +47,6 @@ impl<'cl> CuSinkTask<'cl> for L2PointCloudSink {
 
                         colors.push([0,255,0]);
                     }
-
-                    if let Err(e) = recorder_data.recorder.log(
-                        "lidar/pointcloud",
-                        &rerun::Transform3D::from_translation_rotation(
-                            iso.translation.vector.cast::<f32>().data.0[0],
-                            rerun::Quaternion::from_xyzw(
-                                iso.rotation.as_vector().cast::<f32>().data.0[0]
-                            )
-                        )
-                    ) {
-                        warning!("failed to log pointcloud transformation: {}", e.to_string());
-                    }
-
                     // Log the point cloud to Rerun
                     if let Err(e) = recorder_data.recorder.log(
                         "lidar/pointcloud",
