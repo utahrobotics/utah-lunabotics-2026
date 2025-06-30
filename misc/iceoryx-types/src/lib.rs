@@ -25,7 +25,6 @@ pub struct PointXYZIR {
 
 pub const MAX_POINT_CLOUD_POINTS: usize = 130000;
 
-
 #[repr(C)]
 #[derive(Clone, Debug, ZeroCopySend)]
 #[type_name("IceoryxPointCloud")]
@@ -50,4 +49,4 @@ pub struct ImuMsg {
     pub quaternion: [f32; 4],
     pub angular_velocity: [f32; 3],
     pub linear_acceleration: [f32; 3],
-}
+} 

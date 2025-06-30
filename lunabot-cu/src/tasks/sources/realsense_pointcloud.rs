@@ -1,7 +1,5 @@
-
-use bincode::{Decode, Encode};
 use cu29::{clock::RobotClock, config::ComponentConfig, cutask::{CuSrcTask, Freezable}, output_msg, prelude::*, CuError, CuResult};
-use cu_sensor_payloads::{PointCloud, PointCloudSoa};
+use cu_sensor_payloads::PointCloud;
 use iceoryx2::node::NodeBuilder;
 use iceoryx2::port::subscriber::Subscriber;
 use iceoryx2::prelude::*;
@@ -10,72 +8,51 @@ use cu29::cutask::CuMsg;
 use crate::ROOT_NODE;
 use simple_motion::StaticNode;
 use iceoryx_types::{IceoryxPointCloud, PointXYZIR, MAX_POINT_CLOUD_POINTS};
+use crate::tasks::PointCloudPayload;
 use nalgebra::Point3;
-// timestamps are normalized to [0,1] range for KISS-ICP deskewing
 
-#[derive(Debug, Clone)]
-pub struct PointCloudPayload {
-    pub points: PointCloudSoa<MAX_POINT_CLOUD_POINTS>,
-    pub timestamps: [f32; MAX_POINT_CLOUD_POINTS],
-}
-
-impl Default for PointCloudPayload {
-    fn default() -> Self {
-        Self {
-            points: PointCloudSoa::default(),
-            timestamps: [0.0; MAX_POINT_CLOUD_POINTS],
-        }
-    }
-}
-
-impl Encode for PointCloudPayload {
-    fn encode<E: bincode::enc::Encoder>(&self, encoder: &mut E) -> Result<(), bincode::error::EncodeError> {
-        self.points.encode(encoder)?;
-        self.timestamps.encode(encoder)?;
-        Ok(())
-    }
-}
-
-impl Decode<()> for PointCloudPayload {
-    fn decode<D: bincode::de::Decoder<Context = ()>>(decoder: &mut D) -> Result<Self, bincode::error::DecodeError> {
-        let points = PointCloudSoa::decode(decoder)?;
-        let timestamps = <[f32; MAX_POINT_CLOUD_POINTS]>::decode(decoder)?;
-        Ok(Self { points, timestamps })
-    }
-}
-pub struct PointCloudIceoryxReceiver {
+pub struct RealSensePointCloudReceiver {
     service_name: ServiceName,
     node: iceoryx2::node::Node<ipc::Service>,
     service: Option<PortFactory<ipc::Service, IceoryxPointCloud, ()>>,
     subscriber: Option<Subscriber<ipc::Service, IceoryxPointCloud, ()>>,
-    l2_node: StaticNode
+    camera_node: StaticNode,
 }
 
-impl Freezable for PointCloudIceoryxReceiver {}
+impl Freezable for RealSensePointCloudReceiver {}
 
-impl<'cl> CuSrcTask<'cl> for PointCloudIceoryxReceiver {
+impl<'cl> CuSrcTask<'cl> for RealSensePointCloudReceiver {
     type Output = output_msg!('cl, PointCloudPayload);
 
     fn new(config: Option<&ComponentConfig>) -> CuResult<Self> {
         let service_str = config
             .and_then(|c| c.get::<String>("service"))
-            .unwrap_or_else(|| "unilidar/cloud_full".to_string());
+            .unwrap_or_else(|| "realsense/309622300683/cloud".to_string());
+
+        let camera_name = config
+            .and_then(|c| c.get::<String>("camera_node"))
+            .unwrap_or_else(|| "upper_depth_camera".to_string());
 
         let service_name = ServiceName::new(&service_str).map_err(|e| {
-            CuError::new_with_cause("PointCloudIceoryxReceiver: invalid service name", e)
+            CuError::new_with_cause("RealSensePointCloudReceiver: invalid service name", e)
         })?;
 
         let node = NodeBuilder::new()
             .create::<ipc::Service>()
-            .map_err(|e| CuError::new_with_cause("PointCloudIceoryxReceiver: node create", e))?;
+            .map_err(|e| CuError::new_with_cause("RealSensePointCloudReceiver: node create", e))?;
 
+        let camera_node = ROOT_NODE.get()
+            .ok_or_else(|| CuError::from("RealSensePointCloudReceiver: ROOT_NODE not initialized"))?
+            .get_node_with_name(&camera_name)
+            .ok_or_else(|| CuError::from(format!("RealSensePointCloudReceiver: camera node '{}' not found", camera_name)))?
+            .clone();
 
         Ok(Self {
             service_name,
             node,
             service: None,
             subscriber: None,
-            l2_node: ROOT_NODE.get().unwrap().get_node_with_name("l2_front").unwrap().clone()
+            camera_node,
         })
     }
 
@@ -86,12 +63,12 @@ impl<'cl> CuSrcTask<'cl> for PointCloudIceoryxReceiver {
             .service_builder(&self.service_name)
             .publish_subscribe::<IceoryxPointCloud>()
             .open_or_create()
-            .map_err(|e| CuError::new_with_cause("PointCloudIceoryxReceiver: service", e))?;
+            .map_err(|e| CuError::new_with_cause("RealSensePointCloudReceiver: service", e))?;
 
         let subscriber = service
             .subscriber_builder()
             .create()
-            .map_err(|e| CuError::new_with_cause("PointCloudIceoryxReceiver: subscriber", e))?;
+            .map_err(|e| CuError::new_with_cause("RealSensePointCloudReceiver: subscriber", e))?;
 
         self.service = Some(service);
         self.subscriber = Some(subscriber);
@@ -102,22 +79,23 @@ impl<'cl> CuSrcTask<'cl> for PointCloudIceoryxReceiver {
         let subscriber = self
             .subscriber
             .as_ref()
-            .ok_or_else(|| CuError::from("PointCloudIceoryxReceiver: subscriber missing"))?;
+            .ok_or_else(|| CuError::from("RealSensePointCloudReceiver: subscriber missing"))?;
 
         let mut payload = PointCloudPayload::default();
-        let iso = self.l2_node.get_global_isometry();
+        let iso = self.camera_node.get_global_isometry();
+
         while let Some(sample) = subscriber.receive().map_err(|e| {
-            CuError::new_with_cause("PointCloudIceoryxReceiver: receive", e)
+            CuError::new_with_cause("RealSensePointCloudReceiver: receive", e)
         })? {
             let cloud: &IceoryxPointCloud = &*sample;
-            info!("Received {} points in cloud", cloud.publish_count);
+            info!("Received {} points from RealSense", cloud.publish_count);
 
             for idx in 0..cloud.publish_count.min(MAX_POINT_CLOUD_POINTS as u64) {
                 let p: PointXYZIR = cloud.points[idx as usize];
                 let point = Point3::new(p.x as f64, p.y as f64, p.z as f64);
                 let transformed_point = iso.transform_point(&point);
 
-                // Convert L2 coordinate system to lidar coordinate system
+                // Convert camera coordinate system to global coordinate system
                 payload.points.push(PointCloud::new(
                     clock.now(),
                     transformed_point.x as f32,
@@ -144,4 +122,4 @@ impl<'cl> CuSrcTask<'cl> for PointCloudIceoryxReceiver {
         self.subscriber = None;
         Ok(())
     }
-}
+} 

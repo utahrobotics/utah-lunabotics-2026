@@ -29,6 +29,7 @@ The system is built on the [Copper framework](https://github.com/copper-project/
    https://iceoryx2.readthedocs.io/getting_started.html#ubuntu
    # Build with examples off
    ```
+   IMPORTANT: clone iceoryx in your home directory, and make sure cu-lunabotics is also in your home directory.
 
 2. **Copper Framework** - Real-time robotics task framework
    ```bash
@@ -40,6 +41,8 @@ The system is built on the [Copper framework](https://github.com/copper-project/
 ```bash
 sudo apt update && sudo apt install -y liblapack-dev libblas-dev libopenblas-dev
 ```
+
+4. realsense2 SDK
 
 ### Optional Dependencies
 

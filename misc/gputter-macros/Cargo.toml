@@ -1,0 +1,16 @@
+[package]
+name = "gputter-macros"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+gputter-core = { path = "../gputter-core" }
+proc-macro2 = "1.0.89"
+quote = "1.0.37"
+syn = "2.0.85"
+unfmt.workspace = true
+regex = "1.11.0"
+fxhash.workspace = true

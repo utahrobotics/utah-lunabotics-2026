@@ -1,10 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["rerun-ipc"]
+members = [ "realsense"]
 
 [workspace.dependencies]
-cu29-runtime = { path = "../copper-rs/core/cu29_runtime", features = ["jemalloc"] }
-cu_iceoryx2_source = { path = "../copper-rs/components/sources/cu_iceoryx2_source" }
-cu29 = {path = "../copper-rs/core/cu29"}
-serde = { version = "1.0.219", features = ["derive"] }
-bincode = "2.0.1"
+iceoryx2 = { path = "../../iceoryx2/iceoryx2" }

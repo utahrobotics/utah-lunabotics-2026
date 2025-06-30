@@ -74,6 +74,7 @@ simple-motion = { path = "../misc/simple-motion" }
 cakap2 = { path = "../misc/cakap2" }
 bitcode = "0.6.6"
 tasker = { path = "../misc/tasker"}
+iceoryx-types = { path = "../misc/iceoryx-types" }
 
 # Linux-only dependencies
 [target.'cfg(target_os = "linux")'.dependencies]

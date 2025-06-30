@@ -2,7 +2,8 @@ use cu29::{clock::RobotClock, config::ComponentConfig, cutask::{CuMsg, CuSinkTas
 use cu_spatial_payloads::Transform3D;
 use nalgebra::{Isometry3, UnitQuaternion, Vector3, UnitVector3};
 use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
-use crate::{common::ImuMsg, rerun_viz, utils::{lerp, lerp_value, swing_twist_decomposition}, ROOT_NODE};
+use iceoryx_types::ImuMsg;
+use crate::{rerun_viz, utils::{lerp, lerp_value, swing_twist_decomposition}, ROOT_NODE};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
@@ -18,8 +19,8 @@ pub struct CuLocalizer {
 impl Freezable for CuLocalizer {}
 
 impl<'cl> CuSinkTask<'cl> for CuLocalizer {
-    /// Imu data from l2, isometry from kiss_icp, and a HashMap of camera IDs to estimated observer isometry from apriltags
-    type Input = input_msg!('cl, ImuMsg, Transform3D<f64>, Box<HashMap<String, Transform3D<f64>>>);
+    /// Imu data from l2, isometry from l2 kiss_icp, isometry from realsense kiss_icp, and a HashMap of camera IDs to estimated observer isometry from apriltags
+    type Input = input_msg!('cl, ImuMsg, Transform3D<f64>, Transform3D<f64>, Box<HashMap<String, Transform3D<f64>>>);
 
     fn new(config: Option<&ComponentConfig>) -> CuResult<Self>
         where Self: Sized 
@@ -131,11 +132,11 @@ impl<'cl> CuSinkTask<'cl> for CuLocalizer {
         // Update down_axis after possible adjustment
         down_axis = isometry.rotation * down_axis;
 
-        // Localization hierarchy: AprilTags (primary) -> KISS ICP (backup) -> IMU only
+        // Updated localization hierarchy: AprilTags (primary) -> L2 KISS ICP (secondary) -> RealSense KISS ICP (tertiary) -> IMU only
         let mut pose_updated = false;
 
         // Process camera-specific apriltag input if available (PRIMARY)
-        if let Some(camera_transforms) = input.2.payload() {
+        if let Some(camera_transforms) = input.3.payload() {
             let mut all_observer_isometries = Vec::new();
             
             // Process each camera's detections
@@ -159,27 +160,22 @@ impl<'cl> CuSinkTask<'cl> for CuLocalizer {
             }
             
             if !all_observer_isometries.is_empty() {
-                // Average all camera observations
                 let combined_observer_iso = if all_observer_isometries.len() == 1 {
                     all_observer_isometries[0]
                 } else {
-                    // Simple averaging - could be improved with weighted averaging
                     let mut sum_translation = Vector3::zeros();
                     for iso in &all_observer_isometries {
                         sum_translation += iso.translation.vector;
                     }
                     let mean_translation = sum_translation / all_observer_isometries.len() as f64;
                     
-                    // For rotation, just use the first one for now (proper quaternion averaging is complex)
                     let mean_rotation = all_observer_isometries[0].rotation;
                     
                     Isometry3::from_parts(mean_translation.into(), mean_rotation)
                 };
                 
-                // Down axis for swing-twist decomposition (assuming Y-up coordinate system)
                 let down_axis = -Vector3::y_axis();
                 
-                // Lerp the translation (ported from old localizer)
                 isometry.translation.vector = lerp(
                     isometry.translation.vector,
                     combined_observer_iso.translation.vector,
@@ -187,7 +183,6 @@ impl<'cl> CuSinkTask<'cl> for CuLocalizer {
                     ACCELEROMETER_LERP_SPEED,
                 );
 
-                // Handle rotation using swing-twist decomposition (ported from old localizer)
                 let (_, new_twist) = swing_twist_decomposition(&combined_observer_iso.rotation, &down_axis);
                 let (old_swing, _) = swing_twist_decomposition(&isometry.rotation, &down_axis);
                 let new_rotation = old_swing * new_twist;
@@ -220,29 +215,69 @@ impl<'cl> CuSinkTask<'cl> for CuLocalizer {
             }
         }
         
+        // Try L2 KISS ICP if AprilTags didn't update pose (SECONDARY - preferred over RealSense)
         if !pose_updated {
-            if let Some(kiss_icp_transform) = input.1.payload() {
-                let kiss_icp_iso: Isometry3<f64> = kiss_icp_transform.into();
+            if let Some(l2_transform) = input.1.payload() {
+                let l2_iso: Isometry3<f64> = l2_transform.into();
                 
+                info!("Using L2 KISS-ICP for localization");
 
                 isometry.translation.vector = lerp(
                     isometry.translation.vector,
-                    kiss_icp_iso.translation.vector,
+                    l2_iso.translation.vector,
                     LOCALIZATION_DELTA,
-                    ACCELEROMETER_LERP_SPEED * 0.5,
+                    ACCELEROMETER_LERP_SPEED * 0.8, // Higher confidence than RealSense
                 );
 
-                // Use KISS ICP rotation as well
-                if kiss_icp_iso.rotation.w.is_finite()
-                    && kiss_icp_iso.rotation.i.is_finite()
-                    && kiss_icp_iso.rotation.j.is_finite()
-                    && kiss_icp_iso.rotation.k.is_finite()
+                // Use L2 rotation as well
+                if l2_iso.rotation.w.is_finite()
+                    && l2_iso.rotation.i.is_finite()
+                    && l2_iso.rotation.j.is_finite()
+                    && l2_iso.rotation.k.is_finite()
                 {
-                    let dot_product = isometry.rotation.coords.dot(&kiss_icp_iso.rotation.coords);
+                    let dot_product = isometry.rotation.coords.dot(&l2_iso.rotation.coords);
                     let target_quat = if dot_product < 0.0 {
-                        UnitQuaternion::new_normalize(-kiss_icp_iso.rotation.into_inner())
+                        UnitQuaternion::new_normalize(-l2_iso.rotation.into_inner())
                     } else {
-                        kiss_icp_iso.rotation
+                        l2_iso.rotation
+                    };
+                    isometry.rotation = UnitQuaternion::new_normalize(lerp(
+                        isometry.rotation.into_inner(),
+                        target_quat.into_inner(),
+                        LOCALIZATION_DELTA,
+                        ACCELEROMETER_LERP_SPEED * 0.8,
+                    ));
+                }
+
+                pose_updated = true;
+            }
+        }
+        
+        // Try RealSense KISS ICP if both AprilTags and L2 didn't update pose (TERTIARY)
+        if !pose_updated {
+            if let Some(realsense_transform) = input.2.payload() {
+                let realsense_iso: Isometry3<f64> = realsense_transform.into();
+                
+                info!("Using RealSense KISS-ICP for localization");
+
+                isometry.translation.vector = lerp(
+                    isometry.translation.vector,
+                    realsense_iso.translation.vector,
+                    LOCALIZATION_DELTA,
+                    ACCELEROMETER_LERP_SPEED * 0.5, // Lower confidence than L2
+                );
+
+                // Use RealSense rotation as well
+                if realsense_iso.rotation.w.is_finite()
+                    && realsense_iso.rotation.i.is_finite()
+                    && realsense_iso.rotation.j.is_finite()
+                    && realsense_iso.rotation.k.is_finite()
+                {
+                    let dot_product = isometry.rotation.coords.dot(&realsense_iso.rotation.coords);
+                    let target_quat = if dot_product < 0.0 {
+                        UnitQuaternion::new_normalize(-realsense_iso.rotation.into_inner())
+                    } else {
+                        realsense_iso.rotation
                     };
                     isometry.rotation = UnitQuaternion::new_normalize(lerp(
                         isometry.rotation.into_inner(),
@@ -256,8 +291,10 @@ impl<'cl> CuSinkTask<'cl> for CuLocalizer {
             }
         }
         
+        // Fall back to IMU-only if no other localization sources are available
         if !pose_updated {
             if let Some(angular_velocity) = angular_velocity_opt {
+                info!("Using IMU-only for localization");
                 isometry.append_rotation_wrt_center_mut(&UnitQuaternion::from_axis_angle(
                     &down_axis,
                     -angular_velocity.y * LOCALIZATION_DELTA,

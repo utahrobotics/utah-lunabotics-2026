@@ -5,7 +5,7 @@ use iceoryx2::prelude::*;
 use iceoryx2::service::port_factory::publish_subscribe::PortFactory;
 use cu29::cutask::CuMsg;
 
-use crate::common::point_types::ImuMsg;
+use iceoryx_types::ImuMsg;
 use crate::ROOT_NODE;
 use simple_motion::StaticNode;
 use nalgebra::{Matrix3, Rotation3, UnitQuaternion, Vector3, Quaternion};

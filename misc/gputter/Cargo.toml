@@ -1,0 +1,8 @@
+[package]
+name = "gputter"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+gputter-core.path = "../gputter-core"
+gputter-macros.path = "../gputter-macros"
