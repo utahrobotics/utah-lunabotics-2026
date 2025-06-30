@@ -2,6 +2,8 @@
 
 A modular robotics framework for controlling a lunar excavation robot using the **Copper** real-time task framework. This system handles multi-camera vision processing, LIDAR point clouds, IMU data, and robot localization for autonomous lunar terrain navigation and excavation.
 
+*This repo is in the early stages of a rewrite migrating to the copper framework from last years code base: github.com/utahrobotics/lunadev-2025*
+
 ## Architecture Overview
 
 The system is built on the [Copper framework](https://github.com/copper-project/copper-rs), which provides:
@@ -10,14 +12,17 @@ The system is built on the [Copper framework](https://github.com/copper-project/
 - **Zero-copy data sharing** for high-performance sensor processing
 - **Distributed processing** across multiple cores and nodes
 - **Configuration-driven architecture** using RON (Rust Object Notation)
+- **Inter-Process communication** using Iceoryx2 for integration with separate processes running in ROS2 or elsewhere. 
 
 ### Core Components
 
 - **Vision System**: Multi-camera setup with AprilTag detection for localization
-- **LIDAR Processing**: Unitree L2 LIDAR integration via iceoryx2 IPC
+- **LIDAR Processing**: Unitree L2 and RealSense LIDAR integration via iceoryx2 IPC.
 - **Robot State**: IMU-based orientation tracking and kinematic modeling
 - **Localization**: Sensor fusion for robot pose estimation
 - **Data Logging**: Real-time visualization and recording using Rerun
+- **Teleop**: Using UDP for communication between the base and bot with a custom quality of service state machine.
+- **Lunabase**: Base station software for controlling the robot as well as receiving telemetry and camera feeds.
 
 ## Dependencies
 
