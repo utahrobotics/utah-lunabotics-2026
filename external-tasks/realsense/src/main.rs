@@ -403,7 +403,7 @@ impl DepthCameraTask {
                             let initialized = sample.write_payload(iceoryx_cloud);
                             match initialized.send() {
                                 Ok(_) => {
-                                    println!("Published {} points from camera {}", point_count, self.serial);
+                                    // println!("Published {} points from camera {}", point_count, self.serial);
                                 }
                                 Err(_e) => {
                                     eprintln!("Failed to send point cloud from camera {}", self.serial);

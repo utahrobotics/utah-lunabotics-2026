@@ -28,8 +28,8 @@ constexpr iox::units::Duration CYCLE_TIME = iox::units::Duration::fromMillisecon
 constexpr std::size_t MAX_POINTS_PER_CLOUD = 130000;  // Increased to accommodate accumulated frames
 
 // Frame accumulation parameters (similar to Point LIO's con_frame mechanism)
-constexpr bool ACCUMULATE_FRAMES = false;   // Set to true to enable frame accumulation
-constexpr int ACCUMULATION_COUNT = 2;      // Number of frames to accumulate (adjust as needed)
+constexpr bool ACCUMULATE_FRAMES = true;    // Enable frame accumulation for higher point density
+constexpr int ACCUMULATION_COUNT = 5;       // Accumulate 5 frames for ~25k points per cloud
 
 // Frame accumulation state
 struct FrameAccumulator {
@@ -134,20 +134,29 @@ int main() {
         return -1;
     }
 
-    const std::string port     = "/dev/ttyACM0";
-    const uint32_t    baudrate = 4'000'000;
-    const uint16_t    cloud_scan_num = 9;  // Increase from default 18 to 36
-    const bool        use_system_timestamp = true;
-    const float       range_min = 0.1f;     // Slightly higher minimum to filter noise
-    const float       range_max = 150.0f;   // Increase maximum range
+    // -------------------- UDP (Ethernet) initialisation --------------------
+    const unsigned short lidar_port  = 6101;             // L2 default transmit port
+    const std::string    lidar_ip    = "192.168.1.62";   // L2 default IP
+    const unsigned short local_port  = 6201;             // Target PC receive port
+    const std::string    local_ip    = "192.168.1.2";    // PC NIC IP (must match NIC config)
 
-    if (lreader->initializeSerial(port, baudrate, cloud_scan_num, use_system_timestamp, range_min, range_max)) {
-        std::cerr << "Unilidar initialization failed!" << std::endl;
+    const uint16_t cloud_scan_num      = 18;     // default: one full 360° sweep (18×300 = 5400 pts)
+    const bool     use_system_timestamp = true;
+    const float    range_min            = 0.0f;
+    const float    range_max            = 100.0f;
+
+    if (lreader->initializeUDP(lidar_port, lidar_ip,
+                               local_port, local_ip,
+                               cloud_scan_num, use_system_timestamp,
+                               range_min, range_max)) {
+        std::cerr << "Unilidar UDP initialisation failed!" << std::endl;
         return -1;
     }
+
     lreader->startLidarRotation();
     sleep(1);
-    lreader->setLidarWorkMode(8);
+    // Work-mode 0 = Ethernet, 3-D, IMU enabled, self-start, normal FOV
+    lreader->setLidarWorkMode(0);
     sleep(1);
 
     // ---------------------- iceoryx2 setup -----------------------
