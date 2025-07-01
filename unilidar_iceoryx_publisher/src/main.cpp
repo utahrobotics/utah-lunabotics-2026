@@ -28,7 +28,7 @@ constexpr iox::units::Duration CYCLE_TIME = iox::units::Duration::fromMillisecon
 constexpr std::size_t MAX_POINTS_PER_CLOUD = 130000;  // Increased to accommodate accumulated frames
 
 // Frame accumulation parameters (similar to Point LIO's con_frame mechanism)
-constexpr bool ACCUMULATE_FRAMES = true;    // Enable frame accumulation for higher point density
+constexpr bool ACCUMULATE_FRAMES = false;    // Enable frame accumulation for higher point density
 constexpr int ACCUMULATION_COUNT = 5;       // Accumulate 5 frames for ~25k points per cloud
 
 // Frame accumulation state
