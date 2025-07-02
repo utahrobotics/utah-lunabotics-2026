@@ -15,6 +15,7 @@ use kiss_icp_core::{
 use nalgebra::{Isometry3, Vector3, DMatrix, MatrixXx3};
 use rayon::iter::ParallelIterator;
 use std::time::{Duration, Instant};
+use kiss_icp_core::preprocessing::{preprocess as kiss_preprocess, voxel_downsample};
 
 pub struct KissIcp {
     // Core KISS ICP components
@@ -158,39 +159,45 @@ impl<'cl> CuTask<'cl> for KissIcp {
                 return Ok(());
             }
 
-            let mut filtered_points = Vec::new();
-            let mut filtered_timestamps = Vec::new();
-            
-            for (point, timestamp) in raw_points.iter().zip(timestamps.iter()) {
-                let norm = point.norm();
-                if norm > self.min_range && norm < self.max_range {
-                    filtered_points.push(*point);
-                    filtered_timestamps.push(*timestamp);
-                }
+
+            let raw_matrix = self.points_to_voxel_matrix(&raw_points);
+
+            let deskewed_points: Vec<VoxelPoint> = if self.enable_deskewing && self.is_initialized {
+                self.scan_start_pose = self.previous_pose;
+                self.scan_finish_pose = self.current_pose;
+
+                deskew::scan(&raw_matrix, &timestamps, self.scan_start_pose, self.scan_finish_pose)
+                    .collect()
+            } else {
+                (0..raw_matrix.nrows())
+                    .map(|i| raw_matrix.row(i).transpose())
+                    .collect()
+            };
+
+            if deskewed_points.is_empty() {
+                output.clear_payload();
+                return Ok(());
             }
-            
+
+            let deskewed_matrix = self.points_to_voxel_matrix(&deskewed_points);
+            let filtered_points: Vec<VoxelPoint> =
+                kiss_preprocess(&deskewed_matrix, self.min_range..self.max_range).collect();
+
             if filtered_points.is_empty() {
                 output.clear_payload();
                 return Ok(());
             }
 
-            let frame_matrix = self.points_to_voxel_matrix(&filtered_points);
-            
-            // Apply deskewing if enabled
-            let deskewed_points = if self.enable_deskewing && self.is_initialized {
-                self.scan_start_pose = self.previous_pose;
-                self.scan_finish_pose = self.current_pose;
-                
-                let deskewed: Vec<VoxelPoint> = deskew::scan(&frame_matrix, &filtered_timestamps, 
-                                                           self.scan_start_pose, self.scan_finish_pose).collect();
-                deskewed
-            } else {
-                (0..frame_matrix.nrows())
-                    .map(|i| frame_matrix.row(i).transpose())
-                    .collect()
-            };
+            let filtered_matrix = self.points_to_voxel_matrix(&filtered_points);
+            let downsampled_points: Vec<VoxelPoint> =
+                voxel_downsample(&filtered_matrix, self.voxel_size).collect();
 
-            let downsampled_frame = self.points_to_voxel_matrix(&deskewed_points);
+            if downsampled_points.is_empty() {
+                output.clear_payload();
+                return Ok(());
+            }
+
+            let downsampled_frame = self.points_to_voxel_matrix(&downsampled_points);
 
             if !self.is_initialized {
                 self.voxel_map.add_points(&downsampled_frame);

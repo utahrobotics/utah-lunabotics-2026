@@ -111,12 +111,17 @@ impl<'cl> CuSrcTask<'cl> for PointCloudIceoryxReceiver {
         })? {
             let cloud: &IceoryxPointCloud = &*sample;
             info!("Received {} points in cloud", cloud.publish_count);
-
-            for idx in 0..cloud.publish_count.min(MAX_POINT_CLOUD_POINTS as u64) {
+            let mut pub_count = cloud.publish_count.min(MAX_POINT_CLOUD_POINTS as u64);
+            
+            for idx in 0..(pub_count as usize) {
                 let p: PointXYZIR = cloud.points[idx as usize];
                 let point = Point3::new(p.x as f64, p.y as f64, p.z as f64);
                 let transformed_point = iso.transform_point(&point);
 
+                if p.intensity < 0.5 {
+                    pub_count -= 1;
+                    continue;
+                }
                 // Convert L2 coordinate system to lidar coordinate system
                 payload.points.push(PointCloud::new(
                     clock.now(),

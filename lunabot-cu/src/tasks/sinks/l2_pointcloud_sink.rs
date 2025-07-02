@@ -48,14 +48,14 @@ impl<'cl> CuSinkTask<'cl> for L2PointCloudSink {
                         colors.push([0,255,0]);
                     }
                     // Log the point cloud to Rerun
-                    if let Err(e) = recorder_data.recorder.log(
-                        "lidar/pointcloud",
-                        &Points3D::new(positions)
-                            .with_colors(colors)
-                            .with_radii([0.01f32])
-                    ) {
-                        warning!("Failed to log point cloud to Rerun: {}", format!("{:?}", e));
-                    }
+                    // if let Err(e) = recorder_data.recorder.log(
+                    //     "lidar/pointcloud",
+                    //     &Points3D::new(positions)
+                    //         .with_colors(colors)
+                    //         .with_radii([0.01f32])
+                    // ) {
+                    //     warning!("Failed to log point cloud to Rerun: {}", format!("{:?}", e));
+                    // }
                 } else {
                     debug!("Rerun recorder not available");
                 }
