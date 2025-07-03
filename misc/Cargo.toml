@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["rerun-types-wrapper", "simple-motion", "cakap2", "tasker", "thalassic", "gputter", "iceoryx-types"]
+members = ["rerun-types-wrapper", "simple-motion", "cakap2", "tasker", "thalassic", "gputter", "iceoryx-types",  "launcher"]
 
 
 

@@ -103,7 +103,7 @@
             },
         ),
     ],
-    // monitor:(type:"cu_cursive_consolemon::CuCursiveConsoleMon"),
+    monitor:(type:"cu_cursive_consolemon::CuCursiveConsoleMon"),
     logging:(
         enable_task_logging:true,
         section_size_mib:8,

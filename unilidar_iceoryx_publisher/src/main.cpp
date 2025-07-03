@@ -160,7 +160,7 @@ int main() {
     sleep(1);
 
     // ---------------------- iceoryx2 setup -----------------------
-    set_log_level_from_env_or(LogLevel::Info);
+    set_log_level_from_env_or(LogLevel::Fatal);
     auto node = NodeBuilder().create<ServiceType::Ipc>().expect("node creation");
 
     // IMU service

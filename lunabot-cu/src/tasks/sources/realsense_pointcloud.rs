@@ -57,7 +57,7 @@ impl<'cl> CuSrcTask<'cl> for RealSensePointCloudReceiver {
     }
 
     fn start(&mut self, _clock: &RobotClock) -> CuResult<()> {
-        set_log_level(LogLevel::Trace);
+        set_log_level(LogLevel::Fatal);
         let service = self
             .node
             .service_builder(&self.service_name)

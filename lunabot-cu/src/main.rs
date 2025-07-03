@@ -6,6 +6,7 @@ pub mod common;
 
 use cu29::prelude::*;
 use cu29_helpers::basic_copper_setup;
+use launcher::ProcessCommand;
 use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
 use std::sync::OnceLock;
 use std::thread::sleep;
@@ -22,6 +23,24 @@ pub static ROOT_NODE: OnceLock<StaticNode> = OnceLock::new();
 struct LunabotApplication {}
 
 fn main() {
+    let mut launcher = launcher::ProcessLauncher::new();
+    let suppress_output = cfg!(not(debug_assertions));
+    let mut unilidar_cmd = ProcessCommand::new("./unilidar_publisher")
+        .with_detach(true)
+        .with_working_directory("../unilidar_iceoryx_publisher/");
+    if suppress_output {
+        unilidar_cmd = unilidar_cmd.with_suppress_output(true);
+    }
+    launcher.add_command("unilidar publisher", unilidar_cmd);
+
+    let mut realsense_cmd = ProcessCommand::new("cargo")
+        .with_args(vec!["run", "--release"])
+        .with_working_directory("../external-tasks/realsense");
+    if suppress_output {
+        realsense_cmd = realsense_cmd.with_suppress_output(true);
+    }
+    launcher.add_command("realsense publisher", realsense_cmd);
+    launcher.launch_all().expect("failed to launch commands");
     let logger_path = "logs/lunabot.copper";
     if let Some(parent) = Path::new(logger_path).parent() {
         if !parent.exists() {

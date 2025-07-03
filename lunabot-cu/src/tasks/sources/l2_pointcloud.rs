@@ -48,7 +48,8 @@ pub struct PointCloudIceoryxReceiver {
     node: iceoryx2::node::Node<ipc::Service>,
     service: Option<PortFactory<ipc::Service, IceoryxPointCloud, ()>>,
     subscriber: Option<Subscriber<ipc::Service, IceoryxPointCloud, ()>>,
-    l2_node: StaticNode
+    l2_node: StaticNode,
+    last_seen: Instant
 }
 
 impl Freezable for PointCloudIceoryxReceiver {}
@@ -75,7 +76,8 @@ impl<'cl> CuSrcTask<'cl> for PointCloudIceoryxReceiver {
             node,
             service: None,
             subscriber: None,
-            l2_node: ROOT_NODE.get().unwrap().get_node_with_name("l2_front").unwrap().clone()
+            l2_node: ROOT_NODE.get().unwrap().get_node_with_name("l2_front").unwrap().clone(),
+            last_seen: Instant::now()
         })
     }
 
@@ -112,7 +114,7 @@ impl<'cl> CuSrcTask<'cl> for PointCloudIceoryxReceiver {
             let cloud: &IceoryxPointCloud = &*sample;
             info!("Received {} points in cloud", cloud.publish_count);
             let mut pub_count = cloud.publish_count.min(MAX_POINT_CLOUD_POINTS as u64);
-            
+            self.last_seen = Instant::now();
             for idx in 0..(pub_count as usize) {
                 let p: PointXYZIR = cloud.points[idx as usize];
                 let point = Point3::new(p.x as f64, p.y as f64, p.z as f64);
@@ -141,7 +143,16 @@ impl<'cl> CuSrcTask<'cl> for PointCloudIceoryxReceiver {
             new_msg.clear_payload();
         }
 
-        Ok(())
+        if self.last_seen.elapsed().as_millis() > 600 {
+            return Err(
+                CuError::new_with_cause(
+                    "No points seen in 600 ms", 
+                    std::io::Error::other("No points seen in 600 ms")
+                )
+            )
+        } else {
+            return Ok(());
+        }
     }
 
     fn stop(&mut self, _clock: &RobotClock) -> CuResult<()> {
