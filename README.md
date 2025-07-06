@@ -49,6 +49,23 @@ sudo apt update && sudo apt install -y liblapack-dev libblas-dev libopenblas-dev
 
 4. realsense2 SDK
 
+5. ros2 with iceoryx2_rmw
+
+https://github.com/ekxide/rmw_iceoryx2
+
+
+#### Build instructions for the unitree_lidar_ros2 service
+
+1. https://github.com/matthewashton-k/unilidar_sdk2/blob/main/ROLLING_BUILD_INSTRUCTIONS.md
+
+
+#### ROS2 build deps
+
+1. libasio
+
+2. nlohmann-json3
+
+
 ### Optional Dependencies
 
 1. **cubuild** - Enhanced error messages for Copper macros

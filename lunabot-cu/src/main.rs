@@ -24,7 +24,7 @@ struct LunabotApplication {}
 
 fn main() {
     let mut launcher = launcher::ProcessLauncher::new();
-    let suppress_output = cfg!(not(debug_assertions));
+    let suppress_output = false;
     let mut unilidar_cmd = ProcessCommand::new("./unilidar_publisher")
         .with_detach(true)
         .with_working_directory("../unilidar_iceoryx_publisher/");
