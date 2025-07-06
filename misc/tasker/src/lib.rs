@@ -120,7 +120,7 @@ fn with_tokio_runtime_handle<T>(
                             backtraces.push_str(&format!("{:?}\n\n", drop_notify.backtrace));
                         }
                         warning!(
-                            "The following guards have not dropped after {:.1} seconds\n\n{backtraces}",
+                            "The following guards have not dropped after {:.1} seconds\n\n{}",
                             config.thread_delayed_warning.as_secs_f32()
                         );
                         for drop_notify in &attached_guards {

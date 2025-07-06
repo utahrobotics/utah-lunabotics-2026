@@ -11,7 +11,9 @@ use cu29::prelude::*;
 use tasker::get_tokio_handle;
 use tasker::tokio::{self, net::UdpSocket, sync::mpsc};
 
-use crate::common::{FromLunabot, LunabotStage, TELEOP};
+use common::{FromLunabot, LunabotStage};
+
+use crate::comms::TELEOP;
 
 #[derive(Clone)]
 pub struct PacketBuilder {
@@ -134,7 +136,7 @@ impl<F: FnMut(&[u8]) -> bool + Send + 'static> LunabaseConn<F> {
                         let packet = cakap_sm.get_packet_builder().new_unreliable(bytes.to_vec().into()).unwrap();
                         action = cakap_sm.poll(Event::Action(Action::SendUnreliable(packet)), Instant::now());
                         handle!();
-                        ping_at = tokio::time::Instant::now() + Duration::from_millis(800);
+                        ping_at = tokio::time::Instant::now() + Duration::from_millis(100);
                         continue;
                     }
                     _ = async {

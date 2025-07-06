@@ -1,5 +1,9 @@
+#![feature(f16)]
 use bytemuck::{Pod, Zeroable};
-use nalgebra::{Vector2, Vector3};
+use nalgebra::{Isometry3, Vector2, Vector3};
+use crossbeam::atomic::AtomicCell;
+use std::{sync::Arc, time::Duration};
+use once_cell::sync::Lazy;
 
 #[repr(C)]
 #[derive(bincode::Encode, bincode::Decode,bitcode::Encode, bitcode::Decode, Clone, Copy, PartialEq, Eq, Pod, Zeroable)]
@@ -145,7 +149,7 @@ impl CellsRect {
 
 
 #[repr(u8)]
-#[derive(Debug, Encode, Decode, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, bitcode::Encode, bitcode::Decode, Clone, Copy, PartialEq, Eq, bincode::Encode, bincode::Decode)]
 pub enum LunabotStage {
     TeleOp = 0,
     SoftStop = 1,
@@ -178,6 +182,24 @@ pub enum FromLunabase {
     SoftStop,
     StartPercuss,
     StopPercuss,
+}
+
+impl ToString for FromLunabase {
+    fn to_string(&self) -> String {
+        format!("{self:?}")
+    }
+}
+
+impl ToString for FromAI {
+    fn to_string(&self) -> String {
+        format!("{self:?}")
+    }
+}
+
+impl Default for FromLunabase {
+    fn default() -> Self {
+        Self::SoftStop
+    }
 }
 
 impl FromLunabase {
@@ -257,7 +279,7 @@ impl FromLunabase {
     }
 }
 
-#[derive(Debug, Encode, Decode, Clone, Copy)]
+#[derive(Debug, bitcode::Encode, bitcode::Decode, Clone, Copy, bincode::Encode, bincode::Decode)]
 pub enum FromLunabot {
     RobotIsometry { origin: [f32; 3], quat: [f32; 4] },
     ArmAngles {
@@ -384,6 +406,58 @@ impl Obstacle {
     }
 }
 
+pub const AI_HEARTBEAT_RATE: Duration = Duration::from_millis(50);
+pub const HOST_HEARTBEAT_LISTEN_RATE: Duration = Duration::from_millis(500);
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ParseError {
+    NotEnoughBytes {
+        bytes_needed: usize
+    },
+    InvalidData
+}
+
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, Pod, Zeroable, PartialEq, Eq)]
+pub struct Occupancy(u32);
+
+impl Occupancy {
+    pub const UNKNOWN: Self = Self(0);
+    pub const FREE: Self = Self(1);
+    pub const OCCUPIED: Self = Self(2);
+
+    pub fn occupied(self) -> bool {
+        // True iff the cell is not empty
+        self.0 == 2
+    }
+}
+
+
+#[repr(u8)]
+enum FromHostHeader {
+    BaseIsometry = 0,
+    FromLunabase = 1,
+    ActuatorReadings = 2,
+    ThalassicData = 3
+}
+
+#[derive(Debug)]
+pub enum FromHost {
+    BaseIsometry {
+        isometry: Isometry3<f64>
+    },
+    FromLunabase {
+        msg: FromLunabase
+    },
+    ActuatorReadings {
+        lift: u16,
+        bucket: u16
+    },
+    ThalassicData {
+        obstacle_map: Box<[Occupancy; THALASSIC_CELL_COUNT as usize]>
+    }
+}
+
 
 
 #[derive(Debug, Clone, PartialEq)]
@@ -395,7 +469,7 @@ pub enum FromAI {
     StopPercuss,
     SetStage(LunabotStage),
     RequestThalassic,
-    PathFound(Vec<Vector2<f64>>)
+    PathFound(Box<Vec<Vector2<f64>>>)
 }
 
 impl bincode::Encode for FromAI {
@@ -430,7 +504,7 @@ impl bincode::Encode for FromAI {
             FromAI::PathFound(path) => {
                 7u8.encode(encoder)?;
                 (path.len() as u64).encode(encoder)?;
-                for point in path {
+                for point in path.iter() {
                     point.x.encode(encoder)?;
                     point.y.encode(encoder)?;
                 }
@@ -473,7 +547,86 @@ impl bincode::Decode<()> for FromAI {
                     let y: f64 = Decode::decode(decoder)?;
                     vec.push(Vector2::new(x, y));
                 }
-                Ok(FromAI::PathFound(vec))
+                Ok(FromAI::PathFound(Box::new(vec)))
+            }
+            _ => Err(bincode::error::DecodeError::OtherString("Invalid variant".into())),
+        }
+    }
+}
+
+impl bincode::Encode for FromHost {
+    fn encode<E: bincode::enc::Encoder>(&self, encoder: &mut E) -> Result<(), bincode::error::EncodeError> {
+        use bincode::Encode;
+        match self {
+            FromHost::BaseIsometry { isometry } => {
+                0u8.encode(encoder)?;
+                // encode translation (x,y,z) and quaternion (w,x,y,z)
+                let translation = isometry.translation.vector;
+                translation.x.encode(encoder)?;
+                translation.y.encode(encoder)?;
+                translation.z.encode(encoder)?;
+                let q = isometry.rotation;
+                q.w.encode(encoder)?;
+                q.i.encode(encoder)?;
+                q.j.encode(encoder)?;
+                q.k.encode(encoder)?;
+            }
+            FromHost::FromLunabase { msg } => {
+                1u8.encode(encoder)?;
+                msg.encode(encoder)?;
+            }
+            FromHost::ActuatorReadings { lift, bucket } => {
+                2u8.encode(encoder)?;
+                (*lift).encode(encoder)?;
+                (*bucket).encode(encoder)?;
+            }
+            FromHost::ThalassicData { obstacle_map } => {
+                3u8.encode(encoder)?;
+                // encode as raw bytes of occupancy values
+                for occ in obstacle_map.iter() {
+                    occ.0.encode(encoder)?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl bincode::Decode<()> for FromHost {
+    fn decode<D: bincode::de::Decoder<Context = ()>>(decoder: &mut D) -> Result<Self, bincode::error::DecodeError> {
+        use bincode::Decode;
+        let variant: u8 = Decode::decode(decoder)?;
+        match variant {
+            0 => {
+                let tx: f64 = Decode::decode(decoder)?;
+                let ty: f64 = Decode::decode(decoder)?;
+                let tz: f64 = Decode::decode(decoder)?;
+                let qw: f64 = Decode::decode(decoder)?;
+                let qi: f64 = Decode::decode(decoder)?;
+                let qj: f64 = Decode::decode(decoder)?;
+                let qk: f64 = Decode::decode(decoder)?;
+                let iso = Isometry3::from_parts(
+                    nalgebra::Translation3::new(tx, ty, tz),
+                    nalgebra::UnitQuaternion::from_quaternion(nalgebra::Quaternion::new(qw, qi, qj, qk)),
+                );
+                Ok(FromHost::BaseIsometry { isometry: iso })
+            }
+            1 => {
+                let msg: FromLunabase = Decode::decode(decoder)?;
+                Ok(FromHost::FromLunabase { msg })
+            }
+            2 => {
+                let lift: u16 = Decode::decode(decoder)?;
+                let bucket: u16 = Decode::decode(decoder)?;
+                Ok(FromHost::ActuatorReadings { lift, bucket })
+            }
+            3 => {
+                let mut map: Box<[Occupancy; THALASSIC_CELL_COUNT as usize]> = Box::new([Occupancy::UNKNOWN; THALASSIC_CELL_COUNT as usize]);
+                for occ in map.iter_mut() {
+                    let val: u32 = Decode::decode(decoder)?;
+                    occ.0 = val;
+                }
+                Ok(FromHost::ThalassicData { obstacle_map: map })
             }
             _ => Err(bincode::error::DecodeError::OtherString("Invalid variant".into())),
         }
@@ -528,7 +681,7 @@ mod tests {
     #[test]
     fn test_path_found() {
         let vec_points = vec![Vector2::new(1.0, 2.0), Vector2::new(-3.5, 4.2)];
-        roundtrip(&FromAI::PathFound(vec_points));
+        roundtrip(&FromAI::PathFound(Box::new(vec_points)));
     }
 
     #[test]
@@ -543,3 +696,6 @@ mod tests {
         }
     }
 }
+
+// Add global shared Lunabot stage atomic cell to synchronize stage information across components.
+pub static LUNABOT_STAGE: Lazy<Arc<AtomicCell<LunabotStage>>> = Lazy::new(|| Arc::new(AtomicCell::new(LunabotStage::SoftStop)));

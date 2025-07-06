@@ -2,15 +2,16 @@ use std::{fs::File, net::{IpAddr, SocketAddr}, str::FromStr, sync::Arc, time::Du
 use crossbeam::atomic::AtomicCell;
 use cu29::{clock::RobotClock, config::ComponentConfig, cutask::{CuMsg, CuSrcTask, Freezable}, output_msg, prelude::*, CuError, CuResult};
 use tasker::tokio::sync::{mpsc, watch};
+use tasker::tokio::sync::mpsc::error::TryRecvError;
 
-use crate::common::{FromLunabase, FromLunabot, LunabaseConn, LunabotStage, PacketBuilder, TELEOP};
+use common::{FromLunabase, FromLunabot, LunabotStage, LUNABOT_STAGE};
+use crate::comms::{LunabaseConn, PacketBuilder, TELEOP};
 
 pub struct Lunabase {
     packet_builder: PacketBuilder,
     from_lunabase_rx: mpsc::UnboundedReceiver<FromLunabase>,
     max_pong_delay: u64,
     connected: LunabotConnected,
-    last_pong_time: Instant,
 }
 
 impl Freezable for Lunabase{}
@@ -21,17 +22,24 @@ impl<'cl> CuSrcTask<'cl> for Lunabase {
     fn new(config: Option<&ComponentConfig>) -> CuResult<Self>
         where Self: Sized 
     {
-        if config.is_none() {
-            return Err(CuError::new_with_cause("no config provided", std::io::Error::new(std::io::ErrorKind::Other, "no config provided")));
-        }
-        let config = config.unwrap();
-        let lunabase_address: String = config.get("lunabase_address").unwrap();
-        let lunabase_address = IpAddr::from_str(&lunabase_address).unwrap();
-        let max_pong_delay = config.get("max_pong_delay_ms").unwrap_or(default_max_pong_delay_ms());
+        // Configuration is optional: if no address is provided, we rely on autodiscovery
+        let (lunabase_address_opt, max_pong_delay): (Option<SocketAddr>, u64) = if let Some(cfg) = config {
+            let max_delay = cfg.get("max_pong_delay_ms").unwrap_or(default_max_pong_delay_ms());
 
-        let lunabot_stage = Arc::new(AtomicCell::new(LunabotStage::SoftStop));
+            // "lunabase_address" parameter is optional. If missing we fall back to None for auto-discover.
+            let addr_opt: Option<SocketAddr> = cfg
+                .get::<String>("lunabase_address")
+                .and_then(|s| IpAddr::from_str(&s).ok())
+                .map(|ip| SocketAddr::new(ip, TELEOP));
+
+            (addr_opt, max_delay)
+        } else {
+            (None, default_max_pong_delay_ms())
+        };
+
+        let lunabot_stage = LUNABOT_STAGE.clone();
         let (packet_builder, from_lunabase_rx, connected) = create_packet_builder(
-            Some(SocketAddr::new(lunabase_address, TELEOP)),
+            lunabase_address_opt,
             lunabot_stage.clone(),
             max_pong_delay,
         );
@@ -41,20 +49,53 @@ impl<'cl> CuSrcTask<'cl> for Lunabase {
             from_lunabase_rx,
             max_pong_delay,
             connected,
-            last_pong_time: Instant::now(),
         })
     }
 
     fn process(&mut self, _: &RobotClock, output: Self::Output) -> CuResult<()> {
-        if let Ok(from_lunabase) = self.from_lunabase_rx.try_recv() {
-            if from_lunabase == FromLunabase::Pong {
-                self.last_pong_time = Instant::now();
+        // Collect the latest message from lunabase without blocking. The loop drains the
+        // receiver so we only forward the most recent command each cycle – this keeps the
+        // process function fast while ensuring we never fall behind.
+        let mut latest_msg: Option<FromLunabase> = None;
+        loop {
+            match self.from_lunabase_rx.try_recv() {
+                Ok(msg) => {
+                    latest_msg = Some(msg);
+                }
+                Err(TryRecvError::Empty) => break,
+                Err(TryRecvError::Disconnected) => {
+                    return Err(CuError::from("Lunabase channel disconnected"));
+                }
             }
-            output.set_payload(Some(from_lunabase));
         }
-        if self.last_pong_time.elapsed() > Duration::from_millis(self.max_pong_delay) {
-            return Err(CuError::new_with_cause("no pong received from lunabase", std::io::Error::new(std::io::ErrorKind::Other, "no pong received from lunabase")));
+        if !*self.connected.connected.borrow() {
+            latest_msg = Some(FromLunabase::SoftStop);
         }
+
+        // Forward message to downstream tasks and keep the global stage in sync so that
+        // Ping packets always advertise the correct mode, even if the AI-side SetStage
+        // packet was lost in transport.
+        if let Some(ref msg) = latest_msg {
+            // Update global stage heuristically based on operator commands.
+            match msg {
+                FromLunabase::SoftStop => LUNABOT_STAGE.store(LunabotStage::SoftStop),
+                FromLunabase::ContinueMission => LUNABOT_STAGE.store(LunabotStage::TeleOp),
+                // A navigate / dig-dump command implies autonomous mode.
+                FromLunabase::Navigate(_) | FromLunabase::DigDump(_) => {
+                    LUNABOT_STAGE.store(LunabotStage::Autonomy)
+                }
+                FromLunabase::LiftActuators(cmd) => {
+                    info!("Lunabase: lift actuators command {}", cmd.to_string());
+                }
+                _ => {}
+            }
+
+            output.set_payload(Some(*msg));
+        } else {
+            // No new message this cycle – clear any previous payload.
+            output.clear_payload();
+        }
+
         Ok(())
     }
 }

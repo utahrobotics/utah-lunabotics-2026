@@ -22,5 +22,5 @@ struct PointXYZIR {
 struct IceoryxPointCloud {
     static constexpr const char* IOX2_TYPE_NAME = "IceoryxPointCloud";
     uint64_t publish_count;
-    PointXYZIR points[130000];  // Increased to support accumulated frames
+    PointXYZIR points[20000];  // Reduced to match Rust constant and avoid large IPC payloads
 };

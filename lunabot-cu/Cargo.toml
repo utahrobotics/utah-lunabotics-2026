@@ -77,6 +77,9 @@ tasker = { path = "../misc/tasker"}
 iceoryx-types = { path = "../misc/iceoryx-types" }
 launcher = { path = "../misc/launcher" }
 
+# common 
+common = { path = "../common" }
+
 # Linux-only dependencies
 [target.'cfg(target_os = "linux")'.dependencies]
 v4l = "0.14"

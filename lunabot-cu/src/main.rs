@@ -2,7 +2,7 @@
 pub mod tasks;
 pub mod rerun_viz;
 pub mod utils;
-pub mod common;
+pub mod comms;
 
 use cu29::prelude::*;
 use cu29_helpers::basic_copper_setup;
@@ -23,23 +23,34 @@ pub static ROOT_NODE: OnceLock<StaticNode> = OnceLock::new();
 struct LunabotApplication {}
 
 fn main() {
+    std::panic::set_hook(Box::new(|info| {
+        use std::arch::asm;
+
+        let sp: usize;
+        unsafe { asm!("mov {}, rsp", out(reg) sp) };
+        eprintln!("stack pointer at panic: 0x{:x}", sp);
+        eprintln!("{info}");
+    }));
     let mut launcher = launcher::ProcessLauncher::new();
-    let suppress_output = false;
-    let mut unilidar_cmd = ProcessCommand::new("./unilidar_publisher")
+    let suppress_output = cfg!(not(debug_assertions));
+    let  unilidar_cmd = ProcessCommand::new("./unilidar_publisher")
         .with_detach(true)
-        .with_working_directory("../unilidar_iceoryx_publisher/");
-    if suppress_output {
-        unilidar_cmd = unilidar_cmd.with_suppress_output(true);
-    }
+        .with_working_directory("../unilidar_iceoryx_publisher/")
+        .with_suppress_output(suppress_output);
     launcher.add_command("unilidar publisher", unilidar_cmd);
 
-    let mut realsense_cmd = ProcessCommand::new("cargo")
+    let realsense_cmd = ProcessCommand::new("cargo")
         .with_args(vec!["run", "--release"])
-        .with_working_directory("../external-tasks/realsense");
-    if suppress_output {
-        realsense_cmd = realsense_cmd.with_suppress_output(true);
-    }
+        .with_working_directory("../external-tasks/realsense")
+        .with_suppress_output(suppress_output);
     launcher.add_command("realsense publisher", realsense_cmd);
+
+    let ai_cmd = ProcessCommand::new("cargo")
+        .with_args(vec!["run", "--release"])
+        .with_working_directory("../external-tasks/lunabot-ai2")
+        .with_suppress_output(suppress_output);
+    launcher.add_command("lunabot ai", ai_cmd);
+
     launcher.launch_all().expect("failed to launch commands");
     let logger_path = "logs/lunabot.copper";
     if let Some(parent) = Path::new(logger_path).parent() {

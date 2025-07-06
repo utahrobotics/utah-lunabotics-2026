@@ -1014,6 +1014,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "common"
+version = "0.1.0"
+dependencies = [
+ "bincode 2.0.1",
+ "bitcode",
+ "bytemuck",
+ "crossbeam",
+ "embedded_common",
+ "nalgebra",
+ "once_cell",
+]
+
+[[package]]
 name = "compact_str"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3304,6 +3317,7 @@ dependencies = [
  "cakap2",
  "chrono",
  "circular-buffer",
+ "common",
  "crossbeam",
  "crossbeam-channel",
  "cu-apriltag",

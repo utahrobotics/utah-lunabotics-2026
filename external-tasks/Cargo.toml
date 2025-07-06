@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = [ "realsense"]
+members = [ "realsense", "lunabot-ai2"]
 
 [workspace.dependencies]
 iceoryx2 = { path = "../../iceoryx2/iceoryx2" }

@@ -1,4 +1,3 @@
-
 use bincode::{Decode, Encode};
 use cu29::{clock::RobotClock, config::ComponentConfig, cutask::{CuSrcTask, Freezable}, output_msg, prelude::*, CuError, CuResult};
 use cu_sensor_payloads::{PointCloud, PointCloudSoa};
@@ -106,7 +105,9 @@ impl<'cl> CuSrcTask<'cl> for PointCloudIceoryxReceiver {
             .as_ref()
             .ok_or_else(|| CuError::from("PointCloudIceoryxReceiver: subscriber missing"))?;
 
-        let mut payload = PointCloudPayload::default();
+        // Allocate on the heap to keep the stack small in debug builds
+        let mut payload = Box::new(PointCloudPayload::default());
+
         let iso = self.l2_node.get_global_isometry();
         while let Some(sample) = subscriber.receive().map_err(|e| {
             CuError::new_with_cause("PointCloudIceoryxReceiver: receive", e)
@@ -137,7 +138,7 @@ impl<'cl> CuSrcTask<'cl> for PointCloudIceoryxReceiver {
         }
 
         if !payload.points.is_empty() {
-            new_msg.set_payload(payload);
+            new_msg.set_payload(*payload); // move value out of the Box
         } else {
             new_msg.clear_payload();
         }

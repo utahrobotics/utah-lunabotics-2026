@@ -25,7 +25,7 @@ using namespace iox2;
 constexpr iox::units::Duration CYCLE_TIME = iox::units::Duration::fromMilliseconds(10);
 
 // Helper constants  
-constexpr std::size_t MAX_POINTS_PER_CLOUD = 130000;  // Increased to accommodate accumulated frames
+constexpr std::size_t MAX_POINTS_PER_CLOUD = 20000;  // Reduced to keep messages small
 
 // Frame accumulation parameters (similar to Point LIO's con_frame mechanism)
 constexpr bool ACCUMULATE_FRAMES = false;    // Enable frame accumulation for higher point density

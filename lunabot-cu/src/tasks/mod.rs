@@ -1,6 +1,5 @@
 pub mod sources;
 pub mod april_detection_handler;
-pub mod ai;
 pub mod auto_gstreamer;
 pub mod sinks;
 pub mod kiss_icp;
@@ -9,4 +8,3 @@ pub use auto_gstreamer::*;
 pub use kiss_icp::*;
 pub use sources::*;
 pub use sinks::*;
-pub use ai::*;

@@ -89,7 +89,7 @@ impl<'cl> CuSrcTask<'cl> for UdevMonitor {
                 }
             }
             let Some(port_raw) = device.property_value("ID_PATH") else {
-                info!("No port for camera {path_str}");
+                info!("No port for camera {}", &path_str);
                 continue;
             };
             let Some(port) = port_raw.to_str() else {
@@ -143,7 +143,7 @@ impl<'cl> CuSrcTask<'cl> for UdevMonitor {
                             }
                         }
                         let Some(port_raw) = event.property_value("ID_PATH") else {
-                            info!("No port for camera {path_str}");
+                            info!("No port for camera {}", &path_str);
                             return Ok(());
                         };
                         let Some(port) = port_raw.to_str() else {

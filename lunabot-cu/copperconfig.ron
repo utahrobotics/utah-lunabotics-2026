@@ -61,6 +61,13 @@
             "map_log_interval_secs": 1.0,
         }),
         (id:"localizer", type:"crate::tasks::sinks::CuLocalizer", config:{}),
+        (id:"lunabase", type:"crate::tasks::sources::Lunabase", config:{
+            "max_pong_delay_ms": 500,
+        }),
+        (id:"ai_source", type:"crate::tasks::sources::AiSource", config:{}),
+        (id:"ai_sink", type:"crate::tasks::sinks::AiSink", config:{}),
+        (id:"wheel_ctrl", type:"crate::tasks::sinks::WheelController", config:{}),
+        (id:"actuator_ctrl", type:"crate::tasks::sinks::ActuatorController", config:{}),
     ],
     cnx:[
         (src:"l2_pointcloud", dst:"l2_pointcloud_sink", msg:"crate::tasks::PointCloudPayload"),
@@ -68,7 +75,10 @@
         (src:"l2_pointcloud", dst: "l2_kiss_icp", msg:"crate::tasks::PointCloudPayload"),
         (src:"realsense_pointcloud", dst: "realsense_kiss_icp", msg:"crate::tasks::PointCloudPayload"),
         (src:"l2_kiss_icp", dst:"localizer", msg:"cu_spatial_payloads::Transform3D<f64>"),
-        (src:"realsense_kiss_icp", dst:"localizer", msg:"cu_spatial_payloads::Transform3D<f64>")
+        (src:"realsense_kiss_icp", dst:"localizer", msg:"cu_spatial_payloads::Transform3D<f64>"),
+        (src:"lunabase", dst:"ai_sink", msg:"Option<common::FromLunabase>"),
+        (src:"ai_source", dst:"wheel_ctrl", msg:"(Option<common::FromAI>, Option<common::FromAI>, Option<common::FromAI>)"),
+        (src:"ai_source", dst:"actuator_ctrl", msg:"(Option<common::FromAI>, Option<common::FromAI>, Option<common::FromAI>)")
     ],
     includes:[
         (
@@ -106,6 +116,6 @@
     // monitor:(type:"cu_cursive_consolemon::CuCursiveConsoleMon"),
     logging:(
         enable_task_logging:true,
-        section_size_mib:8,
+        section_size_mib:32,
     ),
 )

@@ -8,7 +8,7 @@ use nalgebra::{
 };
 use spin_sleep::SpinSleeper;
 
-use crate::common::Steering;
+use common::Steering;
 
 /// named as such to avoid confusion with `nalgebra::distance` and `pathfinding::distance`
 pub fn distance_between_tuples((x1, y1): (usize, usize), (x2, y2): (usize, usize)) -> f32 {
