@@ -4,3 +4,10 @@ members = [ "realsense"]
 
 [workspace.dependencies]
 iceoryx2 = { path = "../../iceoryx2/iceoryx2" }
+indexmap = "2.3.0"
+tokio = { version = "1", features = ["full"] }
+fxhash = "0.2"
+nalgebra = { version = "0.33", features = [
+    "serde-serialize",
+    "convert-bytemuck",
+] }

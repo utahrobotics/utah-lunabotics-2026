@@ -1,5 +1,5 @@
 use bytemuck::{Pod, Zeroable};
-use nalgebra::Vector3;
+use nalgebra::{Vector2, Vector3};
 
 #[repr(C)]
 #[derive(bincode::Encode, bincode::Decode,bitcode::Encode, bitcode::Decode, Clone, Copy, PartialEq, Eq, Pod, Zeroable)]
@@ -380,6 +380,166 @@ impl Obstacle {
                     + (((y as f64 - k) * (y as f64 - k)) / (radius_y * radius_y))
                     <= 1.0
             }
+        }
+    }
+}
+
+
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum FromAI {
+    SetSteering(Steering),
+    SetActuators(ActuatorCommand),
+    Heartbeat,
+    StartPercuss,
+    StopPercuss,
+    SetStage(LunabotStage),
+    RequestThalassic,
+    PathFound(Vec<Vector2<f64>>)
+}
+
+impl bincode::Encode for FromAI {
+    fn encode<E: bincode::enc::Encoder>(&self, encoder: &mut E) -> Result<(), bincode::error::EncodeError> {
+        use bincode::Encode;
+        match self {
+            FromAI::SetSteering(steering) => {
+                0u8.encode(encoder)?;
+                steering.encode(encoder)?;
+            }
+            FromAI::SetActuators(cmd) => {
+                1u8.encode(encoder)?;
+                let bytes: [u8; 5] = cmd.serialize();
+                bytes.encode(encoder)?;
+            }
+            FromAI::Heartbeat => {
+                2u8.encode(encoder)?;
+            }
+            FromAI::StartPercuss => {
+                3u8.encode(encoder)?;
+            }
+            FromAI::StopPercuss => {
+                4u8.encode(encoder)?;
+            }
+            FromAI::SetStage(stage) => {
+                5u8.encode(encoder)?;
+                (*stage as u8).encode(encoder)?;
+            }
+            FromAI::RequestThalassic => {
+                6u8.encode(encoder)?;
+            }
+            FromAI::PathFound(path) => {
+                7u8.encode(encoder)?;
+                (path.len() as u64).encode(encoder)?;
+                for point in path {
+                    point.x.encode(encoder)?;
+                    point.y.encode(encoder)?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl bincode::Decode<()> for FromAI {
+    fn decode<D: bincode::de::Decoder<Context = ()>>(decoder: &mut D) -> Result<Self, bincode::error::DecodeError> {
+        use bincode::Decode;
+        let variant: u8 = Decode::decode(decoder)?;
+        match variant {
+            0 => {
+                let steering: Steering = Decode::decode(decoder)?;
+                Ok(FromAI::SetSteering(steering))
+            }
+            1 => {
+                let bytes: [u8; 5] = Decode::decode(decoder)?;
+                let cmd = ActuatorCommand::deserialize(bytes)
+                    .map_err(|e| bincode::error::DecodeError::OtherString(e.into()))?;
+                Ok(FromAI::SetActuators(cmd))
+            }
+            2 => Ok(FromAI::Heartbeat),
+            3 => Ok(FromAI::StartPercuss),
+            4 => Ok(FromAI::StopPercuss),
+            5 => {
+                let stage_val: u8 = Decode::decode(decoder)?;
+                let stage = LunabotStage::try_from(stage_val)
+                    .map_err(|_| bincode::error::DecodeError::OtherString("Invalid stage value".into()))?;
+                Ok(FromAI::SetStage(stage))
+            }
+            6 => Ok(FromAI::RequestThalassic),
+            7 => {
+                let len: u64 = Decode::decode(decoder)?;
+                let mut vec = Vec::with_capacity(len as usize);
+                for _ in 0..len {
+                    let x: f64 = Decode::decode(decoder)?;
+                    let y: f64 = Decode::decode(decoder)?;
+                    vec.push(Vector2::new(x, y));
+                }
+                Ok(FromAI::PathFound(vec))
+            }
+            _ => Err(bincode::error::DecodeError::OtherString("Invalid variant".into())),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use bincode::{encode_to_vec, decode_from_slice};
+
+    fn roundtrip(value: &FromAI) {
+        let config = bincode::config::standard();
+        let bytes = encode_to_vec(value, config).expect("encode");
+        let (decoded, _): (FromAI, usize) = decode_from_slice::<FromAI, _>(&bytes, config).expect("decode");
+        assert_eq!(*value, decoded);
+    }
+
+    #[test]
+    fn test_set_steering() {
+        let value = FromAI::SetSteering(Steering::new(0.5, -0.7, 3.14));
+        roundtrip(&value);
+    }
+
+    #[test]
+    fn test_set_actuators() {
+        let value = FromAI::SetActuators(ActuatorCommand::Shake);
+        roundtrip(&value);
+    }
+
+    #[test]
+    fn test_heartbeat() {
+        roundtrip(&FromAI::Heartbeat);
+    }
+
+    #[test]
+    fn test_percuss() {
+        roundtrip(&FromAI::StartPercuss);
+        roundtrip(&FromAI::StopPercuss);
+    }
+
+    #[test]
+    fn test_set_stage() {
+        roundtrip(&FromAI::SetStage(LunabotStage::Autonomy));
+    }
+
+    #[test]
+    fn test_request_thalassic() {
+        roundtrip(&FromAI::RequestThalassic);
+    }
+
+    #[test]
+    fn test_path_found() {
+        let vec_points = vec![Vector2::new(1.0, 2.0), Vector2::new(-3.5, 4.2)];
+        roundtrip(&FromAI::PathFound(vec_points));
+    }
+
+    #[test]
+    fn test_invalid_variant() {
+        let config = bincode::config::standard();
+        // Variant 255 with no data
+        let bytes = vec![255u8];
+        let err = decode_from_slice::<FromAI, _>(&bytes, config).unwrap_err();
+        match err {
+            bincode::error::DecodeError::OtherString(_) => { /* expected */ }
+            _ => panic!("Unexpected error variant"),
         }
     }
 }
