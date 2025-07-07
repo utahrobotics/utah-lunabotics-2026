@@ -112,6 +112,21 @@
                 "udp_port":5003,
             },
         ),
+        (
+            path:"camera_configs/camera_template_gstreamer.ron",
+            params:{
+                "id":"iriun",
+                "port":"virtual-iriun-webcam-001",
+                "fx":689.93,
+                "fy":689.93,
+                "cx":320.84,
+                "cy":240.819,
+                "width":1280,
+                "height":720,
+                "udp_host":"127.0.0.1",
+                "udp_port":5005,
+            },
+        ),
     ],
     // monitor:(type:"cu_cursive_consolemon::CuCursiveConsoleMon"),
     logging:(

@@ -98,6 +98,7 @@ dependencies = [
  "embedded_common",
  "nalgebra",
  "once_cell",
+ "serde",
 ]
 
 [[package]]

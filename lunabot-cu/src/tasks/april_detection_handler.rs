@@ -103,6 +103,7 @@ impl<'cl> CuTask<'cl> for AprilDetectionHandler {
     type Input = (
         input_msg!('cl, AprilTagDetections),
         input_msg!('cl, AprilTagDetections),
+        input_msg!('cl, AprilTagDetections),
     );
 
     type Output = output_msg!('cl, Box<HashMap<String, Transform3D<f64>>>);
@@ -113,7 +114,7 @@ impl<'cl> CuTask<'cl> for AprilDetectionHandler {
     }
 
     fn process(&mut self, _clock: &RobotClock, input: Self::Input, output: Self::Output) -> CuResult<()> {
-        let (input1, input2) = input;
+        let (input1, input2, input3) = input;
 
         let mut result_map = HashMap::new();
         
@@ -127,6 +128,15 @@ impl<'cl> CuTask<'cl> for AprilDetectionHandler {
         }
         
         if let Some(dets) = input2.payload() {
+            let camera_id = dets.camera_id.as_ref().clone();
+            let tags = cu_detections_to_tag_observations(dets, &camera_id);
+            if !tags.is_empty() {
+                let observer_iso = self.handle_detections(&tags)?;
+                result_map.insert(camera_id, observer_iso);
+            }
+        }
+
+        if let Some(dets) = input3.payload() {
             let camera_id = dets.camera_id.as_ref().clone();
             let tags = cu_detections_to_tag_observations(dets, &camera_id);
             if !tags.is_empty() {
@@ -164,18 +174,19 @@ impl AprilDetectionHandler {
         let mut observer_isometries = Vec::new();
         
         for observation in observations {
-            if !self.known_tags.contains_key(&observation.tag_id) {
+            // Look up the global pose of this tag.
+            let Some(tag_global_isometry) = self.known_tags.get(&observation.tag_id) else {
                 continue;
-            }
+            };
             
+            // Log the tag position in global coordinates for visualization.
             let location = (
-                observation.tag_global_isometry.translation.x as f32,
-                observation.tag_global_isometry.translation.y as f32,
-                observation.tag_global_isometry.translation.z as f32,
+                tag_global_isometry.translation.x as f32,
+                tag_global_isometry.translation.y as f32,
+                tag_global_isometry.translation.z as f32,
             );
             let seen_at = chrono::Local::now().time().trunc_subsecs(0);
-            let quaterion = observation
-                .tag_global_isometry
+            let quaternion_vec = tag_global_isometry
                 .rotation
                 .quaternion()
                 .as_vector()
@@ -187,10 +198,10 @@ impl AprilDetectionHandler {
                 format!("apriltags/{}/{}/location", observation.camera_id, observation.tag_id),
                 &Boxes3D::from_centers_and_half_sizes([(location)], [(0.1, 0.1, 0.01)])
                     .with_quaternions([[
-                        quaterion[0],
-                        quaterion[1],
-                        quaterion[2],
-                        quaterion[3],
+                        quaternion_vec[0],
+                        quaternion_vec[1],
+                        quaternion_vec[2],
+                        quaternion_vec[3],
                     ]])
                     .with_labels([format!("{}", seen_at)]),
             ) {
@@ -200,7 +211,8 @@ impl AprilDetectionHandler {
                 ));
             }
             
-            let isometry_of_observer = observation.get_isometry_of_observer();
+            // Compute the camera pose from the tag's known global pose and the observed local pose.
+            let isometry_of_observer = observation.tag_local_isometry.inverse() * *tag_global_isometry;
             observer_isometries.push(isometry_of_observer);
         }
         
@@ -324,16 +336,23 @@ impl Transform3DFromNa for Transform3D<f64> {
 fn cu_detections_to_tag_observations(dets: &AprilTagDetections, camera_id: &str) -> Vec<TagObservation> {
     let mut apriltags = Vec::new();
     for (id, pose, _) in dets.filtered_by_decision_margin(60.0) {
+        // Convert pose and flip axes to align with robot coordinate conventions.
         let pose: Transform3D<f64> = pose.cast();
         let mut tag_local_isometry: Isometry3<f64> = (&pose).into();
+
+        // Invert Y and Z translations (camera frame -> robot frame)
         tag_local_isometry.translation.y *= -1.0;
         tag_local_isometry.translation.z *= -1.0;
+
+        // Flip the corresponding rotation components.
         let mut scaled_axis = tag_local_isometry.rotation.scaled_axis();
         scaled_axis.y *= -1.0;
         scaled_axis.z *= -1.0;
         tag_local_isometry.rotation = UnitQuaternion::from_scaled_axis(scaled_axis);
+
+        // Apply an additional 180° rotation around the Y-axis so the tag faces forward.
         tag_local_isometry.rotation = UnitQuaternion::from_scaled_axis(
-            tag_local_isometry.rotation * Vector3::new(0.0, std::f64::consts::PI, 0.0)
+            tag_local_isometry.rotation * Vector3::new(0.0, std::f64::consts::PI, 0.0),
         ) * tag_local_isometry.rotation;
 
         apriltags.push(TagObservation {

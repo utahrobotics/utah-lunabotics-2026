@@ -9,10 +9,11 @@
 //! languages.
 
 use bincode::{Decode, Encode};
+use serde::Serialize;
 use iceoryx2::prelude::ZeroCopySend;
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, Encode, Decode, ZeroCopySend)]
+#[derive(Clone, Copy, Debug, Default, Encode, Decode, ZeroCopySend, Serialize)]
 #[type_name("PointXYZIR")]
 pub struct PointXYZIR {
     pub x: f32,
@@ -45,7 +46,7 @@ impl Default for IceoryxPointCloud {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, Encode, Decode, ZeroCopySend)]
+#[derive(Clone, Copy, Debug, Default, Encode, Decode, ZeroCopySend, Serialize)]
 #[type_name("ImuMsg")]
 pub struct ImuMsg {
     pub quaternion: [f32; 4],

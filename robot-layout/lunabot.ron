@@ -18,6 +18,11 @@
             euler: [0.0, 0.0, 180.0]
         },
         {
+            name: Some("cam_iriun"),
+            origin: [0.0, 0.0, 0.0],
+            euler: [0.0, 0.0, 0.0]
+        },
+        {
             name: Some("middle_camera"),
             origin: [0.0, 0.0, -0.215],
             euler: [0.0, 0.0, 0.0]

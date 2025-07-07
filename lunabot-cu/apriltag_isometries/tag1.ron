@@ -1,5 +1,5 @@
 (
     tag_id: 1,
-    origin: (0.0, 0.0, 0.0),
-    forward_axis: (0.0, 0.0, 1.0),
+    origin: (0.5, 0.0, 0.0),
+    forward_axis: (1.0, 0.0, 0.0),
 )

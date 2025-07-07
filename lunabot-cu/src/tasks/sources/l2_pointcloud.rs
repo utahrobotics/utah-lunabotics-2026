@@ -42,6 +42,21 @@ impl Decode<()> for PointCloudPayload {
         Ok(Self { points, timestamps })
     }
 }
+
+use serde::ser::{SerializeStruct, Serializer};
+
+impl serde::Serialize for PointCloudPayload {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("PointCloudPayload", 2)?;
+        state.serialize_field("points", &self.points)?;
+        state.serialize_field("timestamps", &self.timestamps[..])?;
+        state.end()
+    }
+}
+
 pub struct PointCloudIceoryxReceiver {
     service_name: ServiceName,
     node: iceoryx2::node::Node<ipc::Service>,

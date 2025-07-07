@@ -13,4 +13,5 @@ nalgebra = { version = "0.33", features = [
 once_cell = "1.19"
 crossbeam = "0.8"
 embedded_common = { path = "../embedded_common" }
-bincode = { version = "2.0.1", features = ["derive", "serde"] }
+bincode = { version = "=2.0.1", features = ["derive", "serde"] }
+serde = { version = "1", features = ["derive"] }

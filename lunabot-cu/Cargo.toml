@@ -25,11 +25,12 @@ logreader = ["dep:cu29-export"]
 
 # copper
 cu29 = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu29", features = ["log-level-info", "log-level-error"] }
-bincode = { version = "2.0.1", features = ["derive", "serde"] }
+bincode = { version = "=2.0.1", features = ["derive", "serde"] }
 cu29-helpers = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu29-helpers" }
 cu29-export = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu29-export", optional = true }
 cu-apriltag = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu-apriltag" }
-cu_cursive-consolemon = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu_cursive_consolemon" }
+# cu_cursive-consolemon = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu_cursive_consolemon" }
+cu-consolemon = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu-consolemon" }
 cu-sensor-payloads = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu-sensor-payloads" }
 cu-spatial-payloads = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu-spatial-payloads", features = ["nalgebra"]}
 cu-dynthreshold = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu-dynthreshold", features = ["gst"] }
@@ -61,6 +62,9 @@ gstreamer-app = "0.23.5"
 
 rerun = { version = "0.23.2", features = ["nasm", "sdk"], default-features = false }
 chrono = "0.4.41"
+
+# Pin unicode-width to 0.2.0 to resolve version conflict between ratatui (requires =0.2.0) and pfetch (allows ^0.2)
+unicode-width = "=0.2.0"
 
 # embedded
 embedded_common ={ path = "../embedded_common"}

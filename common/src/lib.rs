@@ -4,9 +4,10 @@ use nalgebra::{Isometry3, Vector2, Vector3};
 use crossbeam::atomic::AtomicCell;
 use std::{sync::Arc, time::Duration};
 use once_cell::sync::Lazy;
+use serde::Serialize;
 
 #[repr(C)]
-#[derive(bincode::Encode, bincode::Decode,bitcode::Encode, bitcode::Decode, Clone, Copy, PartialEq, Eq, Pod, Zeroable)]
+#[derive(bincode::Encode, bincode::Decode,bitcode::Encode, bitcode::Decode, Clone, Copy, PartialEq, Eq, Pod, Zeroable, Serialize)]
 pub struct Steering {
     left: i8,
     right: i8,
@@ -149,7 +150,7 @@ impl CellsRect {
 
 
 #[repr(u8)]
-#[derive(Debug, bitcode::Encode, bitcode::Decode, Clone, Copy, PartialEq, Eq, bincode::Encode, bincode::Decode)]
+#[derive(Debug, bitcode::Encode, bitcode::Decode, Clone, Copy, PartialEq, Eq, bincode::Encode, bincode::Decode, Serialize)]
 pub enum LunabotStage {
     TeleOp = 0,
     SoftStop = 1,
@@ -169,7 +170,7 @@ impl TryFrom<u8> for LunabotStage {
     }
 }
 
-#[derive(bincode::Encode, bincode::Decode, Debug, Encode, Decode, Clone, Copy, PartialEq)]
+#[derive(bincode::Encode, bincode::Decode, Debug, Encode, Decode, Clone, Copy, PartialEq, Serialize)]
 pub enum FromLunabase {
     Pong,
     ContinueMission,
@@ -472,84 +473,41 @@ pub enum FromAI {
     PathFound(Box<Vec<Vector2<f64>>>)
 }
 
-impl bincode::Encode for FromAI {
-    fn encode<E: bincode::enc::Encoder>(&self, encoder: &mut E) -> Result<(), bincode::error::EncodeError> {
-        use bincode::Encode;
+// -----------------------------------------------------------------------------
+// Serde serialization (manual) for FromAI.
+// -----------------------------------------------------------------------------
+
+use serde::ser::{SerializeSeq, Serializer};
+
+impl serde::Serialize for FromAI {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
         match self {
             FromAI::SetSteering(steering) => {
-                0u8.encode(encoder)?;
-                steering.encode(encoder)?;
+                // Variant index 0
+                serializer.serialize_newtype_variant("FromAI", 0, "SetSteering", steering)
             }
             FromAI::SetActuators(cmd) => {
-                1u8.encode(encoder)?;
-                let bytes: [u8; 5] = cmd.serialize();
-                bytes.encode(encoder)?;
+                // Serialize ActuatorCommand as its raw 5-byte representation
+                let bytes = cmd.serialize();
+                serializer.serialize_newtype_variant("FromAI", 1, "SetActuators", &bytes)
             }
-            FromAI::Heartbeat => {
-                2u8.encode(encoder)?;
-            }
-            FromAI::StartPercuss => {
-                3u8.encode(encoder)?;
-            }
-            FromAI::StopPercuss => {
-                4u8.encode(encoder)?;
-            }
+            FromAI::Heartbeat => serializer.serialize_unit_variant("FromAI", 2, "Heartbeat"),
+            FromAI::StartPercuss => serializer.serialize_unit_variant("FromAI", 3, "StartPercuss"),
+            FromAI::StopPercuss => serializer.serialize_unit_variant("FromAI", 4, "StopPercuss"),
             FromAI::SetStage(stage) => {
-                5u8.encode(encoder)?;
-                (*stage as u8).encode(encoder)?;
+                serializer.serialize_newtype_variant("FromAI", 5, "SetStage", stage)
             }
             FromAI::RequestThalassic => {
-                6u8.encode(encoder)?;
+                serializer.serialize_unit_variant("FromAI", 6, "RequestThalassic")
             }
             FromAI::PathFound(path) => {
-                7u8.encode(encoder)?;
-                (path.len() as u64).encode(encoder)?;
-                for point in path.iter() {
-                    point.x.encode(encoder)?;
-                    point.y.encode(encoder)?;
-                }
+                // Serialize the path as a sequence
+                // We cannot directly call serialize_newtype_variant because Box<Vec<_>> already implements Serialize.
+                serializer.serialize_newtype_variant("FromAI", 7, "PathFound", path)
             }
-        }
-        Ok(())
-    }
-}
-
-impl bincode::Decode<()> for FromAI {
-    fn decode<D: bincode::de::Decoder<Context = ()>>(decoder: &mut D) -> Result<Self, bincode::error::DecodeError> {
-        use bincode::Decode;
-        let variant: u8 = Decode::decode(decoder)?;
-        match variant {
-            0 => {
-                let steering: Steering = Decode::decode(decoder)?;
-                Ok(FromAI::SetSteering(steering))
-            }
-            1 => {
-                let bytes: [u8; 5] = Decode::decode(decoder)?;
-                let cmd = ActuatorCommand::deserialize(bytes)
-                    .map_err(|e| bincode::error::DecodeError::OtherString(e.into()))?;
-                Ok(FromAI::SetActuators(cmd))
-            }
-            2 => Ok(FromAI::Heartbeat),
-            3 => Ok(FromAI::StartPercuss),
-            4 => Ok(FromAI::StopPercuss),
-            5 => {
-                let stage_val: u8 = Decode::decode(decoder)?;
-                let stage = LunabotStage::try_from(stage_val)
-                    .map_err(|_| bincode::error::DecodeError::OtherString("Invalid stage value".into()))?;
-                Ok(FromAI::SetStage(stage))
-            }
-            6 => Ok(FromAI::RequestThalassic),
-            7 => {
-                let len: u64 = Decode::decode(decoder)?;
-                let mut vec = Vec::with_capacity(len as usize);
-                for _ in 0..len {
-                    let x: f64 = Decode::decode(decoder)?;
-                    let y: f64 = Decode::decode(decoder)?;
-                    vec.push(Vector2::new(x, y));
-                }
-                Ok(FromAI::PathFound(Box::new(vec)))
-            }
-            _ => Err(bincode::error::DecodeError::OtherString("Invalid variant".into())),
         }
     }
 }
@@ -699,3 +657,85 @@ mod tests {
 
 // Add global shared Lunabot stage atomic cell to synchronize stage information across components.
 pub static LUNABOT_STAGE: Lazy<Arc<AtomicCell<LunabotStage>>> = Lazy::new(|| Arc::new(AtomicCell::new(LunabotStage::SoftStop)));
+
+impl bincode::Encode for FromAI {
+    fn encode<E: bincode::enc::Encoder>(&self, encoder: &mut E) -> Result<(), bincode::error::EncodeError> {
+        use bincode::Encode;
+        match self {
+            FromAI::SetSteering(steering) => {
+                0u8.encode(encoder)?;
+                steering.encode(encoder)?;
+            }
+            FromAI::SetActuators(cmd) => {
+                1u8.encode(encoder)?;
+                let bytes: [u8; 5] = cmd.serialize();
+                bytes.encode(encoder)?;
+            }
+            FromAI::Heartbeat => {
+                2u8.encode(encoder)?;
+            }
+            FromAI::StartPercuss => {
+                3u8.encode(encoder)?;
+            }
+            FromAI::StopPercuss => {
+                4u8.encode(encoder)?;
+            }
+            FromAI::SetStage(stage) => {
+                5u8.encode(encoder)?;
+                (*stage as u8).encode(encoder)?;
+            }
+            FromAI::RequestThalassic => {
+                6u8.encode(encoder)?;
+            }
+            FromAI::PathFound(path) => {
+                7u8.encode(encoder)?;
+                (path.len() as u64).encode(encoder)?;
+                for point in path.iter() {
+                    point.x.encode(encoder)?;
+                    point.y.encode(encoder)?;
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl bincode::Decode<()> for FromAI {
+    fn decode<D: bincode::de::Decoder<Context = ()>>(decoder: &mut D) -> Result<Self, bincode::error::DecodeError> {
+        use bincode::Decode;
+        let variant: u8 = Decode::decode(decoder)?;
+        match variant {
+            0 => {
+                let steering: Steering = Decode::decode(decoder)?;
+                Ok(FromAI::SetSteering(steering))
+            }
+            1 => {
+                let bytes: [u8; 5] = Decode::decode(decoder)?;
+                let cmd = ActuatorCommand::deserialize(bytes)
+                    .map_err(|e| bincode::error::DecodeError::OtherString(e.into()))?;
+                Ok(FromAI::SetActuators(cmd))
+            }
+            2 => Ok(FromAI::Heartbeat),
+            3 => Ok(FromAI::StartPercuss),
+            4 => Ok(FromAI::StopPercuss),
+            5 => {
+                let stage_val: u8 = Decode::decode(decoder)?;
+                let stage = LunabotStage::try_from(stage_val)
+                    .map_err(|_| bincode::error::DecodeError::OtherString("Invalid stage value".into()))?;
+                Ok(FromAI::SetStage(stage))
+            }
+            6 => Ok(FromAI::RequestThalassic),
+            7 => {
+                let len: u64 = Decode::decode(decoder)?;
+                let mut vec = Vec::with_capacity(len as usize);
+                for _ in 0..len {
+                    let x: f64 = Decode::decode(decoder)?;
+                    let y: f64 = Decode::decode(decoder)?;
+                    vec.push(Vector2::new(x, y));
+                }
+                Ok(FromAI::PathFound(Box::new(vec)))
+            }
+            _ => Err(bincode::error::DecodeError::OtherString("Invalid variant".into())),
+        }
+    }
+}

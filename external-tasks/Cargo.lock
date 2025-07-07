@@ -470,6 +470,7 @@ dependencies = [
  "embedded_common",
  "nalgebra",
  "once_cell",
+ "serde",
 ]
 
 [[package]]
@@ -1140,6 +1141,7 @@ version = "0.1.0"
 dependencies = [
  "bincode 2.0.1",
  "iceoryx2",
+ "serde",
 ]
 
 [[package]]

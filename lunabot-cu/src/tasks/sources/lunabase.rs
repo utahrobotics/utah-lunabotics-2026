@@ -6,6 +6,7 @@ use tasker::tokio::sync::mpsc::error::TryRecvError;
 
 use common::{FromLunabase, FromLunabot, LunabotStage, LUNABOT_STAGE};
 use crate::comms::{LunabaseConn, PacketBuilder, TELEOP};
+use serde::Serialize;
 
 pub struct Lunabase {
     packet_builder: PacketBuilder,
