@@ -108,7 +108,7 @@ impl<'cl> CuSrcTask<'cl> for PointCloudIceoryxReceiver {
         // Allocate on the heap to keep the stack small in debug builds
         let mut payload = Box::new(PointCloudPayload::default());
 
-        let iso = self.l2_node.get_global_isometry();
+        let iso = self.l2_node.get_isometry_from_base();
         while let Some(sample) = subscriber.receive().map_err(|e| {
             CuError::new_with_cause("PointCloudIceoryxReceiver: receive", e)
         })? {

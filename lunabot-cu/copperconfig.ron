@@ -57,7 +57,7 @@
             "convergence_tolerance": 0.000001,
             "min_threshold": 0.05,
             "max_threshold": 5.0,
-            "enable_deskewing": true,
+            "enable_deskewing": false,
             "map_log_interval_secs": 1.0,
         }),
         (id:"localizer", type:"crate::tasks::sinks::CuLocalizer", config:{}),
@@ -116,6 +116,6 @@
     // monitor:(type:"cu_cursive_consolemon::CuCursiveConsoleMon"),
     logging:(
         enable_task_logging:true,
-        section_size_mib:32,
+        section_size_mib:8,
     ),
 )

@@ -33,22 +33,29 @@ fn main() {
     }));
     let mut launcher = launcher::ProcessLauncher::new();
     let suppress_output = cfg!(not(debug_assertions));
-    let  unilidar_cmd = ProcessCommand::new("./unilidar_publisher")
+    let mut unilidar_cmd = ProcessCommand::new("./unilidar_publisher")
         .with_detach(true)
-        .with_working_directory("../unilidar_iceoryx_publisher/")
-        .with_suppress_output(suppress_output);
+        .with_working_directory("../unilidar_iceoryx_publisher/");
+    if suppress_output {
+        unilidar_cmd = unilidar_cmd.with_suppress_output(true);
+    }
     launcher.add_command("unilidar publisher", unilidar_cmd);
 
-    let realsense_cmd = ProcessCommand::new("cargo")
+    let mut realsense_cmd = ProcessCommand::new("cargo")
         .with_args(vec!["run", "--release"])
-        .with_working_directory("../external-tasks/realsense")
-        .with_suppress_output(suppress_output);
+        .with_working_directory("../external-tasks/realsense");
+    if suppress_output {
+        realsense_cmd = realsense_cmd.with_suppress_output(true);
+    }
     launcher.add_command("realsense publisher", realsense_cmd);
 
-    let ai_cmd = ProcessCommand::new("cargo")
+
+    let mut ai_cmd = ProcessCommand::new("cargo")
         .with_args(vec!["run", "--release"])
-        .with_working_directory("../external-tasks/lunabot-ai2")
-        .with_suppress_output(suppress_output);
+        .with_working_directory("../external-tasks/lunabot-ai2");
+    if suppress_output {
+        ai_cmd = ai_cmd.with_suppress_output(true);
+    }
     launcher.add_command("lunabot ai", ai_cmd);
 
     launcher.launch_all().expect("failed to launch commands");

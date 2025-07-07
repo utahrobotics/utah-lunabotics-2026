@@ -82,7 +82,7 @@ impl<'cl> CuSrcTask<'cl> for RealSensePointCloudReceiver {
             .ok_or_else(|| CuError::from("RealSensePointCloudReceiver: subscriber missing"))?;
 
         let mut payload = Box::new(PointCloudPayload::default());
-        let iso = self.camera_node.get_global_isometry();
+        let iso = self.camera_node.get_isometry_from_base();
 
         while let Some(sample) = subscriber.receive().map_err(|e| {
             CuError::new_with_cause("RealSensePointCloudReceiver: receive", e)

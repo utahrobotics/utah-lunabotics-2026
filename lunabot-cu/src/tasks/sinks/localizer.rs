@@ -226,7 +226,7 @@ impl<'cl> CuSinkTask<'cl> for CuLocalizer {
                     isometry.translation.vector,
                     l2_iso.translation.vector,
                     LOCALIZATION_DELTA,
-                    ACCELEROMETER_LERP_SPEED * 0.8, // Higher confidence than RealSense
+                    ACCELEROMETER_LERP_SPEED * 0.25, // Reduced smoothing for L2
                 );
 
                 // Use L2 rotation as well
@@ -245,7 +245,7 @@ impl<'cl> CuSinkTask<'cl> for CuLocalizer {
                         isometry.rotation.into_inner(),
                         target_quat.into_inner(),
                         LOCALIZATION_DELTA,
-                        ACCELEROMETER_LERP_SPEED * 0.8,
+                        ACCELEROMETER_LERP_SPEED * 0.25,
                     ));
                 }
 

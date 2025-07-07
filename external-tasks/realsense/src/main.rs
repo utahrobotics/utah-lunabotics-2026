@@ -293,7 +293,7 @@ impl DepthCameraTask {
                 ),
                 focal_length_px,
                 principal_point_px: Vector2::new(depth_format.ppx(), depth_format.ppy()),
-                max_depth: 2.0, 
+                max_depth: 3.0, 
             };
 
             let depth_projector = depth_projector_builder.build(self.thalassic_ref.clone());
@@ -425,7 +425,7 @@ impl DepthCameraTask {
 fn main() {
     println!("Starting RealSense depth camera publisher");
 
-    std::env::set_var("STRIDE", "9");
+    std::env::set_var("STRIDE", "15");
 
     // TODO: make this configurable
     let cameras = vec![
