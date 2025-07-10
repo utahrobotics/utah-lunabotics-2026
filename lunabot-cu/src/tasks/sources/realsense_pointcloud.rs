@@ -10,6 +10,7 @@ use simple_motion::StaticNode;
 use iceoryx_types::{IceoryxPointCloud, PointXYZIR, MAX_POINT_CLOUD_POINTS};
 use crate::tasks::PointCloudPayload;
 use nalgebra::Point3;
+use std::time::Instant;
 
 pub struct RealSensePointCloudReceiver {
     service_name: ServiceName,
@@ -17,6 +18,7 @@ pub struct RealSensePointCloudReceiver {
     service: Option<PortFactory<ipc::Service, IceoryxPointCloud, ()>>,
     subscriber: Option<Subscriber<ipc::Service, IceoryxPointCloud, ()>>,
     camera_node: StaticNode,
+    last_seen: Instant
 }
 
 impl Freezable for RealSensePointCloudReceiver {}
@@ -53,6 +55,7 @@ impl<'cl> CuSrcTask<'cl> for RealSensePointCloudReceiver {
             service: None,
             subscriber: None,
             camera_node,
+            last_seen: Instant::now()
         })
     }
 
@@ -89,7 +92,7 @@ impl<'cl> CuSrcTask<'cl> for RealSensePointCloudReceiver {
         })? {
             let cloud: &IceoryxPointCloud = &*sample;
             info!("Received {} points from RealSense", cloud.publish_count);
-
+            self.last_seen = Instant::now();
             for idx in 0..cloud.publish_count.min(MAX_POINT_CLOUD_POINTS as u64) {
                 let p: PointXYZIR = cloud.points[idx as usize];
                 let point = Point3::new(p.x as f64, p.y as f64, p.z as f64);
@@ -114,7 +117,15 @@ impl<'cl> CuSrcTask<'cl> for RealSensePointCloudReceiver {
             new_msg.clear_payload();
         }
 
-        Ok(())
+        if self.last_seen.elapsed().as_millis() > 500 {
+            return Err(
+                CuError::new_with_cause("No pointcloud for 500 ms", 
+                    std::io::Error::other("No pointcloud seen for 500 ms")
+                )
+            )
+        } else {
+            return Ok(())
+        }
     }
 
     fn stop(&mut self, _clock: &RobotClock) -> CuResult<()> {
