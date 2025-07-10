@@ -63,12 +63,25 @@ dependencies = [
 
 [[package]]
 name = "ansi-to-tui"
+version = "6.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cd01ee70df708c9ecb68705af08cee6fe85493992a7e205c52ddbe569314ba47"
+dependencies = [
+ "nom",
+ "ratatui 0.28.1",
+ "simdutf8",
+ "smallvec",
+ "thiserror 1.0.69",
+]
+
+[[package]]
+name = "ansi-to-tui"
 version = "7.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67555e1f1ece39d737e28c8a017721287753af3f93225e4a445b29ccb0f5912c"
 dependencies = [
  "nom",
- "ratatui",
+ "ratatui 0.29.0",
  "simdutf8",
  "smallvec",
  "thiserror 1.0.69",
@@ -142,7 +155,7 @@ dependencies = [
 [[package]]
 name = "apriltag"
 version = "0.5.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#08e89beeedb075f8d6ca4420e9826878540e9c69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#884c82b1546ebf8cbcf94f9c515bdbef20c9aa30"
 dependencies = [
  "apriltag-sys",
  "libc",
@@ -154,7 +167,7 @@ dependencies = [
 [[package]]
 name = "apriltag-sys"
 version = "0.4.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#08e89beeedb075f8d6ca4420e9826878540e9c69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#884c82b1546ebf8cbcf94f9c515bdbef20c9aa30"
 dependencies = [
  "anyhow",
  "cc",
@@ -1030,7 +1043,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "117725a109d387c937a1533ce01b450cbde6b88abceea8473c4d7a85853cda3c"
 dependencies = [
  "lazy_static",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1056,6 +1069,17 @@ dependencies = [
  "nalgebra",
  "once_cell",
  "serde",
+]
+
+[[package]]
+name = "compact_str"
+version = "0.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5138945395949e7dfba09646dc9e766b548ff48e23deb5246890e6b64ae9e1b9"
+dependencies = [
+ "castaway",
+ "itoa",
+ "ryu",
 ]
 
 [[package]]
@@ -1387,7 +1411,7 @@ dependencies = [
 [[package]]
 name = "cu-apriltag"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#08e89beeedb075f8d6ca4420e9826878540e9c69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#884c82b1546ebf8cbcf94f9c515bdbef20c9aa30"
 dependencies = [
  "apriltag",
  "apriltag-sys",
@@ -1403,9 +1427,9 @@ dependencies = [
 [[package]]
 name = "cu-consolemon"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#08e89beeedb075f8d6ca4420e9826878540e9c69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#884c82b1546ebf8cbcf94f9c515bdbef20c9aa30"
 dependencies = [
- "ansi-to-tui",
+ "ansi-to-tui 7.0.0",
  "chrono",
  "color-eyre",
  "compact_str 0.9.0",
@@ -1417,7 +1441,7 @@ dependencies = [
  "log",
  "pfetch",
  "pfetch-logo-parser",
- "ratatui",
+ "ratatui 0.29.0",
  "tui-nodes",
  "tui-widgets",
 ]
@@ -1425,7 +1449,7 @@ dependencies = [
 [[package]]
 name = "cu-dynthreshold"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#08e89beeedb075f8d6ca4420e9826878540e9c69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#884c82b1546ebf8cbcf94f9c515bdbef20c9aa30"
 dependencies = [
  "cu-gstreamer",
  "cu-sensor-payloads",
@@ -1436,7 +1460,7 @@ dependencies = [
 [[package]]
 name = "cu-gstreamer"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#08e89beeedb075f8d6ca4420e9826878540e9c69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#884c82b1546ebf8cbcf94f9c515bdbef20c9aa30"
 dependencies = [
  "bincode 2.0.1",
  "cfg_aliases",
@@ -1451,7 +1475,7 @@ dependencies = [
 [[package]]
 name = "cu-sensor-payloads"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#08e89beeedb075f8d6ca4420e9826878540e9c69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#884c82b1546ebf8cbcf94f9c515bdbef20c9aa30"
 dependencies = [
  "bincode 2.0.1",
  "cu29",
@@ -1465,7 +1489,7 @@ dependencies = [
 [[package]]
 name = "cu-spatial-payloads"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#08e89beeedb075f8d6ca4420e9826878540e9c69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#884c82b1546ebf8cbcf94f9c515bdbef20c9aa30"
 dependencies = [
  "bincode 2.0.1",
  "nalgebra",
@@ -1476,7 +1500,7 @@ dependencies = [
 [[package]]
 name = "cu29"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#08e89beeedb075f8d6ca4420e9826878540e9c69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#884c82b1546ebf8cbcf94f9c515bdbef20c9aa30"
 dependencies = [
  "bincode 2.0.1",
  "ctrlc",
@@ -1496,7 +1520,7 @@ dependencies = [
 [[package]]
 name = "cu29-clock"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#08e89beeedb075f8d6ca4420e9826878540e9c69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#884c82b1546ebf8cbcf94f9c515bdbef20c9aa30"
 dependencies = [
  "bincode 2.0.1",
  "quanta",
@@ -1506,7 +1530,7 @@ dependencies = [
 [[package]]
 name = "cu29-derive"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#08e89beeedb075f8d6ca4420e9826878540e9c69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#884c82b1546ebf8cbcf94f9c515bdbef20c9aa30"
 dependencies = [
  "convert_case 0.8.0",
  "cu29-runtime",
@@ -1523,7 +1547,7 @@ dependencies = [
 [[package]]
 name = "cu29-export"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#08e89beeedb075f8d6ca4420e9826878540e9c69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#884c82b1546ebf8cbcf94f9c515bdbef20c9aa30"
 dependencies = [
  "bincode 2.0.1",
  "clap",
@@ -1536,7 +1560,7 @@ dependencies = [
 [[package]]
 name = "cu29-helpers"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#08e89beeedb075f8d6ca4420e9826878540e9c69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#884c82b1546ebf8cbcf94f9c515bdbef20c9aa30"
 dependencies = [
  "cu29-clock",
  "cu29-log",
@@ -1550,7 +1574,7 @@ dependencies = [
 [[package]]
 name = "cu29-intern-strs"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#08e89beeedb075f8d6ca4420e9826878540e9c69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#884c82b1546ebf8cbcf94f9c515bdbef20c9aa30"
 dependencies = [
  "anyhow",
  "byteorder",
@@ -1560,7 +1584,7 @@ dependencies = [
 [[package]]
 name = "cu29-log"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#08e89beeedb075f8d6ca4420e9826878540e9c69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#884c82b1546ebf8cbcf94f9c515bdbef20c9aa30"
 dependencies = [
  "bincode 2.0.1",
  "cu29-clock",
@@ -1574,7 +1598,7 @@ dependencies = [
 [[package]]
 name = "cu29-log-derive"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#08e89beeedb075f8d6ca4420e9826878540e9c69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#884c82b1546ebf8cbcf94f9c515bdbef20c9aa30"
 dependencies = [
  "cu29-intern-strs",
  "cu29-log",
@@ -1585,7 +1609,7 @@ dependencies = [
 [[package]]
 name = "cu29-log-runtime"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#08e89beeedb075f8d6ca4420e9826878540e9c69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#884c82b1546ebf8cbcf94f9c515bdbef20c9aa30"
 dependencies = [
  "bincode 2.0.1",
  "cu29-clock",
@@ -1598,7 +1622,7 @@ dependencies = [
 [[package]]
 name = "cu29-runtime"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#08e89beeedb075f8d6ca4420e9826878540e9c69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#884c82b1546ebf8cbcf94f9c515bdbef20c9aa30"
 dependencies = [
  "arrayvec",
  "bincode 2.0.1",
@@ -1627,7 +1651,7 @@ dependencies = [
 [[package]]
 name = "cu29-soa-derive"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#08e89beeedb075f8d6ca4420e9826878540e9c69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#884c82b1546ebf8cbcf94f9c515bdbef20c9aa30"
 dependencies = [
  "quote",
  "syn 2.0.104",
@@ -1637,7 +1661,7 @@ dependencies = [
 [[package]]
 name = "cu29-traits"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#08e89beeedb075f8d6ca4420e9826878540e9c69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#884c82b1546ebf8cbcf94f9c515bdbef20c9aa30"
 dependencies = [
  "bincode 2.0.1",
  "compact_str 0.9.0",
@@ -1649,7 +1673,7 @@ dependencies = [
 [[package]]
 name = "cu29-unifiedlog"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#08e89beeedb075f8d6ca4420e9826878540e9c69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#884c82b1546ebf8cbcf94f9c515bdbef20c9aa30"
 dependencies = [
  "bincode 2.0.1",
  "cu29-traits",
@@ -1660,12 +1684,76 @@ dependencies = [
 [[package]]
 name = "cu29-value"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#08e89beeedb075f8d6ca4420e9826878540e9c69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#884c82b1546ebf8cbcf94f9c515bdbef20c9aa30"
 dependencies = [
  "bincode 2.0.1",
  "cu29-clock",
  "ordered-float 5.0.0",
  "serde",
+]
+
+[[package]]
+name = "cu_cursive_consolemon"
+version = "0.8.0"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#884c82b1546ebf8cbcf94f9c515bdbef20c9aa30"
+dependencies = [
+ "ansi-to-tui 6.0.1",
+ "color-eyre",
+ "compact_str 0.6.1",
+ "cu29",
+ "cursive",
+ "num_cpus",
+]
+
+[[package]]
+name = "cursive"
+version = "0.21.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "386d5a36020bb856e9a34ecb8a4e6c9bd6b0262d1857bae4db7bc7e2fdaa532e"
+dependencies = [
+ "ahash",
+ "cfg-if 1.0.1",
+ "crossbeam-channel",
+ "crossterm",
+ "cursive_core",
+ "lazy_static",
+ "libc",
+ "log",
+ "signal-hook",
+ "unicode-segmentation",
+ "unicode-width 0.1.14",
+]
+
+[[package]]
+name = "cursive-macros"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ac7ac0eb0cede3dfdfebf4d5f22354e05a730b79c25fd03481fc69fcfba0a73e"
+dependencies = [
+ "proc-macro2",
+]
+
+[[package]]
+name = "cursive_core"
+version = "0.4.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "321ec774d27fafc66e812034d0025f8858bd7d9095304ff8fc200e0b9f9cc257"
+dependencies = [
+ "ahash",
+ "compact_str 0.8.1",
+ "crossbeam-channel",
+ "cursive-macros",
+ "enum-map",
+ "enumset",
+ "lazy_static",
+ "log",
+ "num",
+ "parking_lot",
+ "serde_json",
+ "time",
+ "unicode-segmentation",
+ "unicode-width 0.1.14",
+ "xi-unicode",
 ]
 
 [[package]]
@@ -1946,6 +2034,47 @@ dependencies = [
 ]
 
 [[package]]
+name = "enum-map"
+version = "2.7.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6866f3bfdf8207509a033af1a75a7b08abda06bbaaeae6669323fd5a097df2e9"
+dependencies = [
+ "enum-map-derive",
+]
+
+[[package]]
+name = "enum-map-derive"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f282cfdfe92516eb26c2af8589c274c7c17681f5ecc03c18255fe741c6aa64eb"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.104",
+]
+
+[[package]]
+name = "enumset"
+version = "1.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6ee17054f550fd7400e1906e2f9356c7672643ed34008a9e8abe147ccd2d821"
+dependencies = [
+ "enumset_derive",
+]
+
+[[package]]
+name = "enumset_derive"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "76d07902c93376f1e96c34abc4d507c0911df3816cef50b01f5a2ff3ad8c370d"
+dependencies = [
+ "darling",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.104",
+]
+
+[[package]]
 name = "env_filter"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1996,7 +2125,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "778e2ac28f6c47af28e4907f13ffd1e1ddbd400980a9abd7c8df189bf578a5ad"
 dependencies = [
  "libc",
- "windows-sys 0.60.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -2328,7 +2457,7 @@ dependencies = [
  "gobject-sys",
  "libc",
  "system-deps",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3237,7 +3366,7 @@ dependencies = [
  "portable-atomic-util",
  "serde",
  "wasm-bindgen",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3649,6 +3778,7 @@ dependencies = [
  "cu29-export",
  "cu29-helpers",
  "cu29-runtime",
+ "cu_cursive_consolemon",
  "embedded_common",
  "gstreamer",
  "gstreamer-app",
@@ -4676,7 +4806,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.12.1",
  "proc-macro2",
  "quote",
  "syn 2.0.104",
@@ -4787,6 +4917,26 @@ dependencies = [
 
 [[package]]
 name = "ratatui"
+version = "0.28.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fdef7f9be5c0122f890d58bdf4d964349ba6a6161f705907526d891efabba57d"
+dependencies = [
+ "bitflags 2.9.1",
+ "cassowary",
+ "compact_str 0.8.1",
+ "instability",
+ "itertools 0.13.0",
+ "lru",
+ "paste",
+ "strum",
+ "strum_macros",
+ "unicode-segmentation",
+ "unicode-truncate",
+ "unicode-width 0.1.14",
+]
+
+[[package]]
+name = "ratatui"
 version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eabd94c2f37801c20583fc49dd5cd6b0ba68c716787c2dd6ed18571e1e63117b"
@@ -4812,7 +4962,7 @@ version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6fef540f80dbe8a0773266fa6077788ceb65ef624cdbf36e131aaf90b4a52df4"
 dependencies = [
- "ratatui",
+ "ratatui 0.29.0",
 ]
 
 [[package]]
@@ -5811,7 +5961,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.4.15",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -5824,7 +5974,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.9.4",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -6198,12 +6348,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sorted-vec"
-version = "0.8.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d372029cb5195f9ab4e4b9aef550787dce78b124fcaee8d82519925defcd6f0d"
-
-[[package]]
 name = "spin_sleep"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6437,7 +6581,7 @@ dependencies = [
  "getrandom 0.3.3",
  "once_cell",
  "rustix 1.0.7",
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -6880,18 +7024,16 @@ dependencies = [
  "derive_builder",
  "font8x8",
  "itertools 0.14.0",
- "ratatui",
+ "ratatui 0.29.0",
 ]
 
 [[package]]
 name = "tui-nodes"
 version = "0.8.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f6e1d78b50b1af41d752d075081271095ff1389b93508a05e618d3e0f5e4d11"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#884c82b1546ebf8cbcf94f9c515bdbef20c9aa30"
 dependencies = [
  "log",
- "ratatui",
- "sorted-vec",
+ "ratatui 0.29.0",
 ]
 
 [[package]]
@@ -6903,7 +7045,7 @@ dependencies = [
  "derive-getters",
  "derive_setters",
  "document-features",
- "ratatui",
+ "ratatui 0.29.0",
 ]
 
 [[package]]
@@ -6913,7 +7055,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eb6e0d8a972545cc209b933a1c06dab8932674b54ae19947834ec854fec2364f"
 dependencies = [
  "itertools 0.13.0",
- "ratatui",
+ "ratatui 0.29.0",
  "ratatui-macros",
  "rstest",
 ]
@@ -6925,7 +7067,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ef6e1d736488ba64c2e74637089a6b9ca666ccd2eaade3ab83854f415f1d260b"
 dependencies = [
  "indoc",
- "ratatui",
+ "ratatui 0.29.0",
  "rstest",
 ]
 
@@ -6936,7 +7078,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ffd1ac763030d3e3fa086b9488d1069cbccb1e40b86c3bcbbf629815c7b0cac2"
 dependencies = [
  "document-features",
- "ratatui",
+ "ratatui 0.29.0",
  "tui-big-text",
  "tui-popup",
  "tui-prompts",
@@ -7404,7 +7546,7 @@ version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf221c93e13a30d793f7645a0e7762c55d169dbb0a49671918a2319d289b10bb"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -7881,6 +8023,12 @@ dependencies = [
  "libc",
  "rustix 1.0.7",
 ]
+
+[[package]]
+name = "xi-unicode"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a67300977d3dc3f8034dae89778f502b6ba20b269527b3223ba59c0cf393bb8a"
 
 [[package]]
 name = "xshell"

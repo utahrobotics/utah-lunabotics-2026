@@ -39,6 +39,7 @@ pub struct CuAutoGStreamer<const N: usize> {
     last_frame_time: Option<Instant>,
     // `Some` after we received a matching `NewDevice`, but before the pipeline is created.
     pending_dev_path: Option<String>,
+    teardown_requested: bool,
 }
 
 impl<const N: usize> Freezable for CuAutoGStreamer<N> {}
@@ -86,6 +87,7 @@ impl<'cl, const N: usize> CuTask<'cl> for CuAutoGStreamer<N> {
             circular_buffer: Arc::new(Mutex::new(CircularBuffer::new())),
             last_frame_time: None,
             pending_dev_path: None,
+            teardown_requested: false
         })
     }
 
@@ -95,6 +97,13 @@ impl<'cl, const N: usize> CuTask<'cl> for CuAutoGStreamer<N> {
 
 
     fn preprocess(&mut self, _clock: &RobotClock) -> CuResult<()> {
+        // Handle requested teardowns first
+        if self.teardown_requested {
+            self.teardown_requested = false;
+            self.stop_pipeline();
+        }
+
+        // Then handle pipeline creation
         if self.pipeline.is_none() {
             if let Some(dev_path) = self.pending_dev_path.take() {
                 self.open_pipeline(&dev_path)?;
@@ -104,7 +113,6 @@ impl<'cl, const N: usize> CuTask<'cl> for CuAutoGStreamer<N> {
     }
 
     fn process(&mut self, clock: &RobotClock, input: Self::Input, output: Self::Output) -> CuResult<()> {
-
         if self.pipeline.is_none() {
             if let Some(dev) = input.payload() {
                 if *dev.port == self.desired_port {
@@ -112,33 +120,32 @@ impl<'cl, const N: usize> CuTask<'cl> for CuAutoGStreamer<N> {
                     self.pending_dev_path = Some(dev.dev_path.to_string());
                 }
             }
-            return Err("No frames received yet".into());
+            output.clear_payload();
+            return Ok(());
         }
 
-        {
-            let mut cb = self.circular_buffer.lock().unwrap();
-            if let Some(buffer) = cb.pop_front() {
-                output.metadata.tov = clock.now().into();
-                output.set_payload(buffer);
-                self.last_frame_time = Some(Instant::now());
-                return Ok(());
-            }
-        }
-
+        // Handle frame timeout without blocking
         if let Some(last) = self.last_frame_time {
             if last.elapsed() > self.req_timeout {
-                info!(
-                    "GStreamer: Frame timeout (>{:?}). Tearing down pipeline.",
-                    self.req_timeout
-                );
-                self.stop_pipeline();
-                return Err("Frame timeout".into());
+                info!("GStreamer: Frame timeout (>{:?}). Requesting teardown.", self.req_timeout);
+                self.teardown_requested = true;
+                self.last_frame_time = None;
             }
         }
 
-        output.clear_payload();
+        // Process frames (non-blocking)
+        let frame = self.circular_buffer.lock().unwrap().pop_front();
+        if let Some(buffer) = frame {
+            output.metadata.tov = clock.now().into();
+            output.set_payload(buffer);
+            self.last_frame_time = Some(Instant::now());
+        } else {
+            output.clear_payload();
+        }
+
         Ok(())
     }
+
 
     fn stop(&mut self, _clock: &RobotClock) -> CuResult<()> {
         self.stop_pipeline();

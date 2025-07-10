@@ -29,7 +29,7 @@ bincode = { version = "=2.0.1", features = ["derive", "serde"] }
 cu29-helpers = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu29-helpers" }
 cu29-export = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu29-export", optional = true }
 cu-apriltag = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu-apriltag" }
-# cu_cursive-consolemon = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu_cursive_consolemon" }
+cu_cursive-consolemon = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu_cursive_consolemon" }
 cu-consolemon = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu-consolemon" }
 cu-sensor-payloads = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu-sensor-payloads" }
 cu-spatial-payloads = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu-spatial-payloads", features = ["nalgebra"]}

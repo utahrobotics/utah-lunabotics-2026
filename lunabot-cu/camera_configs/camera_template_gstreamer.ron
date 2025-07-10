@@ -8,7 +8,7 @@
                 "device_port": "{{port}}",
                 "pipeline": "v4l2src device=<devpath> ! video/x-raw,width={{width}},height={{height}} ! videoconvert ! tee name=t ! queue ! videoconvert ! video/x-raw,format=GRAY8 ! appsink name=copper t. ! queue ! videoconvert ! video/x-raw,format=NV12 ! vaapih264enc bitrate=2000 ! rtph264pay ! udpsink host={{udp_host}} port={{udp_port}} sync=false",
                 "caps": "video/x-raw, format=GRAY8, width={{width}}, height={{height}}",
-                "timeout_ms": 600,
+                "timeout_ms": 100,
             },
         ),
         (
