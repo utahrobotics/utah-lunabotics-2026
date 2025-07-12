@@ -1,0 +1,52 @@
+(
+    tasks: [
+        (
+            id: "cam_{{id}}",
+            type: "crate::tasks::V4lAutoCam",
+            config: {
+                "device_port": "{{port}}",
+                "width": {{width}},
+                "height": {{height}},
+                "fps": 30,
+                "fourcc": "NV12",
+                "buffers": 4,
+                "timeout_ms": 10,
+                // Intrinsics
+                "fx": {{fx}},
+                "fy": {{fy}},
+                "cx": {{cx}},
+                "cy": {{cy}},
+            },
+        ),
+        (
+            id: "detector_cam_{{id}}",
+            type: "cu_apriltag::AprilTags",
+            config: {
+                "tag_family": "tag16h5",
+                "tag_size": 0.14,
+                "fx": {{fx}},
+                "fy": {{fy}},
+                "cx": {{cx}},
+                "cy": {{cy}},
+                "camera_id": "cam_{{id}}",
+            },
+        ),
+        (
+            id: "detection_handler",
+            type: "crate::tasks::AprilDetectionHandler",
+        ),
+        (
+            id: "localizer",
+            type: "crate::tasks::CuLocalizer",
+            config: {
+                "layout_path": "../robot-layout/lunabot.ron"
+            }
+        )
+    ],
+    cnx: [
+        (src: "udev_monitor", dst: "cam_{{id}}", msg: "crate::tasks::NewDevice"),
+        (src: "cam_{{id}}", dst: "detector_cam_{{id}}", msg: "cu_sensor_payloads::CuImage<Vec<u8>>"),
+        (src: "detector_cam_{{id}}", dst: "detection_handler", msg: "cu_apriltag::AprilTagDetections"),
+        (src: "detection_handler", dst: "localizer", msg: "Box<std::collections::HashMap<String, cu_spatial_payloads::Transform3D<f64>>>")
+    ],
+) 

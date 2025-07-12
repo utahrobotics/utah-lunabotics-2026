@@ -82,7 +82,7 @@
     ],
     includes:[
         (
-            path:"camera_configs/camera_template_gstreamer.ron",
+            path:"camera_configs/camera_template_v4l.ron",
             params:{
                 "id":"back",
                 "port":"pci-0000:35:00.0-usb-0:1:1.0",
@@ -92,13 +92,10 @@
                 "cy":240.819,
                 "width":640,
                 "height":480,
-                "udp_host":"127.0.0.1",
-                "udp_port":5004,
             },
         ),
-
         (
-            path:"camera_configs/camera_template_gstreamer.ron",
+            path:"camera_configs/camera_template_v4l.ron",
             params:{
                 "id":"side",
                 "port":"pci-0000:00:14.0-usb-0:1:1.0",
@@ -113,7 +110,7 @@
             },
         ),
         (
-            path:"camera_configs/camera_template_gstreamer.ron",
+            path:"camera_configs/camera_template_v4l.ron",
             params:{
                 "id":"iriun",
                 "port":"virtual-iriun-webcam-001",
@@ -128,8 +125,8 @@
             },
         ),
     ],
-    // monitor:(type:"cu_cursive_consolemon::CuCursiveConsoleMon"),
-    monitor:(type:"cu_consolemon::CuConsoleMon"),
+    monitor:(type:"cu_cursive_consolemon::CuCursiveConsoleMon"),
+    // monitor:(type:"cu_consolemon::CuConsoleMon"),
     logging:(
         enable_task_logging:true,
         section_size_mib:8,

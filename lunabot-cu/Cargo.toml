@@ -45,7 +45,7 @@ anyhow = "1"
 serde = { version = "1", features = ["derive"] }
 iceoryx2 = { path = "../../iceoryx2/iceoryx2" }
 libc = "0.2.173"
-nix = "0.30.1"
+nix = {version="0.30.1", features = ["time"]}
 bytemuck = "1.14"
 nalgebra = { version = "0.33", features = [
     "serde-serialize",
