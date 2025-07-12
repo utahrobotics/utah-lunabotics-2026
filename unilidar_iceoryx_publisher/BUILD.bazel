@@ -1,3 +1,4 @@
+load("@rules_rust//rust:defs.bzl", "rust_common")
 load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
 
 # Define the Unilidar SDK as a precompiled library
