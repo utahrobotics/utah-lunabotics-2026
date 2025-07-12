@@ -1,0 +1,51 @@
+load("@rules_cc//cc:defs.bzl", "cc_binary", "cc_library")
+
+# Define the Unilidar SDK as a precompiled library
+cc_library(
+    name = "unilidar_sdk",
+    srcs = [
+        # Static library from Unilidar SDK
+        "third_party/unilidar_sdk/lib/x86_64/libunilidar_sdk2.a",
+    ],
+    hdrs = glob([
+        "third_party/unilidar_sdk/include/**/*.h",
+        "third_party/unilidar_sdk/include/**/*.hpp",
+    ]),
+    includes = [
+        "third_party/unilidar_sdk/include",
+    ],
+    visibility = ["//visibility:private"],
+)
+
+cc_library(
+    name = "local_headers",
+    hdrs = glob(["include/**/*.hpp"]),
+    strip_include_prefix = "include",  # removes the prefix so "imu_point_types.hpp" works
+    visibility = ["//visibility:public"],
+)
+
+# Main executable
+cc_binary(
+    name = "unilidar_publisher",
+    srcs = [
+        "src/main.cpp",
+    ],
+    deps = [
+        ":unilidar_sdk",
+        ":local_headers",
+        "@iceoryx2//:iceoryx2-cxx-static",
+    ],
+    copts = [
+        "-std=c++17",
+        "-Wall",
+        "-Wextra", 
+        "-Wpedantic",
+    ],
+    defines = [
+        "ICEORYX2_PROJECT=1",
+    ],
+    linkopts = [
+        # Add rpath for runtime library location if needed
+        "-Wl,-rpath,$$ORIGIN",
+    ],
+)
