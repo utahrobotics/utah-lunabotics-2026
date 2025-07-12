@@ -3,7 +3,7 @@ resolver = "3"
 members = [ "realsense", "lunabot-ai2"]
 
 [workspace.dependencies]
-iceoryx2 = { path = "../../iceoryx2/iceoryx2" }
+iceoryx2 = "0.6.1"
 indexmap = "2.3.0"
 tokio = { version = "1", features = ["full"] }
 fxhash = "0.2"

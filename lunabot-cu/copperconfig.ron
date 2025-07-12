@@ -125,7 +125,7 @@
             },
         ),
     ],
-    monitor:(type:"cu_cursive_consolemon::CuCursiveConsoleMon"),
+    // monitor:(type:"cu_cursive_consolemon::CuCursiveConsoleMon"),
     // monitor:(type:"cu_consolemon::CuConsoleMon"),
     logging:(
         enable_task_logging:true,

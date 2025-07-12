@@ -35,7 +35,7 @@ fn main() {
     let suppress_output = cfg!(not(debug_assertions));
     let mut unilidar_cmd = ProcessCommand::new("./unilidar_publisher")
         .with_detach(true)
-        .with_working_directory("../unilidar_iceoryx_publisher/");
+        .with_working_directory("../unilidar_iceoryx_publisher/bazel-bin/");
     if suppress_output {
         unilidar_cmd = unilidar_cmd.with_suppress_output(true);
     }

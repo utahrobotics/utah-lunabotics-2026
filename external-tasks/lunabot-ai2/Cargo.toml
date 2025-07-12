@@ -10,6 +10,6 @@ embedded_common = { path = "../../embedded_common" }
 indexmap.workspace = true
 nalgebra.workspace = true
 fxhash.workspace = true
-iceoryx2 = { path = "../../../iceoryx2/iceoryx2" }
+iceoryx2 = "0.6.1"
 iceoryx-types = { path = "../../misc/iceoryx-types" }
 bincode = { version = "2.0.1", features = ["derive", "serde"] }

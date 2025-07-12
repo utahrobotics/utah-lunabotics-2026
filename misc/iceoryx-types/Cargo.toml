@@ -4,6 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-iceoryx2 = { path = "../../../iceoryx2/iceoryx2" }
+iceoryx2 = "0.6.1"
 bincode = { version = "2.0.1", features = ["derive"] } 
 serde = { version = "1", features = ["derive"] }
