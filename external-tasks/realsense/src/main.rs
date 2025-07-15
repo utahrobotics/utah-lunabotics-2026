@@ -94,7 +94,7 @@ pub fn enumerate_depth_cameras(
             loop {
                 let device = match device_hub.wait_for_device() {
                     Ok(x) => {
-                        println!("Received device for camera {}", target_serial);
+                        // println!("Received device for camera {}", target_serial);
                         x
                     },
                     Err(_e) => {
@@ -112,7 +112,7 @@ pub fn enumerate_depth_cameras(
                     continue;
                 };
                 if target_serial != current_serial_str {
-                    println!("Skipping device for camera {}", current_serial_str);
+                    // println!("Skipping device for camera {}", current_serial_str);
                     continue;
                 }
                 
