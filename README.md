@@ -8,18 +8,16 @@ A modular robotics framework for controlling a lunar excavation robot using the 
 
 The system is built on the [Copper framework](https://github.com/copper-project/copper-rs), which provides:
 - **Real-time task execution** with deterministic scheduling
-- **Message-passing communication** between tasks using typed channels  
-- **Zero-copy data sharing** for high-performance sensor processing
 - **Distributed processing** across multiple cores and nodes
 - **Configuration-driven architecture** using RON (Rust Object Notation)
-- **Inter-Process communication** using Iceoryx2 for integration with separate processes running in ROS2 or elsewhere. 
+- **Inter-Process communication** using Iceoryx2 for integration with separate processes running in ROS2 or elsewhere
 
 ### Core Components
 
 - **Vision System**: Multi-camera setup with AprilTag detection for localization
 - **LIDAR Processing**: Unitree L2 and RealSense LIDAR integration via iceoryx2 IPC.
 - **Robot State**: IMU-based orientation tracking and kinematic modeling
-- **Localization**: Sensor fusion for robot pose estimation
+- **Localization**: Sensor fusion from IMUs, and KISS-ICP for robot pose estimation
 - **Data Logging**: Real-time visualization and recording using Rerun
 - **Teleop**: Using UDP for communication between the base and bot with a custom quality of service state machine.
 - **Lunabase**: Base station software for controlling the robot as well as receiving telemetry and camera feeds.
@@ -28,42 +26,20 @@ The system is built on the [Copper framework](https://github.com/copper-project/
 
 ### Required Dependencies
 
-1. **iceoryx2** - Zero-copy inter-process communication framework
-   ```bash
-   # Ubuntu installation
-   https://iceoryx2.readthedocs.io/getting_started.html#ubuntu
-   # Build with examples off
-   ```
-   IMPORTANT: clone iceoryx2 in your home directory, and make sure cu-lunabotics is also in your home directory.
+1. Bazel 6.2 
 
-2. **Copper Framework** - Real-time robotics task framework
-   ```bash
-   # Automatically pulled from git in Cargo.toml
-   https://github.com/matthewashton-k/copper-rs.git
-   ```
-3. LAPACK/openblas libraries:
+2. LAPACK/openblas libraries:
 
 ```bash
 sudo apt update && sudo apt install -y liblapack-dev libblas-dev libopenblas-dev
 ```
 
-4. realsense2 SDK
-
-5. ros2 with iceoryx2_rmw
-
-https://github.com/ekxide/rmw_iceoryx2
+3. realsense2 SDK
 
 
 #### Build instructions for the unitree_lidar_ros2 service
 
 1. https://github.com/matthewashton-k/unilidar_sdk2/blob/main/ROLLING_BUILD_INSTRUCTIONS.md
-
-
-#### ROS2 build deps
-
-1. libasio
-
-2. nlohmann-json3
 
 
 ### Optional Dependencies
@@ -230,25 +206,10 @@ L2 LIDAR → PointCloudReceiver → PointCloudSink → Rerun Visualization
 4. **PointCloudSink** logs data to Rerun for visualization
 5. **Localizer** incorporates IMU data for robot orientation updates
 
-### Coordinate System Integration
-
-- **L2 LIDAR coordinates** → **Robot base frame** via kinematic transforms
-- **Camera coordinates** → **Robot base frame** via AprilTag observations
-- **Robot base frame** → **Global frame** via sensor fusion in localizer
-
 ## Building and Running
 
 ```bash
-# build and run unilidar publisher 
-mkdir build && cd build
-cmake ..
-make
-cd ../
-./run_publisher.sh
-
-# build and run the lunabot
-make prod # no logging
-made debug # logging
+make help # see commands for building and running
 ```
 
 ## Camera discovery
