@@ -37,6 +37,10 @@ check:
 clean:
 	cd $(UNILIDAR_DIR) && bazel clean
 
+# Kill all processes
+kill:
+	killall realsense unilidar_publisher lunabot-ai2
+
 # Help target to show available commands
 help:
 	@echo "Available targets:"
