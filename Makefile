@@ -52,6 +52,7 @@ help:
 	@echo "  discover-cameras  - Run camera discovery tool"
 	@echo "  check             - Run cargo check on lunabot-cu"
 	@echo "  clean             - Clean Bazel build artifacts"
+	@echo "  kill              - Kill any lunabot sub processes that may still be running"
 	@echo "  help              - Show this help message"
 
 .PHONY: prod debug sync clean-build build-publisher discover-cameras check clean help
