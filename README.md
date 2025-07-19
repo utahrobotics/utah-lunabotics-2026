@@ -37,6 +37,7 @@ sudo apt update && sudo apt install -y liblapack-dev libblas-dev libopenblas-dev
 3. realsense2 SDK
 
 4. GStreamer
+5. libssl-dev
 
 
 ### Optional Dependencies
