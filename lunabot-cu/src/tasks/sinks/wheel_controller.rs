@@ -13,7 +13,7 @@ impl<'cl> CuSinkTask<'cl> for WheelController {
         Ok(Self)
     }
 
-    fn process(&mut self, _clock: &RobotClock, input: Self::Input) -> CuResult<()> {
+    fn process(&mut self, clock: &RobotClock, input: Self::Input) -> CuResult<()> {        
         if let Some(payload) = input.payload() {
             if let Some(FromAI::SetSteering(steer)) = &payload.0 {
                 info!("WheelController: steering {}", steer.get_left_and_right());

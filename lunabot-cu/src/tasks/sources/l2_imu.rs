@@ -69,7 +69,9 @@ impl<'cl> CuSrcTask<'cl> for ImuIceoryxReceiver {
         Ok(())
     }
 
-    fn process(&mut self, _clock: &RobotClock, new_msg: Self::Output) -> CuResult<()> {
+    fn process(&mut self, clock: &RobotClock, new_msg: Self::Output) -> CuResult<()> {
+        let start = clock.now().as_nanos();
+        
         let subscriber = self
             .subscriber
             .as_ref()
@@ -139,7 +141,6 @@ impl<'cl> CuSrcTask<'cl> for ImuIceoryxReceiver {
         } else {
             new_msg.clear_payload();
         }
-
         Ok(())
     }
 

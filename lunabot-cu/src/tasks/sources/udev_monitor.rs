@@ -111,7 +111,7 @@ impl<'cl> CuSrcTask<'cl> for UdevMonitor {
         Ok(())
     }
 
-    fn process(&mut self, _clock: &RobotClock, output: Self::Output) -> CuResult<()> {
+    fn process(&mut self, clock: &RobotClock, output: Self::Output) -> CuResult<()> {        
         output.clear_payload();
         // first pop off the initial enumerated devices
         if !self.initial_enumerated.is_empty() {
@@ -124,7 +124,7 @@ impl<'cl> CuSrcTask<'cl> for UdevMonitor {
         if let Some(monitor_socket) = &self.monitor_socket {
             // Create an iterator from the socket and fetch the next event if any.
             if let Some(event) = monitor_socket.iter().next() {
-                info!("got udev event");
+                println!("got udev event");
                 match event.event_type() {
                     EventType::Add => {
                         let Some(devnode) = event.devnode() else { return Ok(()); };

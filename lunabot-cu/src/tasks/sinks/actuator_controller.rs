@@ -14,7 +14,7 @@ impl<'cl> CuSinkTask<'cl> for ActuatorController {
         Ok(Self)
     }
 
-    fn process(&mut self, _clock: &RobotClock, input: Self::Input) -> CuResult<()> {
+    fn process(&mut self, clock: &RobotClock, input: Self::Input) -> CuResult<()> {        
         if let Some(payload) = input.payload() {
             if let Some(FromAI::SetActuators(cmd)) = &payload.1 {
                 info!("ActuatorController: lift command {}", cmd.to_string());

@@ -70,10 +70,10 @@
         (id:"actuator_ctrl", type:"crate::tasks::sinks::ActuatorController", config:{}),
     ],
     cnx:[
-        (src:"l2_pointcloud", dst:"l2_pointcloud_sink", msg:"crate::tasks::PointCloudPayload"),
+        (src:"l2_pointcloud", dst:"l2_pointcloud_sink", msg:"iceoryx_types::IceoryxPointCloud"),
         (src:"l2_imu", dst:"localizer", msg:"iceoryx_types::ImuMsg"),
-        (src:"l2_pointcloud", dst: "l2_kiss_icp", msg:"crate::tasks::PointCloudPayload"),
-        (src:"realsense_pointcloud", dst: "realsense_kiss_icp", msg:"crate::tasks::PointCloudPayload"),
+        (src:"l2_pointcloud", dst: "l2_kiss_icp", msg:"iceoryx_types::IceoryxPointCloud"),
+        (src:"realsense_pointcloud", dst: "realsense_kiss_icp", msg:"iceoryx_types::IceoryxPointCloud"),
         (src:"l2_kiss_icp", dst:"localizer", msg:"cu_spatial_payloads::Transform3D<f64>"),
         (src:"realsense_kiss_icp", dst:"localizer", msg:"cu_spatial_payloads::Transform3D<f64>"),
         (src:"lunabase", dst:"ai_sink", msg:"Option<common::FromLunabase>"),
@@ -82,7 +82,7 @@
     ],
     includes:[
         (
-            path:"camera_configs/camera_template_v4l.ron",
+            path:"camera_configs/camera_template_gstreamer.ron",
             params:{
                 "id":"back",
                 "port":"pci-0000:35:00.0-usb-0:1:1.0",
@@ -92,10 +92,12 @@
                 "cy":240.819,
                 "width":640,
                 "height":480,
+                "udp_host":"127.0.0.1",
+                "udp_port":5004,
             },
         ),
         (
-            path:"camera_configs/camera_template_v4l.ron",
+            path:"camera_configs/camera_template_gstreamer.ron",
             params:{
                 "id":"side",
                 "port":"pci-0000:00:14.0-usb-0:1:1.0",
@@ -110,7 +112,7 @@
             },
         ),
         (
-            path:"camera_configs/camera_template_v4l.ron",
+            path:"camera_configs/camera_template_gstreamer.ron",
             params:{
                 "id":"iriun",
                 "port":"virtual-iriun-webcam-001",
@@ -128,7 +130,7 @@
     // monitor:(type:"cu_cursive_consolemon::CuCursiveConsoleMon"),
     // monitor:(type:"cu_consolemon::CuConsoleMon"),
     logging:(
-        enable_task_logging:true,
+        enable_task_logging:false,
         section_size_mib:8,
     ),
 )

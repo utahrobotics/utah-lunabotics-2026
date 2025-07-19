@@ -6,18 +6,18 @@
             config: {
                 "camera_id": "cam_{{id}}",
                 "device_port": "{{port}}",
-                "pipeline": "v4l2src device=<devpath> ! video/x-raw,width={{width}},height={{height}} ! videoconvert ! tee name=t ! queue ! videoconvert ! video/x-raw,format=GRAY8 ! appsink name=copper t. ! queue ! videoconvert ! video/x-raw,format=NV12 ! vaapih264enc bitrate=2000 ! rtph264pay ! udpsink host={{udp_host}} port={{udp_port}} sync=false",
+                "pipeline": "v4l2src device=<devpath> ! video/x-raw,width={{width}},height={{height}} ! videoconvert ! tee name=t ! queue ! videoconvert ! video/x-raw,format=GRAY8 ! appsink name=copper_cam_{{id}} t. ! queue ! videoconvert ! video/x-raw,format=NV12 ! vaapih264enc bitrate=2000 ! rtph264pay ! udpsink host={{udp_host}} port={{udp_port}} sync=false",
                 "caps": "video/x-raw, format=GRAY8, width={{width}}, height={{height}}",
-                "timeout_ms": 100,
+                "timeout_ms": 500,
             },
         ),
         (
-            id: "thres_{{id}}",
-            type: "cu_dynthreshold::DynThreshold",
+            id: "gst_convert_{{id}}",
+            type: "crate::tasks::GstToImage",
             config: {
                 "width": {{width}},
                 "height": {{height}},
-                "block_radius": 100
+                "pixel_format": "GRAY"
             }
         ),
         (
@@ -47,8 +47,8 @@
     ],
     cnx: [
         (src: "udev_monitor", dst: "cam_{{id}}", msg: "crate::tasks::NewDevice"),
-        (src: "cam_{{id}}", dst: "thres_{{id}}", msg: "crate::tasks::CuGstBuffer"),
-        (src: "thres_{{id}}", dst: "detector_cam_{{id}}", msg: "cu_sensor_payloads::CuImage<Vec<u8>>"),
+        (src: "cam_{{id}}", dst: "gst_convert_{{id}}", msg: "crate::tasks::CuGstBuffer"),
+        (src: "gst_convert_{{id}}", dst: "detector_cam_{{id}}", msg: "cu_sensor_payloads::CuImage<Vec<u8>>"),
         (src: "detector_cam_{{id}}", dst: "detection_handler", msg: "cu_apriltag::AprilTagDetections"),
         (src: "detection_handler", dst: "localizer", msg: "Box<std::collections::HashMap<String, cu_spatial_payloads::Transform3D<f64>>>")
     ],

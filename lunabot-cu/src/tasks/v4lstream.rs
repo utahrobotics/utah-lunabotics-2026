@@ -44,7 +44,6 @@ impl CuV4LStream {
             return Err(io::Error::other("Stream not active"));
         }
 
-        // Use existing timeout instead of forcing non-blocking
         match self.dequeue() {
             Ok(index) => {
                 self.arena_last_freed_up_index = index;

@@ -169,7 +169,7 @@ mod linux_impl {
                                 let image = CuImage::new(*fmt, handle.clone());
                                 
                                 output.set_payload(image);
-                                output.metadata.tov = Tov::Time(cutime);
+                                output.tov = Tov::Time(cutime);
                                 self.last_frame_time = Some(Instant::now());
                                 
                                 // Requeue buffer after successful processing

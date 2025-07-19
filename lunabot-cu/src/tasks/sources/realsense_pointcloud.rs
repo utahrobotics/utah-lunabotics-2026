@@ -8,7 +8,6 @@ use cu29::cutask::CuMsg;
 use crate::ROOT_NODE;
 use simple_motion::StaticNode;
 use iceoryx_types::{IceoryxPointCloud, PointXYZIR, MAX_POINT_CLOUD_POINTS};
-use crate::tasks::PointCloudPayload;
 use nalgebra::Point3;
 use std::time::Instant;
 
@@ -18,13 +17,13 @@ pub struct RealSensePointCloudReceiver {
     service: Option<PortFactory<ipc::Service, IceoryxPointCloud, ()>>,
     subscriber: Option<Subscriber<ipc::Service, IceoryxPointCloud, ()>>,
     camera_node: StaticNode,
-    last_seen: Instant
+    last_seen: u64
 }
 
 impl Freezable for RealSensePointCloudReceiver {}
 
 impl<'cl> CuSrcTask<'cl> for RealSensePointCloudReceiver {
-    type Output = output_msg!('cl, PointCloudPayload);
+    type Output = output_msg!('cl, IceoryxPointCloud);
 
     fn new(config: Option<&ComponentConfig>) -> CuResult<Self> {
         let service_str = config
@@ -55,7 +54,7 @@ impl<'cl> CuSrcTask<'cl> for RealSensePointCloudReceiver {
             service: None,
             subscriber: None,
             camera_node,
-            last_seen: Instant::now()
+            last_seen: 0
         })
     }
 
@@ -79,52 +78,33 @@ impl<'cl> CuSrcTask<'cl> for RealSensePointCloudReceiver {
     }
 
     fn process(&mut self, clock: &RobotClock, new_msg: Self::Output) -> CuResult<()> {
+        new_msg.clear_payload();
+        
         let subscriber = self
             .subscriber
             .as_ref()
-            .ok_or_else(|| CuError::from("RealSensePointCloudReceiver: subscriber missing"))?;
+            .ok_or_else(|| CuError::from("PointCloudIceoryxReceiver: subscriber missing"))?;
 
-        let mut payload = Box::new(PointCloudPayload::default());
+        // Allocate on the heap to keep the stack small in debug builds
+
         let iso = self.camera_node.get_isometry_from_base();
-
         while let Some(sample) = subscriber.receive().map_err(|e| {
-            CuError::new_with_cause("RealSensePointCloudReceiver: receive", e)
+            CuError::new_with_cause("PointCloudIceoryxReceiver: receive", e)
         })? {
-            let cloud: &IceoryxPointCloud = &*sample;
-            info!("Received {} points from RealSense", cloud.publish_count);
-            self.last_seen = Instant::now();
-            for idx in 0..cloud.publish_count.min(MAX_POINT_CLOUD_POINTS as u64) {
-                let p: PointXYZIR = cloud.points[idx as usize];
-                let point = Point3::new(p.x as f64, p.y as f64, p.z as f64);
-                let transformed_point = iso.transform_point(&point);
-
-                // Convert camera coordinate system to global coordinate system
-                payload.points.push(PointCloud::new(
-                    clock.now(),
-                    transformed_point.x as f32,
-                    transformed_point.y as f32,
-                    transformed_point.z as f32,
-                    p.intensity,
-                    Some(p.ring as u8),
-                ));
-                payload.timestamps[idx as usize] = p.time;
-            }
+            let payload = sample.payload().clone();
+            new_msg.set_payload(payload);
+            self.last_seen = clock.now().as_nanos();
         }
 
-        if !payload.points.is_empty() {
-            new_msg.set_payload(*payload);
-        } else {
-            new_msg.clear_payload();
-        }
-
-        if self.last_seen.elapsed().as_millis() > 500 {
+        if clock.now().as_nanos() - self.last_seen > 600_000 {
             return Err(
-                CuError::new_with_cause("No pointcloud for 500 ms", 
-                    std::io::Error::other("No pointcloud seen for 500 ms")
+                CuError::new_with_cause(
+                    "No points seen in 600 ms", 
+                    std::io::Error::other("No points seen in 600 ms")
                 )
             )
         } else {
-            return Ok(())
+            return Ok(());
         }
     }
 

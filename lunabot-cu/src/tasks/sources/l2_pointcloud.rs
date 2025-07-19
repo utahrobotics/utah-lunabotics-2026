@@ -10,52 +10,8 @@ use crate::ROOT_NODE;
 use simple_motion::StaticNode;
 use iceoryx_types::{IceoryxPointCloud, PointXYZIR, MAX_POINT_CLOUD_POINTS};
 use nalgebra::Point3;
-// timestamps are normalized to [0,1] range for KISS-ICP deskewing
-
-#[derive(Debug, Clone)]
-pub struct PointCloudPayload {
-    pub points: PointCloudSoa<MAX_POINT_CLOUD_POINTS>,
-    pub timestamps: [f32; MAX_POINT_CLOUD_POINTS],
-}
-
-impl Default for PointCloudPayload {
-    fn default() -> Self {
-        Self {
-            points: PointCloudSoa::default(),
-            timestamps: [0.0; MAX_POINT_CLOUD_POINTS],
-        }
-    }
-}
-
-impl Encode for PointCloudPayload {
-    fn encode<E: bincode::enc::Encoder>(&self, encoder: &mut E) -> Result<(), bincode::error::EncodeError> {
-        self.points.encode(encoder)?;
-        self.timestamps.encode(encoder)?;
-        Ok(())
-    }
-}
-
-impl Decode<()> for PointCloudPayload {
-    fn decode<D: bincode::de::Decoder<Context = ()>>(decoder: &mut D) -> Result<Self, bincode::error::DecodeError> {
-        let points = PointCloudSoa::decode(decoder)?;
-        let timestamps = <[f32; MAX_POINT_CLOUD_POINTS]>::decode(decoder)?;
-        Ok(Self { points, timestamps })
-    }
-}
 
 use serde::ser::{SerializeStruct, Serializer};
-
-impl serde::Serialize for PointCloudPayload {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let mut state = serializer.serialize_struct("PointCloudPayload", 2)?;
-        state.serialize_field("points", &self.points)?;
-        state.serialize_field("timestamps", &self.timestamps[..])?;
-        state.end()
-    }
-}
 
 pub struct PointCloudIceoryxReceiver {
     service_name: ServiceName,
@@ -63,13 +19,13 @@ pub struct PointCloudIceoryxReceiver {
     service: Option<PortFactory<ipc::Service, IceoryxPointCloud, ()>>,
     subscriber: Option<Subscriber<ipc::Service, IceoryxPointCloud, ()>>,
     l2_node: StaticNode,
-    last_seen: Instant
+    last_seen: u64
 }
 
 impl Freezable for PointCloudIceoryxReceiver {}
 
 impl<'cl> CuSrcTask<'cl> for PointCloudIceoryxReceiver {
-    type Output = output_msg!('cl, PointCloudPayload);
+    type Output = output_msg!('cl, IceoryxPointCloud);
 
     fn new(config: Option<&ComponentConfig>) -> CuResult<Self> {
         let service_str = config
@@ -91,7 +47,7 @@ impl<'cl> CuSrcTask<'cl> for PointCloudIceoryxReceiver {
             service: None,
             subscriber: None,
             l2_node: ROOT_NODE.get().unwrap().get_node_with_name("l2_front").unwrap().clone(),
-            last_seen: Instant::now()
+            last_seen: 0
         })
     }
 
@@ -115,50 +71,25 @@ impl<'cl> CuSrcTask<'cl> for PointCloudIceoryxReceiver {
     }
 
     fn process(&mut self, clock: &RobotClock, new_msg: Self::Output) -> CuResult<()> {
+        new_msg.clear_payload();
+        
         let subscriber = self
             .subscriber
             .as_ref()
             .ok_or_else(|| CuError::from("PointCloudIceoryxReceiver: subscriber missing"))?;
 
         // Allocate on the heap to keep the stack small in debug builds
-        let mut payload = Box::new(PointCloudPayload::default());
 
         let iso = self.l2_node.get_isometry_from_base();
         while let Some(sample) = subscriber.receive().map_err(|e| {
             CuError::new_with_cause("PointCloudIceoryxReceiver: receive", e)
         })? {
-            let cloud: &IceoryxPointCloud = &*sample;
-            info!("Received {} points in cloud", cloud.publish_count);
-            let mut pub_count = cloud.publish_count.min(MAX_POINT_CLOUD_POINTS as u64);
-            self.last_seen = Instant::now();
-            for idx in 0..(pub_count as usize) {
-                let p: PointXYZIR = cloud.points[idx as usize];
-                let point = Point3::new(p.x as f64, p.y as f64, p.z as f64);
-                let transformed_point = iso.transform_point(&point);
-                // if p.intensity < 200. {
-                //     pub_count -= 1;
-                //     continue;
-                // }
-                // Convert L2 coordinate system to lidar coordinate system
-                payload.points.push(PointCloud::new(
-                    clock.now(),
-                    transformed_point.x as f32,
-                    transformed_point.y as f32,
-                    transformed_point.z as f32,
-                    p.intensity,
-                    Some(p.ring as u8),
-                ));
-                payload.timestamps[idx as usize] = p.time;
-            }
+            let payload = sample.payload().clone();
+            new_msg.set_payload(payload);
+            self.last_seen = clock.now().as_nanos();
         }
 
-        if !payload.points.is_empty() {
-            new_msg.set_payload(*payload); // move value out of the Box
-        } else {
-            new_msg.clear_payload();
-        }
-
-        if self.last_seen.elapsed().as_millis() > 600 {
+        if clock.now().as_nanos() - self.last_seen > 600_000 {
             return Err(
                 CuError::new_with_cause(
                     "No points seen in 600 ms", 

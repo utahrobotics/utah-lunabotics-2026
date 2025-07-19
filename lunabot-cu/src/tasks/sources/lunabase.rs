@@ -53,7 +53,7 @@ impl<'cl> CuSrcTask<'cl> for Lunabase {
         })
     }
 
-    fn process(&mut self, _: &RobotClock, output: Self::Output) -> CuResult<()> {
+    fn process(&mut self, clock: &RobotClock, output: Self::Output) -> CuResult<()> {        
         // Collect the latest message from lunabase without blocking. The loop drains the
         // receiver so we only forward the most recent command each cycle – this keeps the
         // process function fast while ensuring we never fall behind.
@@ -96,7 +96,6 @@ impl<'cl> CuSrcTask<'cl> for Lunabase {
             // No new message this cycle – clear any previous payload.
             output.clear_payload();
         }
-
         Ok(())
     }
 }

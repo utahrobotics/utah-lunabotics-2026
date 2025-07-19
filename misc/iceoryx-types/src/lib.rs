@@ -26,15 +26,17 @@ pub struct PointXYZIR {
 
 /// Maximum number of points stored in the fixed-size point-cloud message.
 /// Reduced from 130 000 → 20 000 to keep message size (and stack usage in Rust) reasonable.
-pub const MAX_POINT_CLOUD_POINTS: usize = 20000;
+pub const MAX_POINT_CLOUD_POINTS: usize = 6000;
 
 #[repr(C)]
-#[derive(Clone, Debug, ZeroCopySend)]
+#[derive(Clone, Debug, ZeroCopySend, Encode, Decode, Serialize)]
 #[type_name("IceoryxPointCloud")]
 pub struct IceoryxPointCloud {
     pub publish_count: u64,
+    #[serde(serialize_with = "<[_]>::serialize")]
     pub points: [PointXYZIR; MAX_POINT_CLOUD_POINTS],
 }
+
 
 impl Default for IceoryxPointCloud {
     fn default() -> Self {

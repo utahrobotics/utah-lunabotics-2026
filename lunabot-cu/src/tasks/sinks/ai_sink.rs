@@ -38,7 +38,7 @@ impl<'cl> CuSinkTask<'cl> for AiSink {
         Ok(Self { publisher })
     }
 
-    fn process(&mut self, _clock: &RobotClock, input: Self::Input) -> CuResult<()> {
+    fn process(&mut self, clock: &RobotClock, input: Self::Input) -> CuResult<()> {        
         if let Some(Some(msg)) = input.payload() {
             // Convert to FromHost variant
             let host_msg = FromHost::FromLunabase { msg: *msg };
@@ -65,7 +65,6 @@ impl<'cl> CuSinkTask<'cl> for AiSink {
                 }
             }
         }
-
         Ok(())
     }
 }

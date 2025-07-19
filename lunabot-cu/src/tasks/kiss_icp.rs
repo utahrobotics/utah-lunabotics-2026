@@ -2,8 +2,8 @@ use cu29::{cutask::{CuMsg, CuTask, Freezable}, input_msg, output_msg, config::Co
 use cu_spatial_payloads::Transform3D;
 use rerun::Rgba32;
 
+use iceoryx_types::IceoryxPointCloud;
 
-use crate::tasks::PointCloudPayload;
 use crate::rerun_viz;
 
 use kiss_icp_core::{
@@ -48,7 +48,7 @@ pub struct KissIcp {
 impl Freezable for KissIcp {}
 
 impl<'cl> CuTask<'cl> for KissIcp {
-    type Input = input_msg!('cl, PointCloudPayload);
+    type Input = input_msg!('cl, IceoryxPointCloud);
     type Output = output_msg!('cl, Transform3D<f64>);
 
     fn new(config: Option<&ComponentConfig>) -> CuResult<Self>
@@ -127,31 +127,28 @@ impl<'cl> CuTask<'cl> for KissIcp {
 
     fn process(
         &mut self,
-        _clock: &RobotClock,
+        clock: &RobotClock,
         input: Self::Input,
         output: Self::Output,
-    ) -> CuResult<()> {
+    ) -> CuResult<()> {      
+        let start = clock.now().as_nanos();  
         if let Some(point_cloud_payload) = input.payload() {
             let mut raw_points = Vec::new();
             let mut timestamps = Vec::new();
             
-            for (idx, point_cloud) in point_cloud_payload.points.iter().enumerate() {
-                let cu_sensor_payloads::Distance(x_length) = point_cloud.x;
-                let cu_sensor_payloads::Distance(y_length) = point_cloud.y;
-                let cu_sensor_payloads::Distance(z_length) = point_cloud.z;
+            for (idx, point) in point_cloud_payload.points[..point_cloud_payload.publish_count as usize].iter().enumerate() {
+                let x = point.x;
+                let y = point.y;
+                let z = point.z;
                 
                 let voxel_point = Vector3::new(
-                    x_length.value as f64,
-                    y_length.value as f64, 
-                    z_length.value as f64,
+                    x as f64,
+                    y as f64,
+                    z as f64,
                 );
                 raw_points.push(voxel_point);
                 
-                if idx < point_cloud_payload.timestamps.len() {
-                    timestamps.push(point_cloud_payload.timestamps[idx] as f64);
-                } else {
-                    timestamps.push(0.5_f64);
-                }
+                timestamps.push(point.time)
             }
             
             if raw_points.is_empty() {
@@ -161,7 +158,9 @@ impl<'cl> CuTask<'cl> for KissIcp {
 
 
             let raw_matrix = self.points_to_voxel_matrix(&raw_points);
-
+            let timestamps = point_cloud_payload.points[..point_cloud_payload.publish_count as usize].iter().map(|p| {
+                p.time as f64
+            }).collect::<Vec<f64>>();
             let deskewed_points: Vec<VoxelPoint> = if self.enable_deskewing && self.is_initialized {
                 self.scan_start_pose = self.previous_pose;
                 self.scan_finish_pose = self.current_pose;
@@ -232,7 +231,6 @@ impl<'cl> CuTask<'cl> for KissIcp {
         } else {
             output.clear_payload();
         }
-
         Ok(())
     }
 

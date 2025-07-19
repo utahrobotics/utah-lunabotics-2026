@@ -14,7 +14,7 @@ use crate::tasks::NewDevice;
 // type mismatches in Copper's type-matching logic.
 pub use cu_gstreamer::CuGstBuffer;
 
-pub type CuDefaultAutoGStreamer = CuAutoGStreamer<8>;
+pub type CuDefaultAutoGStreamer = CuAutoGStreamer<16>;
 
 /// Automatically starts a GStreamer pipeline when the desired camera is detected by `UdevMonitor`.
 /// While the pipeline is running it feeds the most recent buffers through a circular queue.
@@ -87,7 +87,7 @@ impl<'cl, const N: usize> CuTask<'cl> for CuAutoGStreamer<N> {
             circular_buffer: Arc::new(Mutex::new(CircularBuffer::new())),
             last_frame_time: None,
             pending_dev_path: None,
-            teardown_requested: false
+            teardown_requested: false,
         })
     }
 
@@ -96,10 +96,11 @@ impl<'cl, const N: usize> CuTask<'cl> for CuAutoGStreamer<N> {
     }
 
 
-    fn preprocess(&mut self, _clock: &RobotClock) -> CuResult<()> {
+    fn preprocess(&mut self, clock: &RobotClock) -> CuResult<()> {
         // Handle requested teardowns first
         if self.teardown_requested {
             self.teardown_requested = false;
+            info!("GStreamer: Teardown requested");
             self.stop_pipeline();
         }
 
@@ -136,13 +137,12 @@ impl<'cl, const N: usize> CuTask<'cl> for CuAutoGStreamer<N> {
         // Process frames (non-blocking)
         let frame = self.circular_buffer.lock().unwrap().pop_front();
         if let Some(buffer) = frame {
-            output.metadata.tov = clock.now().into();
+            output.tov = clock.now().into();
             output.set_payload(buffer);
             self.last_frame_time = Some(Instant::now());
         } else {
             output.clear_payload();
         }
-
         Ok(())
     }
 
@@ -155,7 +155,6 @@ impl<'cl, const N: usize> CuTask<'cl> for CuAutoGStreamer<N> {
 
 impl<const N: usize> CuAutoGStreamer<N> {
     fn open_pipeline(&mut self, dev_path: &str) -> CuResult<()> {
-        info!("GStreamer: Opening pipeline for device {}", dev_path);
 
         let pipeline_str = self.pipeline_template.replace("<devpath>", dev_path);
         let pipeline = parse::launch(&pipeline_str)
@@ -163,9 +162,9 @@ impl<const N: usize> CuAutoGStreamer<N> {
         let pipeline = pipeline
             .dynamic_cast::<Pipeline>()
             .map_err(|_| CuError::from("Parsed element is not a Pipeline"))?;
-
+        println!("appsink name: {}", format!("copper_{}", self._camera_id));
         let appsink = pipeline
-            .by_name("copper")
+            .by_name(&format!("copper_{}", self._camera_id))
             .ok_or("Appsink element named 'copper' not found in pipeline")?
             .dynamic_cast::<AppSink>()
             .map_err(|_| CuError::from("Element 'copper' is not an AppSink"))?;
@@ -207,6 +206,7 @@ impl<const N: usize> CuAutoGStreamer<N> {
     }
 
     fn stop_pipeline(&mut self) {
+        info!("GStreamer: Stopping pipeline");
         if let Some(pipeline) = &self.pipeline {
             let _ = pipeline.set_state(gstreamer::State::Null);
         }

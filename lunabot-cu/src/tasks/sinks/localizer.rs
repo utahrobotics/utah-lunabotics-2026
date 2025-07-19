@@ -42,9 +42,11 @@ impl<'cl> CuSinkTask<'cl> for CuLocalizer {
 
     fn process(
         &mut self,
-        _clock: &RobotClock,
+        clock: &RobotClock,
         input: Self::Input,
     ) -> CuResult<()> {
+        let start = clock.now().as_nanos();
+
         // Get current robot isometry
         let mut isometry = self.root_node.get_global_isometry();
         
@@ -323,7 +325,7 @@ impl<'cl> CuSinkTask<'cl> for CuLocalizer {
                 }
             }
         }
-
+        let elapsed = (clock.now().as_nanos()- start)/1000;
         Ok(())
     }
 }

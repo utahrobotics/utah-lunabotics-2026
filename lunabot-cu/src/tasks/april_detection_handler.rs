@@ -94,6 +94,7 @@ fn load_known_apriltag_isometries() -> CuResult<HashMap<usize, Isometry3<f64>>> 
 #[derive(Default)]
 pub struct AprilDetectionHandler {
     known_tags: HashMap<usize, Isometry3<f64>>,
+    process_counter: u32,
 }
 
 impl Freezable for AprilDetectionHandler {}
@@ -110,10 +111,11 @@ impl<'cl> CuTask<'cl> for AprilDetectionHandler {
 
     fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
         let known_tags = load_known_apriltag_isometries()?;
-        Ok(Self { known_tags })
+        Ok(Self { known_tags, process_counter: 0 })
     }
 
-    fn process(&mut self, _clock: &RobotClock, input: Self::Input, output: Self::Output) -> CuResult<()> {
+    fn process(&mut self, clock: &RobotClock, input: Self::Input, output: Self::Output) -> CuResult<()> {
+        let start = clock.now().as_nanos();
         let (input1, input2, input3) = input;
 
         let mut result_map = HashMap::new();
@@ -148,7 +150,11 @@ impl<'cl> CuTask<'cl> for AprilDetectionHandler {
         if !result_map.is_empty() {
             output.set_payload(Box::new(result_map));
         }
+        let duration = clock.now().as_nanos() - start;
 
+        if duration/1000 > 10 {
+            eprintln!("apriltag detection handler took {} us", duration/1000)
+        }
         Ok(())
     }
 
@@ -363,7 +369,7 @@ impl Transform3DFromNa for Transform3D<f64> {
         mat[3][1] = 0.0;
         mat[3][2] = 0.0;
         mat[3][3] = 1.0;
-        Transform3D { mat }
+        Transform3D::from_matrix(mat)
     }
 }
 

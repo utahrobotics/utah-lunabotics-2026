@@ -38,7 +38,9 @@ impl<'cl> CuSrcTask<'cl> for AiSource {
         Ok(Self { subscriber })
     }
 
-    fn process(&mut self, _clock: &RobotClock, output: Self::Output) -> CuResult<()> {
+    fn process(&mut self, clock: &RobotClock, output: Self::Output) -> CuResult<()> {
+        let start = clock.now().as_nanos();
+        
         // Drain the subscriber queue so we always act on the most recent message
         let mut steering_msg: Option<FromAI> = None;
         let mut lift_msg: Option<FromAI> = None;
@@ -89,6 +91,7 @@ impl<'cl> CuSrcTask<'cl> for AiSource {
         } else {
             output.clear_payload();
         }
+        
         Ok(())
     }
 }
