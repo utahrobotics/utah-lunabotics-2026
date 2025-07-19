@@ -1,5 +1,5 @@
 # Bazel build configuration
-BAZEL_BUILD_FLAGS = --sandbox_debug --verbose_failures
+BAZEL_BUILD_FLAGS = --sandbox_debug --verbose_failures --spawn_strategy=standalone
 RUST_TOOLCHAIN_VERSION = 1.81.0
 UNILIDAR_DIR = unilidar_iceoryx_publisher
 
