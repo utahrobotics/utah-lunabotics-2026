@@ -38,7 +38,7 @@ http_archive(
     sha256 = "a00886f431c728b17a30d89559ee623d6cfbb4dbb1ee3f717ba27842e3ec4b14",
     strip_prefix = "iceoryx2-{}".format(ICEORYX2_VERSION),
     urls = [
-        "https://github.com/eclipse-iceoryx/iceoryx2/archive/{}.tar.gz".format(ICEORYX2_VERSION),
+        "https://github.com/eclipse-iceoryx/iceoryx2/archive/v{}.tar.gz".format(ICEORYX2_VERSION),
     ],
 )
 
