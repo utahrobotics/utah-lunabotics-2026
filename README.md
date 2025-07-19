@@ -36,10 +36,7 @@ sudo apt update && sudo apt install -y liblapack-dev libblas-dev libopenblas-dev
 
 3. realsense2 SDK
 
-
-#### Build instructions for the unitree_lidar_ros2 service
-
-1. https://github.com/matthewashton-k/unilidar_sdk2/blob/main/ROLLING_BUILD_INSTRUCTIONS.md
+4. GStreamer
 
 
 ### Optional Dependencies
