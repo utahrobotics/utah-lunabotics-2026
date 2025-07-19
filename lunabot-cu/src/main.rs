@@ -23,14 +23,6 @@ pub static ROOT_NODE: OnceLock<StaticNode> = OnceLock::new();
 struct LunabotApplication {}
 
 fn main() {
-    std::panic::set_hook(Box::new(|info| {
-        use std::arch::asm;
-
-        let sp: usize;
-        unsafe { asm!("mov {}, rsp", out(reg) sp) };
-        eprintln!("stack pointer at panic: 0x{:x}", sp);
-        eprintln!("{info}");
-    }));
     let mut launcher = launcher::ProcessLauncher::new();
     let suppress_output = cfg!(not(debug_assertions));
     let mut unilidar_cmd = ProcessCommand::new("./unilidar_publisher")
