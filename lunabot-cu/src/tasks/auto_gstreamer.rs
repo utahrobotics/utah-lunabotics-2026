@@ -126,8 +126,8 @@ impl<'cl, const N: usize> CuTask<'cl> for CuAutoGStreamer<N> {
 
         // Handle frame timeout without blocking
         if let Some(last) = self.last_frame_time {
-            if last.elapsed() > self.req_timeout {
-                info!("GStreamer: Frame timeout (>{:?}). Requesting teardown.", self.req_timeout);
+            if last.elapsed().as_millis() > self.req_timeout.as_millis() {
+                info!("GStreamer: Frame timeout (>{}). Requesting teardown.", self.req_timeout);
                 self.teardown_requested = true;
                 self.last_frame_time = None;
             }
