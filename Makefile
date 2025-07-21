@@ -27,7 +27,7 @@ build-publisher:
 
 # Run camera discovery
 discover-cameras:
-	cd camera-discovery && cargo run
+	cd misc/camera-discovery && cargo run
 
 # Check the main cargo project
 check:
