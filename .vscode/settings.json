@@ -1,6 +1,0 @@
-{
-    "files.associations": {
-        "cstdint": "cpp"
-    },
-    "cmake.sourceDirectory": "/home/matthew_a/lunabotics-cu/unilidar_iceoryx_publisher"
-}
