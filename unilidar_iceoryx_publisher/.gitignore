@@ -1,3 +1,8 @@
-build/
+build
+bazel-bin
+bazel-out
+bazel-testlogs
+bazel-unilidar_iceoryx_publisher
 CMakeFiles/
 unilidar_publisher
+*.log
