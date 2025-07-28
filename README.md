@@ -242,9 +242,8 @@ The system includes an optional **terminal-based monitoring interface** using th
 
 The console monitor displays a live text-based interface showing:
 - **Task Status**: Real-time status of all running tasks
-- **Message Flow**: Live message passing between tasks  
 - **Performance Metrics**: CPU usage, memory, and timing information
-- **System Health**: Error rates and task failure detection
+- **System Health**: Error and task failure detection
 - **Resource Usage**: Memory allocation and processing bottlenecks
 
 #### Enabling the Console Monitor
