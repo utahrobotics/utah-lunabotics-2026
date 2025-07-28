@@ -26,7 +26,7 @@ The system is built on the [Copper framework](https://github.com/copper-project/
 
 ### Required Dependencies
 
-1. Bazel 6.2 
+1. Bazel 6.2 (via bazelisk)
 
 2. LAPACK/openblas libraries:
 
