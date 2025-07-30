@@ -1,37 +1,29 @@
 (
+    runtime: (
+        rate_target_hz: 100      
+    ),
     tasks:[
         (id:"udev_monitor", type:"crate::tasks::UdevMonitor", config:{}),
-        (id:"l2_pointcloud", type:"crate::tasks::sources::PointCloudIceoryxReceiver", config:{}),
-        (id:"l2_pointcloud_sink", type:"crate::tasks::L2PointCloudSink", config:{}),
+        (id:"l2_pointcloud", type:"crate::tasks::sources::PointCloudIceoryxReceiver", config:{},
+            logging: (
+                enabled: false
+            )
+        ),
+        (id:"l2_pointcloud_sink", type:"crate::tasks::L2PointCloudSink", config:{},
+            logging: (
+                enabled: false
+            )
+        ),
         (id:"l2_imu", type:"crate::tasks::sources::ImuIceoryxReceiver", config:{}),
         (id:"realsense_pointcloud", type:"crate::tasks::sources::RealSensePointCloudReceiver", config:{
             "service": "realsense/309622300683/cloud",
             "camera_node": "upper_depth_camera"
-        }),
-        // KISS ICP Configuration Parameters:
-        // 
-        // Point Cloud Preprocessing:
-        // - voxel_size: Size of voxels for downsampling (larger = faster, less precise)
-        // - max_range: Maximum lidar range to consider (meters)
-        // - min_range: Minimum lidar range to consider (meters) 
-        // - max_points_per_voxel: Limit points per voxel (higher = more detail, slower)
-        //
-        // ICP Algorithm:
-        // - initial_threshold: Starting correspondence distance threshold
-        // - min_motion_th: Minimum motion before updating thresholds
-        // - max_iterations: Maximum ICP iterations per frame
-        // - convergence_tolerance: ICP convergence tolerance (lower = more precise)
-        //
-        // Adaptive Thresholding:
-        // - min_threshold: Minimum adaptive threshold (prevents too-tight matching)
-        // - max_threshold: Maximum adaptive threshold (prevents too-loose matching)
-        //
-        // Motion Compensation:
-        // - enable_deskewing: Apply motion compensation using per-point timestamps (recommended: true)
-        //
-        // Visualization:
-        // - map_log_interval_secs: How often to log the accumulated map to Rerun (seconds)
-        (id:"l2_kiss_icp", type:"crate::tasks::KissIcp", config:{ 
+        },
+            logging: (
+                enabled: false
+            )
+        ),
+        (id:"l2_kiss_icp", type:"crate::tasks::KissIcp", config:{
             "voxel_size": 0.1,
             "max_range": 100.0,
             "min_range": 0.2,
@@ -44,9 +36,12 @@
             "max_threshold": 5.0,
             "enable_deskewing": true,
             "map_log_interval_secs": 1.0,
-        }),
+            },
+            logging: (
+                enabled: false
+            )),
         // RealSense KISS ICP - tuned for depth camera characteristics
-        (id:"realsense_kiss_icp", type:"crate::tasks::KissIcp", config:{ 
+        (id:"realsense_kiss_icp", type:"crate::tasks::KissIcp", config:{
             "voxel_size": 0.15,
             "max_range": 100.0,
             "min_range": 0.,
@@ -59,7 +54,11 @@
             "max_threshold": 5.0,
             "enable_deskewing": false,
             "map_log_interval_secs": 1.0,
-        }),
+            },
+            logging: (
+                enabled: false
+            )
+        ),
         (id:"localizer", type:"crate::tasks::sinks::CuLocalizer", config:{}),
         (id:"lunabase", type:"crate::tasks::sources::Lunabase", config:{
             "max_pong_delay_ms": 500,
@@ -130,7 +129,7 @@
     // monitor:(type:"cu_cursive_consolemon::CuCursiveConsoleMon"),
     // monitor:(type:"cu_consolemon::CuConsoleMon"),
     logging:(
-        enable_task_logging:false,
+        enable_task_logging:true,
         section_size_mib:8,
     ),
 )

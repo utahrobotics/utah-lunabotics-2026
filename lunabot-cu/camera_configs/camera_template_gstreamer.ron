@@ -10,6 +10,9 @@
                 "caps": "video/x-raw, format=GRAY8, width={{width}}, height={{height}}",
                 "timeout_ms": 500,
             },
+            logging: (
+                enabled: false
+            )
         ),
         (
             id: "gst_convert_{{id}}",
@@ -18,7 +21,10 @@
                 "width": {{width}},
                 "height": {{height}},
                 "pixel_format": "GRAY"
-            }
+            },
+            logging: (
+                enabled: false
+            )
         ),
         (
             id: "detector_cam_{{id}}",
@@ -32,10 +38,16 @@
                 "cy": {{cy}},
                 "camera_id": "cam_{{id}}",
             },
+            logging: (
+                enabled: false
+            )
         ),
         (
             id: "detection_handler",
             type: "crate::tasks::AprilDetectionHandler",
+            logging: (
+                enabled: false
+            )
         ),
         (
             id: "localizer",
