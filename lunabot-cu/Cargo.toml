@@ -52,9 +52,9 @@ kiss-icp-ops = { path = "../kiss-icp-rs/ops", features = ["openblas"] }
 rayon = "1.10"
 
 crossbeam.workspace = true
-gstreamer = "0.23.6"
+gstreamer = "0.24.0"
 circular-buffer = "1.1.0"
-gstreamer-app = "0.23.5"
+gstreamer-app = "0.24.0"
 
 rerun = { version = "0.23.2", features = [
     "nasm",
