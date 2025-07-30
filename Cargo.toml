@@ -26,7 +26,7 @@ bincode = { version = "2", features = ["derive", "serde"] }
 cu29-helpers = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu29-helpers" }
 cu-apriltag = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu-apriltag" }
 cu_cursive-consolemon = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu_cursive_consolemon" }
-cu-consolemon = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu-consolemon" }
+# cu-consolemon = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu-consolemon" }
 cu-sensor-payloads = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu-sensor-payloads" }
 cu-spatial-payloads = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu-spatial-payloads", features = [
     "nalgebra",
