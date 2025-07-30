@@ -1,0 +1,62 @@
+[workspace]
+resolver = "3"
+members = [
+    "misc/rerun-types-wrapper",
+    "misc/simple-motion",
+    "misc/cakap2",
+    "misc/tasker",
+    "misc/thalassic",
+    "misc/gputter",
+    "misc/iceoryx-types",
+    "misc/launcher",
+    "common",
+    "lunabot-cu",
+    "embedded_common",
+    "external-tasks/realsense",
+    "external-tasks/lunabot-ai2",
+]
+exclude = ["kiss-icp-rs"]
+# Shared dependencies across workspace members
+[workspace.dependencies]
+cu29 = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu29", features = [
+    "log-level-info",
+    "log-level-error",
+] }
+bincode = { version = "=2.0.1", features = ["derive", "serde"] }
+cu29-helpers = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu29-helpers" }
+cu-apriltag = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu-apriltag" }
+cu_cursive-consolemon = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu_cursive_consolemon" }
+cu-consolemon = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu-consolemon" }
+cu-sensor-payloads = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu-sensor-payloads" }
+cu-spatial-payloads = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu-spatial-payloads", features = [
+    "nalgebra",
+] }
+cu-dynthreshold = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu-dynthreshold", features = [
+    "gst",
+] }
+cu29-runtime = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu29-runtime" }
+cu-gstreamer = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu-gstreamer", features = [
+    "gst",
+] }
+iceoryx2 = { version = "0.6.1" }
+crossbeam = "0.8"
+
+nalgebra = { version = "0.33", features = [
+    "serde-serialize",
+    "convert-bytemuck",
+] }
+
+ron = { version = "=0.10.1", features = ["indexmap"] }
+fxhash = "0.2.1"
+indexmap = "2.9.0"
+tokio = { version = "1", features = ["full"] }
+parking_lot = "0.12.2"
+bytemuck = { version = "1", features = ["derive", "extern_crate_alloc"] }
+anyhow = "1"
+unfmt = "0.2.2"
+serde = { version = "1", features = ["derive"] }
+
+
+# Workspace-level metadata
+[workspace.metadata]
+# You can add custom metadata here if needed

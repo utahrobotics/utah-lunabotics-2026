@@ -3,20 +3,14 @@ use std::collections::HashMap;
 use chrono::SubsecRound;
 use cu29::cutask::CuMsg;
 use cu29::{
-    clock::RobotClock,
-    config::ComponentConfig,
-    cutask::Freezable,
-    input_msg,
-    prelude::*,
-    CuResult,
+    clock::RobotClock, config::ComponentConfig, cutask::Freezable, input_msg, prelude::*, CuResult,
 };
 use cu_apriltag::AprilTagDetections;
 
-
+use ron::de::from_str as ron_from_str;
 use serde::Deserialize;
 use std::fs;
 use std::path::Path;
-use ron::de::from_str as ron_from_str;
 
 use crate::rerun_viz;
 
@@ -36,7 +30,6 @@ struct TagDef {
 /// executable when it is run) and returns a mapping from tag ID to its global
 /// `Isometry3`.
 fn load_known_apriltag_isometries() -> CuResult<HashMap<usize, Isometry3<f64>>> {
-
     let search_paths = [
         Path::new("apriltag_isometries").to_path_buf(),
         Path::new(env!("CARGO_MANIFEST_DIR")).join("apriltag_isometries"),
@@ -63,8 +56,13 @@ fn load_known_apriltag_isometries() -> CuResult<HashMap<usize, Isometry3<f64>>> 
             let (fx, fy, fz) = def.forward_axis;
             let forward_axis = Vector3::new(fx, fy, fz);
 
-            let rotation1 = UnitQuaternion::rotation_between(&Vector3::new(0.0, 0.0, -1.0), &forward_axis)
-                .unwrap_or(UnitQuaternion::from_scaled_axis(Vector3::new(0.0, std::f64::consts::PI, 0.0)));
+            let rotation1 =
+                UnitQuaternion::rotation_between(&Vector3::new(0.0, 0.0, -1.0), &forward_axis)
+                    .unwrap_or(UnitQuaternion::from_scaled_axis(Vector3::new(
+                        0.0,
+                        std::f64::consts::PI,
+                        0.0,
+                    )));
 
             let cross_axis = forward_axis.cross(&Vector3::new(0.0, 1.0, 0.0));
             let true_up = cross_axis.cross(&forward_axis);
@@ -111,15 +109,22 @@ impl<'cl> CuTask<'cl> for AprilDetectionHandler {
 
     fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
         let known_tags = load_known_apriltag_isometries()?;
-        Ok(Self { known_tags, process_counter: 0 })
+        Ok(Self {
+            known_tags,
+            process_counter: 0,
+        })
     }
 
-    fn process(&mut self, clock: &RobotClock, input: Self::Input, output: Self::Output) -> CuResult<()> {
-        let start = clock.now().as_nanos();
+    fn process(
+        &mut self,
+        clock: &RobotClock,
+        input: Self::Input,
+        output: Self::Output,
+    ) -> CuResult<()> {
         let (input1, input2, input3) = input;
 
         let mut result_map = HashMap::new();
-        
+
         if let Some(dets) = input1.payload() {
             let camera_id = dets.camera_id.as_ref().clone();
             let tags = self.cu_detections_to_tag_observations(dets, &camera_id);
@@ -128,7 +133,7 @@ impl<'cl> CuTask<'cl> for AprilDetectionHandler {
                 result_map.insert(camera_id, observer_iso);
             }
         }
-        
+
         if let Some(dets) = input2.payload() {
             let camera_id = dets.camera_id.as_ref().clone();
             let tags = self.cu_detections_to_tag_observations(dets, &camera_id);
@@ -146,14 +151,9 @@ impl<'cl> CuTask<'cl> for AprilDetectionHandler {
                 result_map.insert(camera_id, observer_iso);
             }
         }
-        
+
         if !result_map.is_empty() {
             output.set_payload(Box::new(result_map));
-        }
-        let duration = clock.now().as_nanos() - start;
-
-        if duration/1000 > 10 {
-            eprintln!("apriltag detection handler took {} us", duration/1000)
         }
         Ok(())
     }
@@ -178,11 +178,11 @@ impl<'cl> CuTask<'cl> for AprilDetectionHandler {
 impl AprilDetectionHandler {
     fn handle_detections(&self, observations: &[TagObservation]) -> CuResult<Transform3D<f64>> {
         let mut observer_isometries = Vec::new();
-        
+
         for observation in observations {
             // Look up the global pose of this tag.
             let tag_global_isometry = observation.tag_global_isometry;
-            
+
             // Log the tag position in global coordinates for visualization.
             let location = (
                 tag_global_isometry.translation.x as f32,
@@ -197,9 +197,12 @@ impl AprilDetectionHandler {
                 .iter()
                 .map(|val| *val as f32)
                 .collect::<Vec<f32>>();
-                
+
             if let Err(e) = rerun_viz::RECORDER.get().unwrap().recorder.log(
-                format!("apriltags/{}/{}/location", observation.camera_id, observation.tag_id),
+                format!(
+                    "apriltags/{}/{}/location",
+                    observation.camera_id, observation.tag_id
+                ),
                 &Boxes3D::from_centers_and_half_sizes([(location)], [(0.1, 0.1, 0.01)])
                     .with_quaternions([[
                         quaternion_vec[0],
@@ -211,25 +214,30 @@ impl AprilDetectionHandler {
             ) {
                 return Err(CuError::new_with_cause(
                     &format!("Couldn't log april tag: {e}"),
-                    std::io::Error::new(std::io::ErrorKind::Other, "Rerun logging failed")
+                    std::io::Error::new(std::io::ErrorKind::Other, "Rerun logging failed"),
                 ));
             }
-            
+
             // Compute the camera pose from the tag's known global pose and the observed local pose.
-            let isometry_of_observer = observation.tag_local_isometry.inverse() * tag_global_isometry;
+            let isometry_of_observer =
+                observation.tag_local_isometry.inverse() * tag_global_isometry;
             observer_isometries.push(isometry_of_observer);
         }
-        
+
         if observer_isometries.is_empty() {
             return Err("No valid tag observations".into());
         }
-        
+
         let combined = combine_isometries(&observer_isometries);
         let transform = Transform3D::from_na(combined);
         Ok(transform)
     }
 
-    fn cu_detections_to_tag_observations(&self, dets: &AprilTagDetections, camera_id: &str) -> Vec<TagObservation> {
+    fn cu_detections_to_tag_observations(
+        &self,
+        dets: &AprilTagDetections,
+        camera_id: &str,
+    ) -> Vec<TagObservation> {
         let mut apriltags = Vec::new();
         for (id, pose, _) in dets.filtered_by_decision_margin(60.0) {
             if !self.known_tags.contains_key(&id) {
@@ -281,7 +289,12 @@ fn combine_isometries(isometries: &[Isometry3<f64>]) -> Isometry3<f64> {
     }
     let mean_translation = sum_translation / isometries.len() as f64;
 
-    let mean_rotation = average_quaternions(&isometries.iter().map(|iso| iso.rotation).collect::<Vec<_>>());
+    let mean_rotation = average_quaternions(
+        &isometries
+            .iter()
+            .map(|iso| iso.rotation)
+            .collect::<Vec<_>>(),
+    );
 
     Isometry3::from_parts(Translation3::from(mean_translation), mean_rotation)
 }
@@ -310,8 +323,10 @@ fn average_quaternions(quaternions: &[UnitQuaternion<f64>]) -> UnitQuaternion<f6
             u_corrected.set_column(2, &(-u.column(2)));
             rotation_matrix = u_corrected * v_t;
         }
-        
-        UnitQuaternion::from_rotation_matrix(&nalgebra::Rotation3::from_matrix_unchecked(rotation_matrix))
+
+        UnitQuaternion::from_rotation_matrix(&nalgebra::Rotation3::from_matrix_unchecked(
+            rotation_matrix,
+        ))
     } else {
         // Fallback to component averaging if SVD fails
         average_quaternions_component_based(quaternions)
@@ -377,7 +392,6 @@ use cu_spatial_payloads::{Transform3D, Transform3DCast};
 use nalgebra::{Isometry3, Point3, Translation3, UnitQuaternion, Vector3};
 use rerun::Boxes3D;
 
-
 #[derive(Deserialize, Clone, Copy)]
 pub struct Apriltag {
     pub tag_position: Point3<f64>,
@@ -392,7 +406,11 @@ impl Apriltag {
         // First rotation to face along the forward axis
         let rotation1 =
             UnitQuaternion::rotation_between(&Vector3::new(0.0, 0.0, -1.0), &self.forward_axis)
-                .unwrap_or(UnitQuaternion::from_scaled_axis(Vector3::new(0.0, std::f64::consts::PI, 0.0)));
+                .unwrap_or(UnitQuaternion::from_scaled_axis(Vector3::new(
+                    0.0,
+                    std::f64::consts::PI,
+                    0.0,
+                )));
 
         let cross_axis = self.forward_axis.cross(&Vector3::new(0.0, 1.0, 0.0));
         let true_up = cross_axis.cross(&self.forward_axis);

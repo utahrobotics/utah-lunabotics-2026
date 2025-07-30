@@ -345,8 +345,8 @@ impl Transformable {
                     new_angle = new_angle.min(*max_angle);
                 }
                 let new = OneAxisDynamicState {
-                    current_rotation: 
-                        UnitQuaternion::from_axis_angle(&axis, new_angle) * start_rotation,
+                    current_rotation: UnitQuaternion::from_axis_angle(&axis, new_angle)
+                        * start_rotation,
                     current_angle: new_angle,
                 };
                 dynamic.store(new);
@@ -715,6 +715,8 @@ fn all_zeros(v: &[f64; 3]) -> bool {
     v.iter().all(|&x| x == 0.0)
 }
 
+use std::collections::HashMap;
+
 #[derive(Deserialize)]
 pub struct NodeSerde {
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -722,22 +724,23 @@ pub struct NodeSerde {
     #[serde(default)]
     #[serde(skip_serializing_if = "Vec::is_empty")]
     children: Vec<NodeSerde>,
-    #[serde(default, flatten)]
-    fields: ron::Value,
+    #[serde(flatten)]
+    fields: HashMap<String, ron::Value>,
 }
 
 impl From<NodeSerde> for ChainBuilder {
-    fn from(
-        NodeSerde {
+    fn from(node_serde: NodeSerde) -> Self {
+        let NodeSerde {
             name,
-            fields,
             children,
-        }: NodeSerde,
-    ) -> Self {
+            fields,
+        } = node_serde;
+
+        // Convert HashMap back to RON string and parse as restrictions
+        let ron_string = ron::ser::to_string(&fields).unwrap();
         let translation: TranslationRestrictionSerde =
-            ron::de::from_str(&ron::ser::to_string(&fields).unwrap()).unwrap();
-        let rotation: RotationRestrictionSerde =
-            ron::de::from_str(&ron::ser::to_string(&fields).unwrap()).unwrap();
+            ron::de::from_str(&ron_string).unwrap_or_default();
+        let rotation: RotationRestrictionSerde = ron::de::from_str(&ron_string).unwrap_or_default();
 
         let mut builder = ChainBuilder::new(translation.into(), rotation.into());
         if let Some(name) = name {
@@ -746,19 +749,20 @@ impl From<NodeSerde> for ChainBuilder {
 
         let mut queue: VecDeque<_> = children.into_iter().zip(std::iter::repeat(0)).collect();
 
-        while let Some((node_serde, parent_idx)) = queue.pop_front() {
-            let translation: TranslationRestrictionSerde =
-                ron::de::from_str(&ron::ser::to_string(&node_serde.fields).unwrap())
-                    .unwrap();
-            let rotation: RotationRestrictionSerde =
-                ron::de::from_str(&ron::ser::to_string(&node_serde.fields).unwrap()).unwrap();
+        while let Some((child_node, parent_idx)) = queue.pop_front() {
+            let child_ron_string = ron::ser::to_string(&child_node.fields).unwrap();
+            let child_translation: TranslationRestrictionSerde =
+                ron::de::from_str(&child_ron_string).unwrap_or_default();
+            let child_rotation: RotationRestrictionSerde =
+                ron::de::from_str(&child_ron_string).unwrap_or_default();
 
-            let index = builder.add_node(parent_idx, translation.into(), rotation.into());
-            if let Some(name) = node_serde.name {
+            let index =
+                builder.add_node(parent_idx, child_translation.into(), child_rotation.into());
+            if let Some(name) = child_node.name {
                 builder.set_node_name(index, name);
             }
             queue.extend(
-                node_serde
+                child_node
                     .children
                     .into_iter()
                     .zip(std::iter::repeat(index)),

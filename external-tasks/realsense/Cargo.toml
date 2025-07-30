@@ -7,10 +7,10 @@ build = "build.rs"
 [dependencies]
 realsense-rust = "1.2"
 iceoryx2 = { workspace = true }
-nalgebra = "0.33"
+nalgebra.workspace = true
 chrono = { version = "0.4", features = ["serde"] }
-fxhash = "0.2"
-parking_lot = "0.12"
+fxhash.workspace = true
+parking_lot.workspace = true
 
 # Dependencies from misc crates
 gputter = { path = "../../misc/gputter" }

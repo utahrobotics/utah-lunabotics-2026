@@ -12,4 +12,4 @@ nalgebra.workspace = true
 fxhash.workspace = true
 iceoryx2 = "0.6.1"
 iceoryx-types = { path = "../../misc/iceoryx-types" }
-bincode = { version = "2.0.1", features = ["derive", "serde"] }
+bincode.workspace = true

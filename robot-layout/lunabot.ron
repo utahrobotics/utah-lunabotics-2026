@@ -1,41 +1,41 @@
 { // roll pitch yaw
-    free_origin: [0.0, 0.0, 0.0],
-    free_euler: [0.0, 0.0, 0.0],
-    children: [
+    "free_origin": [0.0, 0.0, 0.0],
+    "free_euler": [0.0, 0.0, 0.0],
+    "children": [
         {
-            name: Some("low_left_camera"),
-            origin: [-0.231, 0.0, -0.055],
-            euler: [0.0, 0.0, 90.0]
+            "name": Some("low_left_camera"),
+            "origin": [-0.231, 0.0, -0.055],
+            "euler": [0.0, 0.0, 90.0]
         },
         {
-            name: Some("cam_side"), //used to be low_right_camera
-            origin: [0.231, 0.0, -0.055],
-            euler: [0.0, 0.0, -90.0]
+            "name": Some("cam_side"), //used to be low_right_camera
+            "origin": [0.231, 0.0, -0.055],
+            "euler": [0.0, 0.0, -90.0]
         },
         {
-            name: Some("cam_back"),
-            origin: [0.0, 0.0, 0.475],
-            euler: [0.0, 0.0, 180.0]
+            "name": Some("cam_back"),
+            "origin": [0.0, 0.0, 0.475],
+            "euler": [0.0, 0.0, 180.0]
         },
         {
-            name: Some("cam_iriun"),
-            origin: [0.0, 0.0, 0.0],
-            euler: [0.0, 0.0, 0.0]
+            "name": Some("cam_iriun"),
+            "origin": [0.0, 0.0, 0.0],
+            "euler": [0.0, 0.0, 0.0]
         },
         {
-            name: Some("middle_camera"),
-            origin: [0.0, 0.0, -0.215],
-            euler: [0.0, 0.0, 0.0]
+            "name": Some("middle_camera"),
+            "origin": [0.0, 0.0, -0.215],
+            "euler": [0.0, 0.0, 0.0]
         },
         {
-            name: Some("l2_front"),
-            origin: [0.0, 0.0, 0.0],
-            euler: [0.0, -90.0, 180.0]
+            "name": Some("l2_front"),
+            "origin": [0.0, 0.0, 0.0],
+            "euler": [0.0, -90.0, 180.0]
         },
         {
-            name: Some("upper_depth_camera"),
-            origin: [0.0, 0.0, 0.0],
-            euler: [0.0, 0.0, 0.0]
+            "name": Some("upper_depth_camera"),
+            "origin": [0.0, 0.0, 0.0],
+            "euler": [0.0, 0.0, 0.0]
         },
     ]
-} 
+}

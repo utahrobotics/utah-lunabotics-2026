@@ -24,64 +24,63 @@ logreader = ["dep:cu29-export"]
 [dependencies]
 
 # copper
-cu29 = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu29", features = ["log-level-info", "log-level-error"] }
-bincode = { version = "=2.0.1", features = ["derive", "serde"] }
-cu29-helpers = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu29-helpers" }
+cu29.workspace = true
+bincode.workspace = true
+cu29-helpers.workspace = true
 cu29-export = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu29-export", optional = true }
-cu-apriltag = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu-apriltag" }
-cu_cursive-consolemon = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu_cursive_consolemon" }
-cu-consolemon = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu-consolemon" }
-cu-sensor-payloads = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu-sensor-payloads" }
-cu-spatial-payloads = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu-spatial-payloads", features = ["nalgebra"]}
-cu-dynthreshold = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu-dynthreshold", features = ["gst"] }
-cu29-runtime = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu29-runtime", features = ["jemalloc"] }
-cu-gstreamer = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu-gstreamer", features = ["gst"] }
-
+cu-apriltag.workspace = true
+cu_cursive-consolemon.workspace = true
+cu-consolemon.workspace = true
+cu-sensor-payloads.workspace = true
+cu-spatial-payloads.workspace = true
+cu-dynthreshold.workspace = true
+cu29-runtime.workspace = true
+cu-gstreamer.workspace = true
 
 
 image = { version = "0.24", default-features = false, features = ["jpeg"] }
 crossbeam-channel = "0.5"
 anyhow = "1"
-serde = { version = "1", features = ["derive"] }
-iceoryx2 = { version = "0.6.1"}
+serde.workspace = true
+iceoryx2.workspace = true
 libc = "0.2.173"
-nix = {version="0.30.1", features = ["time"]}
-bytemuck = "1.14"
-nalgebra = { version = "0.33", features = [
-    "serde-serialize",
-    "convert-bytemuck",
-] }
-kiss-icp-core = {path = "../kiss-icp-rs/core"}
-kiss-icp-ops = {path = "../kiss-icp-rs/ops", features = ["openblas"]}
+nix = { version = "0.30.1", features = ["time"] }
+bytemuck.workspace = true
+nalgebra.workspace = true
+kiss-icp-core = { path = "../kiss-icp-rs/core" }
+kiss-icp-ops = { path = "../kiss-icp-rs/ops", features = ["openblas"] }
 rayon = "1.10"
 
-crossbeam = "0.8"
+crossbeam.workspace = true
 gstreamer = "0.23.6"
 circular-buffer = "1.1.0"
 gstreamer-app = "0.23.5"
 
-rerun = { version = "0.23.2", features = ["nasm", "sdk"], default-features = false }
+rerun = { version = "0.23.2", features = [
+    "nasm",
+    "sdk",
+], default-features = false }
 chrono = "0.4.41"
 
 # Pin unicode-width to 0.2.0 to resolve version conflict between ratatui (requires =0.2.0) and pfetch (allows ^0.2)
 unicode-width = "=0.2.0"
 
 # embedded
-embedded_common ={ path = "../embedded_common"}
+embedded_common = { path = "../embedded_common" }
 
 # RON deserialization at runtime
-ron = "0.8"
+ron.workspace = true
 spin_sleep = "1.3.2"
 
 # misc
 simple-motion = { path = "../misc/simple-motion" }
 cakap2 = { path = "../misc/cakap2" }
 bitcode = "0.6.6"
-tasker = { path = "../misc/tasker"}
+tasker = { path = "../misc/tasker" }
 iceoryx-types = { path = "../misc/iceoryx-types" }
 launcher = { path = "../misc/launcher" }
 
-# common 
+# common
 common = { path = "../common" }
 
 # Linux-only dependencies
@@ -90,5 +89,5 @@ v4l = "0.14"
 udev = "0.9"
 
 [build-dependencies]
-ron = "0.8"
-serde = { version = "1", features = ["derive"] }
+ron.workspace = true
+serde.workspace = true

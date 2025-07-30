@@ -7,4 +7,4 @@ edition = "2024"
 nalgebra.workspace = true
 serde.workspace = true
 crossbeam.workspace = true
-ron.workspace = true
+ron = "0.10.0"
