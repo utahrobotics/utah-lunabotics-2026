@@ -1,6 +1,6 @@
 #![feature(f16)]
 use bytemuck::{Pod, Zeroable};
-use nalgebra::{Isometry3, Vector2, Vector3};
+use nalgebra::{Isometry3, Vector2};
 use crossbeam::atomic::AtomicCell;
 use std::{sync::Arc, time::Duration};
 use once_cell::sync::Lazy;
@@ -477,7 +477,7 @@ pub enum FromAI {
 // Serde serialization (manual) for FromAI.
 // -----------------------------------------------------------------------------
 
-use serde::ser::{SerializeSeq, Serializer};
+use serde::ser::Serializer;
 
 impl serde::Serialize for FromAI {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
