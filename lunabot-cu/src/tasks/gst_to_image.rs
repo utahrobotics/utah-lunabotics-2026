@@ -1,9 +1,9 @@
 use cu29::prelude::*;
 use cu_gstreamer::CuGstBuffer;
 use cu_sensor_payloads::{CuImage, CuImageBufferFormat};
+use std::ops::DerefMut;
 use std::sync::Arc;
 use std::time::Instant;
-use std::ops::DerefMut;
 
 /// A fast task that converts CuGstBuffer to CuImage<Vec<u8>> using memory pool optimization.
 /// Uses pre-allocated buffers and fast memory copy to minimize overhead.
@@ -17,9 +17,9 @@ pub struct GstToImage {
 
 impl Freezable for GstToImage {}
 
-impl<'cl> CuTask<'cl> for GstToImage {
-    type Input = input_msg!('cl, CuGstBuffer);
-    type Output = output_msg!('cl, CuImage<Vec<u8>>);
+impl CuTask for GstToImage {
+    type Input<'m> = input_msg!(CuGstBuffer);
+    type Output<'m> = output_msg!(CuImage<Vec<u8>>);
 
     fn new(config: Option<&ComponentConfig>) -> CuResult<Self>
     where
@@ -40,17 +40,24 @@ impl<'cl> CuTask<'cl> for GstToImage {
 
         // Calculate expected buffer size based on pixel format
         let expected_buffer_size = match pixel_format_str.as_str() {
-            "GRAY" | "Y800" => (width * height) as usize,           // 1 byte per pixel
-            "RGB " | "BGR " => (width * height * 3) as usize,       // 3 bytes per pixel
-            "RGBA" | "BGRA" => (width * height * 4) as usize,       // 4 bytes per pixel
-            "YUY2" | "UYVY" => (width * height * 2) as usize,       // 2 bytes per pixel (YUV 4:2:2)
-            _ => return Err(CuError::from(format!("Unsupported pixel format: {}", pixel_format_str))),
+            "GRAY" | "Y800" => (width * height) as usize, // 1 byte per pixel
+            "RGB " | "BGR " => (width * height * 3) as usize, // 3 bytes per pixel
+            "RGBA" | "BGRA" => (width * height * 4) as usize, // 4 bytes per pixel
+            "YUY2" | "UYVY" => (width * height * 2) as usize, // 2 bytes per pixel (YUV 4:2:2)
+            _ => {
+                return Err(CuError::from(format!(
+                    "Unsupported pixel format: {}",
+                    pixel_format_str
+                )))
+            }
         };
 
         let pool = CuHostMemoryPool::new("gst_to_image", 10, move || {
             // Pre-allocate with capacity to avoid reallocations
             let mut vec = Vec::with_capacity(expected_buffer_size);
-            unsafe { vec.set_len(expected_buffer_size); }
+            unsafe {
+                vec.set_len(expected_buffer_size);
+            }
             vec
         })?;
 
@@ -66,22 +73,22 @@ impl<'cl> CuTask<'cl> for GstToImage {
     fn process(
         &mut self,
         _clock: &RobotClock,
-        input: Self::Input,
-        output: Self::Output,
-    ) -> CuResult<()> {        
+        input: &Self::Input<'_>,
+        output: &mut Self::Output<'_>,
+    ) -> CuResult<()> {
         if input.payload().is_none() {
             debug!("GstToImage: No payload in input message, skipping.");
             return Ok(());
         }
 
         let gst_buffer = input.payload().ok_or(CuError::from("No payload"))?;
-        
+
         // Get a pre-allocated buffer from the pool FIRST to minimize lock time
         let handle = self
             .pool
             .acquire()
             .ok_or(CuError::from("Failed to acquire buffer from pool"))?;
-        
+
         let map_start = Instant::now();
         // Map the buffer as readable to get access to the data
         let buffer_hold = gst_buffer
@@ -112,7 +119,7 @@ impl<'cl> CuTask<'cl> for GstToImage {
                 let src_ptr = src.as_ptr();
                 let dst_ptr = dst.as_mut_ptr();
                 let len = src.len();
-                
+
                 // For 640x480 images, try chunk-based copying for better cache behavior
                 if len == 307200 {
                     // Copy in 64KB chunks to stay in L1 cache
@@ -122,7 +129,7 @@ impl<'cl> CuTask<'cl> for GstToImage {
                         std::ptr::copy_nonoverlapping(
                             src_ptr.add(offset),
                             dst_ptr.add(offset),
-                            CHUNK_SIZE
+                            CHUNK_SIZE,
                         );
                         offset += CHUNK_SIZE;
                     }
@@ -131,7 +138,7 @@ impl<'cl> CuTask<'cl> for GstToImage {
                         std::ptr::copy_nonoverlapping(
                             src_ptr.add(offset),
                             dst_ptr.add(offset),
-                            len - offset
+                            len - offset,
                         );
                     }
                 } else {
@@ -225,9 +232,9 @@ mod tests {
         let mut converter = GstToImage::new(Some(&config))?;
 
         let input_data = vec![
-            255, 0, 0,    // Red pixel
-            0, 255, 0,    // Green pixel
-            0, 0, 255,    // Blue pixel
+            255, 0, 0, // Red pixel
+            0, 255, 0, // Green pixel
+            0, 0, 255, // Blue pixel
             255, 255, 255, // White pixel
         ];
 

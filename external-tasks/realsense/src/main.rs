@@ -6,7 +6,10 @@ use std::{
 };
 
 use fxhash::FxHashMap;
-use gputter::{self, types::{AlignedMatrix4, AlignedVec4}};
+use gputter::{
+    self,
+    types::{AlignedMatrix4, AlignedVec4},
+};
 use iceoryx2::prelude::*;
 use nalgebra::{Matrix4, Vector2, Vector4};
 pub use realsense_rust;
@@ -18,8 +21,8 @@ use realsense_rust::{
     pipeline::{ActivePipeline, FrameWaitError, InactivePipeline},
 };
 
-use thalassic::{DepthProjector, DepthProjectorBuilder, ThalassicPipelineRef};
 use iceoryx_types::{IceoryxPointCloud, PointXYZIR, MAX_POINT_CLOUD_POINTS};
+use thalassic::{DepthProjector, DepthProjectorBuilder, ThalassicPipelineRef};
 
 pub struct DepthCameraInfo {
     pub serial: String,
@@ -38,9 +41,7 @@ fn spawn_minimal_thalassic_pipeline() -> ThalassicPipelineRef {
     ThalassicPipelineRef::noop()
 }
 
-pub fn enumerate_depth_cameras(
-    cameras: impl IntoIterator<Item = DepthCameraInfo>,
-) {
+pub fn enumerate_depth_cameras(cameras: impl IntoIterator<Item = DepthCameraInfo>) {
     let thalassic_ref = spawn_minimal_thalassic_pipeline();
     let (init_tx, init_rx) = std::sync::mpsc::channel::<&'static str>();
     let mut threads: FxHashMap<&str, SyncSender<(Device, ActivePipeline)>> = cameras
@@ -87,106 +88,104 @@ pub fn enumerate_depth_cameras(
     std::thread::Builder::new()
         .stack_size(16 * 1024 * 1024) // 16 MB stack size
         .spawn(move || {
-        loop {
-            let Ok(target_serial) = init_rx.recv() else {
-                break;
-            };
             loop {
-                let device = match device_hub.wait_for_device() {
-                    Ok(x) => {
-                        // println!("Received device for camera {}", target_serial);
-                        x
-                    },
-                    Err(_e) => {
-                        eprintln!("Failed to wait for RealSense device: {_e}");
-                        break;
-                    }
+                let Ok(target_serial) = init_rx.recv() else {
+                    break;
                 };
-                
-                let Some(current_serial_cstr) = device.info(Rs2CameraInfo::SerialNumber) else {
-                    eprintln!("Failed to get serial number for RealSense Camera");
-                    continue;
-                };
-                let Ok(current_serial_str) = current_serial_cstr.to_str() else {
-                    eprintln!("Failed to parse serial number {:?}", current_serial_cstr);
-                    continue;
-                };
-                if target_serial != current_serial_str {
-                    // println!("Skipping device for camera {}", current_serial_str);
-                    continue;
-                }
-                
-                let current_serial = current_serial_str.to_string();
-                
-                let Some(pipeline_sender) = threads.get(current_serial_str) else {
-                    eprintln!("Unexpected RealSense camera with serial {}", current_serial);
-                    continue;
-                };
+                loop {
+                    let device = match device_hub.wait_for_device() {
+                        Ok(x) => {
+                            // println!("Received device for camera {}", target_serial);
+                            x
+                        }
+                        Err(_e) => {
+                            eprintln!("Failed to wait for RealSense device: {_e}");
+                            break;
+                        }
+                    };
 
-                let Some(usb_cstr) = device.info(Rs2CameraInfo::UsbTypeDescriptor) else {
-                    eprintln!(
-                        "Failed to read USB type descriptor for RealSense Camera {}",
-                        current_serial
-                    );
-                    continue;
-                };
-                let Ok(usb_str) = usb_cstr.to_str() else {
-                    eprintln!(
-                        "USB type descriptor for RealSense Camera {} is not utf-8",
-                        current_serial
-                    );
-                    continue;
-                };
-                let Ok(_usb_val) = usb_str.parse::<f32>() else {
-                    eprintln!(
-                        "USB type descriptor for RealSense Camera {} is not f32",
-                        current_serial
-                    );
-                    continue;
-                };
-
-                let pipeline_sender = pipeline_sender.clone();
-
-                let mut config = Config::new();
-
-
-                if let Err(e) = config.disable_all_streams() {
-                    eprintln!("Failed to disable all streams: {}", e);
-                    continue;
-                }
-
-                if let Err(e) =
-                    config.enable_stream(Rs2StreamKind::Depth, None, 0, 0, Rs2Format::Z16, 0)
-                {
-                    eprintln!("Failed to enable depth stream: {}", e);
-                    continue;
-                }
-
-
-                let pipeline = match InactivePipeline::try_from(&context) {
-                    Ok(x) => x,
-                    Err(e) => {
-                        eprintln!("Failed to open pipeline: {}", e);
+                    let Some(current_serial_cstr) = device.info(Rs2CameraInfo::SerialNumber) else {
+                        eprintln!("Failed to get serial number for RealSense Camera");
+                        continue;
+                    };
+                    let Ok(current_serial_str) = current_serial_cstr.to_str() else {
+                        eprintln!("Failed to parse serial number {:?}", current_serial_cstr);
+                        continue;
+                    };
+                    if target_serial != current_serial_str {
+                        // println!("Skipping device for camera {}", current_serial_str);
                         continue;
                     }
-                };
-                let pipeline = match pipeline.start(Some(config)) {
-                    Ok(x) => x,
-                    Err(e) => {
-                        eprintln!("Failed to start pipeline: {}", e);
+
+                    let current_serial = current_serial_str.to_string();
+
+                    let Some(pipeline_sender) = threads.get(current_serial_str) else {
+                        eprintln!("Unexpected RealSense camera with serial {}", current_serial);
+                        continue;
+                    };
+
+                    let Some(usb_cstr) = device.info(Rs2CameraInfo::UsbTypeDescriptor) else {
+                        eprintln!(
+                            "Failed to read USB type descriptor for RealSense Camera {}",
+                            current_serial
+                        );
+                        continue;
+                    };
+                    let Ok(usb_str) = usb_cstr.to_str() else {
+                        eprintln!(
+                            "USB type descriptor for RealSense Camera {} is not utf-8",
+                            current_serial
+                        );
+                        continue;
+                    };
+                    let Ok(_usb_val) = usb_str.parse::<f32>() else {
+                        eprintln!(
+                            "USB type descriptor for RealSense Camera {} is not f32",
+                            current_serial
+                        );
+                        continue;
+                    };
+
+                    let pipeline_sender = pipeline_sender.clone();
+
+                    let mut config = Config::new();
+
+                    if let Err(e) = config.disable_all_streams() {
+                        eprintln!("Failed to disable all streams: {}", e);
                         continue;
                     }
-                };
 
-                if let Err(error) = pipeline_sender.send((device, pipeline)) {
-                    error.0 .1.stop();
-                    threads.remove(current_serial.as_str());
+                    if let Err(e) =
+                        config.enable_stream(Rs2StreamKind::Depth, None, 0, 0, Rs2Format::Z16, 0)
+                    {
+                        eprintln!("Failed to enable depth stream: {}", e);
+                        continue;
+                    }
+
+                    let pipeline = match InactivePipeline::try_from(&context) {
+                        Ok(x) => x,
+                        Err(e) => {
+                            eprintln!("Failed to open pipeline: {}", e);
+                            continue;
+                        }
+                    };
+                    let pipeline = match pipeline.start(Some(config)) {
+                        Ok(x) => x,
+                        Err(e) => {
+                            eprintln!("Failed to start pipeline: {}", e);
+                            continue;
+                        }
+                    };
+
+                    if let Err(error) = pipeline_sender.send((device, pipeline)) {
+                        error.0 .1.stop();
+                        threads.remove(current_serial.as_str());
+                    }
+                    break;
                 }
-                break;
             }
-        }
-    })
-    .expect("Failed to spawn device hub thread");
+        })
+        .expect("Failed to spawn device hub thread");
 }
 
 struct DepthCameraState {
@@ -217,16 +216,15 @@ impl DepthCameraTask {
                     // If channel is closed, exit the thread
                     eprintln!("Pipeline channel closed for camera {}", self.serial);
                     return;
-                },
+                }
             };
-            
+
             // Process this camera session
             self.process_camera_session(device, pipeline);
         }
     }
-    
-    fn process_camera_session(&mut self, device: Device, mut pipeline: ActivePipeline) {
 
+    fn process_camera_session(&mut self, device: Device, mut pipeline: ActivePipeline) {
         let mut depth_format = None;
 
         for stream in pipeline.profile().streams() {
@@ -293,7 +291,7 @@ impl DepthCameraTask {
                 ),
                 focal_length_px,
                 principal_point_px: Vector2::new(depth_format.ppx(), depth_format.ppy()),
-                max_depth: 3.0, 
+                max_depth: 3.0,
             };
 
             let depth_projector = depth_projector_builder.build(self.thalassic_ref.clone());
@@ -326,7 +324,7 @@ impl DepthCameraTask {
             self.state.get_mut().unwrap()
         };
 
-        println!("RealSense Camera {} opened with (fx, fy) = ({:.0}, {:.0}), (width, height) = ({:.0}, {:.0})", 
+        println!("RealSense Camera {} opened with (fx, fy) = ({:.0}, {:.0}), (width, height) = ({:.0}, {:.0})",
               self.serial, depth_format.fx(), depth_format.fy(), depth_format.width(), depth_format.height());
 
         loop {
@@ -353,7 +351,7 @@ impl DepthCameraTask {
                 }
                 debug_assert_eq!(frame.bits_per_pixel(), 16);
                 debug_assert_eq!(frame.width() * frame.height() * 2, frame.get_data_size());
-                
+
                 let slice;
                 unsafe {
                     let data: *const _ = frame.get_data();
@@ -375,7 +373,7 @@ impl DepthCameraTask {
                 };
 
                 let identity_transform: AlignedMatrix4<f32> = Matrix4::identity().into();
-                
+
                 depth_projector.project(slice, &identity_transform, depth_scale, Some(point_cloud));
 
                 let mut iceoryx_cloud = IceoryxPointCloud::default();
@@ -387,7 +385,7 @@ impl DepthCameraTask {
                             x: point.x,
                             y: point.y,
                             z: point.z,
-                            intensity: 1.0, 
+                            intensity: 1.0,
                             time: 0.5,
                             ring: 0,
                         };
@@ -406,7 +404,10 @@ impl DepthCameraTask {
                                     // println!("Published {} points from camera {}", point_count, self.serial);
                                 }
                                 Err(_e) => {
-                                    eprintln!("Failed to send point cloud from camera {}", self.serial);
+                                    eprintln!(
+                                        "Failed to send point cloud from camera {}",
+                                        self.serial
+                                    );
                                 }
                             }
                         }
@@ -428,12 +429,10 @@ fn main() {
     std::env::set_var("STRIDE", "15");
 
     // TODO: make this configurable
-    let cameras = vec![
-        DepthCameraInfo {
-            serial: "309622300683".to_string(),
-            depth_enabled: true,
-        }
-    ];
+    let cameras = vec![DepthCameraInfo {
+        serial: "309622300683".to_string(),
+        depth_enabled: true,
+    }];
 
     enumerate_depth_cameras(cameras);
 

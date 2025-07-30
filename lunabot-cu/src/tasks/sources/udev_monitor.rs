@@ -1,9 +1,14 @@
-use std::sync::Arc;
 use bincode::{Decode, Encode};
-use cu29::{clock::RobotClock, config::ComponentConfig, cutask::{CuSrcTask, Freezable}, output_msg, CuResult};
 use cu29::cutask::CuMsg;
 use cu29::prelude::*;
+use cu29::{
+    clock::RobotClock,
+    config::ComponentConfig,
+    cutask::{CuSrcTask, Freezable},
+    output_msg, CuResult,
+};
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 #[cfg(target_os = "linux")]
 use udev::{EventType, Udev};
 
@@ -21,7 +26,10 @@ pub struct NewDevice {
 
 impl Default for NewDevice {
     fn default() -> Self {
-        Self { port: Box::new("pci-0000:35:00.4-usb-0:1:1.3".to_string()), dev_path: Box::new("/dev/video4".to_string()) }
+        Self {
+            port: Box::new("pci-0000:35:00.4-usb-0:1:1.3".to_string()),
+            dev_path: Box::new("/dev/video4".to_string()),
+        }
     }
 }
 
@@ -29,11 +37,14 @@ impl Default for NewDevice {
 impl Freezable for UdevMonitor {}
 
 #[cfg(target_os = "linux")]
-impl<'cl> CuSrcTask<'cl> for UdevMonitor {
-    type Output = output_msg!('cl, NewDevice);
+impl CuSrcTask for UdevMonitor {
+    type Output<'m> = output_msg!(NewDevice);
 
     fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
-        Ok(Self { monitor_socket: None, initial_enumerated: Vec::new() })
+        Ok(Self {
+            monitor_socket: None,
+            initial_enumerated: Vec::new(),
+        })
     }
 
     fn start(&mut self, _clock: &RobotClock) -> CuResult<()> {
@@ -49,7 +60,10 @@ impl<'cl> CuSrcTask<'cl> for UdevMonitor {
                 Ok(x) => x,
                 Err(e) => {
                     error!("Failed to create udev enumerator: {e}");
-                    return Err(CuError::new_with_cause("Failed to create udev enumerator", e));
+                    return Err(CuError::new_with_cause(
+                        "Failed to create udev enumerator",
+                        e,
+                    ));
                 }
             }
         };
@@ -111,7 +125,7 @@ impl<'cl> CuSrcTask<'cl> for UdevMonitor {
         Ok(())
     }
 
-    fn process(&mut self, clock: &RobotClock, output: Self::Output) -> CuResult<()> {        
+    fn process(&mut self, clock: &RobotClock, output: &mut Self::Output<'_>) -> CuResult<()> {
         output.clear_payload();
         // first pop off the initial enumerated devices
         if !self.initial_enumerated.is_empty() {
@@ -127,14 +141,22 @@ impl<'cl> CuSrcTask<'cl> for UdevMonitor {
                 println!("got udev event");
                 match event.event_type() {
                     EventType::Add => {
-                        let Some(devnode) = event.devnode() else { return Ok(()); };
-                        let Some(path_str) = devnode.to_str() else { return Ok(()); };
-                        if !path_str.starts_with("/dev/video") { return Ok(()); }
+                        let Some(devnode) = event.devnode() else {
+                            return Ok(());
+                        };
+                        let Some(path_str) = devnode.to_str() else {
+                            return Ok(());
+                        };
+                        if !path_str.starts_with("/dev/video") {
+                            return Ok(());
+                        }
                         let Some(udev_index) = event.attribute_value("index") else {
                             info!("No udev_index for camera {path_str}");
                             return Ok(());
                         };
-                        if udev_index.to_str() != Some("0") { return Ok(()); }
+                        if udev_index.to_str() != Some("0") {
+                            return Ok(());
+                        }
                         if let Some(name) = event.attribute_value("name") {
                             if let Some(name) = name.to_str() {
                                 if name.contains("RealSense") {
@@ -173,19 +195,26 @@ pub struct UdevMonitor;
 impl Freezable for UdevMonitor {}
 
 #[cfg(not(target_os = "linux"))]
-impl<'cl> CuSrcTask<'cl> for UdevMonitor {
-    type Output = output_msg!('cl, NewDevice);
+impl CuSrcTask for UdevMonitor {
+    type Output<'m> = output_msg!(NewDevice);
 
-    fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> where Self: Sized {
+    fn new(_config: Option<&ComponentConfig>) -> CuResult<Self>
+    where
+        Self: Sized,
+    {
         Ok(Self)
     }
 
-    fn start(&mut self, _clock: &RobotClock) -> CuResult<()> { Ok(()) }
+    fn start(&mut self, _clock: &RobotClock) -> CuResult<()> {
+        Ok(())
+    }
 
-    fn process(&mut self, _clock: &RobotClock, _output: Self::Output) -> CuResult<()> {
+    fn process(&mut self, _clock: &RobotClock, _output: &mut Self::Output<'_>) -> CuResult<()> {
         // No-op stub – never emits new devices.
         Ok(())
     }
 
-    fn stop(&mut self, _clock: &RobotClock) -> CuResult<()> { Ok(()) }
+    fn stop(&mut self, _clock: &RobotClock) -> CuResult<()> {
+        Ok(())
+    }
 }

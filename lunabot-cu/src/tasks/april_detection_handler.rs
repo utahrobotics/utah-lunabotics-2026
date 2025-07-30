@@ -97,15 +97,15 @@ pub struct AprilDetectionHandler {
 
 impl Freezable for AprilDetectionHandler {}
 
-impl<'cl> CuTask<'cl> for AprilDetectionHandler {
+impl CuTask for AprilDetectionHandler {
     // one detections struct per camera
-    type Input = (
-        input_msg!('cl, AprilTagDetections),
-        input_msg!('cl, AprilTagDetections),
-        input_msg!('cl, AprilTagDetections),
+    type Input<'m> = (
+        &'m input_msg!(AprilTagDetections),
+        &'m input_msg!(AprilTagDetections),
+        &'m input_msg!(AprilTagDetections),
     );
 
-    type Output = output_msg!('cl, Box<HashMap<String, Transform3D<f64>>>);
+    type Output<'m> = output_msg!(Box<HashMap<String, Transform3D<f64>>>);
 
     fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
         let known_tags = load_known_apriltag_isometries()?;
@@ -118,8 +118,8 @@ impl<'cl> CuTask<'cl> for AprilDetectionHandler {
     fn process(
         &mut self,
         clock: &RobotClock,
-        input: Self::Input,
-        output: Self::Output,
+        input: &Self::Input<'_>,
+        output: &mut Self::Output<'_>,
     ) -> CuResult<()> {
         let (input1, input2, input3) = input;
 

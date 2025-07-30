@@ -1,11 +1,24 @@
-use std::{fs::File, net::{IpAddr, SocketAddr}, str::FromStr, sync::Arc, time::Duration};
 use crossbeam::atomic::AtomicCell;
-use cu29::{clock::RobotClock, config::ComponentConfig, cutask::{CuMsg, CuSrcTask, Freezable}, output_msg, prelude::*, CuError, CuResult};
-use tasker::tokio::sync::{mpsc, watch};
+use cu29::{
+    clock::RobotClock,
+    config::ComponentConfig,
+    cutask::{CuMsg, CuSrcTask, Freezable},
+    output_msg,
+    prelude::*,
+    CuError, CuResult,
+};
+use std::{
+    fs::File,
+    net::{IpAddr, SocketAddr},
+    str::FromStr,
+    sync::Arc,
+    time::Duration,
+};
 use tasker::tokio::sync::mpsc::error::TryRecvError;
+use tasker::tokio::sync::{mpsc, watch};
 
-use common::{FromLunabase, FromLunabot, LunabotStage, LUNABOT_STAGE};
 use crate::comms::{LunabaseConn, PacketBuilder, TELEOP};
+use common::{FromLunabase, FromLunabot, LunabotStage, LUNABOT_STAGE};
 use serde::Serialize;
 
 pub struct Lunabase {
@@ -15,35 +28,36 @@ pub struct Lunabase {
     connected: LunabotConnected,
 }
 
-impl Freezable for Lunabase{}
+impl Freezable for Lunabase {}
 
-impl<'cl> CuSrcTask<'cl> for Lunabase {
-    type Output = output_msg!('cl, Option<FromLunabase>);
+impl CuSrcTask for Lunabase {
+    type Output<'m> = output_msg!(Option<FromLunabase>);
 
     fn new(config: Option<&ComponentConfig>) -> CuResult<Self>
-        where Self: Sized 
+    where
+        Self: Sized,
     {
         // Configuration is optional: if no address is provided, we rely on autodiscovery
-        let (lunabase_address_opt, max_pong_delay): (Option<SocketAddr>, u64) = if let Some(cfg) = config {
-            let max_delay = cfg.get("max_pong_delay_ms").unwrap_or(default_max_pong_delay_ms());
+        let (lunabase_address_opt, max_pong_delay): (Option<SocketAddr>, u64) =
+            if let Some(cfg) = config {
+                let max_delay = cfg
+                    .get("max_pong_delay_ms")
+                    .unwrap_or(default_max_pong_delay_ms());
 
-            // "lunabase_address" parameter is optional. If missing we fall back to None for auto-discover.
-            let addr_opt: Option<SocketAddr> = cfg
-                .get::<String>("lunabase_address")
-                .and_then(|s| IpAddr::from_str(&s).ok())
-                .map(|ip| SocketAddr::new(ip, TELEOP));
+                // "lunabase_address" parameter is optional. If missing we fall back to None for auto-discover.
+                let addr_opt: Option<SocketAddr> = cfg
+                    .get::<String>("lunabase_address")
+                    .and_then(|s| IpAddr::from_str(&s).ok())
+                    .map(|ip| SocketAddr::new(ip, TELEOP));
 
-            (addr_opt, max_delay)
-        } else {
-            (None, default_max_pong_delay_ms())
-        };
+                (addr_opt, max_delay)
+            } else {
+                (None, default_max_pong_delay_ms())
+            };
 
         let lunabot_stage = LUNABOT_STAGE.clone();
-        let (packet_builder, from_lunabase_rx, connected) = create_packet_builder(
-            lunabase_address_opt,
-            lunabot_stage.clone(),
-            max_pong_delay,
-        );
+        let (packet_builder, from_lunabase_rx, connected) =
+            create_packet_builder(lunabase_address_opt, lunabot_stage.clone(), max_pong_delay);
 
         Ok(Self {
             packet_builder,
@@ -53,7 +67,7 @@ impl<'cl> CuSrcTask<'cl> for Lunabase {
         })
     }
 
-    fn process(&mut self, clock: &RobotClock, output: Self::Output) -> CuResult<()> {        
+    fn process(&mut self, clock: &RobotClock, output: &mut Self::Output<'_>) -> CuResult<()> {
         // Collect the latest message from lunabase without blocking. The loop drains the
         // receiver so we only forward the most recent command each cycle – this keeps the
         // process function fast while ensuring we never fall behind.
@@ -109,13 +123,19 @@ fn log_teleop_messages() -> CuResult<()> {
         .map(|f| FromLunabase::write_code_sheet(f))
         .flatten()
     {
-        return Err(CuError::new_with_cause("failed to write code sheet for FromLunabase", e));
+        return Err(CuError::new_with_cause(
+            "failed to write code sheet for FromLunabase",
+            e,
+        ));
     }
     if let Err(e) = File::create("from_lunabot.txt")
         .map(|f| FromLunabot::write_code_sheet(f))
         .flatten()
     {
-        return Err(CuError::new_with_cause("failed to write code sheet for FromLunabot", e));
+        return Err(CuError::new_with_cause(
+            "failed to write code sheet for FromLunabot",
+            e,
+        ));
     }
 
     Ok(())
@@ -135,7 +155,6 @@ impl LunabotConnected {
         let _ = self.connected.wait_for(|&x| !x).await;
     }
 }
-
 
 fn create_packet_builder(
     lunabase_address: Option<SocketAddr>,

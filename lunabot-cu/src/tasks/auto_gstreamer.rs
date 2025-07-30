@@ -44,9 +44,9 @@ pub struct CuAutoGStreamer<const N: usize> {
 
 impl<const N: usize> Freezable for CuAutoGStreamer<N> {}
 
-impl<'cl, const N: usize> CuTask<'cl> for CuAutoGStreamer<N> {
-    type Input = input_msg!('cl, NewDevice);
-    type Output = output_msg!('cl, CuGstBuffer);
+impl<const N: usize> CuTask for CuAutoGStreamer<N> {
+    type Input<'m> = input_msg!(NewDevice);
+    type Output<'m> = output_msg!(CuGstBuffer);
 
     // -------------------------------------------------------------------------------------
     // Construction
@@ -72,9 +72,7 @@ impl<'cl, const N: usize> CuTask<'cl> for CuAutoGStreamer<N> {
         let caps_str = cfg
             .get::<String>("caps")
             .ok_or("'caps' missing from config")?;
-        let req_timeout = Duration::from_millis(
-            cfg.get::<u32>("timeout_ms").unwrap_or(500) as u64
-        );
+        let req_timeout = Duration::from_millis(cfg.get::<u32>("timeout_ms").unwrap_or(500) as u64);
 
         Ok(Self {
             desired_port,
@@ -95,7 +93,6 @@ impl<'cl, const N: usize> CuTask<'cl> for CuAutoGStreamer<N> {
         Ok(())
     }
 
-
     fn preprocess(&mut self, clock: &RobotClock) -> CuResult<()> {
         // Handle requested teardowns first
         if self.teardown_requested {
@@ -113,7 +110,12 @@ impl<'cl, const N: usize> CuTask<'cl> for CuAutoGStreamer<N> {
         Ok(())
     }
 
-    fn process(&mut self, clock: &RobotClock, input: Self::Input, output: Self::Output) -> CuResult<()> {
+    fn process(
+        &mut self,
+        clock: &RobotClock,
+        input: &Self::Input<'_>,
+        output: &mut Self::Output<'_>,
+    ) -> CuResult<()> {
         if self.pipeline.is_none() {
             if let Some(dev) = input.payload() {
                 if *dev.port == self.desired_port {
@@ -128,7 +130,10 @@ impl<'cl, const N: usize> CuTask<'cl> for CuAutoGStreamer<N> {
         // Handle frame timeout without blocking
         if let Some(last) = self.last_frame_time {
             if last.elapsed().as_millis() > self.req_timeout.as_millis() {
-                info!("GStreamer: Frame timeout (>{}). Requesting teardown.", self.req_timeout);
+                info!(
+                    "GStreamer: Frame timeout (>{}). Requesting teardown.",
+                    self.req_timeout
+                );
                 self.teardown_requested = true;
                 self.last_frame_time = None;
             }
@@ -146,7 +151,6 @@ impl<'cl, const N: usize> CuTask<'cl> for CuAutoGStreamer<N> {
         Ok(())
     }
 
-
     fn stop(&mut self, _clock: &RobotClock) -> CuResult<()> {
         self.stop_pipeline();
         Ok(())
@@ -155,7 +159,6 @@ impl<'cl, const N: usize> CuTask<'cl> for CuAutoGStreamer<N> {
 
 impl<const N: usize> CuAutoGStreamer<N> {
     fn open_pipeline(&mut self, dev_path: &str) -> CuResult<()> {
-
         let pipeline_str = self.pipeline_template.replace("<devpath>", dev_path);
         let pipeline = parse::launch(&pipeline_str)
             .map_err(|e| CuError::new_with_cause("Failed to parse pipeline", e))?;
@@ -177,20 +180,17 @@ impl<const N: usize> CuAutoGStreamer<N> {
 
         appsink.set_callbacks(
             AppSinkCallbacks::builder()
-                .new_sample(
-                    move |appsink| {
-                        let sample = appsink
-                            .pull_sample()
-                            .map_err(|_| gstreamer::FlowError::Eos)?;
-                        let buffer: &BufferRef =
-                            sample.buffer().ok_or(gstreamer::FlowError::Error)?;
-                        circular_buffer
-                            .lock()
-                            .unwrap()
-                            .push_back(CuGstBuffer(buffer.to_owned()));
-                        Ok(FlowSuccess::Ok)
-                    }
-                )
+                .new_sample(move |appsink| {
+                    let sample = appsink
+                        .pull_sample()
+                        .map_err(|_| gstreamer::FlowError::Eos)?;
+                    let buffer: &BufferRef = sample.buffer().ok_or(gstreamer::FlowError::Error)?;
+                    circular_buffer
+                        .lock()
+                        .unwrap()
+                        .push_back(CuGstBuffer(buffer.to_owned()));
+                    Ok(FlowSuccess::Ok)
+                })
                 .build(),
         );
 

@@ -1,4 +1,10 @@
-use cu29::{cutask::{CuMsg, CuTask, Freezable}, input_msg, output_msg, config::ComponentConfig, CuResult, prelude::*};
+use cu29::{
+    config::ComponentConfig,
+    cutask::{CuMsg, CuTask, Freezable},
+    input_msg, output_msg,
+    prelude::*,
+    CuResult,
+};
 use cu_spatial_payloads::Transform3D;
 use rerun::Rgba32;
 
@@ -6,22 +12,22 @@ use iceoryx_types::IceoryxPointCloud;
 
 use crate::rerun_viz;
 
+use kiss_icp_core::preprocessing::{preprocess as kiss_preprocess, voxel_downsample};
 use kiss_icp_core::{
-    voxel_hash_map::{VoxelHashMap, VoxelHashMapArgs},
+    deskew,
     threshold::AdaptiveThreshold,
     types::VoxelPoint,
-    deskew,
+    voxel_hash_map::{VoxelHashMap, VoxelHashMapArgs},
 };
-use nalgebra::{Isometry3, Vector3, DMatrix, MatrixXx3};
+use nalgebra::{DMatrix, Isometry3, MatrixXx3, Vector3};
 use rayon::iter::ParallelIterator;
 use std::time::{Duration, Instant};
-use kiss_icp_core::preprocessing::{preprocess as kiss_preprocess, voxel_downsample};
 
 pub struct KissIcp {
     // Core KISS ICP components
     voxel_map: VoxelHashMap,
     adaptive_threshold: AdaptiveThreshold,
-    
+
     // Configuration parameters
     voxel_size: f64,
     max_range: f64,
@@ -33,7 +39,7 @@ pub struct KissIcp {
     convergence_tolerance: f64,
     min_threshold: f64,
     max_threshold: f64,
-    
+
     // State tracking
     current_pose: Isometry3<f64>,
     previous_pose: Isometry3<f64>,
@@ -47,13 +53,13 @@ pub struct KissIcp {
 
 impl Freezable for KissIcp {}
 
-impl<'cl> CuTask<'cl> for KissIcp {
-    type Input = input_msg!('cl, IceoryxPointCloud);
-    type Output = output_msg!('cl, Transform3D<f64>);
+impl CuTask for KissIcp {
+    type Input<'m> = input_msg!(IceoryxPointCloud);
+    type Output<'m> = output_msg!(Transform3D<f64>);
 
     fn new(config: Option<&ComponentConfig>) -> CuResult<Self>
     where
-        Self: Sized 
+        Self: Sized,
     {
         let voxel_size = config
             .and_then(|c| c.get::<f64>("voxel_size"))
@@ -128,45 +134,51 @@ impl<'cl> CuTask<'cl> for KissIcp {
     fn process(
         &mut self,
         clock: &RobotClock,
-        input: Self::Input,
-        output: Self::Output,
-    ) -> CuResult<()> {      
-        let start = clock.now().as_nanos();  
+        input: &Self::Input<'_>,
+        output: &mut Self::Output<'_>,
+    ) -> CuResult<()> {
+        let start = clock.now().as_nanos();
         if let Some(point_cloud_payload) = input.payload() {
             let mut raw_points = Vec::new();
             let mut timestamps = Vec::new();
-            
-            for (idx, point) in point_cloud_payload.points[..point_cloud_payload.publish_count as usize].iter().enumerate() {
+
+            for (idx, point) in point_cloud_payload.points
+                [..point_cloud_payload.publish_count as usize]
+                .iter()
+                .enumerate()
+            {
                 let x = point.x;
                 let y = point.y;
                 let z = point.z;
-                
-                let voxel_point = Vector3::new(
-                    x as f64,
-                    y as f64,
-                    z as f64,
-                );
+
+                let voxel_point = Vector3::new(x as f64, y as f64, z as f64);
                 raw_points.push(voxel_point);
-                
+
                 timestamps.push(point.time)
             }
-            
+
             if raw_points.is_empty() {
                 output.clear_payload();
                 return Ok(());
             }
 
-
             let raw_matrix = self.points_to_voxel_matrix(&raw_points);
-            let timestamps = point_cloud_payload.points[..point_cloud_payload.publish_count as usize].iter().map(|p| {
-                p.time as f64
-            }).collect::<Vec<f64>>();
+            let timestamps = point_cloud_payload.points
+                [..point_cloud_payload.publish_count as usize]
+                .iter()
+                .map(|p| p.time as f64)
+                .collect::<Vec<f64>>();
             let deskewed_points: Vec<VoxelPoint> = if self.enable_deskewing && self.is_initialized {
                 self.scan_start_pose = self.previous_pose;
                 self.scan_finish_pose = self.current_pose;
 
-                deskew::scan(&raw_matrix, &timestamps, self.scan_start_pose, self.scan_finish_pose)
-                    .collect()
+                deskew::scan(
+                    &raw_matrix,
+                    &timestamps,
+                    self.scan_start_pose,
+                    self.scan_finish_pose,
+                )
+                .collect()
             } else {
                 (0..raw_matrix.nrows())
                     .map(|i| raw_matrix.row(i).transpose())
@@ -201,13 +213,12 @@ impl<'cl> CuTask<'cl> for KissIcp {
             if !self.is_initialized {
                 self.voxel_map.add_points(&downsampled_frame);
                 self.is_initialized = true;
-                
+
                 let transform = Transform3D::from(Isometry3::identity());
                 output.set_payload(transform);
             } else {
-                
                 let correspondence_threshold = self.adaptive_threshold.compute_threshold();
-                
+
                 let estimated_pose = self.voxel_map.register_frame(
                     downsampled_frame.clone(),
                     self.current_pose,
@@ -217,16 +228,17 @@ impl<'cl> CuTask<'cl> for KissIcp {
 
                 let pose_delta = self.previous_pose.inverse() * estimated_pose;
                 self.adaptive_threshold.update_model_deviation(pose_delta);
-                
+
                 self.previous_pose = self.current_pose;
                 self.current_pose = estimated_pose;
 
-                self.voxel_map.update_with_pose(&downsampled_frame, estimated_pose);
+                self.voxel_map
+                    .update_with_pose(&downsampled_frame, estimated_pose);
 
                 let transform = self.isometry_to_transform3d(&estimated_pose);
                 output.set_payload(transform);
             }
-            
+
             self.log_accumulated_map()?;
         } else {
             output.clear_payload();
@@ -269,42 +281,46 @@ impl KissIcp {
     fn isometry_to_transform3d(&self, pose: &Isometry3<f64>) -> Transform3D<f64> {
         Transform3D::from(*pose)
     }
-    
+
     fn log_accumulated_map(&mut self) -> CuResult<()> {
-        if self.last_map_log.elapsed() < self.map_log_interval ||
-           !self.is_initialized || 
-           self.voxel_map.is_empty() {
+        if self.last_map_log.elapsed() < self.map_log_interval
+            || !self.is_initialized
+            || self.voxel_map.is_empty()
+        {
             return Ok(());
         }
-        
+
         let Some(recorder_data) = rerun_viz::RECORDER.get() else {
             return Ok(());
         };
-        
+
         let map_points: Vec<VoxelPoint> = self.voxel_map.get_point_cloud().copied().collect();
         if map_points.is_empty() {
             return Ok(());
         }
-        
+
         let mut positions = Vec::with_capacity(map_points.len());
         let mut colors = Vec::with_capacity(map_points.len());
-        
+
         for point in &map_points {
             positions.push([point.x as f32, point.y as f32, point.z as f32]);
             colors.push([100, 100, 255, 100]);
         }
-        
+
         if let Err(e) = recorder_data.recorder.log(
             "kiss_icp/accumulated_map",
             &rerun::Points3D::new(positions)
                 .with_colors(colors)
-                .with_radii([0.02f32])
+                .with_radii([0.02f32]),
         ) {
             warning!("Failed to log accumulated map to Rerun: {}", e.to_string());
         } else {
-            info!("Logged {} points from accumulated KISS-ICP map", map_points.len());
+            info!(
+                "Logged {} points from accumulated KISS-ICP map",
+                map_points.len()
+            );
         }
-        
+
         self.last_map_log = Instant::now();
         Ok(())
     }

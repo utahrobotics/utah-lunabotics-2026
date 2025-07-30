@@ -142,7 +142,7 @@ dependencies = [
 [[package]]
 name = "apriltag"
 version = "0.5.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "apriltag-sys",
  "libc",
@@ -154,7 +154,7 @@ dependencies = [
 [[package]]
 name = "apriltag-sys"
 version = "0.4.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "anyhow",
  "cc",
@@ -1351,7 +1351,7 @@ dependencies = [
 [[package]]
 name = "cu-apriltag"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "apriltag",
  "apriltag-sys",
@@ -1368,7 +1368,7 @@ dependencies = [
 [[package]]
 name = "cu-dynthreshold"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "cu-gstreamer",
  "cu-sensor-payloads",
@@ -1379,7 +1379,7 @@ dependencies = [
 [[package]]
 name = "cu-gstreamer"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "bincode 2.0.1",
  "cfg_aliases",
@@ -1394,7 +1394,7 @@ dependencies = [
 [[package]]
 name = "cu-sensor-payloads"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "bincode 2.0.1",
  "cu29 0.8.0 (git+https://github.com/matthewashton-k/copper-rs.git?branch=master)",
@@ -1408,7 +1408,7 @@ dependencies = [
 [[package]]
 name = "cu-spatial-payloads"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "bincode 2.0.1",
  "glam",
@@ -1420,7 +1420,7 @@ dependencies = [
 [[package]]
 name = "cu29"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "bincode 2.0.1",
  "compact_str 0.9.0",
@@ -1442,7 +1442,7 @@ dependencies = [
 [[package]]
 name = "cu29"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "bincode 2.0.1",
  "compact_str 0.9.0",
@@ -1464,7 +1464,7 @@ dependencies = [
 [[package]]
 name = "cu29-clock"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "bincode 2.0.1",
  "quanta",
@@ -1474,7 +1474,7 @@ dependencies = [
 [[package]]
 name = "cu29-clock"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "bincode 2.0.1",
  "quanta",
@@ -1484,7 +1484,7 @@ dependencies = [
 [[package]]
 name = "cu29-derive"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "convert_case 0.8.0",
  "cu29-runtime 0.8.0 (git+https://github.com/matthewashton-k/copper-rs.git?branch=master)",
@@ -1501,7 +1501,7 @@ dependencies = [
 [[package]]
 name = "cu29-derive"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "convert_case 0.8.0",
  "cu29-runtime 0.8.0 (git+https://github.com/matthewashton-k/copper-rs.git)",
@@ -1518,7 +1518,7 @@ dependencies = [
 [[package]]
 name = "cu29-export"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "bincode 2.0.1",
  "clap",
@@ -1531,7 +1531,7 @@ dependencies = [
 [[package]]
 name = "cu29-helpers"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "cu29-clock 0.8.0 (git+https://github.com/matthewashton-k/copper-rs.git?branch=master)",
  "cu29-log 0.8.0 (git+https://github.com/matthewashton-k/copper-rs.git?branch=master)",
@@ -1545,7 +1545,7 @@ dependencies = [
 [[package]]
 name = "cu29-intern-strs"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "anyhow",
  "byteorder",
@@ -1555,7 +1555,7 @@ dependencies = [
 [[package]]
 name = "cu29-intern-strs"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "anyhow",
  "byteorder",
@@ -1565,7 +1565,7 @@ dependencies = [
 [[package]]
 name = "cu29-log"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "bincode 2.0.1",
  "cu29-clock 0.8.0 (git+https://github.com/matthewashton-k/copper-rs.git?branch=master)",
@@ -1579,7 +1579,7 @@ dependencies = [
 [[package]]
 name = "cu29-log"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "bincode 2.0.1",
  "cu29-clock 0.8.0 (git+https://github.com/matthewashton-k/copper-rs.git)",
@@ -1593,7 +1593,7 @@ dependencies = [
 [[package]]
 name = "cu29-log-derive"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "cu29-intern-strs 0.8.0 (git+https://github.com/matthewashton-k/copper-rs.git?branch=master)",
  "cu29-log 0.8.0 (git+https://github.com/matthewashton-k/copper-rs.git?branch=master)",
@@ -1604,7 +1604,7 @@ dependencies = [
 [[package]]
 name = "cu29-log-derive"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "cu29-intern-strs 0.8.0 (git+https://github.com/matthewashton-k/copper-rs.git)",
  "cu29-log 0.8.0 (git+https://github.com/matthewashton-k/copper-rs.git)",
@@ -1615,7 +1615,7 @@ dependencies = [
 [[package]]
 name = "cu29-log-runtime"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "bincode 2.0.1",
  "cu29-clock 0.8.0 (git+https://github.com/matthewashton-k/copper-rs.git?branch=master)",
@@ -1628,7 +1628,7 @@ dependencies = [
 [[package]]
 name = "cu29-log-runtime"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "bincode 2.0.1",
  "cu29-clock 0.8.0 (git+https://github.com/matthewashton-k/copper-rs.git)",
@@ -1641,7 +1641,7 @@ dependencies = [
 [[package]]
 name = "cu29-runtime"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "arrayvec",
  "bincode 2.0.1",
@@ -1672,7 +1672,7 @@ dependencies = [
 [[package]]
 name = "cu29-runtime"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "arrayvec",
  "bincode 2.0.1",
@@ -1703,7 +1703,7 @@ dependencies = [
 [[package]]
 name = "cu29-soa-derive"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "quote",
  "syn 2.0.104",
@@ -1713,7 +1713,7 @@ dependencies = [
 [[package]]
 name = "cu29-traits"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "bincode 2.0.1",
  "compact_str 0.9.0",
@@ -1725,7 +1725,7 @@ dependencies = [
 [[package]]
 name = "cu29-traits"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "bincode 2.0.1",
  "compact_str 0.9.0",
@@ -1737,7 +1737,7 @@ dependencies = [
 [[package]]
 name = "cu29-unifiedlog"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "bincode 2.0.1",
  "cu29-traits 0.8.0 (git+https://github.com/matthewashton-k/copper-rs.git?branch=master)",
@@ -1748,7 +1748,7 @@ dependencies = [
 [[package]]
 name = "cu29-unifiedlog"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "bincode 2.0.1",
  "cu29-traits 0.8.0 (git+https://github.com/matthewashton-k/copper-rs.git)",
@@ -1759,7 +1759,7 @@ dependencies = [
 [[package]]
 name = "cu29-value"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "bincode 2.0.1",
  "cu29-clock 0.8.0 (git+https://github.com/matthewashton-k/copper-rs.git?branch=master)",
@@ -1770,7 +1770,7 @@ dependencies = [
 [[package]]
 name = "cu29-value"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "bincode 2.0.1",
  "cu29-clock 0.8.0 (git+https://github.com/matthewashton-k/copper-rs.git)",
@@ -1781,7 +1781,7 @@ dependencies = [
 [[package]]
 name = "cu_cursive_consolemon"
 version = "0.8.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#2590d6c55bed00b0d237017a6838295a896a4f69"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#a5977f3ebf12d16b9e4f5f0cc54f2064a8fb283d"
 dependencies = [
  "ansi-to-tui",
  "color-eyre",

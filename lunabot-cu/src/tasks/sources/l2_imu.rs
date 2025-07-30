@@ -1,14 +1,21 @@
-use cu29::{clock::RobotClock, config::ComponentConfig, cutask::{CuSrcTask, Freezable}, output_msg, prelude::*, CuError, CuResult};
+use cu29::cutask::CuMsg;
+use cu29::{
+    clock::RobotClock,
+    config::ComponentConfig,
+    cutask::{CuSrcTask, Freezable},
+    output_msg,
+    prelude::*,
+    CuError, CuResult,
+};
 use iceoryx2::node::NodeBuilder;
 use iceoryx2::port::subscriber::Subscriber;
 use iceoryx2::prelude::*;
 use iceoryx2::service::port_factory::publish_subscribe::PortFactory;
-use cu29::cutask::CuMsg;
 
-use iceoryx_types::ImuMsg;
 use crate::ROOT_NODE;
+use iceoryx_types::ImuMsg;
+use nalgebra::{Matrix3, Quaternion, Rotation3, UnitQuaternion, Vector3};
 use simple_motion::StaticNode;
-use nalgebra::{Matrix3, Rotation3, UnitQuaternion, Vector3, Quaternion};
 
 pub struct ImuIceoryxReceiver {
     service_name: ServiceName,
@@ -20,17 +27,16 @@ pub struct ImuIceoryxReceiver {
 
 impl Freezable for ImuIceoryxReceiver {}
 
-impl<'cl> CuSrcTask<'cl> for ImuIceoryxReceiver {
-    type Output = output_msg!('cl, ImuMsg);
+impl CuSrcTask for ImuIceoryxReceiver {
+    type Output<'m> = output_msg!(ImuMsg);
 
     fn new(config: Option<&ComponentConfig>) -> CuResult<Self> {
         let service_str = config
             .and_then(|c| c.get::<String>("service"))
             .unwrap_or_else(|| "unilidar/imu".to_string());
 
-        let service_name = ServiceName::new(&service_str).map_err(|e| {
-            CuError::new_with_cause("ImuIceoryxReceiver: invalid service name", e)
-        })?;
+        let service_name = ServiceName::new(&service_str)
+            .map_err(|e| CuError::new_with_cause("ImuIceoryxReceiver: invalid service name", e))?;
 
         let node = NodeBuilder::new()
             .create::<ipc::Service>()
@@ -69,17 +75,18 @@ impl<'cl> CuSrcTask<'cl> for ImuIceoryxReceiver {
         Ok(())
     }
 
-    fn process(&mut self, clock: &RobotClock, new_msg: Self::Output) -> CuResult<()> {
+    fn process(&mut self, clock: &RobotClock, new_msg: &mut Self::Output<'_>) -> CuResult<()> {
         let start = clock.now().as_nanos();
-        
+
         let subscriber = self
             .subscriber
             .as_ref()
             .ok_or_else(|| CuError::from("ImuIceoryxReceiver: subscriber missing"))?;
 
-        if let Some(sample) = subscriber.receive().map_err(|e| {
-            CuError::new_with_cause("ImuIceoryxReceiver: receive", e)
-        })? {
+        if let Some(sample) = subscriber
+            .receive()
+            .map_err(|e| CuError::new_with_cause("ImuIceoryxReceiver: receive", e))?
+        {
             let imu_raw: &ImuMsg = &*sample;
             // coordinate system swap?
             // let flip_matrix = Matrix3::new(
@@ -149,4 +156,4 @@ impl<'cl> CuSrcTask<'cl> for ImuIceoryxReceiver {
         self.subscriber = None;
         Ok(())
     }
-} 
+}

@@ -1,6 +1,13 @@
-use cu29::{clock::RobotClock, config::ComponentConfig, cutask::{CuMsg, CuSinkTask, Freezable}, input_msg, prelude::*, CuError, CuResult};
-use common::{FromLunabase, FromHost};
 use bincode::{config::standard, encode_to_vec};
+use common::{FromHost, FromLunabase};
+use cu29::{
+    clock::RobotClock,
+    config::ComponentConfig,
+    cutask::{CuMsg, CuSinkTask, Freezable},
+    input_msg,
+    prelude::*,
+    CuError, CuResult,
+};
 use iceoryx2::node::NodeBuilder;
 use iceoryx2::port::publisher::Publisher;
 use iceoryx2::prelude::*;
@@ -15,8 +22,8 @@ pub struct AiSink {
 
 impl Freezable for AiSink {}
 
-impl<'cl> CuSinkTask<'cl> for AiSink {
-    type Input = input_msg!('cl, Option<FromLunabase>);
+impl CuSinkTask for AiSink {
+    type Input<'m> = input_msg!(Option<FromLunabase>);
 
     fn new(config: Option<&ComponentConfig>) -> CuResult<Self> {
         // Create iceoryx publisher
@@ -25,7 +32,10 @@ impl<'cl> CuSinkTask<'cl> for AiSink {
             .map_err(|e| CuError::new_with_cause("AiSink: node create", e))?;
 
         let service = node
-            .service_builder(&ServiceName::new(FROM_HOST_SERVICE).map_err(|e| CuError::new_with_cause("AiSink: invalid service name", e))?)
+            .service_builder(
+                &ServiceName::new(FROM_HOST_SERVICE)
+                    .map_err(|e| CuError::new_with_cause("AiSink: invalid service name", e))?,
+            )
             .publish_subscribe::<FromHostBytes>()
             .open_or_create()
             .map_err(|e| CuError::new_with_cause("AiSink: service", e))?;
@@ -38,14 +48,15 @@ impl<'cl> CuSinkTask<'cl> for AiSink {
         Ok(Self { publisher })
     }
 
-    fn process(&mut self, clock: &RobotClock, input: Self::Input) -> CuResult<()> {        
+    fn process(&mut self, clock: &RobotClock, input: &Self::Input<'_>) -> CuResult<()> {
         if let Some(Some(msg)) = input.payload() {
             // Convert to FromHost variant
             let host_msg = FromHost::FromLunabase { msg: *msg };
 
             // Encode with bincode
             let config = standard();
-            let bytes = encode_to_vec(&host_msg, config).map_err(|e| CuError::new_with_cause("AiSink: encode", e))?;
+            let bytes = encode_to_vec(&host_msg, config)
+                .map_err(|e| CuError::new_with_cause("AiSink: encode", e))?;
 
             if bytes.len() > FROM_HOST_MAX_BYTES {
                 return Err(CuError::from("AiSink: message too large for buffer"));

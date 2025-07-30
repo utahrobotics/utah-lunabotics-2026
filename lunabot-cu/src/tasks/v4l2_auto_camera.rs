@@ -1,29 +1,5 @@
 // auto cam task:
 // This allows this module to be used on simulation on Windows and MacOS
-#[cfg(not(target_os = "linux"))]
-mod empty_impl {
-    use cu29::prelude::*;
-    use cu_sensor_payloads::CuImage;
-
-    pub struct V4lAutoCam {}
-
-    impl Freezable for V4lAutoCam {}
-
-    impl<'cl> CuSrcTask<'cl> for V4lAutoCam {
-        type Output = output_msg!('cl, CuImage<Vec<u8>>);
-
-        fn new(_config: Option<&ComponentConfig>) -> CuResult<Self>
-        where
-            Self: Sized,
-        {
-            Ok(Self {})
-        }
-
-        fn process(&mut self, _clock: &RobotClock, _new_msg: Self::Output) -> CuResult<()> {
-            Ok(())
-        }
-    }
-}
 
 #[cfg(not(target_os = "linux"))]
 pub use empty_impl::V4lAutoCam;
@@ -33,18 +9,18 @@ pub use linux_impl::V4lAutoCam;
 
 #[cfg(target_os = "linux")]
 mod linux_impl {
+    use bincode::de;
     use std::any;
     use std::f32::consts::E;
     use std::ops::Deref;
     use std::time::{Duration, Instant};
-    use bincode::de;
     use v4l::video::Capture;
 
     use crate::tasks::udev_monitor::NewDevice;
     use crate::tasks::v4lstream::CuV4LStream;
+    use cu29::cutask::CuMsg;
     use cu29::prelude::*;
     use cu_sensor_payloads::{CuImage, CuImageBufferFormat};
-    use cu29::cutask::CuMsg;
 
     use nix::time::{clock_gettime, ClockId};
 
@@ -87,9 +63,9 @@ mod linux_impl {
         ((duration.as_nanos() as i64 + offset_ns) as u64).into()
     }
 
-    impl<'cl> CuTask<'cl> for V4lAutoCam {
-        type Output = output_msg!('cl, CuImage<Vec<u8>>);
-        type Input = input_msg!('cl, NewDevice); // will have the camera port and device path 
+    impl CuTask for V4lAutoCam {
+        type Output<'m> = output_msg!(CuImage<Vec<u8>>);
+        type Input<'m> = input_msg!(NewDevice); // will have the camera port and device path
 
         fn new(config: Option<&ComponentConfig>) -> CuResult<Self>
         where
@@ -149,7 +125,12 @@ mod linux_impl {
             Ok(())
         }
 
-               fn process(&mut self, clock: &RobotClock, input: Self::Input, output: Self::Output) -> CuResult<()> {
+        fn process(
+            &mut self,
+            clock: &RobotClock,
+            input: &Self::Input<'_>,
+            output: &mut Self::Output<'_>,
+        ) -> CuResult<()> {
             if self.stream.is_none() {
                 if let Some(dev) = input.payload() {
                     if dev.port.to_string() == self.desired_port {
@@ -165,13 +146,16 @@ mod linux_impl {
                     Ok(Some((handle, meta))) => {
                         if meta.bytesused != 0 {
                             if let Some(ref fmt) = self.settled_format {
-                                let cutime = cutime_from_v4ltime(self.v4l_clock_time_offset_ns, meta.timestamp);
+                                let cutime = cutime_from_v4ltime(
+                                    self.v4l_clock_time_offset_ns,
+                                    meta.timestamp,
+                                );
                                 let image = CuImage::new(*fmt, handle.clone());
-                                
+
                                 output.set_payload(image);
                                 output.tov = Tov::Time(cutime);
                                 self.last_frame_time = Some(Instant::now());
-                                
+
                                 // Requeue buffer after successful processing
                                 if let Err(e) = stream.requeue(stream.last_dequeued_index()) {
                                     error!("Failed to requeue buffer: {}", e.to_string());
@@ -212,7 +196,7 @@ mod linux_impl {
                     self.last_frame_time = None;
                 }
             }
-            
+
             Ok(())
         }
 
@@ -266,10 +250,13 @@ mod linux_impl {
                     .map_err(|e| CuError::new_with_cause("Failed to enum frame sizes", e))?;
 
                 // Choose resolution
-                let (width, height) = if let (Some(w), Some(h)) = (self.req_width, self.req_height) {
+                let (width, height) = if let (Some(w), Some(h)) = (self.req_width, self.req_height)
+                {
                     let mut selected: (u32, u32) = (0, 0);
                     for frame in resolutions.iter() {
-                        let FrameSizeEnum::Discrete(size) = &frame.size else { continue };
+                        let FrameSizeEnum::Discrete(size) = &frame.size else {
+                            continue;
+                        };
                         if size.width == w && size.height == h {
                             selected = (size.width, size.height);
                             break;
@@ -278,7 +265,9 @@ mod linux_impl {
                     selected
                 } else {
                     let fs = resolutions.first().unwrap();
-                    let FrameSizeEnum::Discrete(size) = &fs.size else { return Err("Unsupported frame size type".into()) };
+                    let FrameSizeEnum::Discrete(size) = &fs.size else {
+                        return Err("Unsupported frame size type".into());
+                    };
                     (size.width, size.height)
                 };
 
@@ -294,7 +283,10 @@ mod linux_impl {
                     dev.set_params(&new_params)
                         .map_err(|e| CuError::new_with_cause("Failed to set params", e))?;
                 }
-                debug!("V4L: Negotiated resolution: {}x{}", actual_fmt.width, actual_fmt.height);
+                debug!(
+                    "V4L: Negotiated resolution: {}x{}",
+                    actual_fmt.width, actual_fmt.height
+                );
                 actual_fmt
             } else {
                 // Try MJPG fallback
@@ -304,21 +296,26 @@ mod linux_impl {
                     let resolutions = dev
                         .enum_framesizes(format.fourcc)
                         .map_err(|e| CuError::new_with_cause("Failed to enum frame sizes", e))?;
-                    let (width, height) = if let (Some(w), Some(h)) = (self.req_width, self.req_height) {
-                        let mut selected: (u32, u32) = (0, 0);
-                        for frame in resolutions.iter() {
-                            let FrameSizeEnum::Discrete(size) = &frame.size else { continue };
-                            if size.width == w && size.height == h {
-                                selected = (size.width, size.height);
-                                break;
+                    let (width, height) =
+                        if let (Some(w), Some(h)) = (self.req_width, self.req_height) {
+                            let mut selected: (u32, u32) = (0, 0);
+                            for frame in resolutions.iter() {
+                                let FrameSizeEnum::Discrete(size) = &frame.size else {
+                                    continue;
+                                };
+                                if size.width == w && size.height == h {
+                                    selected = (size.width, size.height);
+                                    break;
+                                }
                             }
-                        }
-                        selected
-                    } else {
-                        let fs = resolutions.first().unwrap();
-                        let FrameSizeEnum::Discrete(size) = &fs.size else { return Err("Unsupported frame size type".into()) };
-                        (size.width, size.height)
-                    };
+                            selected
+                        } else {
+                            let fs = resolutions.first().unwrap();
+                            let FrameSizeEnum::Discrete(size) = &fs.size else {
+                                return Err("Unsupported frame size type".into());
+                            };
+                            (size.width, size.height)
+                        };
                     let req_fmt = Format::new(width, height, mjpg_fourcc);
                     let actual_fmt = dev
                         .set_format(&req_fmt)
@@ -329,10 +326,17 @@ mod linux_impl {
                         dev.set_params(&new_params)
                             .map_err(|e| CuError::new_with_cause("Failed to set params", e))?;
                     }
-                    debug!("V4L: Negotiated MJPG resolution: {}x{}", actual_fmt.width, actual_fmt.height);
+                    debug!(
+                        "V4L: Negotiated MJPG resolution: {}x{}",
+                        actual_fmt.width, actual_fmt.height
+                    );
                     actual_fmt
                 } else {
-                    return Err(format!("The V4l device does not provide a format with the FourCC {} or MJPG.", fourcc).into());
+                    return Err(format!(
+                        "The V4l device does not provide a format with the FourCC {} or MJPG.",
+                        fourcc
+                    )
+                    .into());
                 }
             };
 
@@ -346,7 +350,12 @@ mod linux_impl {
                     self.req_buffers as usize + 1,
                     || vec![0; actual_fmt.size as usize],
                 )
-                .map_err(|e| CuError::new_with_cause("Could not create host memory pool backing the V4lStream", e))?,
+                .map_err(|e| {
+                    CuError::new_with_cause(
+                        "Could not create host memory pool backing the V4lStream",
+                        e,
+                    )
+                })?,
             )
             .map_err(|e| CuError::new_with_cause("Could not create the V4lStream", e))?;
 
@@ -357,7 +366,8 @@ mod linux_impl {
             let rb_ns = robot_clock.now().as_nanos();
             clock_gettime(ClockId::CLOCK_MONOTONIC)
                 .map(|ts| {
-                    self.v4l_clock_time_offset_ns = ts.tv_sec() * 1_000_000_000 + ts.tv_nsec() - rb_ns as i64;
+                    self.v4l_clock_time_offset_ns =
+                        ts.tv_sec() * 1_000_000_000 + ts.tv_nsec() - rb_ns as i64;
                 })
                 .map_err(|e| CuError::new_with_cause("Failed to get the current time", e))?;
 
