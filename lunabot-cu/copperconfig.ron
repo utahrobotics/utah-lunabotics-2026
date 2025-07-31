@@ -1,24 +1,41 @@
 (
     runtime: (
-        rate_target_hz: 100      
+        rate_target_hz: 100
     ),
     tasks:[
-        (id:"udev_monitor", type:"crate::tasks::UdevMonitor", config:{}),
-        (id:"l2_pointcloud", type:"crate::tasks::sources::PointCloudIceoryxReceiver", config:{},
+        (
+            id:"udev_monitor",
+            type:"crate::tasks::UdevMonitor",
+            config:{}
+        ),
+        (
+            id:"l2_pointcloud",
+            type:"crate::tasks::sources::PointCloudIceoryxReceiver",
+            config:{},
             logging: (
                 enabled: false
             )
         ),
-        (id:"l2_pointcloud_sink", type:"crate::tasks::L2PointCloudSink", config:{},
+        (
+            id:"l2_pointcloud_sink",
+            type:"crate::tasks::L2PointCloudSink",
+            config:{},
             logging: (
                 enabled: false
             )
         ),
-        (id:"l2_imu", type:"crate::tasks::sources::ImuIceoryxReceiver", config:{}),
-        (id:"realsense_pointcloud", type:"crate::tasks::sources::RealSensePointCloudReceiver", config:{
-            "service": "realsense/309622300683/cloud",
-            "camera_node": "upper_depth_camera"
-        },
+        (
+            id:"l2_imu",
+            type:"crate::tasks::sources::ImuIceoryxReceiver",
+            config:{}
+        ),
+        (
+            id:"realsense_pointcloud",
+            type:"crate::tasks::sources::RealSensePointCloudReceiver",
+            config:{
+                "service": "realsense/309622300683/cloud",
+                "camera_node": "upper_depth_camera"
+            },
             logging: (
                 enabled: false
             )
@@ -131,5 +148,6 @@
     logging:(
         enable_task_logging:true,
         section_size_mib:100,
+        target_hz: 300
     ),
 )
