@@ -14,15 +14,7 @@
             config:{},
             logging: (
                 enabled: false
-            )
-        ),
-        (
-            id:"l2_pointcloud_sink",
-            type:"crate::tasks::L2PointCloudSink",
-            config:{},
-            logging: (
-                enabled: false
-            )
+            ),
         ),
         (
             id:"l2_imu",
@@ -38,9 +30,12 @@
             },
             logging: (
                 enabled: false
-            )
+            ),
         ),
-        (id:"l2_kiss_icp", type:"crate::tasks::KissIcp", config:{
+        (
+            id:"l2_kiss_icp",
+            type:"crate::tasks::KissIcp",
+            config:{
             "voxel_size": 0.1,
             "max_range": 100.0,
             "min_range": 0.2,
@@ -56,37 +51,52 @@
             },
             logging: (
                 enabled: false
-            )),
-        // RealSense KISS ICP - tuned for depth camera characteristics
-        (id:"realsense_kiss_icp", type:"crate::tasks::KissIcp", config:{
-            "voxel_size": 0.15,
-            "max_range": 100.0,
-            "min_range": 0.,
-            "max_points_per_voxel": 20,
-            "initial_threshold": 2.0,
-            "min_motion_th": 0.1,
-            "max_iterations": 10000,
-            "convergence_tolerance": 0.000001,
-            "min_threshold": 0.05,
-            "max_threshold": 5.0,
-            "enable_deskewing": false,
-            "map_log_interval_secs": 1.0,
+            ),
+            background: true
+        ),
+        (
+            id:"realsense_kiss_icp",
+            type:"crate::tasks::KissIcp", config:{
+                "voxel_size": 0.15,
+                "max_range": 100.0,
+                "min_range": 0.,
+                "max_points_per_voxel": 20,
+                "initial_threshold": 2.0,
+                "min_motion_th": 0.1,
+                "max_iterations": 10000,
+                "convergence_tolerance": 0.000001,
+                "min_threshold": 0.05,
+                "max_threshold": 5.0,
+                "enable_deskewing": false,
+                "map_log_interval_secs": 1.0,
             },
             logging: (
                 enabled: false
-            )
+            ),
+            background: true
         ),
-        (id:"localizer", type:"crate::tasks::sinks::CuLocalizer", config:{}),
-        (id:"lunabase", type:"crate::tasks::sources::Lunabase", config:{
-            "max_pong_delay_ms": 500,
-        }),
-        (id:"ai_source", type:"crate::tasks::sources::AiSource", config:{}),
-        (id:"ai_sink", type:"crate::tasks::sinks::AiSink", config:{}),
-        (id:"wheel_ctrl", type:"crate::tasks::sinks::WheelController", config:{}),
-        (id:"actuator_ctrl", type:"crate::tasks::sinks::ActuatorController", config:{}),
+        (
+            id:"localizer", type:"crate::tasks::sinks::CuLocalizer",
+            config:{}),
+        (
+            id:"lunabase", type:"crate::tasks::sources::Lunabase", config:{
+                "max_pong_delay_ms": 500,
+            }
+        ),
+        (
+            id:"ai_source", type:"crate::tasks::sources::AiSource", config:{}
+        ),
+        (
+            id:"ai_sink", type:"crate::tasks::sinks::AiSink", config:{}
+        ),
+        (
+            id:"actuator_ctrl", type:"crate::tasks::sinks::ActuatorController", config:{}
+        ),
+        (
+            id:"wheel_ctrl", type:"crate::tasks::sinks::WheelController", config:{}
+        ),
     ],
     cnx:[
-        (src:"l2_pointcloud", dst:"l2_pointcloud_sink", msg:"iceoryx_types::IceoryxPointCloud"),
         (src:"l2_imu", dst:"localizer", msg:"iceoryx_types::ImuMsg"),
         (src:"l2_pointcloud", dst: "l2_kiss_icp", msg:"iceoryx_types::IceoryxPointCloud"),
         (src:"realsense_pointcloud", dst: "realsense_kiss_icp", msg:"iceoryx_types::IceoryxPointCloud"),
@@ -148,6 +158,5 @@
     logging:(
         enable_task_logging:true,
         section_size_mib:100,
-        target_hz: 300
     ),
 )
