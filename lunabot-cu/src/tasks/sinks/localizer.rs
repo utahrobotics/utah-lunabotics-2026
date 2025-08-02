@@ -13,13 +13,13 @@ use cu29::{
 };
 use cu_spatial_payloads::Transform3D;
 use iceoryx_types::ImuMsg;
-use nalgebra::{Isometry3, UnitQuaternion, UnitVector3, Vector3};
+use nalgebra::{Isometry3, Quaternion, UnitQuaternion, UnitVector3, Vector3};
 use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 // Constants from the old localizer
-const ACCELEROMETER_LERP_SPEED: f64 = 150.0;
+const ACCELEROMETER_LERP_SPEED: f64 = 200.0;
 const LOCALIZATION_DELTA: f64 = 1.0 / 60.0;
 
 pub struct CuLocalizer {
@@ -112,9 +112,8 @@ impl CuSinkTask for CuLocalizer {
 
         // IMU-based orientation adjustment (down-axis alignment and gyro integration)
 
-        let mut down_axis = -Vector3::y_axis();
+        let mut down_axis = Vector3::z_axis();
         let mut angular_velocity_opt: Option<Vector3<f64>> = None;
-
         // Acquire IMU data if available
         if let Some(imu_msg) = input.0.payload() {
             let acceleration = Vector3::new(
@@ -203,7 +202,7 @@ impl CuSinkTask for CuLocalizer {
                     Isometry3::from_parts(mean_translation.into(), mean_rotation)
                 };
 
-                let down_axis = -Vector3::y_axis();
+                let down_axis = Vector3::z_axis();
 
                 isometry.translation.vector = lerp(
                     isometry.translation.vector,
