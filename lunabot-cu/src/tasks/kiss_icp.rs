@@ -133,16 +133,15 @@ impl CuTask for KissIcp {
 
     fn process(
         &mut self,
-        clock: &RobotClock,
+        _clock: &RobotClock,
         input: &Self::Input<'_>,
         output: &mut Self::Output<'_>,
     ) -> CuResult<()> {
-        let start = clock.now().as_nanos();
         if let Some(point_cloud_payload) = input.payload() {
             let mut raw_points = Vec::new();
             let mut timestamps = Vec::new();
 
-            for (idx, point) in point_cloud_payload.points
+            for (_, point) in point_cloud_payload.points
                 [..point_cloud_payload.publish_count as usize]
                 .iter()
                 .enumerate()
@@ -252,20 +251,6 @@ impl CuTask for KissIcp {
 }
 
 impl KissIcp {
-    fn points_to_matrix(&self, points: &[VoxelPoint]) -> DMatrix<f64> {
-        if points.is_empty() {
-            return DMatrix::zeros(0, 3);
-        }
-
-        let mut matrix = DMatrix::zeros(points.len(), 3);
-        for (i, point) in points.iter().enumerate() {
-            matrix[(i, 0)] = point.x;
-            matrix[(i, 1)] = point.y;
-            matrix[(i, 2)] = point.z;
-        }
-        matrix
-    }
-
     fn points_to_voxel_matrix(&self, points: &[VoxelPoint]) -> MatrixXx3<f64> {
         if points.is_empty() {
             return MatrixXx3::zeros(0);
