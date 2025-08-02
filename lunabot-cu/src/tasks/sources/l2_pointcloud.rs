@@ -15,7 +15,7 @@ use iceoryx2::port::subscriber::Subscriber;
 use iceoryx2::prelude::*;
 use iceoryx2::service::port_factory::publish_subscribe::PortFactory;
 use iceoryx_types::{IceoryxPointCloud, PointXYZIR, MAX_POINT_CLOUD_POINTS};
-use nalgebra::Point3;
+use nalgebra::{Point3, UnitQuaternion};
 use simple_motion::StaticNode;
 
 use serde::ser::{SerializeStruct, Serializer};
@@ -91,12 +91,18 @@ impl CuSrcTask for PointCloudIceoryxReceiver {
 
         // Allocate on the heap to keep the stack small in debug builds
 
-        let iso = self.l2_node.get_isometry_from_base();
+        let base_iso = self.l2_node.get_isometry_from_base();
         while let Some(sample) = subscriber
             .receive()
             .map_err(|e| CuError::new_with_cause("PointCloudIceoryxReceiver: receive", e))?
         {
-            let payload = sample.payload().clone();
+            let mut payload = sample.payload().clone();
+            for point in payload.points.iter_mut() {
+                let transformed = base_iso.transform_point(&point.to_nalgebra());
+                *point =
+                    PointXYZIR::from_nalgebra(transformed, point.intensity, point.time, point.ring);
+            }
+
             new_msg.set_payload(payload);
             self.last_seen = clock.now().as_nanos();
         }
