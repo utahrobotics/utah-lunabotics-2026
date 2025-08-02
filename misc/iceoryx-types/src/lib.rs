@@ -9,8 +9,9 @@
 //! languages.
 
 use bincode::{Decode, Encode};
-use serde::Serialize;
 use iceoryx2::prelude::ZeroCopySend;
+use nalgebra::Point3;
+use serde::Serialize;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default, Encode, Decode, ZeroCopySend, Serialize)]
@@ -36,7 +37,6 @@ pub struct IceoryxPointCloud {
     #[serde(serialize_with = "<[_]>::serialize")]
     pub points: [PointXYZIR; MAX_POINT_CLOUD_POINTS],
 }
-
 
 impl Default for IceoryxPointCloud {
     fn default() -> Self {
@@ -103,4 +103,20 @@ impl Default for FromAIBytes {
             data: [0; FROM_AI_MAX_BYTES],
         }
     }
-} 
+}
+
+impl PointXYZIR {
+    pub fn from_nalgebra(point: Point3<f64>, intensity: f32, time: f32, ring: u16) -> Self {
+        Self {
+            x: point.x as f32,
+            y: point.y as f32,
+            z: point.z as f32,
+            intensity,
+            time,
+            ring,
+        }
+    }
+    pub fn to_nalgebra(&self) -> Point3<f64> {
+        Point3::new(self.x as f64, self.y as f64, self.z as f64)
+    }
+}
