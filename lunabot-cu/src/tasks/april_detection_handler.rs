@@ -104,7 +104,7 @@ impl CuTask for AprilDetectionHandler {
         &'m input_msg!(AprilTagDetections),
         &'m input_msg!(AprilTagDetections),
     );
-
+    // camera_id, estimated isometry of camera
     type Output<'m> = output_msg!(Box<HashMap<String, Transform3D<f64>>>);
 
     fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
@@ -129,7 +129,7 @@ impl CuTask for AprilDetectionHandler {
             let camera_id = dets.camera_id.as_ref().clone();
             let tags = self.cu_detections_to_tag_observations(dets, &camera_id);
             if !tags.is_empty() {
-                let observer_iso = self.handle_detections(&tags)?;
+                let observer_iso = self.estimate_observer_isometry_from_observations(&tags)?;
                 result_map.insert(camera_id, observer_iso);
             }
         }
@@ -138,7 +138,7 @@ impl CuTask for AprilDetectionHandler {
             let camera_id = dets.camera_id.as_ref().clone();
             let tags = self.cu_detections_to_tag_observations(dets, &camera_id);
             if !tags.is_empty() {
-                let observer_iso = self.handle_detections(&tags)?;
+                let observer_iso = self.estimate_observer_isometry_from_observations(&tags)?;
                 result_map.insert(camera_id, observer_iso);
             }
         }
@@ -147,7 +147,7 @@ impl CuTask for AprilDetectionHandler {
             let camera_id = dets.camera_id.as_ref().clone();
             let tags = self.cu_detections_to_tag_observations(dets, &camera_id);
             if !tags.is_empty() {
-                let observer_iso = self.handle_detections(&tags)?;
+                let observer_iso = self.estimate_observer_isometry_from_observations(&tags)?;
                 result_map.insert(camera_id, observer_iso);
             }
         }
@@ -176,7 +176,13 @@ impl CuTask for AprilDetectionHandler {
 }
 
 impl AprilDetectionHandler {
-    fn handle_detections(&self, observations: &[TagObservation]) -> CuResult<Transform3D<f64>> {
+    /// estimates the observers isometry from each observation individually, and then averages them all together
+    /// additionally logs the tags known global coords to rerun with a timestamp so we know the tag has been seen recently.
+    /// filters out tags that are more than 2m away
+    fn estimate_observer_isometry_from_observations(
+        &self,
+        observations: &[TagObservation],
+    ) -> CuResult<Transform3D<f64>> {
         let mut observer_isometries = Vec::new();
 
         for observation in observations {
@@ -219,8 +225,16 @@ impl AprilDetectionHandler {
             }
 
             // Compute the camera pose from the tag's known global pose and the observed local pose.
-            let isometry_of_observer =
-                observation.tag_local_isometry.inverse() * tag_global_isometry;
+            let isometry_of_observer = observation.get_isometry_of_observer();
+            // filter out tags that are too far away to be reliale
+            if isometry_of_observer
+                .translation
+                .vector
+                .metric_distance(&observation.tag_global_isometry.translation.vector)
+                > 2.0
+            {
+                continue;
+            }
             observer_isometries.push(isometry_of_observer);
         }
 
