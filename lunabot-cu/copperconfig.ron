@@ -76,7 +76,7 @@
             background: true
         ),
         (
-            id:"localizer", type:"crate::tasks::sinks::CuLocalizer",
+            id:"localizer", type:"crate::tasks::sinks::Localizer",
             config:{}),
         (
             id:"lunabase", type:"crate::tasks::sources::Lunabase", config:{

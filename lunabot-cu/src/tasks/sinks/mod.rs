@@ -1,7 +1,5 @@
 mod localizer;
-mod localizer_good;
 pub use localizer::*;
-pub use localizer_good::*;
 mod actuator_controller;
 mod ai_sink;
 mod wheel_controller;
