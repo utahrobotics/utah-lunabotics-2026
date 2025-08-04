@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 
 use chrono::SubsecRound;
+use cu_apriltag::AprilTagDetections;
 use cu29::cutask::CuMsg;
 use cu29::{
-    clock::RobotClock, config::ComponentConfig, cutask::Freezable, input_msg, prelude::*, CuResult,
+    CuResult, clock::RobotClock, config::ComponentConfig, cutask::Freezable, input_msg, prelude::*,
 };
-use cu_apriltag::AprilTagDetections;
 
 use ron::de::from_str as ron_from_str;
 use serde::Deserialize;
@@ -117,10 +117,11 @@ impl CuTask for AprilDetectionHandler {
 
     fn process(
         &mut self,
-        clock: &RobotClock,
+        _clock: &RobotClock,
         input: &Self::Input<'_>,
         output: &mut Self::Output<'_>,
     ) -> CuResult<()> {
+        output.clear_payload();
         let (input1, input2, input3) = input;
 
         let mut result_map = HashMap::new();
@@ -153,6 +154,7 @@ impl CuTask for AprilDetectionHandler {
         }
 
         if !result_map.is_empty() {
+            println!("setting payload map");
             output.set_payload(Box::new(result_map));
         }
         Ok(())
@@ -233,6 +235,13 @@ impl AprilDetectionHandler {
                 .metric_distance(&observation.tag_global_isometry.translation.vector)
                 > 2.0
             {
+                println!(
+                    "apriltag too far away, distance: {}",
+                    isometry_of_observer
+                        .translation
+                        .vector
+                        .metric_distance(&observation.tag_global_isometry.translation.vector)
+                );
                 continue;
             }
             observer_isometries.push(isometry_of_observer);
