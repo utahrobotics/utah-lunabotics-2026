@@ -1366,17 +1366,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "cu-dynthreshold"
-version = "0.9.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#a8f85ed9da75d7eceddccb6c0b4a46bfbd7baa60"
-dependencies = [
- "cu-gstreamer",
- "cu-sensor-payloads",
- "cu29 0.9.0 (git+https://github.com/matthewashton-k/copper-rs.git?branch=master)",
- "gstreamer",
-]
-
-[[package]]
 name = "cu-gstreamer"
 version = "0.9.0"
 source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#a8f85ed9da75d7eceddccb6c0b4a46bfbd7baa60"
@@ -3782,7 +3771,6 @@ dependencies = [
  "crossbeam",
  "crossbeam-channel",
  "cu-apriltag",
- "cu-dynthreshold",
  "cu-gstreamer",
  "cu-sensor-payloads",
  "cu-spatial-payloads",

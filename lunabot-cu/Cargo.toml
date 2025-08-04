@@ -33,7 +33,7 @@ cu_cursive-consolemon.workspace = true
 # cu-consolemon.workspace = true
 cu-sensor-payloads.workspace = true
 cu-spatial-payloads.workspace = true
-cu-dynthreshold.workspace = true
+# cu-dynthreshold.workspace = true
 cu29-runtime.workspace = true
 cu-gstreamer.workspace = true
 
