@@ -13,6 +13,7 @@ use simple_motion::StaticNode;
 
 use crate::{
     ROOT_NODE, rerun_viz,
+    tasks::april_detection_handler::EncodableIsometry,
     utils::{lerp, lerp_value, swing_twist_decomposition},
 };
 
@@ -33,7 +34,7 @@ impl CuSinkTask for Localizer {
         ImuMsg, // l2 imu
         Transform3D<f64>, // realsense kiss icp
         Transform3D<f64>, // l2 icp
-        Box<HashMap<String, Transform3D<f64>>>);
+        Box<HashMap<String, EncodableIsometry>>);
 
     fn new(_config: Option<&cu29::prelude::ComponentConfig>) -> cu29::CuResult<Self>
     where
@@ -76,7 +77,6 @@ impl CuSinkTask for Localizer {
         };
 
         let fused_isometry = self.fuse_sensor_data(&imu_components, &apriltag_components);
-
         let final_isometry = if let Some(unitree_icp_out) = input.2.payload() {
             let icp_isometry: Isometry3<f64> = unitree_icp_out.into();
 
@@ -103,6 +103,7 @@ impl CuSinkTask for Localizer {
         };
 
         if let Some(iso) = final_isometry {
+            println!("setting root nodes iso");
             self.root_node.set_isometry(iso);
         }
 
@@ -177,7 +178,7 @@ impl Localizer {
     /// Compute swing-twist components from AprilTag data
     fn compute_apriltag_swing_twist(
         &self,
-        camera_transforms: &Box<HashMap<String, Transform3D<f64>>>,
+        camera_transforms: &Box<HashMap<String, EncodableIsometry>>,
     ) -> Option<OrientationComponents> {
         let mut isometry = Isometry3::identity();
         let mut all_observer_isometries = Vec::new();
@@ -187,11 +188,12 @@ impl Localizer {
                 let mut camera_isometry = camera_node.get_isometry_from_base();
                 camera_isometry.inverse_mut();
 
-                let camera_observer_iso: Isometry3<f64> = transform.into();
+                let camera_observer_iso: Isometry3<f64> = transform.to_na()?;
                 let robot_frame_observer_iso = camera_observer_iso * camera_isometry;
 
                 all_observer_isometries.push(robot_frame_observer_iso);
             } else {
+                eprintln!("camera node: {} not found", camera_id);
                 return None;
             }
         }

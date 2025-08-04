@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use bitcode::{Decode, Encode};
 use chrono::SubsecRound;
 use cu_apriltag::AprilTagDetections;
 use cu29::cutask::CuMsg;
@@ -7,6 +8,8 @@ use cu29::{
     CuResult, clock::RobotClock, config::ComponentConfig, cutask::Freezable, input_msg, prelude::*,
 };
 
+use cu_spatial_payloads::{Transform3D, Transform3DCast};
+use kiss_icp_core::types::IntoIsometry3;
 use ron::de::from_str as ron_from_str;
 use serde::Deserialize;
 use std::fs;
@@ -105,7 +108,7 @@ impl CuTask for AprilDetectionHandler {
         &'m input_msg!(AprilTagDetections),
     );
     // camera_id, estimated isometry of camera
-    type Output<'m> = output_msg!(Box<HashMap<String, Transform3D<f64>>>);
+    type Output<'m> = output_msg!(Box<HashMap<String, EncodableIsometry>>);
 
     fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
         let known_tags = load_known_apriltag_isometries()?;
@@ -131,7 +134,7 @@ impl CuTask for AprilDetectionHandler {
             let tags = self.cu_detections_to_tag_observations(dets, &camera_id);
             if !tags.is_empty() {
                 let observer_iso = self.estimate_observer_isometry_from_observations(&tags)?;
-                result_map.insert(camera_id, observer_iso);
+                result_map.insert(camera_id, EncodableIsometry::from_na(&observer_iso));
             }
         }
 
@@ -140,7 +143,7 @@ impl CuTask for AprilDetectionHandler {
             let tags = self.cu_detections_to_tag_observations(dets, &camera_id);
             if !tags.is_empty() {
                 let observer_iso = self.estimate_observer_isometry_from_observations(&tags)?;
-                result_map.insert(camera_id, observer_iso);
+                result_map.insert(camera_id, EncodableIsometry::from_na(&observer_iso));
             }
         }
 
@@ -149,12 +152,10 @@ impl CuTask for AprilDetectionHandler {
             let tags = self.cu_detections_to_tag_observations(dets, &camera_id);
             if !tags.is_empty() {
                 let observer_iso = self.estimate_observer_isometry_from_observations(&tags)?;
-                result_map.insert(camera_id, observer_iso);
+                result_map.insert(camera_id, EncodableIsometry::from_na(&observer_iso));
             }
         }
-
         if !result_map.is_empty() {
-            println!("setting payload map");
             output.set_payload(Box::new(result_map));
         }
         Ok(())
@@ -184,7 +185,7 @@ impl AprilDetectionHandler {
     fn estimate_observer_isometry_from_observations(
         &self,
         observations: &[TagObservation],
-    ) -> CuResult<Transform3D<f64>> {
+    ) -> CuResult<Isometry3<f64>> {
         let mut observer_isometries = Vec::new();
 
         for observation in observations {
@@ -252,8 +253,7 @@ impl AprilDetectionHandler {
         }
 
         let combined = combine_isometries(&observer_isometries);
-        let transform = Transform3D::from_na(combined);
-        Ok(transform)
+        Ok(combined)
     }
 
     fn cu_detections_to_tag_observations(
@@ -270,19 +270,9 @@ impl AprilDetectionHandler {
             let pose: Transform3D<f64> = pose.cast();
             let mut tag_local_isometry: Isometry3<f64> = (&pose).into();
 
-            // Invert Y and Z translations (camera frame -> robot frame)
-            tag_local_isometry.translation.y *= -1.0;
-            tag_local_isometry.translation.z *= -1.0;
-
-            // Flip the corresponding rotation components.
-            let mut scaled_axis = tag_local_isometry.rotation.scaled_axis();
-            scaled_axis.y *= -1.0;
-            scaled_axis.z *= -1.0;
-            tag_local_isometry.rotation = UnitQuaternion::from_scaled_axis(scaled_axis);
-
-            // Apply an additional 180° rotation around the Y-axis so the tag faces forward.
+            // Apply an additional 180° rotation around the z-axis so the tag faces forward.
             tag_local_isometry.rotation = UnitQuaternion::from_scaled_axis(
-                tag_local_isometry.rotation * Vector3::new(0.0, std::f64::consts::PI, 0.0),
+                tag_local_isometry.rotation * Vector3::new(0.0, 0.0, std::f64::consts::PI),
             ) * tag_local_isometry.rotation;
 
             apriltags.push(TagObservation {
@@ -385,34 +375,7 @@ fn average_quaternions_component_based(quaternions: &[UnitQuaternion<f64>]) -> U
     UnitQuaternion::new_normalize(nalgebra::Quaternion::from(mean_coords))
 }
 
-/// Helper trait to convert Isometry3<f64> to Transform3D<f64>
-trait Transform3DFromNa {
-    fn from_na(iso: Isometry3<f64>) -> Self;
-}
-
-impl Transform3DFromNa for Transform3D<f64> {
-    fn from_na(iso: Isometry3<f64>) -> Self {
-        let translation = iso.translation.vector;
-        let rotation = iso.rotation.to_rotation_matrix();
-        let mut mat = [[0.0; 4]; 4];
-        for i in 0..3 {
-            for j in 0..3 {
-                mat[i][j] = rotation[(i, j)];
-            }
-        }
-        mat[0][3] = translation.x;
-        mat[1][3] = translation.y;
-        mat[2][3] = translation.z;
-        mat[3][0] = 0.0;
-        mat[3][1] = 0.0;
-        mat[3][2] = 0.0;
-        mat[3][3] = 1.0;
-        Transform3D::from_matrix(mat)
-    }
-}
-
-use cu_spatial_payloads::{Transform3D, Transform3DCast};
-use nalgebra::{Isometry3, Translation3, UnitQuaternion, Vector3};
+use nalgebra::{Isometry3, Matrix4, Translation3, UnitQuaternion, Vector3};
 use rerun::Boxes3D;
 /// An observation of the global orientation and position
 /// of the camera that observed an apriltag.

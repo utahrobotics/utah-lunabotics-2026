@@ -18,7 +18,7 @@
             "euler": [0.0, 0.0, 180.0]
         },
         {
-            "name": Some("cam_iriun"),
+            "name": Some("cam_laptop_front"),
             "origin": [0.0, 0.0, 0.0],
             "euler": [0.0, 0.0, 0.0]
         },
