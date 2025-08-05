@@ -93,7 +93,7 @@ impl<const N: usize> CuTask for CuAutoGStreamer<N> {
         Ok(())
     }
 
-    fn preprocess(&mut self, clock: &RobotClock) -> CuResult<()> {
+    fn preprocess(&mut self, _clock: &RobotClock) -> CuResult<()> {
         // Handle requested teardowns first
         if self.teardown_requested {
             self.teardown_requested = false;

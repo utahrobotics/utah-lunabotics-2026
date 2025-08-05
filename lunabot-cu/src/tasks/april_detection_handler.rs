@@ -93,7 +93,6 @@ fn load_known_apriltag_isometries() -> CuResult<HashMap<usize, Isometry3<f64>>> 
 #[derive(Default)]
 pub struct AprilDetectionHandler {
     known_tags: HashMap<usize, Isometry3<f64>>,
-    process_counter: u32,
 }
 
 impl Freezable for AprilDetectionHandler {}
@@ -110,10 +109,7 @@ impl CuTask for AprilDetectionHandler {
 
     fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
         let known_tags = load_known_apriltag_isometries()?;
-        Ok(Self {
-            known_tags,
-            process_counter: 0,
-        })
+        Ok(Self { known_tags })
     }
 
     fn process(
