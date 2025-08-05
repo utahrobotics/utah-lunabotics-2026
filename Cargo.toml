@@ -56,6 +56,10 @@ anyhow = "1"
 unfmt = "0.2.2"
 serde = { version = "1", features = ["derive"] }
 
+tokio-serial = "5.4.5"
+tokio-util = "0.7.16"
+futures-util = "0.3.31"
+
 
 # Workspace-level metadata
 [workspace.metadata]

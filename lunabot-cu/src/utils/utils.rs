@@ -3,12 +3,14 @@
 use std::ops::{Add, Mul, Sub};
 
 use crossbeam::atomic::AtomicCell;
+use mio::{Events, Interest, Poll, Token};
 use nalgebra::{
     Quaternion, RealField, SimdRealField, UnitQuaternion, UnitVector3, Vector2, Vector3,
 };
 use spin_sleep::SpinSleeper;
 
 use common::Steering;
+use udev::Event;
 
 /// named as such to avoid confusion with `nalgebra::distance` and `pathfinding::distance`
 pub fn distance_between_tuples((x1, y1): (usize, usize), (x2, y2): (usize, usize)) -> f32 {
@@ -205,4 +207,30 @@ mod tests {
             actual_angular_velocity
         );
     }
+}
+
+pub fn udev_poll(mut socket: udev::MonitorSocket) -> impl Iterator<Item = Event> {
+    let mut poll = Poll::new().unwrap();
+    let mut events = Events::with_capacity(1024);
+
+    poll.registry()
+        .register(
+            &mut socket,
+            Token(0),
+            Interest::READABLE | Interest::WRITABLE,
+        )
+        .unwrap();
+
+    std::iter::from_fn(move || {
+        loop {
+            poll.poll(&mut events, None).unwrap();
+
+            for event in &events {
+                if event.token() == Token(0) && event.is_writable() {
+                    return Some(socket.iter().collect::<Vec<_>>());
+                }
+            }
+        }
+    })
+    .flatten()
 }

@@ -2,7 +2,7 @@ use cu29::prelude::*;
 use gstreamer::prelude::*;
 
 use circular_buffer::CircularBuffer;
-use gstreamer::{parse, BufferRef, Caps, FlowSuccess, Pipeline};
+use gstreamer::{BufferRef, Caps, FlowSuccess, Pipeline, parse};
 use gstreamer_app::{AppSink, AppSinkCallbacks};
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
@@ -165,7 +165,6 @@ impl<const N: usize> CuAutoGStreamer<N> {
         let pipeline = pipeline
             .dynamic_cast::<Pipeline>()
             .map_err(|_| CuError::from("Parsed element is not a Pipeline"))?;
-        println!("appsink name: {}", format!("copper_{}", self._camera_id));
         let appsink = pipeline
             .by_name(&format!("copper_{}", self._camera_id))
             .ok_or("Appsink element named 'copper' not found in pipeline")?

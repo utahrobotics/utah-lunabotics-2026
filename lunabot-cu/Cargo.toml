@@ -83,10 +83,16 @@ launcher = { path = "../misc/launcher" }
 # common
 common = { path = "../common" }
 
+tokio-serial.workspace = true
+futures-util.workspace = true
+tokio-util.workspace = true
+cobs = "0.4.0"
+bytes = "1.10.1"
+mio = "1.0.4"
+
 # Linux-only dependencies
 [target.'cfg(target_os = "linux")'.dependencies]
-v4l = "0.14"
-udev = "0.9"
+udev = { version = "0.9", features = ["mio10"] }
 
 [build-dependencies]
 ron.workspace = true
