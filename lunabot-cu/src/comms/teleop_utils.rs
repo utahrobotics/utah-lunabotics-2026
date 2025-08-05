@@ -5,7 +5,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use cakap2::{packet::Action, Event, PeerStateMachine, RecommendedAction};
+use cakap2::{Event, PeerStateMachine, RecommendedAction, packet::Action};
 use crossbeam::atomic::AtomicCell;
 use cu29::prelude::*;
 use tasker::get_tokio_handle;
