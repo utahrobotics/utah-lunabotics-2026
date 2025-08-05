@@ -3,7 +3,6 @@ use cu_sensor_payloads::{CuImage, CuImageBufferFormat};
 use cu29::prelude::*;
 use std::ops::DerefMut;
 use std::sync::Arc;
-use std::time::Instant;
 
 /// A fast task that converts CuGstBuffer to CuImage<Vec<u8>> using memory pool optimization.
 /// Uses pre-allocated buffers and fast memory copy to minimize overhead.

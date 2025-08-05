@@ -1,9 +1,9 @@
 use cu29::{
+    CuResult,
     clock::RobotClock,
     config::ComponentConfig,
     cutask::{CuSinkTask, Freezable},
     prelude::*,
-    CuResult,
 };
 
 use common::FromAI;
@@ -19,7 +19,7 @@ impl CuSinkTask for WheelController {
         Ok(Self)
     }
 
-    fn process(&mut self, clock: &RobotClock, input: &Self::Input<'_>) -> CuResult<()> {
+    fn process(&mut self, _clock: &RobotClock, input: &Self::Input<'_>) -> CuResult<()> {
         if let Some(payload) = input.payload() {
             if let Some(FromAI::SetSteering(steer)) = &payload.0 {
                 info!("WheelController: steering {}", steer.get_left_and_right());

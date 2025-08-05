@@ -1,17 +1,16 @@
 use bincode::{config::standard, encode_to_vec};
 use common::{FromHost, FromLunabase};
 use cu29::{
+    CuError, CuResult,
     clock::RobotClock,
     config::ComponentConfig,
     cutask::{CuMsg, CuSinkTask, Freezable},
     input_msg,
-    prelude::*,
-    CuError, CuResult,
 };
+use iceoryx_types::{FROM_HOST_MAX_BYTES, FromHostBytes};
 use iceoryx2::node::NodeBuilder;
 use iceoryx2::port::publisher::Publisher;
 use iceoryx2::prelude::*;
-use iceoryx_types::{FromHostBytes, FROM_HOST_MAX_BYTES};
 
 const FROM_HOST_SERVICE: &str = "lunabot/host_to_ai";
 
@@ -24,7 +23,7 @@ impl Freezable for AiSink {}
 impl CuSinkTask for AiSink {
     type Input<'m> = input_msg!(Option<FromLunabase>);
 
-    fn new(config: Option<&ComponentConfig>) -> CuResult<Self> {
+    fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
         // Create iceoryx publisher
         let node = NodeBuilder::new()
             .create::<ipc::Service>()
@@ -47,12 +46,10 @@ impl CuSinkTask for AiSink {
         Ok(Self { publisher })
     }
 
-    fn process(&mut self, clock: &RobotClock, input: &Self::Input<'_>) -> CuResult<()> {
+    fn process(&mut self, _clock: &RobotClock, input: &Self::Input<'_>) -> CuResult<()> {
         if let Some(Some(msg)) = input.payload() {
-            // Convert to FromHost variant
             let host_msg = FromHost::FromLunabase { msg: *msg };
 
-            // Encode with bincode
             let config = standard();
             let bytes = encode_to_vec(&host_msg, config)
                 .map_err(|e| CuError::new_with_cause("AiSink: encode", e))?;

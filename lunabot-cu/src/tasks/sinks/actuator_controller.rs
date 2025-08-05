@@ -1,9 +1,9 @@
 use cu29::{
+    CuResult,
     clock::RobotClock,
     config::ComponentConfig,
     cutask::{CuSinkTask, Freezable},
     prelude::*,
-    CuResult,
 };
 
 use common::FromAI;
@@ -20,7 +20,7 @@ impl CuSinkTask for ActuatorController {
         Ok(Self)
     }
 
-    fn process(&mut self, clock: &RobotClock, input: &Self::Input<'_>) -> CuResult<()> {
+    fn process(&mut self, _clock: &RobotClock, input: &Self::Input<'_>) -> CuResult<()> {
         if let Some(payload) = input.payload() {
             if let Some(FromAI::SetActuators(cmd)) = &payload.1 {
                 info!("ActuatorController: lift command {}", cmd.to_string());
