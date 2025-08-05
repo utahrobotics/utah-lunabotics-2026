@@ -414,3 +414,26 @@ impl TagObservation {
         self.tag_local_isometry.inverse() * self.tag_global_isometry
     }
 }
+
+#[derive(bincode::Encode, bincode::Decode, Debug, Clone, Copy, Serialize)]
+pub struct EncodableIsometry {
+    inner: [f64; 16],
+}
+impl EncodableIsometry {
+    /// Convert from nalgebra Isometry3 to EncodableIsometry
+    pub fn from_na(isometry: &Isometry3<f64>) -> Self {
+        let matrix = isometry.to_matrix();
+        let slice = matrix.as_slice();
+        let mut inner = [0.0; 16];
+        inner.copy_from_slice(slice);
+        Self { inner }
+    }
+    /// Convert from EncodableIsometry to nalgebra Isometry3
+    pub fn to_na(&self) -> Option<Isometry3<f64>> {
+        let matrix = Matrix4::from_column_slice(&self.inner);
+        let rotation_matrix = matrix.fixed_slice::<3, 3>(0, 0).into_owned();
+        let translation = Vector3::new(matrix[(0, 3)], matrix[(1, 3)], matrix[(2, 3)]);
+        let rotation = UnitQuaternion::from_matrix(&rotation_matrix);
+        Some(Isometry3::from_parts(translation.into(), rotation))
+    }
+}
