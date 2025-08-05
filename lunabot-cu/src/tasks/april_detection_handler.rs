@@ -431,7 +431,7 @@ impl EncodableIsometry {
     /// Convert from EncodableIsometry to nalgebra Isometry3
     pub fn to_na(&self) -> Option<Isometry3<f64>> {
         let matrix = Matrix4::from_column_slice(&self.inner);
-        let rotation_matrix = matrix.fixed_slice::<3, 3>(0, 0).into_owned();
+        let rotation_matrix = matrix.fixed_view::<3, 3>(0, 0).into_owned();
         let translation = Vector3::new(matrix[(0, 3)], matrix[(1, 3)], matrix[(2, 3)]);
         let rotation = UnitQuaternion::from_matrix(&rotation_matrix);
         Some(Isometry3::from_parts(translation.into(), rotation))
