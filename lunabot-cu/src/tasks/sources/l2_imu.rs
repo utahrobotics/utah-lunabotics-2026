@@ -1,11 +1,10 @@
 use cu29::cutask::CuMsg;
 use cu29::{
+    CuError, CuResult,
     clock::RobotClock,
     config::ComponentConfig,
     cutask::{CuSrcTask, Freezable},
     output_msg,
-    prelude::*,
-    CuError, CuResult,
 };
 use iceoryx2::node::NodeBuilder;
 use iceoryx2::port::subscriber::Subscriber;
@@ -75,9 +74,8 @@ impl CuSrcTask for ImuIceoryxReceiver {
         Ok(())
     }
 
-    fn process(&mut self, clock: &RobotClock, new_msg: &mut Self::Output<'_>) -> CuResult<()> {
+    fn process(&mut self, _clock: &RobotClock, new_msg: &mut Self::Output<'_>) -> CuResult<()> {
         new_msg.clear_payload();
-        let start = clock.now().as_nanos();
 
         let subscriber = self
             .subscriber
@@ -123,47 +121,6 @@ impl CuSrcTask for ImuIceoryxReceiver {
                     quat[3] as f32,
                 ],
             };
-
-            // let q_raw = UnitQuaternion::new_normalize(Quaternion::new(
-            //     imu_raw.quaternion[0] as f64,
-            //     imu_raw.quaternion[1] as f64,
-            //     imu_raw.quaternion[2] as f64,
-            //     imu_raw.quaternion[3] as f64,
-            // ));
-            // let q_robot = rot_total * q_raw;
-
-            // let ang_raw = Vector3::new(
-            //     imu_raw.angular_velocity[0] as f64,
-            //     imu_raw.angular_velocity[1] as f64,
-            //     imu_raw.angular_velocity[2] as f64,
-            // );
-            // let lin_raw = Vector3::new(
-            //     imu_raw.linear_acceleration[0] as f64,
-            //     imu_raw.linear_acceleration[1] as f64,
-            //     imu_raw.linear_acceleration[2] as f64,
-            // );
-
-            // let ang_robot = rot_total.transform_vector(&ang_raw);
-            // let lin_robot = rot_total.transform_vector(&lin_raw);
-
-            // let mut imu_out = *imu_raw;
-
-            // imu_out.quaternion = [
-            //     q_robot.w as f32,
-            //     q_robot.i as f32,
-            //     q_robot.j as f32,
-            //     q_robot.k as f32,
-            // ];
-            // imu_out.angular_velocity = [
-            //     ang_robot.x as f32,
-            //     ang_robot.y as f32,
-            //     ang_robot.z as f32,
-            // ];
-            // imu_out.linear_acceleration = [
-            //     lin_robot.x as f32,
-            //     lin_robot.y as f32,
-            //     lin_robot.z as f32,
-            // ];
 
             new_msg.set_payload(actual_message);
         }

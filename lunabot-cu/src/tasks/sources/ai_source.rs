@@ -1,17 +1,16 @@
 use bincode::{config::standard, decode_from_slice};
 use common::{FromAI, LUNABOT_STAGE};
 use cu29::{
+    CuError, CuResult,
     clock::RobotClock,
     config::ComponentConfig,
     cutask::{CuMsg, CuSrcTask, Freezable},
     output_msg,
-    prelude::*,
-    CuError, CuResult,
 };
+use iceoryx_types::{FROM_AI_MAX_BYTES, FromAIBytes};
 use iceoryx2::node::NodeBuilder;
 use iceoryx2::port::subscriber::Subscriber;
 use iceoryx2::prelude::*;
-use iceoryx_types::{FromAIBytes, FROM_AI_MAX_BYTES};
 
 const FROM_AI_SERVICE: &str = "lunabot/ai_to_host";
 
@@ -25,7 +24,7 @@ impl CuSrcTask for AiSource {
     // (Steering, LiftAct, BucketAct) each Option<FromAI>
     type Output<'m> = output_msg!((Option<FromAI>, Option<FromAI>, Option<FromAI>));
 
-    fn new(config: Option<&ComponentConfig>) -> CuResult<Self> {
+    fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
         let node = NodeBuilder::new()
             .create::<ipc::Service>()
             .map_err(|e| CuError::new_with_cause("AiSource: node create", e))?;
@@ -68,7 +67,6 @@ impl CuSrcTask for AiSource {
                     let config = standard();
                     if let Ok((msg, _)) = decode_from_slice::<FromAI, _>(bytes, config) {
                         if let FromAI::SetStage(stage) = msg {
-                            // Keep global stage in sync – important for Ping packets.
                             LUNABOT_STAGE.store(stage);
                         }
                         // Track latest actuator & general message separately so we can prioritise actuator commands.
@@ -106,7 +104,6 @@ impl CuSrcTask for AiSource {
             }
         }
 
-        // Compose tuple (steering, lift, bucket)
         if steering_msg.is_some() || lift_msg.is_some() || bucket_msg.is_some() {
             output.set_payload((steering_msg, lift_msg, bucket_msg));
         } else {

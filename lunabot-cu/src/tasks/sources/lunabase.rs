@@ -1,13 +1,14 @@
 use crossbeam::atomic::AtomicCell;
 use cu29::{
+    CuError, CuResult,
     clock::RobotClock,
     config::ComponentConfig,
     cutask::{CuMsg, CuSrcTask, Freezable},
     output_msg,
     prelude::*,
-    CuError, CuResult,
 };
 use std::{
+    collections::VecDeque,
     fs::File,
     net::{IpAddr, SocketAddr},
     str::FromStr,
@@ -18,13 +19,12 @@ use tasker::tokio::sync::mpsc::error::TryRecvError;
 use tasker::tokio::sync::{mpsc, watch};
 
 use crate::comms::{LunabaseConn, PacketBuilder, TELEOP};
-use common::{FromLunabase, FromLunabot, LunabotStage, LUNABOT_STAGE};
+use common::{FromLunabase, FromLunabot, LUNABOT_STAGE, LunabotStage};
 
 pub struct Lunabase {
-    packet_builder: PacketBuilder,
     from_lunabase_rx: mpsc::UnboundedReceiver<FromLunabase>,
-    max_pong_delay: u64,
     connected: LunabotConnected,
+    message_buffer: VecDeque<FromLunabase>,
 }
 
 impl Freezable for Lunabase {}
@@ -55,26 +55,21 @@ impl CuSrcTask for Lunabase {
             };
 
         let lunabot_stage = LUNABOT_STAGE.clone();
-        let (packet_builder, from_lunabase_rx, connected) =
+        let (_, from_lunabase_rx, connected) =
             create_packet_builder(lunabase_address_opt, lunabot_stage.clone(), max_pong_delay);
 
         Ok(Self {
-            packet_builder,
             from_lunabase_rx,
-            max_pong_delay,
             connected,
+            message_buffer: VecDeque::new(),
         })
     }
 
     fn process(&mut self, clock: &RobotClock, output: &mut Self::Output<'_>) -> CuResult<()> {
-        // Collect the latest message from lunabase without blocking. The loop drains the
-        // receiver so we only forward the most recent command each cycle – this keeps the
-        // process function fast while ensuring we never fall behind.
-        let mut latest_msg: Option<FromLunabase> = None;
         loop {
             match self.from_lunabase_rx.try_recv() {
                 Ok(msg) => {
-                    latest_msg = Some(msg);
+                    self.message_buffer.push_back(msg);
                 }
                 Err(TryRecvError::Empty) => break,
                 Err(TryRecvError::Disconnected) => {
@@ -82,19 +77,17 @@ impl CuSrcTask for Lunabase {
                 }
             }
         }
-        if !*self.connected.connected.borrow() {
-            latest_msg = Some(FromLunabase::SoftStop);
+        if !self.connected.is_connected() {
+            self.message_buffer.push_back(FromLunabase::SoftStop);
         }
 
         // Forward message to downstream tasks and keep the global stage in sync so that
         // Ping packets always advertise the correct mode, even if the AI-side SetStage
         // packet was lost in transport.
-        if let Some(ref msg) = latest_msg {
-            // Update global stage heuristically based on operator commands.
+        if let Some(ref msg) = self.message_buffer.pop_front() {
             match msg {
                 FromLunabase::SoftStop => LUNABOT_STAGE.store(LunabotStage::SoftStop),
                 FromLunabase::ContinueMission => LUNABOT_STAGE.store(LunabotStage::TeleOp),
-                // A navigate / dig-dump command implies autonomous mode.
                 FromLunabase::Navigate(_) | FromLunabase::DigDump(_) => {
                     LUNABOT_STAGE.store(LunabotStage::Autonomy)
                 }
@@ -106,7 +99,6 @@ impl CuSrcTask for Lunabase {
 
             output.set_payload(Some(*msg));
         } else {
-            // No new message this cycle – clear any previous payload.
             output.clear_payload();
         }
         Ok(())
@@ -117,41 +109,14 @@ pub fn default_max_pong_delay_ms() -> u64 {
     1500
 }
 
-fn log_teleop_messages() -> CuResult<()> {
-    if let Err(e) = File::create("from_lunabase.txt")
-        .map(|f| FromLunabase::write_code_sheet(f))
-        .flatten()
-    {
-        return Err(CuError::new_with_cause(
-            "failed to write code sheet for FromLunabase",
-            e,
-        ));
-    }
-    if let Err(e) = File::create("from_lunabot.txt")
-        .map(|f| FromLunabot::write_code_sheet(f))
-        .flatten()
-    {
-        return Err(CuError::new_with_cause(
-            "failed to write code sheet for FromLunabot",
-            e,
-        ));
-    }
-
-    Ok(())
-}
-
 #[derive(Clone)]
 struct LunabotConnected {
     connected: watch::Receiver<bool>,
 }
 
 impl LunabotConnected {
-    // fn is_connected(&self) -> bool {
-    //     *self.connected.borrow()
-    // }
-
-    async fn wait_disconnect(&mut self) {
-        let _ = self.connected.wait_for(|&x| !x).await;
+    fn is_connected(&self) -> bool {
+        *self.connected.borrow()
     }
 }
 
@@ -190,13 +155,15 @@ fn create_packet_builder(
 
     let (connected_tx, connected_rx) = watch::channel(false);
 
-    std::thread::spawn(move || loop {
-        match pinged_rx.recv_timeout(Duration::from_millis(max_pong_delay_ms)) {
-            Ok(()) => {
-                let _ = connected_tx.send(true);
-            }
-            Err(_) => {
-                let _ = connected_tx.send(false);
+    std::thread::spawn(move || {
+        loop {
+            match pinged_rx.recv_timeout(Duration::from_millis(max_pong_delay_ms)) {
+                Ok(()) => {
+                    let _ = connected_tx.send(true);
+                }
+                Err(_) => {
+                    let _ = connected_tx.send(false);
+                }
             }
         }
     });
