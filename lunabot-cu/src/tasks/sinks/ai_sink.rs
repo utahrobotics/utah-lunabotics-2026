@@ -11,7 +11,6 @@ use cu29::{
 use iceoryx2::node::NodeBuilder;
 use iceoryx2::port::publisher::Publisher;
 use iceoryx2::prelude::*;
-use iceoryx2::service::port_factory::publish_subscribe::PortFactory;
 use iceoryx_types::{FromHostBytes, FROM_HOST_MAX_BYTES};
 
 const FROM_HOST_SERVICE: &str = "lunabot/host_to_ai";

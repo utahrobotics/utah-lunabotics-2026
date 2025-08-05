@@ -12,11 +12,6 @@ use embedded_common::*;
 use futures_util::StreamExt;
 use nalgebra::Vector3;
 use simple_motion::{Node, NodeData, StaticImmutableNode};
-use std::{
-    fs, io,
-    path::{Path, PathBuf},
-    thread,
-};
 use tasker::{
     BlockOn, get_tokio_handle,
     tokio::{

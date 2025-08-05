@@ -6,7 +6,7 @@ use cu29::{
     CuResult,
 };
 
-use common::{FromAI, Steering};
+use common::FromAI;
 
 pub struct WheelController;
 

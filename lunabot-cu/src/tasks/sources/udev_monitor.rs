@@ -8,7 +8,6 @@ use cu29::{
     output_msg, CuResult,
 };
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 #[cfg(target_os = "linux")]
 use udev::{EventType, Udev};
 

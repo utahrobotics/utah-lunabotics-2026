@@ -8,15 +8,12 @@ use cu29::{
     prelude::*,
     CuError, CuResult,
 };
-use cu_sensor_payloads::PointCloud;
 use iceoryx2::node::NodeBuilder;
 use iceoryx2::port::subscriber::Subscriber;
 use iceoryx2::prelude::*;
 use iceoryx2::service::port_factory::publish_subscribe::PortFactory;
-use iceoryx_types::{IceoryxPointCloud, PointXYZIR, MAX_POINT_CLOUD_POINTS};
-use nalgebra::Point3;
+use iceoryx_types::IceoryxPointCloud;
 use simple_motion::StaticNode;
-use std::time::Instant;
 
 pub struct RealSensePointCloudReceiver {
     service_name: ServiceName,

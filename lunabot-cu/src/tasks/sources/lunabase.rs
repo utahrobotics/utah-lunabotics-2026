@@ -19,7 +19,6 @@ use tasker::tokio::sync::{mpsc, watch};
 
 use crate::comms::{LunabaseConn, PacketBuilder, TELEOP};
 use common::{FromLunabase, FromLunabot, LunabotStage, LUNABOT_STAGE};
-use serde::Serialize;
 
 pub struct Lunabase {
     packet_builder: PacketBuilder,

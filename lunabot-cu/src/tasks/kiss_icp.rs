@@ -6,7 +6,6 @@ use cu29::{
     CuResult,
 };
 use cu_spatial_payloads::Transform3D;
-use rerun::Rgba32;
 
 use iceoryx_types::IceoryxPointCloud;
 
@@ -19,7 +18,7 @@ use kiss_icp_core::{
     types::VoxelPoint,
     voxel_hash_map::{VoxelHashMap, VoxelHashMapArgs},
 };
-use nalgebra::{DMatrix, Isometry3, MatrixXx3, Vector3};
+use nalgebra::{Isometry3, MatrixXx3, Vector3};
 use rayon::iter::ParallelIterator;
 use std::time::{Duration, Instant};
 

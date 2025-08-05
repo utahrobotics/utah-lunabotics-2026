@@ -1,5 +1,4 @@
 use crate::ROOT_NODE;
-use bincode::{Decode, Encode};
 use cu29::cutask::CuMsg;
 use cu29::{
     clock::RobotClock,
@@ -9,16 +8,13 @@ use cu29::{
     prelude::*,
     CuError, CuResult,
 };
-use cu_sensor_payloads::{PointCloud, PointCloudSoa};
 use iceoryx2::node::NodeBuilder;
 use iceoryx2::port::subscriber::Subscriber;
 use iceoryx2::prelude::*;
 use iceoryx2::service::port_factory::publish_subscribe::PortFactory;
-use iceoryx_types::{IceoryxPointCloud, PointXYZIR, MAX_POINT_CLOUD_POINTS};
-use nalgebra::{Point3, UnitQuaternion};
+use iceoryx_types::{IceoryxPointCloud, PointXYZIR};
 use simple_motion::StaticNode;
 
-use serde::ser::{SerializeStruct, Serializer};
 
 pub struct PointCloudIceoryxReceiver {
     service_name: ServiceName,

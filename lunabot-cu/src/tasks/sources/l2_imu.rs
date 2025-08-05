@@ -12,10 +12,9 @@ use iceoryx2::port::subscriber::Subscriber;
 use iceoryx2::prelude::*;
 use iceoryx2::service::port_factory::publish_subscribe::PortFactory;
 
-use crate::tasks::ActuatorController;
 use crate::ROOT_NODE;
 use iceoryx_types::ImuMsg;
-use nalgebra::{Matrix3, Quaternion, Rotation3, UnitQuaternion, Vector3};
+use nalgebra::{Quaternion, UnitQuaternion, Vector3};
 use simple_motion::StaticNode;
 
 pub struct ImuIceoryxReceiver {
