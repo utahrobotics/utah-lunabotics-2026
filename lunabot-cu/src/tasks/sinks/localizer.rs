@@ -76,8 +76,15 @@ impl CuSinkTask for Localizer {
         };
 
         let fused_isometry = self.fuse_sensor_data(&imu_components, &apriltag_components);
+
         let final_isometry = if let Some(unitree_icp_out) = input.2.payload() {
             let icp_isometry: Isometry3<f64> = unitree_icp_out.into();
+            if let Some(fused_isometry) = fused_isometry
+                && apriltag_components.is_some()
+            {
+                self.kiss_icp_correction =
+                    Some(Self::transformation_between(icp_isometry, fused_isometry))
+            }
 
             match (fused_isometry, &self.kiss_icp_correction) {
                 (_, Some(correction)) => {
