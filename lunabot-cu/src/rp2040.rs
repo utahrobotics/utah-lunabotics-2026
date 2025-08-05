@@ -11,7 +11,6 @@ use tasker::{
     tokio::{
         self,
         io::{AsyncWriteExt, BufStream},
-        sync::Mutex,
         time::timeout,
     },
 };
@@ -21,18 +20,8 @@ use udev::{EventType, MonitorBuilder, Udev};
 
 use crate::utils::{CobsCodec, udev_poll};
 
-pub struct V3PicoInfo {
-    pub serial: String,
-    pub imus: [IMUInfo; 4],
-}
-
-pub struct IMUInfo {
-    pub node: StaticImmutableNode,
-    pub link_name: String,
-}
-
 /// find pico connected to the v3 pcb.
-pub fn enumerate_v3picos(pico: V3PicoInfo) -> (Sender<ActuatorCommand>, Receiver<FromPicoV3>) {
+pub fn enumerate_v3picos() -> (Sender<ActuatorCommand>, Receiver<FromPicoV3>) {
     let (path_tx, path_rx) = std::sync::mpsc::sync_channel::<String>(1);
     let (actuator_cmd_tx, actuator_cmd_rx) = crossbeam_channel::bounded(50);
     let (from_pico_tx, from_pico_rx) = crossbeam_channel::bounded(50);
@@ -46,7 +35,6 @@ pub fn enumerate_v3picos(pico: V3PicoInfo) -> (Sender<ActuatorCommand>, Receiver
             task.v3pico_task().block_on();
         }
     });
-    let controller_serial = pico.serial;
     std::thread::spawn(move || {
         let mut monitor = match MonitorBuilder::new() {
             Ok(x) => x,
@@ -115,28 +103,20 @@ pub fn enumerate_v3picos(pico: V3PicoInfo) -> (Sender<ActuatorCommand>, Receiver
                 let Some(serial_cstr) = device.property_value("ID_SERIAL") else {
                     return;
                 };
-                let Some(mut serial) = serial_cstr.to_str() else {
+                let Some(serial) = serial_cstr.to_str() else {
                     warning!("Failed to parse serial of device {}", path_str);
                     return;
                 };
-                let Some(tmp) = serial.strip_prefix("USR_V3PICO_") else {
-                    if serial == "USR_V3PICO" {
-                        warning!(
-                            "Actuator controller at path {} has no serial number",
-                            path_str
-                        );
-                        return;
+                match serial.strip_prefix("USR_V3PICO_") {
+                    Some(_) => {
+                        if path_tx.send(path.to_string_lossy().to_string()).is_err() {
+                            warning!("Couldn't send controller path");
+                        }
                     }
-                    return;
-                };
-                serial = tmp;
-
-                if serial == controller_serial {
-                    if path_tx.send(path_str.into()).is_err() {
-                        warning!("Couldnt send controller path");
+                    None if serial == "USR_V3PICO" => {
+                        warning!("Actuator controller at path {} has no serial number", path);
                     }
-                } else {
-                    warning!("Unexpected actuator with serial {}", serial);
+                    None => {} // Device doesn't match, silently ignore
                 }
             })
     });
