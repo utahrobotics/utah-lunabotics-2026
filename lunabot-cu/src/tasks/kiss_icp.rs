@@ -1,11 +1,11 @@
+use cu_spatial_payloads::Transform3D;
 use cu29::{
+    CuResult,
     config::ComponentConfig,
     cutask::{CuMsg, CuTask, Freezable},
     input_msg, output_msg,
     prelude::*,
-    CuResult,
 };
-use cu_spatial_payloads::Transform3D;
 
 use iceoryx_types::IceoryxPointCloud;
 
@@ -32,12 +32,6 @@ pub struct KissIcp {
     max_range: f64,
     min_range: f64,
     initial_threshold: f64,
-    min_motion_th: f64,
-    max_points_per_voxel: usize,
-    max_iterations: usize,
-    convergence_tolerance: f64,
-    min_threshold: f64,
-    max_threshold: f64,
 
     // State tracking
     current_pose: Isometry3<f64>,
@@ -78,18 +72,6 @@ impl CuTask for KissIcp {
         let max_points_per_voxel = config
             .and_then(|c| c.get::<i32>("max_points_per_voxel"))
             .unwrap_or(20) as usize;
-        let max_iterations = config
-            .and_then(|c| c.get::<i32>("max_iterations"))
-            .unwrap_or(500) as usize;
-        let convergence_tolerance = config
-            .and_then(|c| c.get::<f64>("convergence_tolerance"))
-            .unwrap_or(1e-6);
-        let min_threshold = config
-            .and_then(|c| c.get::<f64>("min_threshold"))
-            .unwrap_or(0.05);
-        let max_threshold = config
-            .and_then(|c| c.get::<f64>("max_threshold"))
-            .unwrap_or(5.0);
         let enable_deskewing = config
             .and_then(|c| c.get::<bool>("enable_deskewing"))
             .unwrap_or(true);
@@ -109,12 +91,6 @@ impl CuTask for KissIcp {
             max_range,
             min_range,
             initial_threshold,
-            min_motion_th,
-            max_points_per_voxel,
-            max_iterations,
-            convergence_tolerance,
-            min_threshold,
-            max_threshold,
             current_pose: Isometry3::identity(),
             previous_pose: Isometry3::identity(),
             scan_start_pose: Isometry3::identity(),
