@@ -1,3 +1,5 @@
+use std::collections::VecDeque;
+
 use bincode::{config::standard, decode_from_slice};
 use common::{FromAI, LUNABOT_STAGE};
 use cu29::{
@@ -16,13 +18,16 @@ const FROM_AI_SERVICE: &str = "lunabot/ai_to_host";
 
 pub struct AiSource {
     subscriber: Subscriber<ipc::Service, FromAIBytes, ()>,
+    actuator_msg_queue: VecDeque<FromAI>,
+    steering_msg_queue: VecDeque<FromAI>,
+    other_msg_queue: VecDeque<FromAI>,
 }
 
 impl Freezable for AiSource {}
 
 impl CuSrcTask for AiSource {
     // (Steering, LiftAct, BucketAct) each Option<FromAI>
-    type Output<'m> = output_msg!((Option<FromAI>, Option<FromAI>, Option<FromAI>));
+    type Output<'m> = output_msg!((Option<FromAI>, Option<FromAI>));
 
     fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
         let node = NodeBuilder::new()
@@ -43,16 +48,16 @@ impl CuSrcTask for AiSource {
             .create()
             .map_err(|e| CuError::new_with_cause("AiSource: subscriber", e))?;
 
-        Ok(Self { subscriber })
+        Ok(Self {
+            subscriber,
+            actuator_msg_queue: VecDeque::new(),
+            steering_msg_queue: VecDeque::new(),
+            other_msg_queue: VecDeque::new(),
+        })
     }
 
-    fn process(&mut self, clock: &RobotClock, output: &mut Self::Output<'_>) -> CuResult<()> {
-        let start = clock.now().as_nanos();
-
+    fn process(&mut self, _clock: &RobotClock, output: &mut Self::Output<'_>) -> CuResult<()> {
         // Drain the subscriber queue so we always act on the most recent message
-        let mut steering_msg: Option<FromAI> = None;
-        let mut lift_msg: Option<FromAI> = None;
-        let mut bucket_msg: Option<FromAI> = None;
         loop {
             match self
                 .subscriber
@@ -71,30 +76,12 @@ impl CuSrcTask for AiSource {
                         }
                         // Track latest actuator & general message separately so we can prioritise actuator commands.
                         match msg {
-                            FromAI::SetActuators(cmd) => {
-                                use embedded_common::Actuator::{Bucket, Lift};
-                                match cmd {
-                                    embedded_common::ActuatorCommand::SetSpeed(_, act) => match act
-                                    {
-                                        Lift => lift_msg = Some(FromAI::SetActuators(cmd)),
-                                        Bucket => bucket_msg = Some(FromAI::SetActuators(cmd)),
-                                    },
-                                    embedded_common::ActuatorCommand::SetDirection(_, act) => {
-                                        match act {
-                                            Lift => lift_msg = Some(FromAI::SetActuators(cmd)),
-                                            Bucket => bucket_msg = Some(FromAI::SetActuators(cmd)),
-                                        }
-                                    }
-                                    embedded_common::ActuatorCommand::Shake => {
-                                        lift_msg = Some(FromAI::SetActuators(cmd))
-                                    }
-                                    embedded_common::ActuatorCommand::StartPercuss
-                                    | embedded_common::ActuatorCommand::StopPercuss => {
-                                        bucket_msg = Some(FromAI::SetActuators(cmd))
-                                    }
-                                }
+                            FromAI::SetActuators(_) => {
+                                self.actuator_msg_queue.push_back(msg);
                             }
-                            FromAI::SetSteering(_) => steering_msg = Some(msg),
+                            FromAI::SetSteering(_) => {
+                                self.steering_msg_queue.push_back(msg);
+                            }
                             _ => {}
                         }
                     }
@@ -103,9 +90,17 @@ impl CuSrcTask for AiSource {
                 None => break,
             }
         }
+        // steering, actuators
+        let mut payload = (None, None);
+        if let Some(actuator_cmd) = self.actuator_msg_queue.pop_front() {
+            payload.1 = Some(actuator_cmd);
+        }
+        if let Some(steering_cmd) = self.steering_msg_queue.pop_front() {
+            payload.0 = Some(steering_cmd);
+        }
 
-        if steering_msg.is_some() || lift_msg.is_some() || bucket_msg.is_some() {
-            output.set_payload((steering_msg, lift_msg, bucket_msg));
+        if payload.0.is_some() || payload.1.is_some() {
+            output.set_payload(payload);
         } else {
             output.clear_payload();
         }

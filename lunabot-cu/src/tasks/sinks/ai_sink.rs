@@ -61,7 +61,6 @@ impl CuSinkTask for AiSink {
             let mut payload = FromHostBytes::default();
             payload.len = bytes.len() as u32;
             payload.data[..bytes.len()].copy_from_slice(&bytes);
-
             match self.publisher.loan_uninit() {
                 Ok(sample) => {
                     let initialized = sample.write_payload(payload);

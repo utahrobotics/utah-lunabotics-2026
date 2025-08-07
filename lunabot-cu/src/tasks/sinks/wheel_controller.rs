@@ -13,7 +13,8 @@ pub struct WheelController;
 impl Freezable for WheelController {}
 
 impl CuSinkTask for WheelController {
-    type Input<'m> = input_msg!((Option<FromAI>, Option<FromAI>, Option<FromAI>));
+    // steering, actuators (just ignore the actuators here for now)
+    type Input<'m> = input_msg!((Option<FromAI>, Option<FromAI>));
 
     fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
         Ok(Self)
