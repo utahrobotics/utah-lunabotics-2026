@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 
 use bincode::{config::standard, decode_from_slice};
-use common::{FromAI, LUNABOT_STAGE};
+use common::{FromAI, LUNABOT_STAGE, Steering};
 use cu29::{
     CuError, CuResult,
     clock::RobotClock,
@@ -9,6 +9,7 @@ use cu29::{
     cutask::{CuMsg, CuSrcTask, Freezable},
     output_msg,
 };
+use embedded_common::ActuatorCommand;
 use iceoryx_types::{FROM_AI_MAX_BYTES, FromAIBytes};
 use iceoryx2::node::NodeBuilder;
 use iceoryx2::port::subscriber::Subscriber;
@@ -18,16 +19,15 @@ const FROM_AI_SERVICE: &str = "lunabot/ai_to_host";
 
 pub struct AiSource {
     subscriber: Subscriber<ipc::Service, FromAIBytes, ()>,
-    actuator_msg_queue: VecDeque<FromAI>,
-    steering_msg_queue: VecDeque<FromAI>,
-    other_msg_queue: VecDeque<FromAI>,
+    actuator_msg_queue: VecDeque<ActuatorCommand>,
+    steering_msg_queue: VecDeque<Steering>,
 }
 
 impl Freezable for AiSource {}
 
 impl CuSrcTask for AiSource {
     // (Steering, LiftAct, BucketAct) each Option<FromAI>
-    type Output<'m> = output_msg!((Option<FromAI>, Option<FromAI>));
+    type Output<'m> = output_msg!((Option<Steering>, Option<[u8; 5]>));
 
     fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
         let node = NodeBuilder::new()
@@ -52,7 +52,6 @@ impl CuSrcTask for AiSource {
             subscriber,
             actuator_msg_queue: VecDeque::new(),
             steering_msg_queue: VecDeque::new(),
-            other_msg_queue: VecDeque::new(),
         })
     }
 
@@ -71,16 +70,17 @@ impl CuSrcTask for AiSource {
 
                     let config = standard();
                     if let Ok((msg, _)) = decode_from_slice::<FromAI, _>(bytes, config) {
-                        if let FromAI::SetStage(stage) = msg {
-                            LUNABOT_STAGE.store(stage);
-                        }
+                        if let FromAI::SetStage(stage) = msg {}
                         // Track latest actuator & general message separately so we can prioritise actuator commands.
                         match msg {
-                            FromAI::SetActuators(_) => {
-                                self.actuator_msg_queue.push_back(msg);
+                            FromAI::SetActuators(actuator_cmd) => {
+                                self.actuator_msg_queue.push_back(actuator_cmd);
                             }
-                            FromAI::SetSteering(_) => {
-                                self.steering_msg_queue.push_back(msg);
+                            FromAI::SetSteering(steering_cmd) => {
+                                self.steering_msg_queue.push_back(steering_cmd);
+                            }
+                            FromAI::SetStage(stage) => {
+                                LUNABOT_STAGE.store(stage);
                             }
                             _ => {}
                         }
@@ -93,7 +93,7 @@ impl CuSrcTask for AiSource {
         // steering, actuators
         let mut payload = (None, None);
         if let Some(actuator_cmd) = self.actuator_msg_queue.pop_front() {
-            payload.1 = Some(actuator_cmd);
+            payload.1 = Some(actuator_cmd.serialize());
         }
         if let Some(steering_cmd) = self.steering_msg_queue.pop_front() {
             payload.0 = Some(steering_cmd);

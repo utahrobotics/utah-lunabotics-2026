@@ -102,10 +102,10 @@
         (src:"realsense_pointcloud", dst: "realsense_kiss_icp", msg:"iceoryx_types::IceoryxPointCloud"),
         (src:"l2_kiss_icp", dst:"localizer", msg:"cu_spatial_payloads::Transform3D<f64>"),
         (src:"realsense_kiss_icp", dst:"localizer", msg:"cu_spatial_payloads::Transform3D<f64>"),
-        (src:"lunabase", dst:"ai_sink", msg:"Option<common::FromLunabase>"),Option<common::FromAI>, 
+        (src:"lunabase", dst:"ai_sink", msg:"Option<common::FromLunabase>"),
         // copper doesn't support multiple outputs on a single task so for now we just put them in a tuple and ignore one side
-        (src:"ai_source", dst:"wheel_ctrl", msg:"(Option<common::FromAI>, Option<common::FromAI>)"),
-        (src:"ai_source", dst:"actuator_ctrl", msg:"(Option<common::FromAI>, Option<common::FromAI>)")
+        (src:"ai_source", dst:"wheel_ctrl", msg:"(Option<common::Steering>, Option<[u8; 5]>)"),
+        (src:"ai_source", dst:"actuator_ctrl", msg:"(Option<common::Steering>, Option<[u8; 5]>)")
     ],
     includes:[
         (

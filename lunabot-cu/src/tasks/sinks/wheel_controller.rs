@@ -6,7 +6,7 @@ use cu29::{
     prelude::*,
 };
 
-use common::FromAI;
+use common::Steering;
 
 pub struct WheelController;
 
@@ -14,7 +14,7 @@ impl Freezable for WheelController {}
 
 impl CuSinkTask for WheelController {
     // steering, actuators (just ignore the actuators here for now)
-    type Input<'m> = input_msg!((Option<FromAI>, Option<FromAI>));
+    type Input<'m> = input_msg!((Option<Steering>, Option<[u8; 5]>));
 
     fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
         Ok(Self)
@@ -22,8 +22,11 @@ impl CuSinkTask for WheelController {
 
     fn process(&mut self, _clock: &RobotClock, input: &Self::Input<'_>) -> CuResult<()> {
         if let Some(payload) = input.payload() {
-            if let Some(FromAI::SetSteering(steer)) = &payload.0 {
-                info!("WheelController: steering {}", steer.get_left_and_right());
+            if let Some(steering) = &payload.0 {
+                info!(
+                    "WheelController: steering {}",
+                    steering.get_left_and_right()
+                );
             }
         }
         Ok(())

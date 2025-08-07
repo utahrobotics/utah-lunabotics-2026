@@ -30,7 +30,7 @@ pub enum ActuatorCommand {
     SetDirection(Direction, Actuator),
     Shake,
     StartPercuss,
-    StopPercuss
+    StopPercuss,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -53,7 +53,7 @@ pub enum FromIMU {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum FromPicoV3 {
     Reading([FromIMU; 4], ActuatorReading),
-    Error
+    Error,
 }
 
 /// Radians per second
@@ -160,8 +160,9 @@ impl ActuatorCommand {
                 Actuator::Lift
             } else if bytes[3] == Actuator::Bucket as u8 {
                 Actuator::Bucket
-            } else if bytes[0] == 2 { // shake command
-                Actuator::Lift           
+            } else if bytes[0] == 2 {
+                // shake command
+                Actuator::Lift
             } else {
                 return Err("Unknown actuator specifier (not m1 or m2)");
             }
@@ -183,15 +184,9 @@ impl ActuatorCommand {
                 };
                 Ok(ActuatorCommand::SetDirection(dir, actuator))
             }
-            tag if tag == 2 => {
-                Ok(ActuatorCommand::Shake)
-            } 
-            tag if tag == 3 => {
-                Ok(ActuatorCommand::StartPercuss)
-            } 
-            tag if tag == 4 => {
-                Ok(ActuatorCommand::StopPercuss)
-            } 
+            tag if tag == 2 => Ok(ActuatorCommand::Shake),
+            tag if tag == 3 => Ok(ActuatorCommand::StartPercuss),
+            tag if tag == 4 => Ok(ActuatorCommand::StopPercuss),
             _ => Err("Invalid variant tag"),
         }
     }
@@ -250,9 +245,9 @@ impl Not for Direction {
 
     fn not(self) -> Self::Output {
         if self == Self::Forward {
-            return Self::Backward
+            return Self::Backward;
         } else {
-            return Self::Forward
+            return Self::Forward;
         }
     }
 }
@@ -277,7 +272,6 @@ impl ActuatorReading {
     }
 }
 
-
 impl FromPicoV3 {
     /// 1 tag + 4 FromImu (4×25) + 1 ActuatorReading (4)  = 105 bytes
     pub const SIZE: usize = 105;
@@ -290,7 +284,7 @@ impl FromPicoV3 {
                 bytes[0] = 0;
                 for (i, r) in readings.iter().enumerate() {
                     let start = 1 + i * FromIMU::SIZE;
-                    let end   = start + FromIMU::SIZE;
+                    let end = start + FromIMU::SIZE;
                     bytes[start..end].copy_from_slice(&r.serialize());
                 }
                 bytes[Self::SIZE - 4..].copy_from_slice(&act.serialize());
@@ -306,7 +300,7 @@ impl FromPicoV3 {
                 let mut readings: [FromIMU; 4] = [FromIMU::Error; 4];
                 for i in 0..4 {
                     let start = 1 + i * FromIMU::SIZE;
-                    let end   = start + FromIMU::SIZE;
+                    let end = start + FromIMU::SIZE;
                     let imu_bytes: [u8; FromIMU::SIZE] =
                         bytes[start..end].try_into().map_err(|_| "slice size")?;
                     readings[i] = FromIMU::deserialize(imu_bytes)?;

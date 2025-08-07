@@ -6,8 +6,10 @@ use cu29::{
     prelude::*,
 };
 
-use common::FromAI;
+use common::{FromAI, Steering};
 use embedded_common::ActuatorCommand;
+
+use crate::PICO_TX;
 
 pub struct ActuatorController;
 
@@ -15,16 +17,21 @@ impl Freezable for ActuatorController {}
 
 impl CuSinkTask for ActuatorController {
     // steering, actuators (just ignore the steering for now)
-    type Input<'m> = input_msg!((Option<FromAI>, Option<FromAI>));
+    // actuator command is a slice because the ActuatorCommand doesnt implement Serialize or Decode due to being no_std
+    type Input<'m> = input_msg!((Option<Steering>, Option<[u8; 5]>));
 
     fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
         Ok(Self)
     }
 
     fn process(&mut self, _clock: &RobotClock, input: &Self::Input<'_>) -> CuResult<()> {
-        if let Some(payload) = input.payload() {
-            if let Some(FromAI::SetActuators(cmd)) = &payload.1 {
-                info!("ActuatorController command {}", cmd.to_string());
+        if let Some(payload) = input.payload()
+            && let Some(cmd_bytes) = &payload.1
+            && let Some(pico_tx) = PICO_TX.get()
+            && let Ok(actuator_cmd) = ActuatorCommand::deserialize(*cmd_bytes)
+        {
+            if let Err(err) = pico_tx.send(actuator_cmd) {
+                error!("Failed to send actuator command: {}", err.to_string());
             }
         }
         Ok(())

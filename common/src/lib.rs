@@ -1,19 +1,30 @@
 #![feature(f16)]
 use bytemuck::{Pod, Zeroable};
-use nalgebra::{Isometry3, Vector2};
 use crossbeam::atomic::AtomicCell;
-use std::{sync::Arc, time::Duration};
+use nalgebra::{Isometry3, Vector2};
 use once_cell::sync::Lazy;
 use serde::Serialize;
+use std::{sync::Arc, time::Duration};
 
 #[repr(C)]
-#[derive(bincode::Encode, bincode::Decode,bitcode::Encode, bitcode::Decode, Clone, Copy, PartialEq, Eq, Pod, Zeroable, Serialize)]
+#[derive(
+    bincode::Encode,
+    bincode::Decode,
+    bitcode::Encode,
+    bitcode::Decode,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Pod,
+    Zeroable,
+    Serialize,
+)]
 pub struct Steering {
     left: i8,
     right: i8,
     weight: u16,
 }
-
 
 impl std::fmt::Debug for Steering {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -77,19 +88,17 @@ impl Default for Steering {
     }
 }
 
-
 #[derive(Clone, Copy, Debug, Default, Encode, Decode)]
 pub struct IMUReading {
     pub angular_velocity: [f64; 3],
     pub acceleration: [f64; 3],
 }
 
-
 use std::io::Write;
 
 use bitcode::{Decode, Encode};
 use embedded_common::{Actuator, ActuatorCommand};
-use nalgebra::{distance, Point2, Point3};
+use nalgebra::{Point2, Point3, distance};
 
 // Taken from https://opus-codec.org/docs/opus_api-1.5/group__opus__encoder.html#gad2d6bf6a9ffb6674879d7605ed073e25
 pub const AUDIO_FRAME_SIZE: u32 = 960;
@@ -148,9 +157,19 @@ impl CellsRect {
     }
 }
 
-
 #[repr(u8)]
-#[derive(Debug, bitcode::Encode, bitcode::Decode, Clone, Copy, PartialEq, Eq, bincode::Encode, bincode::Decode, Serialize)]
+#[derive(
+    Debug,
+    bitcode::Encode,
+    bitcode::Decode,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    bincode::Encode,
+    bincode::Decode,
+    Serialize,
+)]
 pub enum LunabotStage {
     TeleOp = 0,
     SoftStop = 1,
@@ -165,12 +184,14 @@ impl TryFrom<u8> for LunabotStage {
             0 => Ok(Self::TeleOp),
             1 => Ok(Self::SoftStop),
             2 => Ok(Self::Autonomy),
-            _ => Err(())
+            _ => Err(()),
         }
     }
 }
 
-#[derive(bincode::Encode, bincode::Decode, Debug, Encode, Decode, Clone, Copy, PartialEq, Serialize)]
+#[derive(
+    bincode::Encode, bincode::Decode, Debug, Encode, Decode, Clone, Copy, PartialEq, Serialize,
+)]
 pub enum FromLunabase {
     Pong,
     ContinueMission,
@@ -280,13 +301,12 @@ impl FromLunabase {
     }
 }
 
-#[derive(Debug, bitcode::Encode, bitcode::Decode, Clone, Copy, bincode::Encode, bincode::Decode)]
+#[derive(
+    Debug, bitcode::Encode, bitcode::Decode, Clone, Copy, bincode::Encode, bincode::Decode,
+)]
 pub enum FromLunabot {
     RobotIsometry { origin: [f32; 3], quat: [f32; 4] },
-    ArmAngles {
-        hinge: f32,
-        bucket: f32
-    },
+    ArmAngles { hinge: f32, bucket: f32 },
     Ping(LunabotStage),
 }
 
@@ -307,7 +327,6 @@ impl FromLunabot {
         Ok(())
     }
 }
-
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum PathKind {
@@ -412,10 +431,8 @@ pub const HOST_HEARTBEAT_LISTEN_RATE: Duration = Duration::from_millis(500);
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ParseError {
-    NotEnoughBytes {
-        bytes_needed: usize
-    },
-    InvalidData
+    NotEnoughBytes { bytes_needed: usize },
+    InvalidData,
 }
 
 #[repr(transparent)]
@@ -433,33 +450,30 @@ impl Occupancy {
     }
 }
 
-
 #[repr(u8)]
 enum FromHostHeader {
     BaseIsometry = 0,
     FromLunabase = 1,
     ActuatorReadings = 2,
-    ThalassicData = 3
+    ThalassicData = 3,
 }
 
 #[derive(Debug)]
 pub enum FromHost {
     BaseIsometry {
-        isometry: Isometry3<f64>
+        isometry: Isometry3<f64>,
     },
     FromLunabase {
-        msg: FromLunabase
+        msg: FromLunabase,
     },
     ActuatorReadings {
         lift: u16,
-        bucket: u16
+        bucket: u16,
     },
     ThalassicData {
-        obstacle_map: Box<[Occupancy; THALASSIC_CELL_COUNT as usize]>
-    }
+        obstacle_map: Box<[Occupancy; THALASSIC_CELL_COUNT as usize]>,
+    },
 }
-
-
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum FromAI {
@@ -470,7 +484,7 @@ pub enum FromAI {
     StopPercuss,
     SetStage(LunabotStage),
     RequestThalassic,
-    PathFound(Box<Vec<Vector2<f64>>>)
+    PathFound(Box<Vec<Vector2<f64>>>),
 }
 
 // -----------------------------------------------------------------------------
@@ -513,7 +527,10 @@ impl serde::Serialize for FromAI {
 }
 
 impl bincode::Encode for FromHost {
-    fn encode<E: bincode::enc::Encoder>(&self, encoder: &mut E) -> Result<(), bincode::error::EncodeError> {
+    fn encode<E: bincode::enc::Encoder>(
+        &self,
+        encoder: &mut E,
+    ) -> Result<(), bincode::error::EncodeError> {
         use bincode::Encode;
         match self {
             FromHost::BaseIsometry { isometry } => {
@@ -551,7 +568,9 @@ impl bincode::Encode for FromHost {
 }
 
 impl bincode::Decode<()> for FromHost {
-    fn decode<D: bincode::de::Decoder<Context = ()>>(decoder: &mut D) -> Result<Self, bincode::error::DecodeError> {
+    fn decode<D: bincode::de::Decoder<Context = ()>>(
+        decoder: &mut D,
+    ) -> Result<Self, bincode::error::DecodeError> {
         use bincode::Decode;
         let variant: u8 = Decode::decode(decoder)?;
         match variant {
@@ -565,7 +584,9 @@ impl bincode::Decode<()> for FromHost {
                 let qk: f64 = Decode::decode(decoder)?;
                 let iso = Isometry3::from_parts(
                     nalgebra::Translation3::new(tx, ty, tz),
-                    nalgebra::UnitQuaternion::from_quaternion(nalgebra::Quaternion::new(qw, qi, qj, qk)),
+                    nalgebra::UnitQuaternion::from_quaternion(nalgebra::Quaternion::new(
+                        qw, qi, qj, qk,
+                    )),
                 );
                 Ok(FromHost::BaseIsometry { isometry: iso })
             }
@@ -579,14 +600,17 @@ impl bincode::Decode<()> for FromHost {
                 Ok(FromHost::ActuatorReadings { lift, bucket })
             }
             3 => {
-                let mut map: Box<[Occupancy; THALASSIC_CELL_COUNT as usize]> = Box::new([Occupancy::UNKNOWN; THALASSIC_CELL_COUNT as usize]);
+                let mut map: Box<[Occupancy; THALASSIC_CELL_COUNT as usize]> =
+                    Box::new([Occupancy::UNKNOWN; THALASSIC_CELL_COUNT as usize]);
                 for occ in map.iter_mut() {
                     let val: u32 = Decode::decode(decoder)?;
                     occ.0 = val;
                 }
                 Ok(FromHost::ThalassicData { obstacle_map: map })
             }
-            _ => Err(bincode::error::DecodeError::OtherString("Invalid variant".into())),
+            _ => Err(bincode::error::DecodeError::OtherString(
+                "Invalid variant".into(),
+            )),
         }
     }
 }
@@ -594,12 +618,13 @@ impl bincode::Decode<()> for FromHost {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use bincode::{encode_to_vec, decode_from_slice};
+    use bincode::{decode_from_slice, encode_to_vec};
 
     fn roundtrip(value: &FromAI) {
         let config = bincode::config::standard();
         let bytes = encode_to_vec(value, config).expect("encode");
-        let (decoded, _): (FromAI, usize) = decode_from_slice::<FromAI, _>(&bytes, config).expect("decode");
+        let (decoded, _): (FromAI, usize) =
+            decode_from_slice::<FromAI, _>(&bytes, config).expect("decode");
         assert_eq!(*value, decoded);
     }
 
@@ -656,10 +681,14 @@ mod tests {
 }
 
 // Add global shared Lunabot stage atomic cell to synchronize stage information across components.
-pub static LUNABOT_STAGE: Lazy<Arc<AtomicCell<LunabotStage>>> = Lazy::new(|| Arc::new(AtomicCell::new(LunabotStage::SoftStop)));
+pub static LUNABOT_STAGE: Lazy<Arc<AtomicCell<LunabotStage>>> =
+    Lazy::new(|| Arc::new(AtomicCell::new(LunabotStage::SoftStop)));
 
 impl bincode::Encode for FromAI {
-    fn encode<E: bincode::enc::Encoder>(&self, encoder: &mut E) -> Result<(), bincode::error::EncodeError> {
+    fn encode<E: bincode::enc::Encoder>(
+        &self,
+        encoder: &mut E,
+    ) -> Result<(), bincode::error::EncodeError> {
         use bincode::Encode;
         match self {
             FromAI::SetSteering(steering) => {
@@ -701,7 +730,9 @@ impl bincode::Encode for FromAI {
 }
 
 impl bincode::Decode<()> for FromAI {
-    fn decode<D: bincode::de::Decoder<Context = ()>>(decoder: &mut D) -> Result<Self, bincode::error::DecodeError> {
+    fn decode<D: bincode::de::Decoder<Context = ()>>(
+        decoder: &mut D,
+    ) -> Result<Self, bincode::error::DecodeError> {
         use bincode::Decode;
         let variant: u8 = Decode::decode(decoder)?;
         match variant {
@@ -720,8 +751,9 @@ impl bincode::Decode<()> for FromAI {
             4 => Ok(FromAI::StopPercuss),
             5 => {
                 let stage_val: u8 = Decode::decode(decoder)?;
-                let stage = LunabotStage::try_from(stage_val)
-                    .map_err(|_| bincode::error::DecodeError::OtherString("Invalid stage value".into()))?;
+                let stage = LunabotStage::try_from(stage_val).map_err(|_| {
+                    bincode::error::DecodeError::OtherString("Invalid stage value".into())
+                })?;
                 Ok(FromAI::SetStage(stage))
             }
             6 => Ok(FromAI::RequestThalassic),
@@ -735,7 +767,9 @@ impl bincode::Decode<()> for FromAI {
                 }
                 Ok(FromAI::PathFound(Box::new(vec)))
             }
-            _ => Err(bincode::error::DecodeError::OtherString("Invalid variant".into())),
+            _ => Err(bincode::error::DecodeError::OtherString(
+                "Invalid variant".into(),
+            )),
         }
     }
 }
