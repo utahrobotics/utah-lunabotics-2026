@@ -1,4 +1,4 @@
-# Lunabot: Lunar Excavation Robot Control System
+# Lunabot
 
 A modular robotics framework for controlling a lunar excavation robot using the **Copper** real-time task framework. This system handles multi-camera vision processing, LIDAR point clouds, IMU data, and robot localization for autonomous lunar terrain navigation and excavation.
 
@@ -16,8 +16,8 @@ The system is built on the [Copper framework](https://github.com/copper-project/
 
 - **Vision System**: Multi-camera setup with AprilTag detection for localization
 - **LIDAR Processing**: Unitree L2 and RealSense LIDAR integration via iceoryx2 IPC.
-- **Robot State**: IMU-based orientation tracking and kinematic modeling
-- **Localization**: Sensor fusion from IMUs, and KISS-ICP for robot pose estimation
+- **Robot State**: Rigid kinematic chain modeling.
+- **Localization**: Sensor fusion from IMUs, KISS-ICP, and apriltags for robot pose estimation
 - **Data Logging**: Real-time visualization and recording using Rerun
 - **Teleop**: Using UDP for communication between the base and bot with a custom quality of service state machine.
 - **Lunabase**: Base station software for controlling the robot as well as receiving telemetry and camera feeds.
@@ -56,96 +56,6 @@ apt-get install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
    ```bash
    https://github.com/copper-project/copper-rs/tree/master/support/cargo_cubuild
    ```
-
-## Configuration System
-
-The system uses a hierarchical configuration approach with the **Copper** framework:
-
-### Main Configuration (`copperconfig.ron`)
-
-The primary configuration file defines:
-- **Tasks**: Individual processing components with their types and configs
-- **Connections**: Message flow between tasks using typed channels
-- **Includes**: Template instantiation for reusable components
-- **Logging**: System-wide logging and monitoring settings
-
-```ron
-(
-    tasks: [
-        (id: "udev_monitor", type: "crate::tasks::UdevMonitor", config: {}),
-        (id: "l2_pointcloud", type: "crate::tasks::sources::PointCloudIceoryxReceiver", config: {}),
-        // ... more tasks
-    ],
-    cnx: [
-        (src: "l2_pointcloud", dst: "l2_pointcloud_sink", msg: "crate::tasks::PointCloudPayload"),
-        // ... more connections
-    ],
-    includes: [
-        // Template instantiations (see below)
-    ],
-    logging: (
-        enable_task_logging: true,
-        section_size_mib: 8,
-    ),
-)
-```
-
-### Template System with Includes
-
-The configuration uses a **template system** to instantiate multiple similar components:
-
-#### Camera Template (`camera_configs/camera_template_gstreamer.ron`)
-
-This template defines a complete camera processing pipeline that gets instantiated for each physical camera:
-
-```ron
-(
-    tasks: [
-        (id: "cam_{{id}}", type: "crate::tasks::CuDefaultAutoGStreamer", config: {
-            "camera_id": "cam_{{id}}",
-            "device_port": "{{port}}",
-            "pipeline": "v4l2src device=<devpath> ! video/x-raw,width={{width}},height={{height}} ! ...",
-            // GStreamer pipeline with parameter substitution
-        }),
-        (id: "thres_{{id}}", type: "cu_dynthreshold::DynThreshold", config: {
-            "width": {{width}}, "height": {{height}}, "block_radius": 100
-        }),
-        (id: "detector_cam_{{id}}", type: "cu_apriltag::AprilTags", config: {
-            "fx": {{fx}}, "fy": {{fy}}, "cx": {{cx}}, "cy": {{cy}}, // Camera intrinsics
-        }),
-        // Shared tasks (detection_handler, localizer)
-    ],
-    cnx: [
-        (src: "cam_{{id}}", dst: "thres_{{id}}", msg: "crate::tasks::CuGstBuffer"),
-        (src: "thres_{{id}}", dst: "detector_cam_{{id}}", msg: "cu_sensor_payloads::CuImage<Vec<u8>>"),
-        // ... complete processing chain
-    ],
-)
-```
-
-#### Template Instantiation
-
-Templates are instantiated in the main config with specific parameters:
-
-```ron
-includes: [
-    (
-        path: "camera_configs/camera_template_gstreamer.ron",
-        params: {
-            "id": "back",                           // Camera identifier
-            "port": "pci-0000:35:00.0-usb-0:1:1.0", // USB device port
-            "fx": 689.93, "fy": 689.93,             // Camera intrinsics
-            "cx": 320.84, "cy": 240.819,
-            "width": 640, "height": 480,
-            "udp_host": "127.0.0.1", "udp_port": 5004, // Video streaming
-        },
-    ),
-    // Additional camera instances...
-]
-```
-
-This creates a complete camera processing pipeline for each camera with custom parameters while sharing common processing tasks.
-
 ### Robot Kinematic Configuration (`robot-layout/lunabot.ron`)
 
 Defines the robot's physical structure and sensor placements:
@@ -162,38 +72,6 @@ Defines the robot's physical structure and sensor placements:
 }
 ```
 
-## Task Architecture
-
-The system follows a **dataflow architecture** where tasks communicate via typed message channels:
-
-### Task Categories
-
-#### Source Tasks (`src/tasks/sources/`)
-- **UdevMonitor**: Detects camera connection/disconnection events
-- **PointCloudIceoryxReceiver**: Receives LIDAR data via iceoryx2 IPC  
-- **ImuIceoryxReceiver**: Receives IMU data from the LIDAR unit
-- **Teleop**: TODO Manual robot control interface
-
-#### Processing Tasks (`src/tasks/`)
-- **CuDefaultAutoGStreamer**: Camera capture and video streaming
-- **DynThreshold**: Adaptive image thresholding for AprilTag detection
-- **AprilTags**: Fiducial marker detection for localization
-- **AprilDetectionHandler**: Aggregates detections from multiple cameras
-
-#### Sink Tasks (`src/tasks/sinks/`)
-- **L2PointCloudSink**: LIDAR data logging and visualization
-- **CuLocalizer**: Robot pose estimation and state tracking
-
-### Data Flow Example
-
-```
-UdevMonitor → AutoGStreamer → DynThreshold → AprilTags → DetectionHandler → Localizer
-                    ↓
-              UDP Video Stream
-
-L2 LIDAR → PointCloudReceiver → PointCloudSink → Rerun Visualization
-         → ImuReceiver → Localizer → Robot State Updates
-```
 
 ## System Operation
 
@@ -201,7 +79,7 @@ L2 LIDAR → PointCloudReceiver → PointCloudSink → Rerun Visualization
 
 1. **UdevMonitor** detects when cameras are plugged in
 2. **AutoGStreamer** matches device ports to configured cameras and starts capture
-3. **DynThreshold** applies adaptive thresholding for marker detection
+3. **DynThreshold (or GstToImage)** applies adaptive thresholding for marker detection
 4. **AprilTags** detects fiducial markers and estimates camera poses
 5. **DetectionHandler** aggregates multi-camera observations
 6. **Localizer** updates robot pose using camera-based localization
@@ -211,7 +89,6 @@ L2 LIDAR → PointCloudReceiver → PointCloudSink → Rerun Visualization
 1. **unilidar_iceoryx_publisher** (C++) captures L2 LIDAR data and publishes via iceoryx2
 2. **PointCloudReceiver** consumes point clouds and transforms to robot coordinates
 3. **ImuReceiver** processes inertial data for orientation tracking
-4. **PointCloudSink** logs data to Rerun for visualization
 5. **Localizer** incorporates IMU data for robot orientation updates
 
 ## Building and Running
@@ -242,7 +119,6 @@ The system includes an optional **terminal-based monitoring interface** using th
 
 The console monitor displays a live text-based interface showing:
 - **Task Status**: Real-time status of all running tasks
-- **Performance Metrics**: CPU usage, memory, and timing information
 - **System Health**: Error and task failure detection
 - **Resource Usage**: Memory allocation and processing bottlenecks
 
