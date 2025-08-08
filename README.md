@@ -45,9 +45,9 @@ apt-get install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
       gstreamer1.0-libav libgstrtspserver-1.0-dev libges-1.0-dev
 ```
 
-6. libssl-dev
+5. libssl-dev
 
-7. apriltag library https://github.com/AprilRobotics/apriltag?tab=readme-ov-file#install
+6. apriltag library https://github.com/AprilRobotics/apriltag?tab=readme-ov-file#install
 
 
 ### Optional Dependencies
