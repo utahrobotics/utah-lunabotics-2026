@@ -26,28 +26,7 @@ The system is built on the [Copper framework](https://github.com/copper-project/
 
 ### Required Dependencies
 
-1. Bazel 6.2 (via bazelisk)
-
-2. LAPACK/openblas libraries:
-
-```bash
-sudo apt update && sudo apt install -y liblapack-dev libblas-dev libopenblas-dev
-```
-
-3. realsense2 SDK
-
-4. GStreamer
-
-```bash
-apt-get install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
-      gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
-      gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
-      gstreamer1.0-libav libgstrtspserver-1.0-dev libges-1.0-dev
-```
-
-5. libssl-dev
-
-6. apriltag library https://github.com/AprilRobotics/apriltag?tab=readme-ov-file#install
+1. See dockerfile, anything installed there is a dependency.
 
 
 ### Optional Dependencies
@@ -56,6 +35,10 @@ apt-get install libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
    ```bash
    https://github.com/copper-project/copper-rs/tree/master/support/cargo_cubuild
    ```
+
+2. Rerun - visualize data produced by the robot.
+
+
 ### Robot Kinematic Configuration (`robot-layout/lunabot.ron`)
 
 Defines the robot's physical structure and sensor placements:
@@ -135,5 +118,12 @@ To enable it, uncomment the monitor line in `copperconfig.ron`:
 ```
 
 
-## Configuring
-TODO
+## Get Started
+_First either use docker or install dependencies listed in the dockerfile system wide_
+1. clone repo
+2. run `make sync` to sync the dependencies for the c++ portion of the codebase.
+3. run `make prod` to build and run the robot.
+
+If you have rerun installed, you should see a window pop up that begins to recieve data from the robot, and as the robot reads sensor data in it will update its isometry which you can watch live through rerun.
+
+ TODO: lunabase instructions
