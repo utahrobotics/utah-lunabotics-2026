@@ -90,7 +90,7 @@ make discover-cameras
 
 ## Logging and Visualization
 
-- **Copper logs**: Stored in `logs/lunabot.copper` for system debugging (only active on debug builds)
+- **Copper logs**: Stored in `logs/lunabot.copper` for system debugging (messages only active on debug builds, full copperlist logging enabled when enable_task_logging is true)
 - **Rerun visualization**: Real-time 3D visualization of robot state, point clouds, and camera feeds
 - **Video streams**: Live UDP streams from cameras for remote monitoring
 
