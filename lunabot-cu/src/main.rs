@@ -101,4 +101,8 @@ fn launch_subprocs() {
     launcher.add_command("lunabot ai", ai_cmd);
 
     launcher.launch_all().expect("failed to launch commands");
+    std::panic::set_hook(Box::new(|info| {
+        launcher.kill_all();
+        eprintln!("Panic: {}", info);
+    }));
 }
