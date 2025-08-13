@@ -71,12 +71,21 @@ impl ProcessCommand {
 
 pub struct ProcessLauncher {
     commands: HashMap<String, ProcessCommand>,
+    pids: Vec<u32>,
 }
 
 impl ProcessLauncher {
+    pub fn kill_all(&mut self) {
+        for pid in &self.pids {
+            let _ = Command::new("kill").arg(pid.to_string()).output();
+        }
+        self.pids.clear();
+    }
+
     pub fn new() -> Self {
         Self {
             commands: HashMap::new(),
+            pids: Vec::new(),
         }
     }
 
@@ -85,23 +94,25 @@ impl ProcessLauncher {
         self
     }
 
-    pub fn launch_all(&self) -> Result<(), Box<dyn std::error::Error>> {
-        for (name, command) in &self.commands {
-            self.launch_process(command)?;
+    pub fn launch_all(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        let commands: Vec<ProcessCommand> = self.commands.values().cloned().collect();
+        for command in commands {
+            self.launch_process(&command)?;
         }
         Ok(())
     }
 
-    pub fn launch_command(&self, name: &str) -> Result<(), Box<dyn std::error::Error>> {
-        if let Some(command) = self.commands.get(name) {
-            self.launch_process(command)?;
+    pub fn launch_command(&mut self, name: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let maybe_cmd = self.commands.get(name).cloned();
+        if let Some(command) = maybe_cmd {
+            self.launch_process(&command)?;
         } else {
             return Err(format!("Command '{}' not found", name).into());
         }
         Ok(())
     }
 
-    fn launch_process(&self, process_command: &ProcessCommand) -> Result<(), Box<dyn std::error::Error>> {
+    fn launch_process(&mut self, process_command: &ProcessCommand) -> Result<(), Box<dyn std::error::Error>> {
         let mut cmd = Command::new(&process_command.command);
         
         // Add arguments
@@ -127,7 +138,8 @@ impl ProcessLauncher {
         // Launch the process
         if process_command.config.detach {
             // Spawn and detach (don't wait for completion)
-            cmd.spawn()?;
+            let child = cmd.spawn()?.id();
+            self.pids.push(child);
         } else {
             // Wait for completion
             let status = cmd.status()?;
