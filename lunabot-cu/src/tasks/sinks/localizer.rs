@@ -109,7 +109,6 @@ impl CuSinkTask for Localizer {
         };
 
         if let Some(iso) = final_isometry {
-            println!("setting root nodes iso");
             self.root_node.set_isometry(iso);
         }
 
