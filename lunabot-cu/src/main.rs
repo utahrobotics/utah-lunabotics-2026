@@ -1,5 +1,6 @@
-#![feature(try_blocks, f16)]
+#![feature(try_blocks, f16, mpmc_channel)]
 pub mod comms;
+mod motors;
 pub mod rerun_viz;
 mod rp2040;
 pub mod tasks;

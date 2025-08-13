@@ -93,8 +93,32 @@
             id:"actuator_ctrl", type:"crate::tasks::sinks::ActuatorController", config:{}
         ),
         (
-            id:"wheel_ctrl", type:"crate::tasks::sinks::WheelController", config:{}
+            id:"motor_ctrl", type:"crate::tasks::sinks::MotorController", config:{
+                "speed_multiplier": 5000,
+                "vesc_pairs": [
+                    // yes having these as strings is janky but it works
+                    "VescPair(
+                        id1: 75,
+                        id2: 110,
+                        mask1: Right,
+                        mask2: Right
+                    )",
+                    "VescPair(
+                        id1: 63,
+                        id2: 74,
+                        mask1: Left,
+                        mask2: Left
+                    )"
+                ]
+            }
         ),
+        (
+            id: "detection_handler",
+            type: "crate::tasks::AprilDetectionHandler",
+            logging: (
+                enabled: false
+            )
+        )
     ],
     cnx:[
         (src:"l2_imu", dst:"localizer", msg:"iceoryx_types::ImuMsg"),
@@ -104,8 +128,13 @@
         (src:"realsense_kiss_icp", dst:"localizer", msg:"cu_spatial_payloads::Transform3D<f64>"),
         (src:"lunabase", dst:"ai_sink", msg:"Option<common::FromLunabase>"),
         // copper doesn't support multiple outputs on a single task so for now we just put them in a tuple and ignore one side
-        (src:"ai_source", dst:"wheel_ctrl", msg:"(Option<common::Steering>, Option<[u8; 5]>)"),
-        (src:"ai_source", dst:"actuator_ctrl", msg:"(Option<common::Steering>, Option<[u8; 5]>)")
+        (src:"ai_source", dst:"motor_ctrl", msg:"(Option<common::Steering>, Option<[u8; 5]>)"),
+        (src:"ai_source", dst:"actuator_ctrl", msg:"(Option<common::Steering>, Option<[u8; 5]>)"),
+        (
+            src: "detection_handler",
+            dst: "localizer",
+            msg: "Box<std::collections::HashMap<String, crate::tasks::april_detection_handler::EncodableIsometry>>"
+        ),
     ],
     includes:[
         (

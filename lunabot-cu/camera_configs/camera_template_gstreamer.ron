@@ -41,27 +41,12 @@
             logging: (
                 enabled: false
             )
-        ),
-        (
-            id: "detection_handler",
-            type: "crate::tasks::AprilDetectionHandler",
-            logging: (
-                enabled: false
-            )
-        ),
-        (
-            id: "localizer",
-            type: "crate::tasks::CuLocalizer",
-            config: {
-                "layout_path": "../robot-layout/lunabot.ron"
-            }
         )
     ],
     cnx: [
         (src: "udev_monitor", dst: "cam_{{id}}", msg: "crate::tasks::NewDevice"),
         (src: "cam_{{id}}", dst: "gst_convert_{{id}}", msg: "crate::tasks::CuGstBuffer"),
         (src: "gst_convert_{{id}}", dst: "detector_cam_{{id}}", msg: "cu_sensor_payloads::CuImage<Vec<u8>>"),
-        (src: "detection_handler", dst: "localizer", msg: "Box<std::collections::HashMap<String, crate::tasks::april_detection_handler::EncodableIsometry>>"),
         (src: "detector_cam_{{id}}", dst: "detection_handler", msg: "cu_apriltag::AprilTagDetections"),
     ],
 )

@@ -29,7 +29,7 @@ bincode.workspace = true
 cu29-helpers.workspace = true
 cu29-export = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu29-export", optional = true }
 cu-apriltag.workspace = true
-cu_cursive-consolemon.workspace = true
+# cu_cursiveconsolemon.workspace = true
 # cu-consolemon.workspace = true
 cu-sensor-payloads.workspace = true
 cu-spatial-payloads.workspace = true

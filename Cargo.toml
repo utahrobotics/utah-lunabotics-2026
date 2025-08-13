@@ -19,24 +19,24 @@ members = [
 exclude = ["kiss-icp-rs"]
 # Shared dependencies across workspace members
 [workspace.dependencies]
-cu29 = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu29", features = [
+cu29 = { path = "/home/matthew_a/copper-rs/core/cu29", package = "cu29", features = [
     "log-level-info",
     "log-level-error",
 ] }
 bincode = { version = "2", features = ["derive", "serde"] }
-cu29-helpers = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu29-helpers" }
-cu-apriltag = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu-apriltag" }
-cu_cursive-consolemon = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu_cursive_consolemon" }
-# cu-consolemon = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu-consolemon" }
-cu-sensor-payloads = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu-sensor-payloads" }
-cu-spatial-payloads = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu-spatial-payloads", features = [
+cu29-helpers = { path = "/home/matthew_a/copper-rs/core/cu29_helpers" }
+cu-apriltag = { path = "/home/matthew_a/copper-rs/components/tasks/cu_apriltag" }
+cu_cursive_consolemon = { path = "/home/matthew_a/copper-rs/components/monitors/cu_cursive_consolemon" }
+# cu-consolemon = { path = "/home/matthew_a/copper-rs/components/monitors/cu_consolemon" }
+cu-sensor-payloads = { path = "/home/matthew_a/copper-rs/components/payloads/cu_sensor_payloads" }
+cu-spatial-payloads = { path = "/home/matthew_a/copper-rs/components/payloads/cu_spatial_payloads", features = [
     "nalgebra",
 ] }
-cu-dynthreshold = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu-dynthreshold", features = [
+cu-dynthreshold = { path = "/home/matthew_a/copper-rs/components/tasks/cu_dynthreshold", features = [
     "gst",
 ] }
-cu29-runtime = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu29-runtime" }
-cu-gstreamer = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu-gstreamer", features = [
+cu29-runtime = { path = "/home/matthew_a/copper-rs/core/cu29_runtime" }
+cu-gstreamer = { path = "/home/matthew_a/copper-rs/components/sources/cu_gstreamer", features = [
     "gst",
 ] }
 iceoryx2 = { version = "0.6.1" }
