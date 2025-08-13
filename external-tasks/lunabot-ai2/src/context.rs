@@ -1,3 +1,5 @@
+use std::thread::yield_now;
+
 use bincode::{config::standard, decode_from_slice, encode_to_vec};
 use common::{FromAI, FromHost, AI_HEARTBEAT_RATE};
 use iceoryx2::node::NodeBuilder;
@@ -51,30 +53,27 @@ impl HostHandle {
 
                         match decode_from_slice::<FromHost, _>(bytes, config) {
                             Ok((msg, _)) => {
-                                // Non-blocking send; fall back to blocking if full.
                                 if let Err(e) = from_host_tx.try_send(msg) {
                                     let _ = from_host_tx.blocking_send(e.into_inner());
                                 }
                             }
-                            Err(_) => {
-                                // Could log decode error, skip invalid message
+                            Err(e) => {
+                                eprintln!("HostHandle: error decoding FromHostBytes: {}", e);
                                 continue;
                             }
                         }
                     }
                     Ok(None) => {
-                        // No new sample; yield a bit
-                        std::thread::sleep(Duration::from_millis(5));
+                        yield_now();
                     }
-                    Err(_e) => {
-                        // Error retrieving data – in production we might log; here just continue
-                        std::thread::sleep(Duration::from_millis(5));
+                    Err(e) => {
+                        eprintln!("HostHandle: error receiving FromHostBytes: {}", e);
+                        yield_now();
                     }
                 }
             }
         });
 
-        // Create publisher inside the async context (we can't share Node across threads easily)
         let node = NodeBuilder::new()
             .create::<ipc::Service>()
             .expect("HostHandle: failed to create iceoryx2 node (publisher)");
@@ -107,7 +106,6 @@ impl HostHandle {
                     }
                 },
                 _ = tokio::time::sleep_until(next_instant) => {
-                    // Send heartbeat and update timer
                     self.last_heartbeat = next_instant;
                     self.write_to_host(FromAI::Heartbeat);
                 }
@@ -123,14 +121,13 @@ impl HostHandle {
         let config = standard();
         if let Ok(bytes) = encode_to_vec(&msg, config) {
             if bytes.len() > FROM_AI_MAX_BYTES {
-                // Infeasible large message; drop.
+                eprintln!("HostHandle: message too large to send: {} bytes", bytes.len());
                 return;
             }
 
             let mut payload = FromAIBytes::default();
             payload.len = bytes.len() as u32;
             payload.data[..bytes.len()].copy_from_slice(&bytes);
-
             if let Ok(sample) = self.publisher.loan_uninit() {
                 let initialized = sample.write_payload(payload);
                 let _ = initialized.send();
