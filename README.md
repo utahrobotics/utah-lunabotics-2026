@@ -12,15 +12,6 @@ The system is built on the [Copper framework](https://github.com/copper-project/
 - **Configuration-driven architecture** using RON (Rust Object Notation)
 - **Inter-Process communication** using Iceoryx2 for integration with separate processes running in ROS2 or elsewhere
 
-### Core Components
-
-- **Vision System**: Multi-camera setup with AprilTag detection for localization
-- **LIDAR Processing**: Unitree L2 and RealSense LIDAR integration via iceoryx2 IPC.
-- **Robot State**: Rigid kinematic chain modeling.
-- **Localization**: Sensor fusion from IMUs, KISS-ICP, and apriltags for robot pose estimation
-- **Data Logging**: Real-time visualization and recording using Rerun
-- **Teleop**: Using UDP for communication between the base and bot with a custom quality of service state machine.
-- **Lunabase**: Base station software for controlling the robot as well as receiving telemetry and camera feeds.
 
 ## Dependencies
 
