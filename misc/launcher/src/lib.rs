@@ -71,17 +71,10 @@ impl ProcessCommand {
 
 pub struct ProcessLauncher {
     commands: HashMap<String, ProcessCommand>,
-    pids: Vec<u32>,
+    pub pids: Vec<u32>,
 }
 
 impl ProcessLauncher {
-    pub fn kill_all(&mut self) {
-        for pid in &self.pids {
-            let _ = Command::new("kill").arg(pid.to_string()).output();
-        }
-        self.pids.clear();
-    }
-
     pub fn new() -> Self {
         Self {
             commands: HashMap::new(),
