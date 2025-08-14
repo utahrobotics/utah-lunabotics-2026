@@ -24,6 +24,8 @@ use crate::utils::{CobsCodec, udev_poll};
 pub fn enumerate_v3picos() -> (Sender<ActuatorCommand>, Receiver<FromPicoV3>) {
     let (path_tx, path_rx) = std::sync::mpsc::sync_channel::<String>(1);
     let (actuator_cmd_tx, actuator_cmd_rx) = crossbeam_channel::bounded(50);
+
+    // channel for connecting messages from the pico to other threads/copper tasks
     let (from_pico_tx, from_pico_rx) = crossbeam_channel::bounded(50);
     std::thread::spawn(move || {
         let mut task = V3PicoTask {
