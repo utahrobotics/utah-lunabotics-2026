@@ -87,18 +87,9 @@ impl CuSinkTask for Localizer {
 
             match (fused_isometry, &self.kiss_icp_correction) {
                 (_, Some(correction)) => {
-                    let corrected_icp_translation = correction
-                        .transform_point(&icp_isometry.translation.vector.into())
-                        .coords;
-
-                    let rotation_matrix = correction.matrix().fixed_view::<3, 3>(0, 0).into_owned();
-                    let corrected_icp_rotation =
-                        UnitQuaternion::from_matrix(&rotation_matrix) * icp_isometry.rotation;
-
-                    Some(Isometry3::from_parts(
-                        corrected_icp_translation.into(),
-                        corrected_icp_rotation,
-                    ))
+                    let correction_iso = Isometry3::from_matrix_unchecked(correction.into_inner());
+                    let corrected_icp = correction_iso * icp_isometry;
+                    Some(corrected_icp)
                 }
                 (Some(fused), None) => Some(fused),
                 (None, None) => Some(icp_isometry),
@@ -297,12 +288,7 @@ impl Localizer {
     /// is relative to where the algorithm started mapping, to where the robot
     /// actually is in world coords
     fn transformation_between(relative: Isometry3<f64>, actual: Isometry3<f64>) -> Transform3<f64> {
-        let rotation_correction = relative.rotation.rotation_to(&actual.rotation);
-        let translation_correction = actual.translation.vector - relative.translation.vector;
-        Transform3::from_matrix_unchecked(
-            rotation_correction
-                .to_homogeneous()
-                .append_translation(&translation_correction),
-        )
+        let correction_isometry = actual * relative.inverse();
+        Transform3::from_matrix_unchecked(correction_isometry.to_homogeneous())
     }
 }
