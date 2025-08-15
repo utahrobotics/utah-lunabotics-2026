@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use cu_spatial_payloads::Transform3D;
+use cu_spatial_payloads::{EncodableIsometry, Transform3D};
 use cu29::{
     CuError,
     cutask::{CuMsg, CuSinkTask, Freezable},
@@ -12,7 +12,6 @@ use simple_motion::StaticNode;
 
 use crate::{
     ROOT_NODE, rerun_viz,
-    tasks::april_detection_handler::EncodableIsometry,
     utils::{lerp, lerp_value, swing_twist_decomposition},
 };
 
@@ -221,13 +220,7 @@ impl Localizer {
 
             let down_axis = Vector3::z_axis();
 
-            // Apply lerp to translation
-            isometry.translation.vector = lerp(
-                isometry.translation.vector,
-                combined_observer_iso.translation.vector,
-                LOCALIZATION_DELTA,
-                ACCELEROMETER_LERP_SPEED,
-            );
+            isometry.translation = combined_observer_iso.translation;
 
             // Decompose the AprilTag rotation
             let (swing, twist) =

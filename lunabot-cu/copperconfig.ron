@@ -1,7 +1,4 @@
 (
-    runtime: (
-        rate_target_hz: 100
-    ),
     tasks:[
         (
             id:"udev_monitor",
@@ -133,7 +130,7 @@
         (
             src: "detection_handler",
             dst: "localizer",
-            msg: "Box<std::collections::HashMap<String, crate::tasks::april_detection_handler::EncodableIsometry>>"
+            msg: "Box<std::collections::HashMap<String, cu_spatial_payloads::EncodableIsometry>>"
         ),
     ],
     includes:[
@@ -186,7 +183,7 @@
     // monitor:(type:"cu_cursive_consolemon::CuCursiveConsoleMon"),
     // monitor:(type:"cu_consolemon::CuConsoleMon"),
     logging:(
-        enable_task_logging:true,
+        enable_task_logging:false,
         section_size_mib:100,
     ),
 )

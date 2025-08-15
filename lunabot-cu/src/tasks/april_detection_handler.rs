@@ -7,7 +7,7 @@ use cu29::{
     CuResult, clock::RobotClock, config::ComponentConfig, cutask::Freezable, input_msg, prelude::*,
 };
 
-use cu_spatial_payloads::{Transform3D, Transform3DCast};
+use cu_spatial_payloads::{EncodableIsometry, Transform3D, Transform3DCast};
 use ron::de::from_str as ron_from_str;
 use serde::Deserialize;
 use std::fs;
@@ -247,6 +247,7 @@ impl AprilDetectionHandler {
         }
 
         let combined = combine_isometries(&observer_isometries);
+
         Ok(combined)
     }
 
@@ -261,8 +262,12 @@ impl AprilDetectionHandler {
                 continue;
             }
             // Convert pose and flip axes to align with robot coordinate conventions.
-            let pose: Transform3D<f64> = pose.cast();
-            let mut tag_local_isometry: Isometry3<f64> = (&pose).into();
+            let Some(pose) = pose.to_na() else {
+                warning!("failed to convert pose to nalgebra type");
+                continue;
+            };
+
+            let mut tag_local_isometry: Isometry3<f64> = pose;
 
             // Apply an additional 180° rotation around the z-axis so the tag faces forward.
             tag_local_isometry.rotation = UnitQuaternion::from_scaled_axis(
@@ -405,29 +410,11 @@ impl std::fmt::Debug for TagObservation {
 impl TagObservation {
     /// Get the isometry of the observer.
     pub fn get_isometry_of_observer(&self) -> Isometry3<f64> {
-        self.tag_local_isometry.inverse() * self.tag_global_isometry
-    }
-}
-
-#[derive(bincode::Encode, bincode::Decode, Debug, Clone, Copy, Serialize)]
-pub struct EncodableIsometry {
-    inner: [f64; 16],
-}
-impl EncodableIsometry {
-    /// Convert from nalgebra Isometry3 to EncodableIsometry
-    pub fn from_na(isometry: &Isometry3<f64>) -> Self {
-        let matrix = isometry.to_matrix();
-        let slice = matrix.as_slice();
-        let mut inner = [0.0; 16];
-        inner.copy_from_slice(slice);
-        Self { inner }
-    }
-    /// Convert from EncodableIsometry to nalgebra Isometry3
-    pub fn to_na(&self) -> Option<Isometry3<f64>> {
-        let matrix = Matrix4::from_column_slice(&self.inner);
-        let rotation_matrix = matrix.fixed_view::<3, 3>(0, 0).into_owned();
-        let translation = Vector3::new(matrix[(0, 3)], matrix[(1, 3)], matrix[(2, 3)]);
-        let rotation = UnitQuaternion::from_matrix(&rotation_matrix);
-        Some(Isometry3::from_parts(translation.into(), rotation))
+        let inv_rotation = self.tag_local_isometry.rotation.inverse();
+        self.tag_global_isometry
+            * Isometry3::from_parts(
+                (inv_rotation * -self.tag_local_isometry.translation.vector).into(),
+                inv_rotation,
+            )
     }
 }
