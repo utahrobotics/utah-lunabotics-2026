@@ -21,7 +21,7 @@ const LOCALIZATION_DELTA: f64 = 1.0 / 60.0;
 pub struct Localizer {
     root_node: StaticNode,
     last_rerun_log: u64,
-    kiss_icp_correction: Option<Transform3<f64>>,
+    kiss_icp_correction: Option<Isometry3<f64>>,
 }
 
 impl Freezable for Localizer {}
@@ -87,8 +87,7 @@ impl CuSinkTask for Localizer {
 
             match (fused_isometry, &self.kiss_icp_correction) {
                 (_, Some(correction)) => {
-                    let correction_iso = Isometry3::from_matrix_unchecked(correction.into_inner());
-                    let corrected_icp = correction_iso * icp_isometry;
+                    let corrected_icp = correction * icp_isometry;
                     Some(corrected_icp)
                 }
                 (Some(fused), None) => Some(fused),
@@ -287,8 +286,7 @@ impl Localizer {
     /// Used to find the correction between where kiss_icp thinks the robot
     /// is relative to where the algorithm started mapping, to where the robot
     /// actually is in world coords
-    fn transformation_between(relative: Isometry3<f64>, actual: Isometry3<f64>) -> Transform3<f64> {
-        let correction_isometry = actual * relative.inverse();
-        Transform3::from_matrix_unchecked(correction_isometry.to_homogeneous())
+    fn transformation_between(relative: Isometry3<f64>, actual: Isometry3<f64>) -> Isometry3<f64> {
+        actual * relative.inverse()
     }
 }
