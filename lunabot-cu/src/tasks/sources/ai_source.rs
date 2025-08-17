@@ -40,11 +40,14 @@ impl CuSrcTask for AiSource {
                     .map_err(|e| CuError::new_with_cause("AiSource: invalid service name", e))?,
             )
             .publish_subscribe::<FromAIBytes>()
+            .enable_safe_overflow(false)
+            .subscriber_max_buffer_size(20)
             .open_or_create()
             .map_err(|e| CuError::new_with_cause("AiSource: service", e))?;
 
         let subscriber = service
             .subscriber_builder()
+            .buffer_size(19)
             .create()
             .map_err(|e| CuError::new_with_cause("AiSource: subscriber", e))?;
 
@@ -54,42 +57,36 @@ impl CuSrcTask for AiSource {
             steering_msg_queue: VecDeque::new(),
         })
     }
-
-    fn process(&mut self, _clock: &RobotClock, output: &mut Self::Output<'_>) -> CuResult<()> {
+    fn process(&mut self, clock: &RobotClock, output: &mut Self::Output<'_>) -> CuResult<()> {
         // Drain the subscriber queue so we always act on the most recent message
-        loop {
-            match self
-                .subscriber
-                .receive()
-                .map_err(|e| CuError::new_with_cause("AiSource: receive", e))?
-            {
-                Some(sample) => {
-                    let payload: &FromAIBytes = &*sample;
-                    let len = payload.len.min(FROM_AI_MAX_BYTES as u32) as usize;
-                    let bytes = &payload.data[..len];
-
-                    let config = standard();
-                    if let Ok((msg, _)) = decode_from_slice::<FromAI, _>(bytes, config) {
-                        if let FromAI::SetStage(stage) = msg {}
-                        // Track latest actuator & general message separately so we can prioritise actuator commands.
-                        match msg {
-                            FromAI::SetActuators(actuator_cmd) => {
-                                self.actuator_msg_queue.push_back(actuator_cmd);
-                            }
-                            FromAI::SetSteering(steering_cmd) => {
-                                self.steering_msg_queue.push_back(steering_cmd);
-                            }
-                            FromAI::SetStage(stage) => {
-                                LUNABOT_STAGE.store(stage);
-                            }
-                            _ => {}
-                        }
-                    }
-                    // continue loop to see if there's an even newer message queued
+        while let Some(sample) = self
+            .subscriber
+            .receive()
+            .map_err(|e| CuError::new_with_cause("AiSource: receive", e))?
+        {
+            let payload: &FromAIBytes = &*sample;
+            let len = payload.len.min(FROM_AI_MAX_BYTES as u32) as usize;
+            let bytes = &payload.data[..len];
+            let config = standard();
+            if let Ok((msg, _)) = decode_from_slice::<FromAI, _>(bytes, config) {
+                if let FromAI::SetStage(stage) = msg {
+                    LUNABOT_STAGE.store(stage);
                 }
-                None => break,
+                match msg {
+                    FromAI::SetActuators(actuator_cmd) => {
+                        self.actuator_msg_queue.push_back(actuator_cmd);
+                    }
+                    FromAI::SetSteering(steering_cmd) => {
+                        self.steering_msg_queue.push_back(steering_cmd);
+                    }
+                    FromAI::SetStage(stage) => {
+                        LUNABOT_STAGE.store(stage);
+                    }
+                    _ => {}
+                }
             }
         }
+
         // steering, actuators
         let mut payload = (None, None);
         if let Some(actuator_cmd) = self.actuator_msg_queue.pop_front() {
@@ -98,13 +95,11 @@ impl CuSrcTask for AiSource {
         if let Some(steering_cmd) = self.steering_msg_queue.pop_front() {
             payload.0 = Some(steering_cmd);
         }
-
         if payload.0.is_some() || payload.1.is_some() {
             output.set_payload(payload);
         } else {
             output.clear_payload();
         }
-
         Ok(())
     }
 }

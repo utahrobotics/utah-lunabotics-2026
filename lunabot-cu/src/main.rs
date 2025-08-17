@@ -31,7 +31,6 @@ struct LunabotApplication {}
 
 fn main() {
     launch_subprocs();
-
     let logger_path = "logs/lunabot.copper";
     if let Some(parent) = Path::new(logger_path).parent() {
         if !parent.exists() {
@@ -50,6 +49,7 @@ fn main() {
         .expect("Failed to initialize rerun viz.");
 
     let (pico_tx, pico_rx) = enumerate_v3picos();
+
     PICO_RX.set(pico_rx).expect("Failed to set PICO_RX");
     PICO_TX.set(pico_tx).expect("Failed to set PICO_TX");
 
@@ -102,7 +102,7 @@ fn launch_subprocs() {
 
     launcher.launch_all().expect("failed to launch commands");
     let pids = launcher.pids.clone();
-    std::panic::set_hook(Box::new(move |info| {    
+    std::panic::set_hook(Box::new(move |info| {
         use std::process::Command;
 
         for pid in &pids {

@@ -77,7 +77,7 @@ impl CuSrcTask for Lunabase {
                 }
             }
         }
-        if !self.connected.is_connected() {
+        if !self.connected.is_connected() && LUNABOT_STAGE.load() != LunabotStage::SoftStop {
             self.message_buffer.push_back(FromLunabase::SoftStop);
         }
 
@@ -90,9 +90,6 @@ impl CuSrcTask for Lunabase {
                 FromLunabase::ContinueMission => LUNABOT_STAGE.store(LunabotStage::TeleOp),
                 FromLunabase::Navigate(_) | FromLunabase::DigDump(_) => {
                     LUNABOT_STAGE.store(LunabotStage::Autonomy)
-                }
-                FromLunabase::LiftActuators(cmd) => {
-                    info!("Lunabase: lift actuators command {}", cmd.to_string());
                 }
                 _ => {}
             }

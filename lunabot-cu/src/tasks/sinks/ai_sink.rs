@@ -35,11 +35,14 @@ impl CuSinkTask for AiSink {
                     .map_err(|e| CuError::new_with_cause("AiSink: invalid service name", e))?,
             )
             .publish_subscribe::<FromHostBytes>()
+            .subscriber_max_buffer_size(20)
+            .enable_safe_overflow(false)
             .open_or_create()
             .map_err(|e| CuError::new_with_cause("AiSink: service", e))?;
 
         let publisher = service
             .publisher_builder()
+            .unable_to_deliver_strategy(UnableToDeliverStrategy::Block)
             .create()
             .map_err(|e| CuError::new_with_cause("AiSink: publisher", e))?;
 

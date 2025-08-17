@@ -1,17 +1,13 @@
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
-use crossbeam::atomic::AtomicCell;
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender};
 use cu29::prelude::*;
 use embedded_common::*;
-use futures_util::StreamExt;
-use simple_motion::{Node, NodeData, StaticImmutableNode};
 use tasker::{
     BlockOn, get_tokio_handle,
     tokio::{
         self,
         io::{AsyncWriteExt, BufStream},
-        time::timeout,
     },
 };
 use tokio_serial::SerialPortBuilderExt;
@@ -22,7 +18,7 @@ use crate::utils::{CobsCodec, udev_poll};
 
 /// find pico connected to the v3 pcb.
 pub fn enumerate_v3picos() -> (Sender<ActuatorCommand>, Receiver<FromPicoV3>) {
-    let (path_tx, path_rx) = std::sync::mpsc::sync_channel::<String>(1);
+    let (path_tx, path_rx) = crossbeam_channel::bounded::<String>(1);
     let (actuator_cmd_tx, actuator_cmd_rx) = crossbeam_channel::bounded(50);
 
     // channel for connecting messages from the pico to other threads/copper tasks
@@ -126,19 +122,14 @@ pub fn enumerate_v3picos() -> (Sender<ActuatorCommand>, Receiver<FromPicoV3>) {
 }
 
 struct V3PicoTask {
-    path: std::sync::mpsc::Receiver<String>,
+    path: crossbeam_channel::Receiver<String>,
     actuator_command_rx: crossbeam_channel::Receiver<ActuatorCommand>,
     from_pico_tx: crossbeam_channel::Sender<FromPicoV3>,
 }
 
 impl V3PicoTask {
     async fn v3pico_task(&mut self) {
-        let path_str = match self.path.recv() {
-            Ok(x) => x,
-            Err(_) => loop {
-                std::thread::park();
-            },
-        };
+        let path_str = self.path.recv().expect("failed to get path");
         let mut port = match tokio_serial::new(&path_str, 150000)
             // .timeout(std::time::Duration::from_millis(100))
             .flow_control(tokio_serial::FlowControl::Hardware)
@@ -154,7 +145,7 @@ impl V3PicoTask {
                 return;
             }
         };
-        info!("Opened V3Pico controller port {}", &path_str);
+        println!("Opened V3Pico controller port {}", &path_str);
         if let Err(e) = port.set_exclusive(true) {
             warning!(
                 "Failed to set V3Pico controller port {} exclusive: {}",
@@ -171,46 +162,47 @@ impl V3PicoTask {
         get_tokio_handle().spawn(async move {
             let mut no_reading_count = 0;
             loop {
-                tokio::time::sleep(std::time::Duration::from_millis(IMU_READING_DELAY_MS - 1))
-                    .await;
-                let Ok(reading) = timeout(Duration::from_millis(200), reader.next()).await else {
-                    error!("Pico has become unresponsive.");
-                    let _ = is_broken_tx.send(true);
-                    break;
-                };
-                if let Some(Err(e)) = reading {
-                    let _ = is_broken_tx.send(true);
-                    error!("failed to read from pico: {}", e.to_string());
-                    break;
-                }
-                if let None = reading {
-                    no_reading_count += 1;
-                    if no_reading_count <= 5 {
-                        let _ = is_broken_tx.send(true);
-                        error!("Pico has become unresponsive. (no reading count)");
-                        break;
-                    }
-                    continue;
-                }
-                let reading = reading.unwrap().unwrap();
-                let Ok(reading) = reading.try_into() else {
-                    warning!("not 105 bytes");
-                    continue;
-                };
-                let Ok(reading) = FromPicoV3::deserialize(reading) else {
-                    error!("Failed to deserialize message from picov3 serial port");
-                    let _ = is_broken_tx.send(true);
-                    match powercycle_ioctl() {
-                        Ok(_) => {}
-                        Err(e) => {
-                            error!("ioctl failed: {}", e.to_string());
-                        }
-                    }
-                    break;
-                };
-                if let Err(e) = from_pico_tx.send(reading) {
-                    error!("Failed to send reading to from_pico_tx: {}", e.to_string());
-                }
+
+                //     tokio::time::sleep(std::time::Duration::from_millis(IMU_READING_DELAY_MS - 1))
+                //         .await;
+                //     let Ok(reading) = timeout(Duration::from_millis(200), reader.next()).await else {
+                //         error!("Pico has become unresponsive.");
+                //         let _ = is_broken_tx.send(true);
+                //         break;
+                //     };
+                //     if let Some(Err(e)) = reading {
+                //         let _ = is_broken_tx.send(true);
+                //         error!("failed to read from pico: {}", e.to_string());
+                //         break;
+                //     }
+                //     if let None = reading {
+                //         no_reading_count += 1;
+                //         if no_reading_count <= 5 {
+                //             let _ = is_broken_tx.send(true);
+                //             error!("Pico has become unresponsive. (no reading count)");
+                //             break;
+                //         }
+                //         continue;
+                //     }
+                //     let reading = reading.unwrap().unwrap();
+                //     let Ok(reading) = reading.try_into() else {
+                //         warning!("not 105 bytes");
+                //         continue;
+                //     };
+                //     let Ok(reading) = FromPicoV3::deserialize(reading) else {
+                //         error!("Failed to deserialize message from picov3 serial port");
+                //         let _ = is_broken_tx.send(true);
+                //         match powercycle_ioctl() {
+                //             Ok(_) => {}
+                //             Err(e) => {
+                //                 error!("ioctl failed: {}", e.to_string());
+                //             }
+                //         }
+                //         break;
+                //     };
+                //     if let Err(e) = from_pico_tx.send(reading) {
+                //         error!("Failed to send reading to from_pico_tx: {}", e.to_string());
+                //     }
             }
         });
 

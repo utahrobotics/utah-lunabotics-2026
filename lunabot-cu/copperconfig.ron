@@ -74,11 +74,12 @@
         ),
         (
             id:"localizer", type:"crate::tasks::sinks::Localizer",
-            config:{}),
+            config:{}
+        ),
         (
             id:"lunabase", type:"crate::tasks::sources::Lunabase", config:{
                 "max_pong_delay_ms": 500,
-            }
+            },
         ),
         (
             id:"ai_source", type:"crate::tasks::sources::AiSource", config:{}
@@ -114,7 +115,7 @@
             type: "crate::tasks::AprilDetectionHandler",
             logging: (
                 enabled: false
-            )
+            ),
         )
     ],
     cnx:[

@@ -1,13 +1,16 @@
 use std::thread::yield_now;
 
 use bincode::{config::standard, decode_from_slice, encode_to_vec};
-use common::{FromAI, FromHost, AI_HEARTBEAT_RATE};
+use common::{AI_HEARTBEAT_RATE, FromAI, FromHost};
 use iceoryx2::node::NodeBuilder;
 use iceoryx2::port::publisher::Publisher;
 use iceoryx2::prelude::*;
-use tokio::{sync::mpsc::{self, Receiver}, time::{Instant, Duration}};
+use tokio::{
+    sync::mpsc::{self, Receiver},
+    time::{Duration, Instant},
+};
 
-use iceoryx_types::{FromAIBytes, FromHostBytes, FROM_AI_MAX_BYTES, FROM_HOST_MAX_BYTES};
+use iceoryx_types::{FROM_AI_MAX_BYTES, FROM_HOST_MAX_BYTES, FromAIBytes, FromHostBytes};
 
 const FROM_HOST_SERVICE: &str = "lunabot/host_to_ai";
 const FROM_AI_SERVICE: &str = "lunabot/ai_to_host";
@@ -20,29 +23,29 @@ pub struct HostHandle {
 
 impl HostHandle {
     pub fn new() -> Self {
-        // Channel used to forward decoded messages into async context
         let (from_host_tx, from_host) = mpsc::channel(32);
 
-        // Build iceoryx2 node and ports in a dedicated thread (blocking API)
         std::thread::spawn(move || {
-            // Create node
             let node = NodeBuilder::new()
                 .create::<ipc::Service>()
                 .expect("HostHandle: failed to create iceoryx2 node");
 
-            // --- Subscriber for FromHostBytes ---
             let from_service = node
-                .service_builder(&ServiceName::new(FROM_HOST_SERVICE).expect("invalid service name"))
+                .service_builder(
+                    &ServiceName::new(FROM_HOST_SERVICE).expect("invalid service name"),
+                )
                 .publish_subscribe::<FromHostBytes>()
+                .subscriber_max_buffer_size(20)
+                .enable_safe_overflow(false)
                 .open_or_create()
                 .expect("HostHandle: failed to open host→AI service");
 
             let subscriber = from_service
                 .subscriber_builder()
+                .buffer_size(19)
                 .create()
                 .expect("HostHandle: failed to create subscriber");
 
-            // Blocking loop: receive samples, decode, forward through channel
             let config = standard();
             loop {
                 match subscriber.receive() {
@@ -63,12 +66,9 @@ impl HostHandle {
                             }
                         }
                     }
-                    Ok(None) => {
-                        yield_now();
-                    }
+                    Ok(None) => {}
                     Err(e) => {
                         eprintln!("HostHandle: error receiving FromHostBytes: {}", e);
-                        yield_now();
                     }
                 }
             }
@@ -81,11 +81,14 @@ impl HostHandle {
         let to_service = node
             .service_builder(&ServiceName::new(FROM_AI_SERVICE).expect("invalid service name"))
             .publish_subscribe::<FromAIBytes>()
+            .subscriber_max_buffer_size(20)
+            .enable_safe_overflow(false)
             .open_or_create()
             .expect("HostHandle: failed to open AI→host service");
 
         let publisher = to_service
             .publisher_builder()
+            .unable_to_deliver_strategy(UnableToDeliverStrategy::Block)
             .create()
             .expect("HostHandle: failed to create publisher");
 
@@ -117,20 +120,26 @@ impl HostHandle {
         self.from_host.try_recv().ok()
     }
 
+    // doesn't return an error because we dont care about the error anywhere else in the code
     pub fn write_to_host(&mut self, msg: FromAI) {
         let config = standard();
         if let Ok(bytes) = encode_to_vec(&msg, config) {
             if bytes.len() > FROM_AI_MAX_BYTES {
-                eprintln!("HostHandle: message too large to send: {} bytes", bytes.len());
+                eprintln!(
+                    "HostHandle: message too large to send: {} bytes",
+                    bytes.len()
+                );
                 return;
             }
 
             let mut payload = FromAIBytes::default();
             payload.len = bytes.len() as u32;
             payload.data[..bytes.len()].copy_from_slice(&bytes);
-            if let Ok(sample) = self.publisher.loan_uninit() {
-                let initialized = sample.write_payload(payload);
-                let _ = initialized.send();
+            match self.publisher.send_copy(payload) {
+                Ok(_) => {}
+                Err(e) => {
+                    eprintln!("failed to send copy: {e}");
+                }
             }
         }
     }

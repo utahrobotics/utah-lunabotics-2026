@@ -1,5 +1,3 @@
-use std::error::Error;
-
 use cu29::{
     CuResult,
     clock::RobotClock,
@@ -32,13 +30,8 @@ impl CuSinkTask for ActuatorController {
             && let Some(pico_tx) = PICO_TX.get()
             && let Ok(actuator_cmd) = ActuatorCommand::deserialize(*cmd_bytes)
         {
-            if pico_tx.is_full() {
-                return Err(
-                    CuError::new_with_cause("pico crossbeam thread channel is full", std::io::Error::other("channel full"))
-                );
-            }
-            if let Err(err) = pico_tx.send(actuator_cmd) {
-                error!("Failed to send actuator command: {}", err.to_string());
+            if let Err(err) = pico_tx.try_send(actuator_cmd) {
+                eprintln!("Failed to send actuator command: {}", err.to_string());
             }
         }
         Ok(())

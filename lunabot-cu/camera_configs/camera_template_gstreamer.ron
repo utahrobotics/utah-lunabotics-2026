@@ -25,7 +25,8 @@
             },
             logging: (
                 enabled: false
-            )
+            ),
+            background: true
         ),
         (
             id: "detector_cam_{{id}}",
