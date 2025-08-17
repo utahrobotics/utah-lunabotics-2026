@@ -7,7 +7,7 @@ use cu29::{
     input_msg,
 };
 use iceoryx_types::ImuMsg;
-use nalgebra::{Isometry3, Transform3, UnitQuaternion, UnitVector3, Vector3};
+use nalgebra::{Isometry3, UnitQuaternion, UnitVector3, Vector3};
 use simple_motion::StaticNode;
 
 use crate::{
@@ -30,8 +30,8 @@ impl CuSinkTask for Localizer {
     // IMU from l2, apriltag detections
     type Input<'m> = input_msg!('m,
         ImuMsg, // l2 imu
-        Transform3D<f64>, // realsense kiss icp
-        Transform3D<f64>, // l2 icp
+        EncodableIsometry, // realsense kiss icp
+        EncodableIsometry, // l2 icp
         Box<HashMap<String, EncodableIsometry>>);
 
     fn new(_config: Option<&cu29::prelude::ComponentConfig>) -> cu29::CuResult<Self>
@@ -77,7 +77,12 @@ impl CuSinkTask for Localizer {
         let fused_isometry = self.fuse_sensor_data(&imu_components, &apriltag_components);
 
         let final_isometry = if let Some(unitree_icp_out) = input.2.payload() {
-            let icp_isometry: Isometry3<f64> = unitree_icp_out.into();
+            let Some(icp_isometry) = unitree_icp_out.to_na() else {
+                return Err(CuError::new_with_cause(
+                    "Failed to convert unitree icp isometry",
+                    std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid isometry data"),
+                ));
+            };
             if let Some(fused_isometry) = fused_isometry
                 && apriltag_components.is_some()
             {

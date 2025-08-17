@@ -121,8 +121,8 @@
         (src:"l2_imu", dst:"localizer", msg:"iceoryx_types::ImuMsg"),
         (src:"l2_pointcloud", dst: "l2_kiss_icp", msg:"iceoryx_types::IceoryxPointCloud"),
         (src:"realsense_pointcloud", dst: "realsense_kiss_icp", msg:"iceoryx_types::IceoryxPointCloud"),
-        (src:"l2_kiss_icp", dst:"localizer", msg:"cu_spatial_payloads::Transform3D<f64>"),
-        (src:"realsense_kiss_icp", dst:"localizer", msg:"cu_spatial_payloads::Transform3D<f64>"),
+        (src:"l2_kiss_icp", dst:"localizer", msg:"cu_spatial_payloads::EncodableIsometry"),
+        (src:"realsense_kiss_icp", dst:"localizer", msg:"cu_spatial_payloads::EncodableIsometry"),
         (src:"lunabase", dst:"ai_sink", msg:"Option<common::FromLunabase>"),
         // copper doesn't support multiple outputs on a single task so for now we just put them in a tuple and ignore one side
         (src:"ai_source", dst:"motor_ctrl", msg:"(Option<common::Steering>, Option<[u8; 5]>)"),

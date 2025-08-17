@@ -1,4 +1,4 @@
-use cu_spatial_payloads::Transform3D;
+use cu_spatial_payloads::{EncodableIsometry, Transform3D};
 use cu29::{
     CuResult,
     config::ComponentConfig,
@@ -48,7 +48,7 @@ impl Freezable for KissIcp {}
 
 impl CuTask for KissIcp {
     type Input<'m> = input_msg!(IceoryxPointCloud);
-    type Output<'m> = output_msg!(Transform3D<f64>);
+    type Output<'m> = output_msg!(EncodableIsometry);
 
     fn new(config: Option<&ComponentConfig>) -> CuResult<Self>
     where
@@ -187,9 +187,7 @@ impl CuTask for KissIcp {
             if !self.is_initialized {
                 self.voxel_map.add_points(&downsampled_frame);
                 self.is_initialized = true;
-
-                let transform = Transform3D::from(Isometry3::identity());
-                output.set_payload(transform);
+                output.set_payload(EncodableIsometry::from_na(&Isometry3::identity()));
             } else {
                 let correspondence_threshold = self.adaptive_threshold.compute_threshold();
 
@@ -209,8 +207,7 @@ impl CuTask for KissIcp {
                 self.voxel_map
                     .update_with_pose(&downsampled_frame, estimated_pose);
 
-                let transform = self.isometry_to_transform3d(&estimated_pose);
-                output.set_payload(transform);
+                output.set_payload(EncodableIsometry::from_na(&estimated_pose));
             }
 
             self.log_accumulated_map()?;
@@ -236,10 +233,6 @@ impl KissIcp {
             matrix.row_mut(i).copy_from(&point.transpose());
         }
         matrix
-    }
-
-    fn isometry_to_transform3d(&self, pose: &Isometry3<f64>) -> Transform3D<f64> {
-        Transform3D::from(*pose)
     }
 
     fn log_accumulated_map(&mut self) -> CuResult<()> {
