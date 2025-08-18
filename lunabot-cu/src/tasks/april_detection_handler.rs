@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::f64::consts::PI;
 
 use chrono::SubsecRound;
 use cu_apriltag::AprilTagDetections;
@@ -8,12 +9,13 @@ use cu29::{
 };
 
 use cu_spatial_payloads::{EncodableIsometry, Transform3D, Transform3DCast};
+use gstreamer::message::Tag;
 use ron::de::from_str as ron_from_str;
 use serde::Deserialize;
 use std::fs;
 use std::path::Path;
 
-use crate::rerun_viz;
+use crate::rerun_viz::{self, RECORDER};
 
 /// Data definition that mirrors the contents of a `.ron` apriltag isometry file.
 /// The field names are intentionally kept simple so that we can be flexible with
@@ -25,6 +27,32 @@ struct TagDef {
     forward_axis: (f64, f64, f64),
     #[serde(default)]
     roll: f64,
+}
+
+impl TagDef {
+    pub fn get_quat(self) -> UnitQuaternion<f64> {
+        let forward_axis = Vector3::new(
+            self.forward_axis.0,
+            self.forward_axis.1,
+            self.forward_axis.2,
+        );
+        // First rotation to face along the forward axis
+        let rotation1 =
+            UnitQuaternion::rotation_between(&Vector3::new(0.0, 0.0, -1.0), &forward_axis)
+                .unwrap_or(UnitQuaternion::from_scaled_axis(Vector3::new(0.0, PI, 0.0)));
+
+        let cross_axis = forward_axis.cross(&Vector3::new(0.0, 1.0, 0.0));
+        let true_up = cross_axis.cross(&forward_axis);
+
+        // Second rotation to rotate the up axis to face directly up
+        let actual_up = rotation1 * Vector3::new(0.0, 1.0, 0.0);
+        let rotation2 = UnitQuaternion::rotation_between(&actual_up, &true_up).unwrap();
+
+        // Third rotation to roll the tag
+        let rotation3 = UnitQuaternion::from_scaled_axis(forward_axis.normalize() * self.roll);
+
+        rotation3 * rotation2 * rotation1
+    }
 }
 
 /// Reads every `*.ron` file in `apriltag_isometries/` (located next to the
@@ -53,32 +81,23 @@ fn load_known_apriltag_isometries() -> CuResult<HashMap<usize, Isometry3<f64>>> 
             let contents = fs::read_to_string(&path).map_err(|e| e.to_string())?;
             let def: TagDef = ron_from_str(&contents).map_err(|e| e.to_string())?;
 
-            let (x, y, z) = def.origin;
-            let (fx, fy, fz) = def.forward_axis;
-            let forward_axis = Vector3::new(fx, fy, fz);
+            // Debug output for tag definitions
+            println!(
+                "Loading tag {}: origin=({:.3}, {:.3}, {:.3}), forward=({:.3}, {:.3}, {:.3})",
+                def.tag_id,
+                def.origin.0,
+                def.origin.1,
+                def.origin.2,
+                def.forward_axis.0,
+                def.forward_axis.1,
+                def.forward_axis.2
+            );
 
-            let rotation1 =
-                UnitQuaternion::rotation_between(&Vector3::new(0.0, 0.0, -1.0), &forward_axis)
-                    .unwrap_or(UnitQuaternion::from_scaled_axis(Vector3::new(
-                        0.0,
-                        std::f64::consts::PI,
-                        0.0,
-                    )));
+            let translation = Vector3::new(def.origin.0, def.origin.1, def.origin.2);
+            let id = def.tag_id;
+            let rotation = def.get_quat();
 
-            let cross_axis = forward_axis.cross(&Vector3::new(0.0, 1.0, 0.0));
-            let true_up = cross_axis.cross(&forward_axis);
-
-            let actual_up = rotation1 * Vector3::new(0.0, 1.0, 0.0);
-            let rotation2 = UnitQuaternion::rotation_between(&actual_up, &true_up)
-                .unwrap_or(UnitQuaternion::identity());
-
-            let rotation3 = UnitQuaternion::from_scaled_axis(forward_axis.normalize() * def.roll);
-
-            let orientation = rotation3 * rotation2 * rotation1;
-
-            let isometry = Isometry3::from_parts(Translation3::new(x, y, z), orientation);
-
-            known_tags.insert(def.tag_id, isometry);
+            known_tags.insert(id, Isometry3::from_parts(translation.into(), rotation));
         }
 
         // Prefer the first directory that exists & contains files.
@@ -206,7 +225,7 @@ impl AprilDetectionHandler {
                     "apriltags/{}/{}/location",
                     observation.camera_id, observation.tag_id
                 ),
-                &Boxes3D::from_centers_and_half_sizes([(location)], [(0.1, 0.1, 0.01)])
+                &Boxes3D::from_centers_and_half_sizes([(location)], [(0.01, 0.1, 0.1)])
                     .with_quaternions([[
                         quaternion_vec[0],
                         quaternion_vec[1],
@@ -223,7 +242,8 @@ impl AprilDetectionHandler {
 
             // Compute the camera pose from the tag's known global pose and the observed local pose.
             let isometry_of_observer = observation.get_isometry_of_observer();
-            // filter out tags that are too far away to be reliale
+
+            // filter out tags that are too far away to be reliable
             if isometry_of_observer
                 .translation
                 .vector
@@ -261,22 +281,27 @@ impl AprilDetectionHandler {
             if !self.known_tags.contains_key(&id) {
                 continue;
             }
-            // Convert pose and flip axes to align with robot coordinate conventions.
+
             let Some(pose) = pose.to_na() else {
                 warning!("failed to convert pose to nalgebra type");
                 continue;
             };
 
             let mut tag_local_isometry: Isometry3<f64> = pose;
-
-            // Apply an additional 180° rotation around the z-axis so the tag faces forward.
+            let tag_global_isometry = *self.known_tags.get(&id).unwrap();
+            tag_local_isometry.translation.y *= -1.0;
+            tag_local_isometry.translation.z *= -1.0;
+            let mut scaled_axis = tag_local_isometry.rotation.scaled_axis();
+            scaled_axis.y *= -1.0;
+            scaled_axis.z *= -1.0;
+            tag_local_isometry.rotation = UnitQuaternion::from_scaled_axis(scaled_axis);
             tag_local_isometry.rotation = UnitQuaternion::from_scaled_axis(
-                tag_local_isometry.rotation * Vector3::new(0.0, 0.0, std::f64::consts::PI),
+                tag_local_isometry.rotation * Vector3::new(0.0, PI, 0.0),
             ) * tag_local_isometry.rotation;
 
             apriltags.push(TagObservation {
                 tag_local_isometry,
-                tag_global_isometry: *self.known_tags.get(&id).unwrap(),
+                tag_global_isometry,
                 decision_margin: 0.0,
                 tag_id: id,
                 camera_id: camera_id.to_string(),
@@ -374,8 +399,12 @@ fn average_quaternions_component_based(quaternions: &[UnitQuaternion<f64>]) -> U
     UnitQuaternion::new_normalize(nalgebra::Quaternion::from(mean_coords))
 }
 
-use nalgebra::{Isometry3, Matrix4, Translation3, UnitQuaternion, Vector3};
-use rerun::Boxes3D;
+use nalgebra::{
+    Isometry3, Matrix3, Matrix4, Quaternion, Rotation, Rotation3, Translation3, UnitQuaternion,
+    Vector3,
+};
+use rerun::{Archetype, Arrows3D, Boxes3D, Vector3D};
+
 /// An observation of the global orientation and position
 /// of the camera that observed an apriltag.
 #[derive(Clone)]
@@ -410,11 +439,32 @@ impl std::fmt::Debug for TagObservation {
 impl TagObservation {
     /// Get the isometry of the observer.
     pub fn get_isometry_of_observer(&self) -> Isometry3<f64> {
+        // let mut observer_pose = self.tag_local_isometry;
+        // observer_pose.translation.vector = self.tag_global_isometry.translation.vector
+        //     + self.tag_global_isometry.rotation
+        //         * observer_pose.rotation.inverse()
+        //         * observer_pose.translation.vector;
+        // observer_pose.rotation = self.tag_global_isometry.rotation
+        //     * UnitQuaternion::from_axis_angle(&(observer_pose.rotation * Vector3::y_axis()), PI)
+        //     * observer_pose.rotation;
+        // observer_pose
         let inv_rotation = self.tag_local_isometry.rotation.inverse();
-        self.tag_global_isometry
+        let observer_iso = self.tag_global_isometry
             * Isometry3::from_parts(
                 (inv_rotation * -self.tag_local_isometry.translation.vector).into(),
                 inv_rotation,
-            )
+            );
+
+        // lmao
+        let transform = Matrix3::new(0.0, 0.0, -1.0, -1.0, 0.0, 0.0, 0.0, 1.0, 0.0);
+
+        let new_translation = transform * observer_iso.translation.vector;
+
+        let new_rotation =
+            transform * observer_iso.rotation.to_rotation_matrix().matrix() * transform.transpose();
+        Isometry3::from_parts(
+            Vector3::new(new_translation.x, new_translation.y, new_translation.z).into(),
+            UnitQuaternion::from_matrix(&new_rotation),
+        )
     }
 }
