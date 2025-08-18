@@ -2,10 +2,11 @@ use bincode::{Decode, Encode};
 use cu29::cutask::CuMsg;
 use cu29::prelude::*;
 use cu29::{
+    CuResult,
     clock::RobotClock,
     config::ComponentConfig,
     cutask::{CuSrcTask, Freezable},
-    output_msg, CuResult,
+    output_msg,
 };
 use serde::{Deserialize, Serialize};
 #[cfg(target_os = "linux")]
@@ -137,7 +138,6 @@ impl CuSrcTask for UdevMonitor {
         if let Some(monitor_socket) = &self.monitor_socket {
             // Create an iterator from the socket and fetch the next event if any.
             if let Some(event) = monitor_socket.iter().next() {
-                println!("got udev event");
                 match event.event_type() {
                     EventType::Add => {
                         let Some(devnode) = event.devnode() else {
