@@ -42,6 +42,9 @@ Defines the robot's physical structure and sensor placements:
 
 ## Building and Running
 
+1. set the rust version to 1.90.0 ```rustup install beta```
+2. ```rustup default beta```
+
 ```bash
 make help # see commands for building and running
 ```
