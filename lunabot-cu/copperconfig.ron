@@ -1,10 +1,14 @@
 (
     tasks:[
+        // waits for v4l udev add events, and reports them to the camera tasks
+        // camera tasks can open the device if the port from the reported event
+        // matches the port from the camera task config
         (
             id:"udev_monitor",
             type:"crate::tasks::UdevMonitor",
             config:{}
         ),
+        // subscribes to  point clouds from iceoryx2, published from c++ by the unilidar_iceoryx_publisher
         (
             id:"l2_pointcloud",
             type:"crate::tasks::sources::PointCloudIceoryxReceiver",
@@ -13,11 +17,13 @@
                 enabled: false
             ),
         ),
+        // subscribes to imu information from the unilidar_iceoryx_publisher
         (
             id:"l2_imu",
             type:"crate::tasks::sources::ImuIceoryxReceiver",
             config:{}
         ),
+        // subscribes to pointclouds from the external_tasks/realsense process
         (
             id:"realsense_pointcloud",
             type:"crate::tasks::sources::RealSensePointCloudReceiver",
@@ -29,28 +35,29 @@
                 enabled: false
             ),
         ),
+        // registers point clouds into a global map, and estimates the isometry of the lidar node.
+        // the isometry is relative to the robots starting position, not actual global coordinates
         (
             id:"l2_kiss_icp",
             type:"crate::tasks::KissIcp",
             config:{
-            "voxel_size": 0.1,
-            "max_range": 100.0,
-            "min_range": 0.2,
-            "max_points_per_voxel": 10000,
-            "initial_threshold": 2.0,
-            "min_motion_th": 0.1,
-            "max_iterations": 10000,
-            "convergence_tolerance": 0.000001,
-            "min_threshold": 0.05,
-            "max_threshold": 5.0,
-            "enable_deskewing": true,
-            "map_log_interval_secs": 1.0,
+                "voxel_size": 0.1,
+                "max_range": 100.0,
+                "min_range": 0.2,
+                "max_points_per_voxel": 10000,
+                "initial_threshold": 2.0,
+                "min_motion_th": 0.1,
+                "max_threshold": 5.0,
+                "enable_deskewing": true,
+                "map_log_interval_secs": 1.0,
             },
             logging: (
                 enabled: false
             ),
             background: true
         ),
+        // KISS ICP isn't really build for point clouds from RGB-D, so
+        // eventually we will probably end up only using the realsense for obstacle detection
         (
             id:"realsense_kiss_icp",
             type:"crate::tasks::KissIcp", config:{
@@ -60,8 +67,6 @@
                 "max_points_per_voxel": 20,
                 "initial_threshold": 2.0,
                 "min_motion_th": 0.1,
-                "max_iterations": 10000,
-                "convergence_tolerance": 0.000001,
                 "min_threshold": 0.05,
                 "max_threshold": 5.0,
                 "enable_deskewing": false,
@@ -72,24 +77,31 @@
             ),
             background: true
         ),
+        // fuses information from IMUs, Apriltags, and ICP algos providing one global robot position.
+        // position is logged to rerun at 60 hz
         (
             id:"localizer", type:"crate::tasks::sinks::Localizer",
             config:{}
         ),
+        // receives messages from the lunabase over UDP
         (
             id:"lunabase", type:"crate::tasks::sources::Lunabase", config:{
                 "max_pong_delay_ms": 500,
             },
         ),
+        // subscribes to messages published by external-tasks/lunabot-ai2
         (
             id:"ai_source", type:"crate::tasks::sources::AiSource", config:{}
         ),
+        // messages sent to the ai_sink are sent over IPC to lunabot-ai2
         (
             id:"ai_sink", type:"crate::tasks::sinks::AiSink", config:{}
         ),
+        // receives messages from the ai_source and sends them over serial to the pico which then moves the actuators
         (
             id:"actuator_ctrl", type:"crate::tasks::sinks::ActuatorController", config:{}
         ),
+        // receives messages from the ai_source and tells the motors to move accordingly
         (
             id:"motor_ctrl", type:"crate::tasks::sinks::MotorController", config:{
                 "speed_multiplier": 5000,
@@ -110,6 +122,7 @@
                 ]
             }
         ),
+        // handles apriltag detections from all the cameras, combining them and then sending them over to the localizer
         (
             id: "detection_handler",
             type: "crate::tasks::AprilDetectionHandler",
@@ -135,6 +148,9 @@
         ),
     ],
     includes:[
+        // starts a gstreamer pipeline that waits for a message from udev_monitor and then starts the pipeline accordingly
+        // sends frames through a dynamic threshold and then to the apriltag detector, then to the detection handler.
+        // frames are streamed over udp to the host and port specified in the config
         (
             path:"camera_configs/camera_template_gstreamer.ron",
             params:{
