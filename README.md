@@ -56,35 +56,6 @@ make help # see commands for building and running
 make discover-cameras
 ```
 
-## Logging and Visualization
-
-- **Copper logs**: Stored in `logs/lunabot.copper` for system debugging (messages only active on debug builds, full copperlist logging enabled when enable_task_logging is true)
-- **Rerun visualization**: Real-time 3D visualization of robot state, point clouds, and camera feeds
-- **Video streams**: Live UDP streams from cameras for remote monitoring
-
-### Console Monitor (Task latency and health viewer)
-
-The system includes an optional **terminal-based monitoring interface** using the Cursive TUI library for real-time system debugging and task monitoring.
-
-#### What the Console Monitor Provides
-
-The console monitor displays a live text-based interface showing:
-- **Task Status**: Real-time status of all running tasks
-- **System Health**: Error and task failure detection
-- **Resource Usage**: Memory allocation and processing bottlenecks
-
-#### Enabling the Console Monitor
-
-To enable it, uncomment the monitor line in `copperconfig.ron`:
-
-```ron
-(
-    // ... existing config ...
-    monitor: (type: "cu_cursive_consolemon::CuCursiveConsoleMon"),
-    // ... rest of config ...
-)
-```
-
 
 ## Get Started
 _First either use docker or install dependencies listed in the dockerfile system wide_
