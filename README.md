@@ -42,8 +42,9 @@ Defines the robot's physical structure and sensor placements:
 
 ## Building and Running
 
-1. set the rust version to 1.90.0 ```rustup install beta```
-2. ```rustup default beta```
+1. set the rust version ```rustup install nightly-2025-03-18-x86_64-unknown-linux-gnu```
+2. ```rustup default nightly-2025-03-18-x86_64-unknown-linux-gnu```
+3. sometimes you have to increase the stack size for it to compile ```export RUST_MIN_STACK=107108864```
 
 ```bash
 make help # see commands for building and running
