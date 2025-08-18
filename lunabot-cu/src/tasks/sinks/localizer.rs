@@ -22,6 +22,7 @@ pub struct Localizer {
     root_node: StaticNode,
     last_rerun_log: u64,
     kiss_icp_correction: Option<Isometry3<f64>>,
+    last_icp_reading: Option<(Isometry3<f64>, u64)>,
 }
 
 impl Freezable for Localizer {}
@@ -43,6 +44,7 @@ impl CuSinkTask for Localizer {
                 root_node: root_node.clone(),
                 last_rerun_log: 0,
                 kiss_icp_correction: None,
+                last_icp_reading: None,
             });
         } else {
             return Err(CuError::new_with_cause(
@@ -75,6 +77,14 @@ impl CuSinkTask for Localizer {
         };
 
         let fused_isometry = self.fuse_sensor_data(&imu_components, &apriltag_components);
+        // if icp and apriltag readings are within 1 ms then calculate the icp correction
+        if let Some(fused_isometry) = fused_isometry
+            && apriltag_components.is_some()
+            && let Some(icp) = self.last_icp_reading
+            && (clock.now().as_nanos() - icp.1) < 1_000_000
+        {
+            self.kiss_icp_correction = Some(Self::transformation_between(icp.0, fused_isometry))
+        }
 
         let final_isometry = if let Some(unitree_icp_out) = input.2.payload() {
             let Some(icp_isometry) = unitree_icp_out.to_na() else {
@@ -83,12 +93,7 @@ impl CuSinkTask for Localizer {
                     std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid isometry data"),
                 ));
             };
-            if let Some(fused_isometry) = fused_isometry
-                && apriltag_components.is_some()
-            {
-                self.kiss_icp_correction =
-                    Some(Self::transformation_between(icp_isometry, fused_isometry))
-            }
+            self.last_icp_reading = Some((icp_isometry, clock.now().as_nanos()));
 
             match (fused_isometry, &self.kiss_icp_correction) {
                 (_, Some(correction)) => {
