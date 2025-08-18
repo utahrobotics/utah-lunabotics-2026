@@ -1,16 +1,9 @@
 # Lunabot
 
-A modular robotics framework for controlling a lunar excavation robot using the **Copper** real-time task framework. This system handles multi-camera vision processing, LIDAR point clouds, IMU data, and robot localization for autonomous lunar terrain navigation and excavation.
-
 *This repo is in the early stages of a rewrite migrating to the copper framework from last years code base: github.com/utahrobotics/lunadev-2025*
 
 ## Architecture Overview
-
-The system is built on the [Copper framework](https://github.com/copper-project/copper-rs), which provides:
-- **Real-time task execution** with deterministic scheduling
-- **Distributed processing** across multiple cores and nodes
-- **Configuration-driven architecture** using RON (Rust Object Notation)
-- **Inter-Process communication** using Iceoryx2 for integration with separate processes running in ROS2 or elsewhere
+<img width="4210" height="834" alt="graphviz" src="https://github.com/user-attachments/assets/7a088db9-2914-4817-95a1-f575d1092c70" />
 
 
 ## Dependencies
@@ -47,25 +40,11 @@ Defines the robot's physical structure and sensor placements:
 ```
 
 
-## System Operation
-
-### Camera Processing Pipeline
-
-1. **UdevMonitor** detects when cameras are plugged in
-2. **AutoGStreamer** matches device ports to configured cameras and starts capture
-3. **DynThreshold (or GstToImage)** applies adaptive thresholding for marker detection
-4. **AprilTags** detects fiducial markers and estimates camera poses
-5. **DetectionHandler** aggregates multi-camera observations
-6. **Localizer** updates robot pose using camera-based localization
-
-### LIDAR Processing Pipeline
-
-1. **unilidar_iceoryx_publisher** (C++) captures L2 LIDAR data and publishes via iceoryx2
-2. **PointCloudReceiver** consumes point clouds and transforms to robot coordinates
-3. **ImuReceiver** processes inertial data for orientation tracking
-5. **Localizer** incorporates IMU data for robot orientation updates
-
 ## Building and Running
+
+1. set the rust version ```rustup install nightly-2025-03-18-x86_64-unknown-linux-gnu```
+2. ```rustup default nightly-2025-03-18-x86_64-unknown-linux-gnu```
+3. sometimes you have to increase the stack size for it to compile ```export RUST_MIN_STACK=107108864```
 
 ```bash
 make help # see commands for building and running
@@ -79,35 +58,6 @@ make help # see commands for building and running
 make discover-cameras
 ```
 
-## Logging and Visualization
-
-- **Copper logs**: Stored in `logs/lunabot.copper` for system debugging (messages only active on debug builds, full copperlist logging enabled when enable_task_logging is true)
-- **Rerun visualization**: Real-time 3D visualization of robot state, point clouds, and camera feeds
-- **Video streams**: Live UDP streams from cameras for remote monitoring
-
-### Console Monitor (Task latency and health viewer)
-
-The system includes an optional **terminal-based monitoring interface** using the Cursive TUI library for real-time system debugging and task monitoring.
-
-#### What the Console Monitor Provides
-
-The console monitor displays a live text-based interface showing:
-- **Task Status**: Real-time status of all running tasks
-- **System Health**: Error and task failure detection
-- **Resource Usage**: Memory allocation and processing bottlenecks
-
-#### Enabling the Console Monitor
-
-To enable it, uncomment the monitor line in `copperconfig.ron`:
-
-```ron
-(
-    // ... existing config ...
-    monitor: (type: "cu_cursive_consolemon::CuCursiveConsoleMon"),
-    // ... rest of config ...
-)
-```
-
 
 ## Get Started
 _First either use docker or install dependencies listed in the dockerfile system wide_
@@ -118,3 +68,9 @@ _First either use docker or install dependencies listed in the dockerfile system
 If you have rerun installed, you should see a window pop up that begins to recieve data from the robot, and as the robot reads sensor data in it will update its isometry which you can watch live through rerun.
 
  TODO: lunabase instructions
+
+## TODO: everything logging related
+1. copper log macros only print in debug builds (I likely will change this)
+2. console monitor stuff
+3. rerun stuff
+
