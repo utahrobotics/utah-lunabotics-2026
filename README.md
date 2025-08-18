@@ -42,24 +42,6 @@ Defines the robot's physical structure and sensor placements:
 ```
 
 
-## System Operation
-
-### Camera Processing Pipeline
-
-1. **UdevMonitor** detects when cameras are plugged in
-2. **AutoGStreamer** matches device ports to configured cameras and starts capture
-3. **DynThreshold (or GstToImage)** applies adaptive thresholding for marker detection
-4. **AprilTags** detects fiducial markers and estimates camera poses
-5. **DetectionHandler** aggregates multi-camera observations
-6. **Localizer** updates robot pose using camera-based localization
-
-### LIDAR Processing Pipeline
-
-1. **unilidar_iceoryx_publisher** (C++) captures L2 LIDAR data and publishes via iceoryx2
-2. **PointCloudReceiver** consumes point clouds and transforms to robot coordinates
-3. **ImuReceiver** processes inertial data for orientation tracking
-5. **Localizer** incorporates IMU data for robot orientation updates
-
 ## Building and Running
 
 ```bash
@@ -113,3 +95,9 @@ _First either use docker or install dependencies listed in the dockerfile system
 If you have rerun installed, you should see a window pop up that begins to recieve data from the robot, and as the robot reads sensor data in it will update its isometry which you can watch live through rerun.
 
  TODO: lunabase instructions
+
+## TODO: everything logging related
+1. copper log macros only print in debug builds (I likely will change this)
+2. console monitor stuff
+3. rerun stuff
+
