@@ -5,12 +5,7 @@ A modular robotics framework for controlling a lunar excavation robot using the 
 *This repo is in the early stages of a rewrite migrating to the copper framework from last years code base: github.com/utahrobotics/lunadev-2025*
 
 ## Architecture Overview
-
-The system is built on the [Copper framework](https://github.com/copper-project/copper-rs), which provides:
-- **Real-time task execution** with deterministic scheduling
-- **Distributed processing** across multiple cores and nodes
-- **Configuration-driven architecture** using RON (Rust Object Notation)
-- **Inter-Process communication** using Iceoryx2 for integration with separate processes running in ROS2 or elsewhere
+<img width="4210" height="834" alt="graphviz" src="https://github.com/user-attachments/assets/7a088db9-2914-4817-95a1-f575d1092c70" />
 
 
 ## Dependencies
