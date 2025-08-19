@@ -122,7 +122,7 @@ impl CuSrcTask for ImuIceoryxReceiver {
                 ],
             };
 
-            new_msg.set_payload(actual_message);
+            // new_msg.set_payload(actual_message);
         }
         Ok(())
     }

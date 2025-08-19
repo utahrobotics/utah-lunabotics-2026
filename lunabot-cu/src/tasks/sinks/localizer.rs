@@ -31,8 +31,8 @@ impl CuSinkTask for Localizer {
     // IMU from l2, apriltag detections
     type Input<'m> = input_msg!('m,
         ImuMsg, // l2 imu
-        EncodableIsometry, // realsense kiss icp
-        EncodableIsometry, // l2 icp
+        EncodableIsometry, // l2 kiss icp
+        EncodableIsometry, // realsense icp
         Box<HashMap<String, EncodableIsometry>>);
 
     fn new(_config: Option<&cu29::prelude::ComponentConfig>) -> cu29::CuResult<Self>
@@ -86,7 +86,7 @@ impl CuSinkTask for Localizer {
             self.kiss_icp_correction = Some(Self::transformation_between(icp.0, fused_isometry))
         }
 
-        let final_isometry = if let Some(unitree_icp_out) = input.2.payload() {
+        let final_isometry = if let Some(unitree_icp_out) = input.1.payload() {
             let Some(icp_isometry) = unitree_icp_out.to_na() else {
                 return Err(CuError::new_with_cause(
                     "Failed to convert unitree icp isometry",
