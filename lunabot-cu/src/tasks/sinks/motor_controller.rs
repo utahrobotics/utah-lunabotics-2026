@@ -21,7 +21,7 @@ impl CuSinkTask for MotorController {
     type Input<'m> = input_msg!((Option<Steering>, Option<[u8; 5]>));
 
     fn new(config: Option<&ComponentConfig>) -> CuResult<Self> {
-        let mut motor_ref = None;
+        let motor_ref;
         if let Some(config) = config
             && let Some(vesc_pairs) = config.get::<Vec<VescPair>>("vesc_pairs")
         {
@@ -45,20 +45,15 @@ impl CuSinkTask for MotorController {
                     ));
                 }
             }
-            motor_ref = Some(enumerate_motors(vesc_ids, speed_multiplier));
+            motor_ref = enumerate_motors(vesc_ids, speed_multiplier);
+        } else {
+            return Err(CuError::new_with_cause(
+                "no vesc pairs or speed multiplier set in config",
+                std::io::Error::other("no vesc pairs or speed multiplier set in config"),
+            ));
         }
 
-        Ok(Self {
-            motor_ref: motor_ref.ok_or_else(|| {
-                CuError::new_with_cause(
-                    "motor_ref is None",
-                    std::io::Error::new(
-                        std::io::ErrorKind::NotFound,
-                        "No motors found in configuration",
-                    ),
-                )
-            })?,
-        })
+        Ok(Self { motor_ref })
     }
 
     fn preprocess(&mut self, _clock: &RobotClock) -> CuResult<()> {
@@ -68,10 +63,8 @@ impl CuSinkTask for MotorController {
     fn process(&mut self, _clock: &RobotClock, input: &Self::Input<'_>) -> CuResult<()> {
         if let Some(payload) = input.payload() {
             if let Some(steering) = &payload.0 {
-                info!(
-                    "WheelController: steering {}",
-                    steering.get_left_and_right()
-                );
+                let (left, right) = steering.get_left_and_right();
+                self.motor_ref.set_speed(left as f32, right as f32);
             }
         }
         Ok(())
