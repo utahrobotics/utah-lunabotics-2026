@@ -104,7 +104,7 @@
         // receives messages from the ai_source and tells the motors to move accordingly
         (
             id:"motor_ctrl", type:"crate::tasks::sinks::MotorController", config:{
-                "speed_multiplier": 5000,
+                "speed_multiplier": 1500,
                 "vesc_pairs": [
                     // yes having these as strings is janky but it works
                     "VescPair(
