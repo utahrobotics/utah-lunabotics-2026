@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use cu_spatial_payloads::{EncodableIsometry, Transform3D};
+use cu_spatial_payloads::EncodableIsometry;
 use cu29::{
     CuError,
     cutask::{CuMsg, CuSinkTask, Freezable},
@@ -8,10 +8,12 @@ use cu29::{
 };
 use iceoryx_types::ImuMsg;
 use nalgebra::{Isometry3, UnitQuaternion, UnitVector3, Vector3};
+use rerun::Transform3D;
 use simple_motion::StaticNode;
 
 use crate::{
-    ROOT_NODE, rerun_viz,
+    ROOT_NODE,
+    rerun_viz::{self, RECORDER},
     utils::{lerp, lerp_value, swing_twist_decomposition},
 };
 
@@ -23,6 +25,7 @@ pub struct Localizer {
     last_rerun_log: u64,
     kiss_icp_correction: Option<Isometry3<f64>>,
     last_icp_reading: Option<(Isometry3<f64>, u64)>,
+    last_imu_orientation: Option<(Isometry3<f64>, u64)>,
 }
 
 impl Freezable for Localizer {}
@@ -45,6 +48,7 @@ impl CuSinkTask for Localizer {
                 last_rerun_log: 0,
                 kiss_icp_correction: None,
                 last_icp_reading: None,
+                last_imu_orientation: None,
             });
         } else {
             return Err(CuError::new_with_cause(
@@ -83,7 +87,22 @@ impl CuSinkTask for Localizer {
             && let Some(icp) = self.last_icp_reading
             && (clock.now().as_nanos() - icp.1) < 1_000_000
         {
-            self.kiss_icp_correction = Some(Self::transformation_between(icp.0, fused_isometry))
+            let correction = Self::transformation_between(icp.0, fused_isometry);
+
+            if let Some(rec) = RECORDER.get() {
+                rec.recorder
+                    .log(
+                        "kiss_icp",
+                        &rerun::Transform3D::from_translation_rotation(
+                            correction.translation.vector.cast::<f32>().data.0[0],
+                            rerun::Quaternion::from_xyzw(
+                                correction.rotation.as_vector().cast::<f32>().data.0[0],
+                            ),
+                        ),
+                    )
+                    .unwrap();
+            }
+            self.kiss_icp_correction = Some(correction);
         }
 
         let final_isometry = if let Some(unitree_icp_out) = input.1.payload() {
