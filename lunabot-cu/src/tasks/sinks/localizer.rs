@@ -119,11 +119,10 @@ impl CuSinkTask for Localizer {
             };
 
             if let Some((imu_components, imu_time)) = &self.last_imu_orientation {
-                if clock.now().as_nanos() - imu_time < 1_000_000 {
+                if clock.now().as_nanos() - imu_time < 50_000_000 {
                     let down_axis = Vector3::z_axis();
                     let (_icp_swing, icp_twist) =
                         swing_twist_decomposition(&corrected_icp.rotation, &down_axis);
-
                     let combined_rotation = imu_components.swing * icp_twist;
 
                     Some(Isometry3::from_parts(
