@@ -25,7 +25,7 @@ pub struct Localizer {
     last_rerun_log: u64,
     kiss_icp_correction: Option<Isometry3<f64>>,
     last_icp_reading: Option<(Isometry3<f64>, u64)>,
-    last_imu_orientation: Option<(Isometry3<f64>, u64)>,
+    last_imu_orientation: Option<(OrientationComponents, u64)>,
 }
 
 impl Freezable for Localizer {}
@@ -69,7 +69,9 @@ impl CuSinkTask for Localizer {
                 imu_raw.linear_acceleration[1] as f64,
                 imu_raw.linear_acceleration[2] as f64,
             );
-            self.compute_imu_swing_twist(acceleration)
+            let iso = self.compute_imu_swing_twist(acceleration);
+            self.last_imu_orientation = iso.clone().map(|iso| (iso, clock.now().as_nanos()));
+            iso
         } else {
             None
         };
@@ -105,22 +107,34 @@ impl CuSinkTask for Localizer {
             self.kiss_icp_correction = Some(correction);
         }
 
-        let final_isometry = if let Some(unitree_icp_out) = input.1.payload() {
-            let Some(icp_isometry) = unitree_icp_out.to_na() else {
-                return Err(CuError::new_with_cause(
-                    "Failed to convert unitree icp isometry",
-                    std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid isometry data"),
-                ));
-            };
-            self.last_icp_reading = Some((icp_isometry, clock.now().as_nanos()));
+        // compute final isometry, take swing from imu always (if last reading is < 1ms ago) and twist from corrected icp, as well as translation from corrected icp.
+        let final_isometry = if let Some(kiss_icp) = input.1.payload() {
+            let kiss_icp_iso: Isometry3<f64> = kiss_icp.to_na().unwrap_or(Isometry3::identity());
+            self.last_icp_reading = Some((kiss_icp_iso, clock.now().as_nanos()));
 
-            match (fused_isometry, &self.kiss_icp_correction) {
-                (_, Some(correction)) => {
-                    let corrected_icp = correction * icp_isometry;
+            let corrected_icp = if let Some(correction) = self.kiss_icp_correction {
+                correction * kiss_icp_iso
+            } else {
+                kiss_icp_iso
+            };
+
+            if let Some((imu_components, imu_time)) = &self.last_imu_orientation {
+                if clock.now().as_nanos() - imu_time < 1_000_000 {
+                    let down_axis = Vector3::z_axis();
+                    let (_icp_swing, icp_twist) =
+                        swing_twist_decomposition(&corrected_icp.rotation, &down_axis);
+
+                    let combined_rotation = imu_components.swing * icp_twist;
+
+                    Some(Isometry3::from_parts(
+                        corrected_icp.translation,
+                        combined_rotation,
+                    ))
+                } else {
                     Some(corrected_icp)
                 }
-                (Some(fused), None) => Some(fused),
-                (None, None) => Some(icp_isometry),
+            } else {
+                Some(corrected_icp)
             }
         } else {
             fused_isometry
