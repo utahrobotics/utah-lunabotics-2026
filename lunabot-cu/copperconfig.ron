@@ -41,10 +41,10 @@
             id:"l2_kiss_icp",
             type:"crate::tasks::KissIcp",
             config:{
-                "voxel_size": 0.1,
+                "voxel_size": 0.5,
                 "max_range": 100.0,
                 "min_range": 0.2,
-                "max_points_per_voxel": 10000,
+                "max_points_per_voxel": 40,
                 "initial_threshold": 2.0,
                 "min_motion_th": 0.1,
                 "max_threshold": 5.0,
@@ -197,7 +197,7 @@
             },
         ),
     ],
-    // monitor:(type:"cu_cursive_consolemon::CuCursiveConsoleMon"),
+    //monitor:(type:"cu_cursive_consolemon::CuCursiveConsoleMon"),
     // monitor:(type:"cu_consolemon::CuConsoleMon"),
     logging:(
         enable_task_logging:false,

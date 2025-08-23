@@ -257,7 +257,7 @@ impl KissIcp {
 
         for point in &map_points {
             positions.push([point.x as f32, point.y as f32, point.z as f32]);
-            colors.push([100, 100, 255, 100]);
+            colors.push([0, 255, 0]);
         }
 
         if let Err(e) = recorder_data.recorder.log(
