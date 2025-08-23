@@ -225,7 +225,7 @@ impl AprilDetectionHandler {
                     "apriltags/{}/{}/location",
                     observation.camera_id, observation.tag_id
                 ),
-                &Boxes3D::from_centers_and_half_sizes([(location)], [(0.01, 0.1, 0.1)])
+                &Boxes3D::from_centers_and_half_sizes([(location)], [(0.1, 0.01, 0.1)])
                     .with_quaternions([[
                         quaternion_vec[0],
                         quaternion_vec[1],
