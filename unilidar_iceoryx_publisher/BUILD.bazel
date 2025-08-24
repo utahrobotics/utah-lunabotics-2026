@@ -25,7 +25,7 @@ cc_library(
     visibility = ["//visibility:public"],
 )
 
-# Main executable
+# Main executable with optimizations
 cc_binary(
     name = "unilidar_publisher",
     srcs = [
@@ -39,14 +39,23 @@ cc_binary(
     copts = [
         "-std=c++17",
         "-Wall",
-        "-Wextra", 
+        "-Wextra",
         "-Wpedantic",
+        # Optimization flags
+        "-O3",              # Maximum optimization for speed
+        "-DNDEBUG",         # Disable debug assertions
+        "-march=native",    # Optimize for the current CPU architecture
+        "-mtune=native",    # Tune for the current CPU
+        "-flto",            # Link-time optimization
     ],
     defines = [
         "ICEORYX2_PROJECT=1",
+        "NDEBUG",  # Also define NDEBUG in preprocessor
     ],
     linkopts = [
         # Add rpath for runtime library location if needed
         "-Wl,-rpath,$$ORIGIN",
+        # Link-time optimization
+        "-flto",
     ],
 )
