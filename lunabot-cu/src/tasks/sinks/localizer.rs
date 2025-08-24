@@ -69,8 +69,12 @@ impl CuSinkTask for Localizer {
                 imu_raw.linear_acceleration[1] as f64,
                 imu_raw.linear_acceleration[2] as f64,
             );
+            // TODO: correct acceleration by the self.kiss_icp_correction param if it exists.
             let iso = self.compute_imu_swing_twist(acceleration);
             self.last_imu_orientation = iso.clone().map(|iso| (iso, clock.now().as_nanos()));
+
+            // TODO: subtract gravity from acceleration
+            // TODO: update + predict steps for a kalman filter
             iso
         } else {
             None
@@ -106,13 +110,14 @@ impl CuSinkTask for Localizer {
             }
             self.kiss_icp_correction = Some(correction);
         }
-
+        let mut update_kalman_filter = false;
         // compute final isometry, take swing from imu always (if last reading is < 1ms ago) and twist from corrected icp, as well as translation from corrected icp.
         let final_isometry = if let Some(kiss_icp) = input.1.payload() {
             let kiss_icp_iso: Isometry3<f64> = kiss_icp.to_na().unwrap_or(Isometry3::identity());
             self.last_icp_reading = Some((kiss_icp_iso, clock.now().as_nanos()));
 
             let corrected_icp = if let Some(correction) = self.kiss_icp_correction {
+                update_kalman_filter = true;
                 correction * kiss_icp_iso
             } else {
                 kiss_icp_iso
@@ -139,7 +144,16 @@ impl CuSinkTask for Localizer {
             fused_isometry
         };
 
-        if let Some(iso) = final_isometry {
+        if update_kalman_filter {
+            // update kalman filter with the kiss icp position reading (known to be +- 10 cm from the actual real position)
+        }
+
+        if self.kiss_icp_correction.is_some() && self.last_icp_reading.is_some()
+        /*&& kalman filter initialized */
+        {
+            // TODO: use kalman filter state to set root nodes isometry
+        } else if let Some(iso) = final_isometry {
+            // TODO: fall back if kalman filtered position isn't available
             self.root_node.set_isometry(iso);
         }
 
@@ -170,11 +184,11 @@ impl CuSinkTask for Localizer {
 }
 
 #[derive(Debug, Clone)]
-struct OrientationComponents {
-    swing: UnitQuaternion<f64>,
-    twist: UnitQuaternion<f64>,
-    full_rotation: UnitQuaternion<f64>,
-    translation: Vector3<f64>,
+pub struct OrientationComponents {
+    pub swing: UnitQuaternion<f64>,
+    pub twist: UnitQuaternion<f64>,
+    pub full_rotation: UnitQuaternion<f64>,
+    pub translation: Vector3<f64>,
 }
 
 impl Localizer {
