@@ -2701,6 +2701,7 @@ name = "iceoryx-types"
 version = "0.1.0"
 dependencies = [
  "bincode 2.0.1",
+ "common",
  "iceoryx2",
  "nalgebra",
  "serde",
@@ -5415,6 +5416,7 @@ name = "realsense"
 version = "0.1.0"
 dependencies = [
  "chrono",
+ "common",
  "fxhash",
  "gputter",
  "iceoryx-types",

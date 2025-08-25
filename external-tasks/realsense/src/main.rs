@@ -5,6 +5,7 @@ use std::{
     time::Duration,
 };
 
+use common::{THALASSIC_HEIGHT, THALASSIC_WIDTH};
 use fxhash::FxHashMap;
 use gputter::{
     self,
@@ -21,12 +22,16 @@ use realsense_rust::{
     pipeline::{ActivePipeline, FrameWaitError, InactivePipeline},
 };
 
-use iceoryx_types::{IceoryxPointCloud, PointXYZIR, MAX_POINT_CLOUD_POINTS};
-use thalassic::{DepthProjector, DepthProjectorBuilder, ThalassicPipelineRef};
+use iceoryx_types::{IceoryxOccupancyGrid, IceoryxPointCloud, PointXYZIR, MAX_POINT_CLOUD_POINTS};
+use thalassic::{
+    DepthProjector, DepthProjectorBuilder, Occupancy, OccupancyGridPipeline,
+    OccupancyGridPipelineBuilder, OccupancyGridPipelineRef, ThalassicPipelineRef,
+};
 
 pub struct DepthCameraInfo {
     pub serial: String,
     pub depth_enabled: bool,
+    pub occupancy_enabled: bool,
 }
 
 struct ThalassicData;
@@ -62,8 +67,9 @@ pub fn enumerate_depth_cameras(cameras: impl IntoIterator<Item = DepthCameraInfo
                         thalassic_ref,
                         init_tx,
                         depth_enabled: camera_info.depth_enabled,
+                        occupancy_enabled: camera_info.occupancy_enabled,
                     };
-                    camera_task.run(); // Changed from loop calling depth_camera_task
+                    camera_task.run();
                 })
                 .expect("Failed to spawn camera task thread");
             Some((serial, tx))
@@ -86,103 +92,97 @@ pub fn enumerate_depth_cameras(cameras: impl IntoIterator<Item = DepthCameraInfo
     };
 
     std::thread::Builder::new()
-        .stack_size(16 * 1024 * 1024) // 16 MB stack size
-        .spawn(move || {
+        .stack_size(16 * 1024 * 1024)
+        .spawn(move || loop {
+            let Ok(target_serial) = init_rx.recv() else {
+                break;
+            };
             loop {
-                let Ok(target_serial) = init_rx.recv() else {
-                    break;
+                let device = match device_hub.wait_for_device() {
+                    Ok(x) => x,
+                    Err(_e) => {
+                        eprintln!("Failed to wait for RealSense device: {_e}");
+                        break;
+                    }
                 };
-                loop {
-                    let device = match device_hub.wait_for_device() {
-                        Ok(x) => {
-                            // println!("Received device for camera {}", target_serial);
-                            x
-                        }
-                        Err(_e) => {
-                            eprintln!("Failed to wait for RealSense device: {_e}");
-                            break;
-                        }
-                    };
 
-                    let Some(current_serial_cstr) = device.info(Rs2CameraInfo::SerialNumber) else {
-                        eprintln!("Failed to get serial number for RealSense Camera");
-                        continue;
-                    };
-                    let Ok(current_serial_str) = current_serial_cstr.to_str() else {
-                        eprintln!("Failed to parse serial number {:?}", current_serial_cstr);
-                        continue;
-                    };
-                    if target_serial != current_serial_str {
-                        // println!("Skipping device for camera {}", current_serial_str);
-                        continue;
-                    }
-
-                    let current_serial = current_serial_str.to_string();
-
-                    let Some(pipeline_sender) = threads.get(current_serial_str) else {
-                        eprintln!("Unexpected RealSense camera with serial {}", current_serial);
-                        continue;
-                    };
-
-                    let Some(usb_cstr) = device.info(Rs2CameraInfo::UsbTypeDescriptor) else {
-                        eprintln!(
-                            "Failed to read USB type descriptor for RealSense Camera {}",
-                            current_serial
-                        );
-                        continue;
-                    };
-                    let Ok(usb_str) = usb_cstr.to_str() else {
-                        eprintln!(
-                            "USB type descriptor for RealSense Camera {} is not utf-8",
-                            current_serial
-                        );
-                        continue;
-                    };
-                    let Ok(_usb_val) = usb_str.parse::<f32>() else {
-                        eprintln!(
-                            "USB type descriptor for RealSense Camera {} is not f32",
-                            current_serial
-                        );
-                        continue;
-                    };
-
-                    let pipeline_sender = pipeline_sender.clone();
-
-                    let mut config = Config::new();
-
-                    if let Err(e) = config.disable_all_streams() {
-                        eprintln!("Failed to disable all streams: {}", e);
-                        continue;
-                    }
-
-                    if let Err(e) =
-                        config.enable_stream(Rs2StreamKind::Depth, None, 0, 0, Rs2Format::Z16, 0)
-                    {
-                        eprintln!("Failed to enable depth stream: {}", e);
-                        continue;
-                    }
-
-                    let pipeline = match InactivePipeline::try_from(&context) {
-                        Ok(x) => x,
-                        Err(e) => {
-                            eprintln!("Failed to open pipeline: {}", e);
-                            continue;
-                        }
-                    };
-                    let pipeline = match pipeline.start(Some(config)) {
-                        Ok(x) => x,
-                        Err(e) => {
-                            eprintln!("Failed to start pipeline: {}", e);
-                            continue;
-                        }
-                    };
-
-                    if let Err(error) = pipeline_sender.send((device, pipeline)) {
-                        error.0 .1.stop();
-                        threads.remove(current_serial.as_str());
-                    }
-                    break;
+                let Some(current_serial_cstr) = device.info(Rs2CameraInfo::SerialNumber) else {
+                    eprintln!("Failed to get serial number for RealSense Camera");
+                    continue;
+                };
+                let Ok(current_serial_str) = current_serial_cstr.to_str() else {
+                    eprintln!("Failed to parse serial number {:?}", current_serial_cstr);
+                    continue;
+                };
+                if target_serial != current_serial_str {
+                    continue;
                 }
+
+                let current_serial = current_serial_str.to_string();
+
+                let Some(pipeline_sender) = threads.get(current_serial_str) else {
+                    eprintln!("Unexpected RealSense camera with serial {}", current_serial);
+                    continue;
+                };
+
+                let Some(usb_cstr) = device.info(Rs2CameraInfo::UsbTypeDescriptor) else {
+                    eprintln!(
+                        "Failed to read USB type descriptor for RealSense Camera {}",
+                        current_serial
+                    );
+                    continue;
+                };
+                let Ok(usb_str) = usb_cstr.to_str() else {
+                    eprintln!(
+                        "USB type descriptor for RealSense Camera {} is not utf-8",
+                        current_serial
+                    );
+                    continue;
+                };
+                let Ok(_usb_val) = usb_str.parse::<f32>() else {
+                    eprintln!(
+                        "USB type descriptor for RealSense Camera {} is not f32",
+                        current_serial
+                    );
+                    continue;
+                };
+
+                let pipeline_sender = pipeline_sender.clone();
+
+                let mut config = Config::new();
+
+                if let Err(e) = config.disable_all_streams() {
+                    eprintln!("Failed to disable all streams: {}", e);
+                    continue;
+                }
+
+                if let Err(e) =
+                    config.enable_stream(Rs2StreamKind::Depth, None, 0, 0, Rs2Format::Z16, 0)
+                {
+                    eprintln!("Failed to enable depth stream: {}", e);
+                    continue;
+                }
+
+                let pipeline = match InactivePipeline::try_from(&context) {
+                    Ok(x) => x,
+                    Err(e) => {
+                        eprintln!("Failed to open pipeline: {}", e);
+                        continue;
+                    }
+                };
+                let pipeline = match pipeline.start(Some(config)) {
+                    Ok(x) => x,
+                    Err(e) => {
+                        eprintln!("Failed to start pipeline: {}", e);
+                        continue;
+                    }
+                };
+
+                if let Err(error) = pipeline_sender.send((device, pipeline)) {
+                    error.0 .1.stop();
+                    threads.remove(current_serial.as_str());
+                }
+                break;
             }
         })
         .expect("Failed to spawn device hub thread");
@@ -192,6 +192,10 @@ struct DepthCameraState {
     depth_projector: DepthProjector,
     point_cloud: Box<[AlignedVec4<f32>]>,
     cloud_publisher: iceoryx2::port::publisher::Publisher<ipc::Service, IceoryxPointCloud, ()>,
+    occupancy_pipeline: Option<OccupancyGridPipeline>,
+    occupancy_grid: Option<Box<[Occupancy]>>,
+    occupancy_publisher:
+        Option<iceoryx2::port::publisher::Publisher<ipc::Service, IceoryxOccupancyGrid, ()>>,
 }
 
 struct DepthCameraTask {
@@ -201,25 +205,24 @@ struct DepthCameraTask {
     thalassic_ref: ThalassicPipelineRef,
     init_tx: Sender<&'static str>,
     depth_enabled: bool,
+    occupancy_enabled: bool,
 }
 
 impl DepthCameraTask {
     fn run(&mut self) {
         loop {
             let _ = self.init_tx.send(self.serial);
-            let (device, mut pipeline) = match self.pipeline.recv() {
+            let (device, pipeline) = match self.pipeline.recv() {
                 Ok(x) => {
                     println!("Received device and pipeline for camera {}", self.serial);
                     x
                 }
                 Err(_) => {
-                    // If channel is closed, exit the thread
                     eprintln!("Pipeline channel closed for camera {}", self.serial);
                     return;
                 }
             };
 
-            // Process this camera session
             self.process_camera_session(device, pipeline);
         }
     }
@@ -264,6 +267,9 @@ impl DepthCameraTask {
             depth_projector,
             point_cloud,
             cloud_publisher,
+            ref mut occupancy_pipeline,
+            ref mut occupancy_grid,
+            occupancy_publisher,
         } = if let Some(state) = self.state.get_mut() {
             state
         } else {
@@ -300,17 +306,67 @@ impl DepthCameraTask {
                 .create::<ipc::Service>()
                 .expect("Failed to create iceoryx2 node");
 
-            let service_name = format!("realsense/{}/cloud", self.serial);
-            let service = node
-                .service_builder(&ServiceName::new(&service_name).expect("Invalid service name"))
+            let cloud_service_name = format!("realsense/{}/cloud", self.serial);
+            let cloud_service = node
+                .service_builder(
+                    &ServiceName::new(&cloud_service_name).expect("Invalid service name"),
+                )
                 .publish_subscribe::<IceoryxPointCloud>()
                 .open_or_create()
-                .expect("Failed to create service");
+                .expect("Failed to create cloud service");
 
-            let cloud_publisher = service
+            let cloud_publisher = cloud_service
                 .publisher_builder()
                 .create()
-                .expect("Failed to create publisher");
+                .expect("Failed to create cloud publisher");
+
+            let (occupancy_pipeline, occupancy_grid, occupancy_publisher) = if self
+                .occupancy_enabled
+            {
+                let grid_dimensions = Vector2::new(
+                    NonZeroU32::new(THALASSIC_WIDTH).unwrap(),
+                    NonZeroU32::new(THALASSIC_HEIGHT).unwrap(),
+                );
+                let cell_count = grid_dimensions.x.get() * grid_dimensions.y.get();
+
+                let occupancy_builder = OccupancyGridPipelineBuilder {
+                    occupancy_grid_dimensions: grid_dimensions,
+                    cell_size: 0.1, // 10cm cells
+                    min_points_for_occupied: 3,
+                    max_points_threshold: 50,
+                    neighborhood_radius: 2,
+                };
+
+                let mut occupancy_pipeline = occupancy_builder.build();
+
+                occupancy_pipeline.occupancy_grid_ref = self.thalassic_ref.clone();
+
+                let occupancy_grid = std::iter::repeat(Occupancy(0))
+                    .take(cell_count as usize)
+                    .collect::<Box<[_]>>();
+
+                let occupancy_service_name = format!("realsense/{}/occupancy", self.serial);
+                let occupancy_service = node
+                    .service_builder(
+                        &ServiceName::new(&occupancy_service_name).expect("Invalid service name"),
+                    )
+                    .publish_subscribe::<IceoryxOccupancyGrid>()
+                    .open_or_create()
+                    .expect("Failed to create occupancy service");
+
+                let occupancy_publisher = occupancy_service
+                    .publisher_builder()
+                    .create()
+                    .expect("Failed to create occupancy publisher");
+
+                (
+                    Some(occupancy_pipeline),
+                    Some(occupancy_grid),
+                    Some(occupancy_publisher),
+                )
+            } else {
+                (None, None, None)
+            };
 
             let _ = self.state.set(DepthCameraState {
                 point_cloud: std::iter::repeat_n(
@@ -320,6 +376,9 @@ impl DepthCameraTask {
                 .collect(),
                 depth_projector,
                 cloud_publisher,
+                occupancy_pipeline,
+                occupancy_grid,
+                occupancy_publisher,
             });
             self.state.get_mut().unwrap()
         };
@@ -343,9 +402,10 @@ impl DepthCameraTask {
             };
 
             for frame in frames.frames_of_type::<DepthFrame>() {
-                if !self.depth_enabled {
+                if !self.depth_enabled && !self.occupancy_enabled {
                     break;
                 }
+
                 if !matches!(frame.get(0, 0), Some(PixelKind::Z16 { .. })) {
                     eprintln!("Unexpected depth pixel kind for camera {}", self.serial);
                 }
@@ -376,43 +436,95 @@ impl DepthCameraTask {
 
                 depth_projector.project(slice, &identity_transform, depth_scale, Some(point_cloud));
 
-                let mut iceoryx_cloud = IceoryxPointCloud::default();
-                let mut point_count = 0;
+                if self.depth_enabled {
+                    let mut iceoryx_cloud = IceoryxPointCloud::default();
+                    let mut point_count = 0;
 
-                for (_idx, &point) in point_cloud.iter().enumerate() {
-                    if point.w != 0.0 && point_count < MAX_POINT_CLOUD_POINTS {
-                        iceoryx_cloud.points[point_count] = PointXYZIR {
-                            x: point.x,
-                            y: point.y,
-                            z: point.z,
-                            intensity: 1.0,
-                            time: 0.5,
-                            ring: 0,
-                        };
-                        point_count += 1;
+                    for (_idx, &point) in point_cloud.iter().enumerate() {
+                        if point.w != 0.0 && point_count < MAX_POINT_CLOUD_POINTS {
+                            iceoryx_cloud.points[point_count] = PointXYZIR {
+                                x: point.x,
+                                y: point.y,
+                                z: point.z,
+                                intensity: 1.0,
+                                time: 0.5,
+                                ring: 0,
+                            };
+                            point_count += 1;
+                        }
+                    }
+
+                    iceoryx_cloud.publish_count = point_count as u64;
+
+                    if point_count > 0 {
+                        match cloud_publisher.loan_uninit() {
+                            Ok(sample) => {
+                                let initialized = sample.write_payload(iceoryx_cloud);
+                                match initialized.send() {
+                                    Ok(_) => {
+                                        println!(
+                                            "Published {} points from camera {}",
+                                            point_count, self.serial
+                                        );
+                                    }
+                                    Err(_e) => {
+                                        eprintln!(
+                                            "Failed to send point cloud from camera {}",
+                                            self.serial
+                                        );
+                                    }
+                                }
+                            }
+                            Err(_e) => {
+                                eprintln!("Failed to loan sample for camera {}", self.serial);
+                            }
+                        }
                     }
                 }
 
-                iceoryx_cloud.publish_count = point_count as u64;
+                if self.occupancy_enabled {
+                    if let (Some(ref mut pipeline), Some(ref mut grid), Some(ref publisher)) = (
+                        occupancy_pipeline.as_mut(),
+                        occupancy_grid.as_mut(),
+                        occupancy_publisher.as_ref(),
+                    ) {
+                        if pipeline.will_process() {
+                            pipeline.process(grid);
 
-                if point_count > 0 {
-                    match cloud_publisher.loan_uninit() {
-                        Ok(sample) => {
-                            let initialized = sample.write_payload(iceoryx_cloud);
-                            match initialized.send() {
-                                Ok(_) => {
-                                    // println!("Published {} points from camera {}", point_count, self.serial);
+                            let mut iceoryx_occupancy = IceoryxOccupancyGrid::default();
+                            iceoryx_occupancy.width = THALASSIC_WIDTH;
+                            iceoryx_occupancy.height = THALASSIC_HEIGHT;
+
+                            let copy_size = grid.len().min(iceoryx_occupancy.data.len());
+                            for i in 0..copy_size {
+                                iceoryx_occupancy.data[i] = grid[i].0 as u8;
+                            }
+
+                            match publisher.loan_uninit() {
+                                Ok(sample) => {
+                                    let initialized = sample.write_payload(iceoryx_occupancy);
+                                    match initialized.send() {
+                                        Ok(_) => {
+                                            println!(
+                                                "Published occupancy grid from camera {}",
+                                                self.serial
+                                            );
+                                        }
+                                        Err(_e) => {
+                                            eprintln!(
+                                                "Failed to send occupancy grid from camera {}",
+                                                self.serial
+                                            );
+                                        }
+                                    }
                                 }
                                 Err(_e) => {
                                     eprintln!(
-                                        "Failed to send point cloud from camera {}",
+                                        "Failed to loan occupancy sample for camera {}",
                                         self.serial
                                     );
                                 }
                             }
-                        }
-                        Err(_e) => {
-                            eprintln!("Failed to loan sample for camera {}", self.serial);
                         }
                     }
                 }
@@ -424,14 +536,15 @@ impl DepthCameraTask {
 }
 
 fn main() {
-    println!("Starting RealSense depth camera publisher");
+    println!("Starting RealSense depth camera publisher with occupancy grid");
 
-    std::env::set_var("STRIDE", "15");
+    // std::env::set_var("STRIDE", "15");
 
-    // TODO: make this configurable
+    // Configure cameras with both point cloud and occupancy grid enabled
     let cameras = vec![DepthCameraInfo {
-        serial: "309622300683".to_string(),
+        serial: "044422250424".to_string(),
         depth_enabled: true,
+        occupancy_enabled: true,
     }];
 
     enumerate_depth_cameras(cameras);

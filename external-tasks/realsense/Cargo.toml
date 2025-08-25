@@ -18,3 +18,5 @@ simple-motion = { path = "../../misc/simple-motion" }
 tasker = { path = "../../misc/tasker" }
 thalassic = { path = "../../misc/thalassic" }
 iceoryx-types = { path = "../../misc/iceoryx-types" }
+
+common.workspace = true

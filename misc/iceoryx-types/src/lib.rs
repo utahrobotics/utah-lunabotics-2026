@@ -9,6 +9,7 @@
 //! languages.
 
 use bincode::{Decode, Encode};
+use common::{THALASSIC_CELL_COUNT, THALASSIC_HEIGHT, THALASSIC_WIDTH};
 use iceoryx2::prelude::ZeroCopySend;
 use nalgebra::Point3;
 use serde::Serialize;
@@ -23,6 +24,26 @@ pub struct PointXYZIR {
     pub intensity: f32,
     pub time: f32,
     pub ring: u16,
+}
+
+#[repr(C)]
+#[derive(Clone, Debug, ZeroCopySend, Encode, Decode, Serialize)]
+#[type_name("IceoryxOccupancyGrid")]
+pub struct IceoryxOccupancyGrid {
+    pub width: u32,
+    pub height: u32,
+    #[serde(serialize_with = "<[_]>::serialize")]
+    pub data: [u8; THALASSIC_CELL_COUNT as usize],
+}
+
+impl Default for IceoryxOccupancyGrid {
+    fn default() -> Self {
+        Self {
+            width: THALASSIC_WIDTH,
+            height: THALASSIC_HEIGHT,
+            data: [0; THALASSIC_CELL_COUNT as usize],
+        }
+    }
 }
 
 /// Maximum number of points stored in the fixed-size point-cloud message.

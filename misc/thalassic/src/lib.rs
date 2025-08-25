@@ -16,13 +16,17 @@ use nalgebra::{Vector2, Vector3};
 
 mod depth2pcl;
 mod obstaclefilter;
+mod occupancy_normalize;
 mod pcl2obstacle;
+mod pcl2occupancy;
 
 mod expand_obstacles;
 use expand_obstacles::ExpandObstacles;
 use obstaclefilter::ObstacleFilter;
 use parking_lot::Mutex;
 use pcl2obstacle::Pcl2Obstacle;
+
+use crate::{occupancy_normalize::OccupancyNormalize, pcl2occupancy::Pcl2Occupancy};
 // use pcl2sum::Pcl2Sum;
 // use sum2height::Sum2Height;
 
@@ -66,6 +70,20 @@ type BetaBindGroups = (
     GpuBufferSet<ExpanderBindGrp>,
 );
 
+type Pcl2OccupancyBindGrp = (
+    UniformBuffer<AlignedVec2<u32>>, // image dimensions
+    UniformBuffer<u32>,              // min_points_for_occupied
+    UniformBuffer<u32>,              // max_points_threshold
+    UniformBuffer<u32>,              // neighborhood_radius
+);
+
+type OccupancyGridBindGroups = (
+    GpuBufferSet<PointCloudGrp>,        // Index 0 - points
+    GpuBufferSet<Pcl2OccupancyBindGrp>, // Index 1 - all uniforms
+    GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>, // Index 2 - raw occupancy
+    GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>, // Index 3 - normalized occupancy
+);
+
 #[derive(Debug, Clone, Copy)]
 pub struct DepthProjectorBuilder {
     pub image_size: Vector2<NonZeroU32>,
@@ -77,7 +95,10 @@ pub struct DepthProjectorBuilder {
 impl DepthProjectorBuilder {
     pub fn build(self, thalassic_ref: ThalassicPipelineRef) -> DepthProjector {
         let pixel_count = self.image_size.x.get() * self.image_size.y.get();
-        let stride = std::env::var("STRIDE").unwrap_or("4".into()).parse::<u32>().expect("STRIDE MUST BE A U32");
+        let stride = std::env::var("STRIDE")
+            .unwrap_or("4".into())
+            .parse::<u32>()
+            .expect("STRIDE MUST BE A U32");
         let [depth_fn] = Depth2Pcl {
             depths: BufferGroupBinding::<_, AlphaBindGroups>::get::<0, 0>(),
             points: BufferGroupBinding::<_, AlphaBindGroups>::get::<1, 0>(),
@@ -253,16 +274,29 @@ impl ThalassicBuilder {
 
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable, PartialEq, Eq)]
-pub struct Occupancy(u32);
+/// likelyhood of being occupied on a scale of 0-10
+pub struct Occupancy(pub u32);
+
+pub enum OccupancyType {
+    /// occupancy scores are normalized from 1-10,
+    /// occupied is above 5
+    Occupied(u32),
+    /// occupancy scores are normalized from 1-10, free is > 5 but not 0
+    Free(u32),
+    Unknown,
+}
 
 impl Occupancy {
     pub const UNKNOWN: Self = Self(0);
-    pub const FREE: Self = Self(1);
-    pub const OCCUPIED: Self = Self(2);
 
-    pub fn occupied(self) -> bool {
-        // True iff the cell is not empty
-        self.0 == 2
+    pub fn occupancy_type(self) -> OccupancyType {
+        if self == Self::UNKNOWN {
+            return OccupancyType::Unknown;
+        } else if self.0 >= 5 {
+            return OccupancyType::Occupied(self.0);
+        } else {
+            return OccupancyType::Free(self.0);
+        }
     }
 }
 
@@ -327,6 +361,7 @@ impl ThalassicPipeline {
             filtered_obstacle_map,
             expander_input_grp,
         );
+
         self.pipeline.workgroups[0] = Vector3::new(
             shared.image_dimensions.x / 8,
             shared.image_dimensions.y / 8,
@@ -387,5 +422,170 @@ impl ThalassicPipeline {
 
     pub fn get_ref(&self) -> ThalassicPipelineRef {
         self.thalassic_ref.clone()
+    }
+}
+
+pub struct OccupancyGridPipeline {
+    pipeline: ComputePipeline<OccupancyGridBindGroups, 2>,
+    cell_count: NonZeroU32,
+    grid_dimensions: Vector2<NonZeroU32>,
+    bind_grps: Option<(
+        GpuBufferSet<Pcl2OccupancyBindGrp>, // uniforms
+        GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>, // raw occupancy
+        GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>, // normalized occupancy
+    )>,
+    pub occupancy_grid_ref: ThalassicPipelineRef,
+    // Normalization parameters
+    min_points_for_occupied: u32,
+    max_points_threshold: u32,
+    neighborhood_radius: u32,
+}
+
+impl OccupancyGridPipeline {
+    pub fn will_process(&self) -> bool {
+        self.occupancy_grid_ref.shared.lock().1
+    }
+
+    pub fn process(&mut self, occupancy_grid_out: &mut [Occupancy]) {
+        let mut shared_lock = self.occupancy_grid_ref.shared.lock();
+
+        if !shared_lock.1 {
+            return;
+        }
+
+        let mut shared = shared_lock.0.take().unwrap();
+        let (uniforms_grp, raw_occupancy_grp, normalized_occupancy_grp) =
+            self.bind_grps.take().unwrap();
+
+        let mut bind_grps: OccupancyGridBindGroups = (
+            shared.points,
+            uniforms_grp,
+            raw_occupancy_grp,
+            normalized_occupancy_grp,
+        );
+
+        // Set workgroups for both stages
+        self.pipeline.workgroups[0] = Vector3::new(
+            shared.image_dimensions.x.div_ceil(8),
+            shared.image_dimensions.y.div_ceil(8),
+            1,
+        );
+        self.pipeline.workgroups[1] = Vector3::new(
+            self.grid_dimensions.x.get().div_ceil(8),
+            self.grid_dimensions.y.get().div_ceil(8),
+            1,
+        );
+
+        self.pipeline
+            .new_pass(|mut lock| {
+                // Write uniforms (following ThalassicPipeline pattern)
+                bind_grps
+                    .1
+                    .write::<0, _>(&shared.image_dimensions.into(), &mut lock);
+                bind_grps
+                    .1
+                    .write::<1, _>(&self.min_points_for_occupied, &mut lock);
+                bind_grps
+                    .1
+                    .write::<2, _>(&self.max_points_threshold, &mut lock);
+                bind_grps
+                    .1
+                    .write::<3, _>(&self.neighborhood_radius, &mut lock);
+
+                &mut bind_grps
+            })
+            .finish();
+
+        let (points_grp, uniforms_grp, raw_occupancy_grp, normalized_occupancy_grp) = bind_grps;
+
+        // Read the normalized results back to the output buffer
+        normalized_occupancy_grp
+            .buffers
+            .0
+            .read(bytemuck::cast_slice_mut(occupancy_grid_out));
+
+        // Restore the bind groups and shared state
+        self.bind_grps = Some((uniforms_grp, raw_occupancy_grp, normalized_occupancy_grp));
+        shared.points = points_grp;
+        shared_lock.0.replace(shared);
+        shared_lock.1 = false;
+    }
+
+    pub fn set_normalization_params(&mut self, min_points: u32, max_points: u32, radius: u32) {
+        self.min_points_for_occupied = min_points;
+        self.max_points_threshold = max_points;
+        self.neighborhood_radius = radius;
+    }
+}
+
+pub struct OccupancyGridPipelineBuilder {
+    pub occupancy_grid_dimensions: Vector2<NonZeroU32>,
+    pub cell_size: f32,
+    pub min_points_for_occupied: u32,
+    pub max_points_threshold: u32,
+    pub neighborhood_radius: u32,
+}
+
+impl OccupancyGridPipelineBuilder {
+    pub fn build(self) -> OccupancyGridPipeline {
+        let cell_count =
+            self.occupancy_grid_dimensions.x.get() * self.occupancy_grid_dimensions.y.get();
+        let cell_count = NonZeroU32::new(cell_count).unwrap();
+
+        let [pcl2occupancy] = Pcl2Occupancy {
+            cell_size: self.cell_size,
+            obstacle_map: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<2, 0>(),
+            points: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<0, 0>(),
+            image_dimensions: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<1, 0>(),
+            heightmap_width: self.occupancy_grid_dimensions.x,
+            cell_count,
+        }
+        .compile();
+
+        let [occupancy_normalizer] = OccupancyNormalize {
+            raw_occupancy: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<2, 0>(),
+            normalized_occupancy: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<3, 0>(),
+            min_points_for_occupied: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<1, 1>(
+            ),
+            max_points_threshold: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<1, 2>(),
+            neighborhood_radius: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<1, 3>(),
+            cell_count,
+            grid_width: self.occupancy_grid_dimensions.x,
+            grid_height: self.occupancy_grid_dimensions.y,
+        }
+        .compile();
+
+        let mut pipeline = ComputePipeline::new([&pcl2occupancy, &occupancy_normalizer]);
+
+        pipeline.workgroups = [
+            Vector3::new(1, 1, 1),
+            Vector3::new(
+                self.occupancy_grid_dimensions.x.get().div_ceil(8),
+                self.occupancy_grid_dimensions.y.get().div_ceil(8),
+                1,
+            ),
+        ];
+
+        let bind_grps = Some((
+            GpuBufferSet::from((
+                UniformBuffer::new(), // image_dimensions
+                UniformBuffer::new(), // min_points_for_occupied
+                UniformBuffer::new(), // max_points_threshold
+                UniformBuffer::new(), // neighborhood_radius
+            )),
+            GpuBufferSet::from((StorageBuffer::new_dyn(cell_count.get() as usize).unwrap(),)), // raw occupancy
+            GpuBufferSet::from((StorageBuffer::new_dyn(cell_count.get() as usize).unwrap(),)), // normalized occupancy
+        ));
+
+        OccupancyGridPipeline {
+            pipeline,
+            cell_count,
+            grid_dimensions: self.occupancy_grid_dimensions,
+            bind_grps,
+            occupancy_grid_ref: ThalassicPipelineRef::noop(),
+            min_points_for_occupied: self.min_points_for_occupied,
+            max_points_threshold: self.max_points_threshold,
+            neighborhood_radius: self.neighborhood_radius,
+        }
     }
 }

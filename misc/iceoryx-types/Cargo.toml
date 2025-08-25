@@ -8,3 +8,4 @@ iceoryx2 = "0.6.1"
 bincode = { version = "=2.0.1", features = ["derive", "serde"] }
 serde = { version = "1", features = ["derive"] }
 nalgebra.workspace = true
+common.workspace = true

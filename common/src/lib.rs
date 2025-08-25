@@ -439,23 +439,27 @@ pub enum ParseError {
 #[derive(Debug, Clone, Copy, Pod, Zeroable, PartialEq, Eq)]
 pub struct Occupancy(u32);
 
-impl Occupancy {
-    pub const UNKNOWN: Self = Self(0);
-    pub const FREE: Self = Self(1);
-    pub const OCCUPIED: Self = Self(2);
-
-    pub fn occupied(self) -> bool {
-        // True iff the cell is not empty
-        self.0 == 2
-    }
+pub enum OccupancyType {
+    /// occupancy scores are normalized from 1-10,
+    /// occupied is above 5
+    Occupied(u32),
+    /// occupancy scores are normalized from 1-10, free is > 5 but not 0
+    Free(u32),
+    Unknown,
 }
 
-#[repr(u8)]
-enum FromHostHeader {
-    BaseIsometry = 0,
-    FromLunabase = 1,
-    ActuatorReadings = 2,
-    ThalassicData = 3,
+impl Occupancy {
+    pub const UNKNOWN: Self = Self(0);
+
+    pub fn occupancy_type(self) -> OccupancyType {
+        if self == Self::UNKNOWN {
+            return OccupancyType::Unknown;
+        } else if self.0 >= 5 {
+            return OccupancyType::Occupied(self.0);
+        } else {
+            return OccupancyType::Free(self.0);
+        }
+    }
 }
 
 #[derive(Debug)]
