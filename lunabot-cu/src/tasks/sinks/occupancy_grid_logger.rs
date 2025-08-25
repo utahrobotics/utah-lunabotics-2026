@@ -51,5 +51,5 @@ impl CuSinkTask for OccupancyGridSink {
 }
 
 fn index_to_xy(index: usize) -> (usize, usize) {
-    (index % THALASSIC_WIDTH as usize,index % THALASSIC_WIDTH as usize)
+    (index % THALASSIC_WIDTH as usize,index / THALASSIC_WIDTH as usize)
 }
