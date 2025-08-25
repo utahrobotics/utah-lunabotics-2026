@@ -33,7 +33,7 @@ pub struct IceoryxOccupancyGrid {
     pub width: u32,
     pub height: u32,
     #[serde(serialize_with = "<[_]>::serialize")]
-    pub data: [u8; THALASSIC_CELL_COUNT as usize],
+    pub data: [u32; THALASSIC_CELL_COUNT as usize],
 }
 
 impl Default for IceoryxOccupancyGrid {

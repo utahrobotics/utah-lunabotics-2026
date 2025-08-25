@@ -25,7 +25,7 @@ use realsense_rust::{
 use iceoryx_types::{IceoryxOccupancyGrid, IceoryxPointCloud, PointXYZIR, MAX_POINT_CLOUD_POINTS};
 use thalassic::{
     DepthProjector, DepthProjectorBuilder, Occupancy, OccupancyGridPipeline,
-    OccupancyGridPipelineBuilder, OccupancyGridPipelineRef, ThalassicPipelineRef,
+    OccupancyGridPipelineBuilder, ThalassicPipelineRef,
 };
 
 pub struct DepthCameraInfo {
@@ -497,7 +497,7 @@ impl DepthCameraTask {
 
                             let copy_size = grid.len().min(iceoryx_occupancy.data.len());
                             for i in 0..copy_size {
-                                iceoryx_occupancy.data[i] = grid[i].0 as u8;
+                                iceoryx_occupancy.data[i] = grid[i].0;
                             }
 
                             match publisher.loan_uninit() {
@@ -542,7 +542,7 @@ fn main() {
 
     // Configure cameras with both point cloud and occupancy grid enabled
     let cameras = vec![DepthCameraInfo {
-        serial: "044422250424".to_string(),
+        serial: "311322302990".to_string(),
         depth_enabled: true,
         occupancy_enabled: true,
     }];

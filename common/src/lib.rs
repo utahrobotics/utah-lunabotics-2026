@@ -437,7 +437,7 @@ pub enum ParseError {
 
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, Pod, Zeroable, PartialEq, Eq)]
-pub struct Occupancy(u32);
+pub struct Occupancy(pub u32);
 
 pub enum OccupancyType {
     /// occupancy scores are normalized from 1-10,
