@@ -311,7 +311,7 @@ impl DepthCameraTask {
                 ),
                 focal_length_px,
                 principal_point_px: Vector2::new(depth_format.ppx(), depth_format.ppy()),
-                max_depth: 3.0,
+                max_depth: 2.0,
             };
 
             let depth_projector = depth_projector_builder.build(self.thalassic_ref.clone());
@@ -363,7 +363,7 @@ impl DepthCameraTask {
                     cell_size: THALASSIC_CELL_SIZE,
                     min_points_for_occupied: 5,
                     max_points_threshold: 50,
-                    neighborhood_radius: 3,
+                    neighborhood_radius: 2,
                 };
 
                 let mut occupancy_pipeline = occupancy_builder.build();
