@@ -1,6 +1,6 @@
 {
     "free_origin": [0.0, 0.0, 0.0],
-    "free_euler": [0.0, 0.0, 180.0],
+    "free_euler": [0.0, 0.0, 0.0],
     "children": [
         {
             "name": Some("cam_side"),

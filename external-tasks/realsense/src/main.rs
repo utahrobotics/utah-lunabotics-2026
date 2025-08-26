@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use common::{THALASSIC_HEIGHT, THALASSIC_WIDTH};
+use common::{THALASSIC_CELL_SIZE, THALASSIC_HEIGHT, THALASSIC_WIDTH};
 use crossbeam::atomic::AtomicCell;
 use cu_spatial_payloads::EncodableIsometry;
 use fxhash::FxHashMap;
@@ -360,7 +360,7 @@ impl DepthCameraTask {
 
                 let occupancy_builder = OccupancyGridPipelineBuilder {
                     occupancy_grid_dimensions: grid_dimensions,
-                    cell_size: 0.1, // 10cm cells
+                    cell_size: THALASSIC_CELL_SIZE,
                     min_points_for_occupied: 3,
                     max_points_threshold: 50,
                     neighborhood_radius: 2,
