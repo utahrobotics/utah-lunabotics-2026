@@ -79,6 +79,7 @@ type Pcl2OccupancyBindGrp = (
     UniformBuffer<u32>,              // min_points_for_occupied
     UniformBuffer<u32>,              // max_points_threshold
     UniformBuffer<u32>,              // neighborhood_radius
+    UniformBuffer<u32>,              // min_known_neighbors_ratio
 );
 
 type OccupancyGridBindGroups = (
@@ -449,6 +450,7 @@ pub struct OccupancyGridPipeline {
     min_points_for_occupied: u32,
     max_points_threshold: u32,
     neighborhood_radius: u32,
+    min_known_neighbors_ratio: u32
 }
 
 impl OccupancyGridPipeline {
@@ -520,6 +522,9 @@ impl OccupancyGridPipeline {
                 bind_grps
                     .1
                     .write::<3, _>(&self.neighborhood_radius, &mut lock);
+                bind_grps
+                    .1
+                    .write::<4, _>(&self.min_known_neighbors_ratio, &mut lock);
                 let radius_in_cells = (robot_radius_m / cell_size).ceil() as u32;
                 bind_grps.4.write::<1, _>(&radius_in_cells, &mut lock);
                 &mut bind_grps
@@ -569,6 +574,7 @@ pub struct OccupancyGridPipelineBuilder {
     pub min_points_for_occupied: u32,
     pub max_points_threshold: u32,
     pub neighborhood_radius: u32,
+    pub min_known_neighbors_ratio: u32
 }
 
 impl OccupancyGridPipelineBuilder {
@@ -599,6 +605,7 @@ impl OccupancyGridPipelineBuilder {
             cell_count,
             grid_width: self.occupancy_grid_dimensions.x,
             grid_height: self.occupancy_grid_dimensions.y,
+            min_known_neighbors_ratio: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<1, 4>(),
         }
         .compile();
 
@@ -657,6 +664,7 @@ impl OccupancyGridPipelineBuilder {
                 UniformBuffer::new(), // min_points_for_occupied
                 UniformBuffer::new(), // max_points_threshold
                 UniformBuffer::new(), // neighborhood_radius
+                UniformBuffer::new()
             )),
             GpuBufferSet::from((StorageBuffer::new_dyn(cell_count.get() as usize).unwrap(),)), // raw occupancy
             GpuBufferSet::from((StorageBuffer::new_dyn(cell_count.get() as usize).unwrap(),)), // normalized occupancy
@@ -678,6 +686,7 @@ impl OccupancyGridPipelineBuilder {
             min_points_for_occupied: self.min_points_for_occupied,
             max_points_threshold: self.max_points_threshold,
             neighborhood_radius: self.neighborhood_radius,
+            min_known_neighbors_ratio: self.min_known_neighbors_ratio
         }
     }
 }

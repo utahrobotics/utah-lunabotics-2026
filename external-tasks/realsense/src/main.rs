@@ -364,6 +364,7 @@ impl DepthCameraTask {
                     min_points_for_occupied: 5,
                     max_points_threshold: 50,
                     neighborhood_radius: 2,
+                    min_known_neighbors_ratio: 50
                 };
 
                 let mut occupancy_pipeline = occupancy_builder.build();
