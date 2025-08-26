@@ -12,6 +12,8 @@ build_shader!(
 
     // Output: normalized occupancy scores (0-10)
     #[buffer] var<storage, read_write> normalized_occupancy: array<u32, CELL_COUNT>;
+    #[buffer] var<storage, read_write> is_known: array<atomic<u32>, CELL_COUNT>;
+
 
     #[buffer] var<uniform> min_points_for_occupied: u32;
     #[buffer] var<uniform> max_points_threshold: u32;
@@ -90,6 +92,9 @@ build_shader!(
         let final_score = min(10u, count_score + density_bonus + relative_bonus);
 
         normalized_occupancy[cell_index] = final_score;
+        if final_score > 0 {
+            atomicAdd(&is_known[cell_index], 1u);
+        }
     }
     "#
 );

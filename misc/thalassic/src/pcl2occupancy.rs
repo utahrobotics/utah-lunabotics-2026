@@ -7,6 +7,8 @@ build_shader!(
     const CELL_SIZE: f32 = {{cell_size}};
 
     #[buffer] var<storage, read_write> obstacle_map: array<atomic<u32>, CELL_COUNT>;
+    // maps to already processed cells, this flag is set in the final shader
+    #[buffer] var<storage, read_write> is_known: array<atomic<u32>, CELL_COUNT>;
     #[buffer] var<storage, read_write> points: array<vec4f>;
     #[buffer] var<uniform> image_dimensions: vec2u;
 
@@ -41,6 +43,10 @@ build_shader!(
         }
 
         let cell_index = y_index * HEIGHTMAP_WIDTH + x_index;
+
+        if is_known[cell_index] > 0 { // if the point has already been processed skip it
+            return;
+        }
 
         atomicAdd(&obstacle_map[cell_index], 1u);
     }

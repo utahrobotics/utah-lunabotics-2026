@@ -5,6 +5,8 @@ build_shader!(
 r#"
 #[buffer] var<storage, read_write> normalized_occupancy_grid: array<u32>;
 #[buffer] var<storage, read_write> expanded_obstacles: array<u32>;
+#[buffer] var<storage, read_write> is_known: array<atomic<u32>>;
+
 
 // radius of the robot in meters
 #[buffer] var<uniform> radius_in_cells: u32;
@@ -17,6 +19,7 @@ const GRID_HEIGHT: NonZeroU32 = {{grid_height}};
 fn compute_main(@builtin(global_invocation_id) cell: vec3u) {
     let pos = cell.xy;
     let center_i = xy_to_index(pos);
+    
 
     if (pos.x >= GRID_WIDTH - radius_in_cells || pos.x <= radius_in_cells || pos.y <= radius_in_cells || pos.y >= GRID_HEIGHT - radius_in_cells) {
         expanded_obstacles[center_i] = 10; // anything out of bounds is an obstacle
@@ -45,6 +48,7 @@ fn compute_main(@builtin(global_invocation_id) cell: vec3u) {
             let i = xy_to_index(vec2u(x, y));
             if (normalized_occupancy_grid[i] > 5) {
                 expanded_obstacles[center_i] = normalized_occupancy_grid[i];
+                atomicAdd(&is_known[center_i], 1u);
                 return;
             }
         }
