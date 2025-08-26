@@ -1,18 +1,22 @@
 use std::{
     cell::OnceCell,
     num::NonZeroU32,
+    ops::Deref,
     sync::mpsc::{Receiver, Sender, SyncSender},
     time::Duration,
 };
 
 use common::{THALASSIC_HEIGHT, THALASSIC_WIDTH};
+use crossbeam::atomic::AtomicCell;
+use cu_spatial_payloads::EncodableIsometry;
 use fxhash::FxHashMap;
 use gputter::{
     self,
     types::{AlignedMatrix4, AlignedVec4},
 };
+use iceoryx2::port::subscriber::Subscriber;
 use iceoryx2::prelude::*;
-use nalgebra::{Matrix4, Vector2, Vector4};
+use nalgebra::{Isometry3, Matrix4, Vector2, Vector4};
 pub use realsense_rust;
 use realsense_rust::{
     config::Config,
@@ -68,6 +72,7 @@ pub fn enumerate_depth_cameras(cameras: impl IntoIterator<Item = DepthCameraInfo
                         init_tx,
                         depth_enabled: camera_info.depth_enabled,
                         occupancy_enabled: camera_info.occupancy_enabled,
+                        camera_node_isometry: AtomicCell::new(Isometry3::identity()),
                     };
                     camera_task.run();
                 })
@@ -156,9 +161,14 @@ pub fn enumerate_depth_cameras(cameras: impl IntoIterator<Item = DepthCameraInfo
                     continue;
                 }
 
-                if let Err(e) =
-                    config.enable_stream(Rs2StreamKind::Depth, None, 0, 0, Rs2Format::Z16, 0)
-                {
+                if let Err(e) = config.enable_stream(
+                    Rs2StreamKind::Depth,
+                    None,           // device index (None = any)
+                    640,            // width - explicitly supported
+                    480,            // height - explicitly supported
+                    Rs2Format::Z16, // format
+                    30,             // fps - supported at this resolution
+                ) {
                     eprintln!("Failed to enable depth stream: {}", e);
                     continue;
                 }
@@ -196,6 +206,8 @@ struct DepthCameraState {
     occupancy_grid: Option<Box<[Occupancy]>>,
     occupancy_publisher:
         Option<iceoryx2::port::publisher::Publisher<ipc::Service, IceoryxOccupancyGrid, ()>>,
+    // subscribes to EncodableIsometry
+    realsense_isometry_subscriber: Subscriber<ipc::Service, [f64; 16], ()>,
 }
 
 struct DepthCameraTask {
@@ -206,6 +218,7 @@ struct DepthCameraTask {
     init_tx: Sender<&'static str>,
     depth_enabled: bool,
     occupancy_enabled: bool,
+    camera_node_isometry: AtomicCell<Isometry3<f64>>,
 }
 
 impl DepthCameraTask {
@@ -270,6 +283,7 @@ impl DepthCameraTask {
             ref mut occupancy_pipeline,
             ref mut occupancy_grid,
             occupancy_publisher,
+            realsense_isometry_subscriber,
         } = if let Some(state) = self.state.get_mut() {
             state
         } else {
@@ -319,6 +333,21 @@ impl DepthCameraTask {
                 .publisher_builder()
                 .create()
                 .expect("Failed to create cloud publisher");
+
+            let from_service = node
+                .service_builder(
+                    &ServiceName::new("localizer/realsense_isometry")
+                        .expect("invalid service name"),
+                )
+                .publish_subscribe::<[f64; 16]>()
+                .enable_safe_overflow(true)
+                .open_or_create()
+                .expect("Realsense: failed to open localizer→realsense service");
+
+            let iso_subscriber = from_service
+                .subscriber_builder()
+                .create()
+                .expect("Realsense: failed to create subscriber");
 
             let (occupancy_pipeline, occupancy_grid, occupancy_publisher) = if self
                 .occupancy_enabled
@@ -379,6 +408,7 @@ impl DepthCameraTask {
                 occupancy_pipeline,
                 occupancy_grid,
                 occupancy_publisher,
+                realsense_isometry_subscriber: iso_subscriber,
             });
             self.state.get_mut().unwrap()
         };
@@ -387,7 +417,7 @@ impl DepthCameraTask {
               self.serial, depth_format.fx(), depth_format.fy(), depth_format.width(), depth_format.height());
 
         loop {
-            let frames = match pipeline.wait(Some(Duration::from_millis(1000))) {
+            let frames = match pipeline.wait(Some(Duration::from_millis(2000))) {
                 Ok(x) => x,
                 Err(e) => {
                     eprintln!(
@@ -431,8 +461,34 @@ impl DepthCameraTask {
                         continue;
                     }
                 };
-
-                let identity_transform: AlignedMatrix4<f32> = Matrix4::identity().into();
+                match realsense_isometry_subscriber.receive() {
+                    Ok(Some(sample)) => {
+                        self.camera_node_isometry.store(
+                            EncodableIsometry {
+                                inner: *(sample.deref()),
+                            }
+                            .to_na()
+                            .unwrap_or_else(|| {
+                                eprintln!(
+                                    "failed to convert encodable isometry to nalgebra isometry3"
+                                );
+                                Isometry3::identity()
+                            }),
+                        );
+                    }
+                    Ok(None) => {
+                        println!("no sample available");
+                    }
+                    Err(e) => {
+                        eprintln!("failed to receive camera isometry: {e}");
+                    }
+                }
+                let identity_transform: AlignedMatrix4<f32> = self
+                    .camera_node_isometry
+                    .load()
+                    .to_homogeneous()
+                    .cast::<f32>()
+                    .into();
 
                 depth_projector.project(slice, &identity_transform, depth_scale, Some(point_cloud));
 
@@ -538,8 +594,7 @@ impl DepthCameraTask {
 fn main() {
     println!("Starting RealSense depth camera publisher with occupancy grid");
 
-    // std::env::set_var("STRIDE", "15");
-
+    std::env::set_var("STRIDE", "15");
     // Configure cameras with both point cloud and occupancy grid enabled
     let cameras = vec![DepthCameraInfo {
         serial: "311322302990".to_string(),

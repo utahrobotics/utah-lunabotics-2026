@@ -1,18 +1,19 @@
 use crate::ROOT_NODE;
+use crate::rerun_viz::RECORDER;
 use cu29::cutask::CuMsg;
 use cu29::{
+    CuError, CuResult,
     clock::RobotClock,
     config::ComponentConfig,
     cutask::{CuSrcTask, Freezable},
     output_msg,
     prelude::*,
-    CuError, CuResult,
 };
+use iceoryx_types::{IceoryxPointCloud, PointXYZIR};
 use iceoryx2::node::NodeBuilder;
 use iceoryx2::port::subscriber::Subscriber;
 use iceoryx2::prelude::*;
 use iceoryx2::service::port_factory::publish_subscribe::PortFactory;
-use iceoryx_types::IceoryxPointCloud;
 use simple_motion::StaticNode;
 
 pub struct RealSensePointCloudReceiver {
@@ -95,14 +96,33 @@ impl CuSrcTask for RealSensePointCloudReceiver {
             .as_ref()
             .ok_or_else(|| CuError::from("PointCloudIceoryxReceiver: subscriber missing"))?;
 
-        // Allocate on the heap to keep the stack small in debug builds
-
-        let iso = self.camera_node.get_isometry_from_base();
         while let Some(sample) = subscriber
             .receive()
             .map_err(|e| CuError::new_with_cause("PointCloudIceoryxReceiver: receive", e))?
         {
-            let payload = sample.payload().clone();
+            let mut payload = sample.payload().clone();
+            let mut positions = Vec::new();
+            let mut colors = Vec::new();
+
+            for point in payload.points.iter_mut() {
+                let transformed = point.to_nalgebra();
+                positions.push([
+                    transformed.x as f32,
+                    transformed.y as f32,
+                    transformed.z as f32,
+                ]);
+                colors.push([0, 100, 100]);
+                *point =
+                    PointXYZIR::from_nalgebra(transformed, point.intensity, point.time, point.ring);
+            }
+            if let Err(e) = RECORDER.get().unwrap().recorder.log(
+                "realsense",
+                &rerun::Points3D::new(positions)
+                    .with_colors(colors)
+                    .with_radii([0.02f32]),
+            ) {
+                warning!("Failed to log accumulated map to Rerun: {}", e.to_string());
+            }
             new_msg.set_payload(payload);
             self.last_seen = clock.now().as_nanos();
         }
