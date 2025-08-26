@@ -59,8 +59,8 @@ build_shader!(
                 if (neighbor_count > 0u) {
                     local_max = max(local_max, neighbor_count);
                     local_sum += neighbor_count;
-                    local_count++;
                 }
+                local_count++;
             }
         }
 
