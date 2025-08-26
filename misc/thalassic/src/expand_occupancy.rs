@@ -1,9 +1,9 @@
 use gputter::build_shader;
 
 build_shader!(
-    pub(crate) ExpandObstacles,
+    pub(crate) ExpandOccupancy,
 r#"
-#[buffer] var<storage, read_write> filtered_obstacles: array<u32>;
+#[buffer] var<storage, read_write> normalized_occupancy_grid: array<u32>;
 #[buffer] var<storage, read_write> expanded_obstacles: array<u32>;
 
 // radius of the robot in meters
@@ -19,17 +19,15 @@ fn compute_main(@builtin(global_invocation_id) cell: vec3u) {
     let center_i = xy_to_index(pos);
 
     if (pos.x >= GRID_WIDTH - radius_in_cells || pos.x <= radius_in_cells || pos.y <= radius_in_cells || pos.y >= GRID_HEIGHT - radius_in_cells) {
-        expanded_obstacles[center_i] = 2;
+        expanded_obstacles[center_i] = 10; // anything out of bounds is an obstacle
         return;
     }
 
-    if (filtered_obstacles[center_i] == 0) {
-        expanded_obstacles[center_i] = 0;
-    } else if (filtered_obstacles[center_i] == 2) {
-        expanded_obstacles[center_i] = 2;
+    if (normalized_occupancy_grid[center_i] < 5) { // free or unknown
+        expanded_obstacles[center_i] = normalized_occupancy_grid[center_i];
+    } else if (normalized_occupancy_grid[center_i] > 5) { // occupied
+        expanded_obstacles[center_i] = normalized_occupancy_grid[center_i];
         return;
-    } else {
-        expanded_obstacles[center_i] = 1;
     }
 
     // convert to i32 temporarily to avoid underflowing to maximum u32 values
@@ -45,8 +43,8 @@ fn compute_main(@builtin(global_invocation_id) cell: vec3u) {
                 continue;
             }
             let i = xy_to_index(vec2u(x, y));
-            if (filtered_obstacles[i] == 2) {
-                expanded_obstacles[center_i] = 2;
+            if (normalized_occupancy_grid[i] > 5) {
+                expanded_obstacles[center_i] = normalized_occupancy_grid[i];
                 return;
             }
         }

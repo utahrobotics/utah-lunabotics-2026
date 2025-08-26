@@ -1,4 +1,4 @@
-use std::{num::NonZeroU32, sync::Arc};
+use std::{cell, num::NonZeroU32, sync::Arc};
 
 use bytemuck::{Pod, Zeroable};
 use depth2pcl::Depth2Pcl;
@@ -15,6 +15,7 @@ use gputter::{
 use nalgebra::{Vector2, Vector3};
 
 mod depth2pcl;
+mod expand_occupancy;
 mod obstaclefilter;
 mod occupancy_normalize;
 mod pcl2obstacle;
@@ -26,7 +27,10 @@ use obstaclefilter::ObstacleFilter;
 use parking_lot::Mutex;
 use pcl2obstacle::Pcl2Obstacle;
 
-use crate::{occupancy_normalize::OccupancyNormalize, pcl2occupancy::Pcl2Occupancy};
+use crate::{
+    expand_occupancy::ExpandOccupancy, occupancy_normalize::OccupancyNormalize,
+    pcl2occupancy::Pcl2Occupancy,
+};
 // use pcl2sum::Pcl2Sum;
 // use sum2height::Sum2Height;
 
@@ -82,6 +86,7 @@ type OccupancyGridBindGroups = (
     GpuBufferSet<Pcl2OccupancyBindGrp>, // Index 1 - all uniforms
     GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>, // Index 2 - raw occupancy
     GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>, // Index 3 - normalized occupancy
+    GpuBufferSet<ExpanderBindGrp>, // Index 4 - occupancy expander
 );
 
 #[derive(Debug, Clone, Copy)]
@@ -426,13 +431,14 @@ impl ThalassicPipeline {
 }
 
 pub struct OccupancyGridPipeline {
-    pipeline: ComputePipeline<OccupancyGridBindGroups, 2>,
+    pipeline: ComputePipeline<OccupancyGridBindGroups, 3>,
     cell_count: NonZeroU32,
     grid_dimensions: Vector2<NonZeroU32>,
     bind_grps: Option<(
         GpuBufferSet<Pcl2OccupancyBindGrp>, // uniforms
         GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>, // raw occupancy
         GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>, // normalized occupancy
+        GpuBufferSet<ExpanderBindGrp>,
     )>,
     pub occupancy_grid_ref: ThalassicPipelineRef,
     // Normalization parameters
@@ -446,7 +452,12 @@ impl OccupancyGridPipeline {
         self.occupancy_grid_ref.shared.lock().1
     }
 
-    pub fn process(&mut self, occupancy_grid_out: &mut [Occupancy]) {
+    pub fn process(
+        &mut self,
+        robot_radius_m: f32,
+        cell_size: f32,
+        occupancy_grid_out: &mut [Occupancy],
+    ) {
         let mut shared_lock = self.occupancy_grid_ref.shared.lock();
 
         if !shared_lock.1 {
@@ -454,7 +465,7 @@ impl OccupancyGridPipeline {
         }
 
         let mut shared = shared_lock.0.take().unwrap();
-        let (uniforms_grp, raw_occupancy_grp, normalized_occupancy_grp) =
+        let (uniforms_grp, raw_occupancy_grp, normalized_occupancy_grp, expander_grp) =
             self.bind_grps.take().unwrap();
 
         let mut bind_grps: OccupancyGridBindGroups = (
@@ -462,6 +473,7 @@ impl OccupancyGridPipeline {
             uniforms_grp,
             raw_occupancy_grp,
             normalized_occupancy_grp,
+            expander_grp,
         );
 
         // Set workgroups for both stages
@@ -491,21 +503,28 @@ impl OccupancyGridPipeline {
                 bind_grps
                     .1
                     .write::<3, _>(&self.neighborhood_radius, &mut lock);
-
+                let radius_in_cells = (robot_radius_m / cell_size).ceil() as u32;
+                bind_grps.4.write::<1, _>(&radius_in_cells, &mut lock);
                 &mut bind_grps
             })
             .finish();
 
-        let (points_grp, uniforms_grp, raw_occupancy_grp, normalized_occupancy_grp) = bind_grps;
+        let (points_grp, uniforms_grp, raw_occupancy_grp, normalized_occupancy_grp, expander_grp) =
+            bind_grps;
 
-        // Read the normalized results back to the output buffer
-        normalized_occupancy_grp
+        // Read the expanded occupancy grid results back to the output buffer
+        expander_grp
             .buffers
             .0
             .read(bytemuck::cast_slice_mut(occupancy_grid_out));
 
         // Restore the bind groups and shared state
-        self.bind_grps = Some((uniforms_grp, raw_occupancy_grp, normalized_occupancy_grp));
+        self.bind_grps = Some((
+            uniforms_grp,
+            raw_occupancy_grp,
+            normalized_occupancy_grp,
+            expander_grp,
+        ));
         shared.points = points_grp;
         shared_lock.0.replace(shared);
         shared_lock.1 = false;
@@ -555,10 +574,30 @@ impl OccupancyGridPipelineBuilder {
         }
         .compile();
 
-        let mut pipeline = ComputePipeline::new([&pcl2occupancy, &occupancy_normalizer]);
+        let [occupancy_expander] =
+            ExpandOccupancy {
+                normalized_occupancy_grid: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<
+                    3,
+                    0,
+                >(),
+                expanded_obstacles: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<4, 0>(),
+                radius_in_cells: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<4, 1>(),
+                grid_width: self.occupancy_grid_dimensions.x,
+                grid_height: self.occupancy_grid_dimensions.y,
+            }
+            .compile();
 
+        let mut pipeline =
+            ComputePipeline::new([&pcl2occupancy, &occupancy_normalizer, &occupancy_expander]);
+
+        // ????
         pipeline.workgroups = [
             Vector3::new(1, 1, 1),
+            Vector3::new(
+                self.occupancy_grid_dimensions.x.get().div_ceil(8),
+                self.occupancy_grid_dimensions.y.get().div_ceil(8),
+                1,
+            ),
             Vector3::new(
                 self.occupancy_grid_dimensions.x.get().div_ceil(8),
                 self.occupancy_grid_dimensions.y.get().div_ceil(8),
@@ -575,13 +614,18 @@ impl OccupancyGridPipelineBuilder {
             )),
             GpuBufferSet::from((StorageBuffer::new_dyn(cell_count.get() as usize).unwrap(),)), // raw occupancy
             GpuBufferSet::from((StorageBuffer::new_dyn(cell_count.get() as usize).unwrap(),)), // normalized occupancy
+            GpuBufferSet::from((
+                StorageBuffer::new_dyn(cell_count.get() as usize).unwrap(),
+                UniformBuffer::new(),
+            )),
         ));
 
         OccupancyGridPipeline {
             pipeline,
             cell_count,
             grid_dimensions: self.occupancy_grid_dimensions,
-            bind_grps,
+            bind_grps, // ???m Option<(GpuBufferSet<(..., ..., ..., ...)>, ..., ..., ...)> (u32)
+            //found enum Option<(GpuBufferSet<(..., ..., ..., ...)>, ..., ..., ...)> ([_])
             occupancy_grid_ref: ThalassicPipelineRef::noop(),
             min_points_for_occupied: self.min_points_for_occupied,
             max_points_threshold: self.max_points_threshold,

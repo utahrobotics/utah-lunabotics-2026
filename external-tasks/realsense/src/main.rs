@@ -361,9 +361,9 @@ impl DepthCameraTask {
                 let occupancy_builder = OccupancyGridPipelineBuilder {
                     occupancy_grid_dimensions: grid_dimensions,
                     cell_size: THALASSIC_CELL_SIZE,
-                    min_points_for_occupied: 3,
+                    min_points_for_occupied: 5,
                     max_points_threshold: 50,
-                    neighborhood_radius: 2,
+                    neighborhood_radius: 3,
                 };
 
                 let mut occupancy_pipeline = occupancy_builder.build();
@@ -545,7 +545,7 @@ impl DepthCameraTask {
                         occupancy_publisher.as_ref(),
                     ) {
                         if pipeline.will_process() {
-                            pipeline.process(grid);
+                            pipeline.process(0.50, THALASSIC_CELL_SIZE, grid);
 
                             let mut iceoryx_occupancy = IceoryxOccupancyGrid::default();
                             iceoryx_occupancy.width = THALASSIC_WIDTH;
@@ -594,7 +594,7 @@ impl DepthCameraTask {
 fn main() {
     println!("Starting RealSense depth camera publisher with occupancy grid");
 
-    std::env::set_var("STRIDE", "20");
+    // std::env::set_var("STRIDE", "5");
     // Configure cameras with both point cloud and occupancy grid enabled
     let cameras = vec![DepthCameraInfo {
         serial: "311322302990".to_string(),
