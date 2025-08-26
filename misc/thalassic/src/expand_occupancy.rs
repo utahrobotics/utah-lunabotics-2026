@@ -48,7 +48,7 @@ fn compute_main(@builtin(global_invocation_id) cell: vec3u) {
             let i = xy_to_index(vec2u(x, y));
             if (normalized_occupancy_grid[i] > 5) {
                 expanded_obstacles[center_i] = normalized_occupancy_grid[i];
-                atomicAdd(&is_known[center_i], 1u);
+                // atomicAdd(&is_known[center_i], 1u);
                 return;
             }
         }

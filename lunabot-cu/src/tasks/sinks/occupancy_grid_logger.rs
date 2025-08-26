@@ -26,6 +26,7 @@ impl CuSinkTask for OccupancyGridSink {
         if let Some(grid) = input.payload() {
             let mut positions = Vec::new();
             let mut colors = Vec::new();
+            let mut labels = Vec::new();
             for (point, score) in grid.data.iter().enumerate().map(|(i, score)| {
                 let (x, y) = index_to_xy(i);
                 (rerun::Position3D::new(x as f32 * THALASSIC_CELL_SIZE, y as f32 * THALASSIC_CELL_SIZE, 0.0), Occupancy(*score))
@@ -41,9 +42,10 @@ impl CuSinkTask for OccupancyGridSink {
                     common::OccupancyType::Unknown => {
                         Color::BLACK
                     },
-                })
+                });
+                labels.push(score.0.to_string());
             }
-            RECORDER.get().unwrap().recorder.log("occupancy", &Points3D::new(positions).with_colors(colors));
+            RECORDER.get().unwrap().recorder.log("occupancy", &Points3D::new(positions).with_colors(colors).with_labels(labels));
         }
 
         Ok(())

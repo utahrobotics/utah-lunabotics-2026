@@ -33,12 +33,21 @@ build_shader!(
         let cell_index = y * GRID_WIDTH + x;
 
         let raw_count = raw_occupancy[cell_index];
-
+        let is_cell_known = atomicLoad(&is_known[cell_index]) > 0u;
         // mark as unknown (0)
         if (raw_count == 0u) {
+            // known cell with a positive score, keep the existing score
+            if (is_cell_known && normalized_occupancy[cell_index] > 0u) {
+                return;
+            }
             normalized_occupancy[cell_index] = 0u;
             return;
         }
+        
+        if (is_cell_known && normalized_occupancy[cell_index] > 0u) {
+            return;
+        }
+        
 
         var local_max = raw_count;
         var local_sum = raw_count;
@@ -59,8 +68,8 @@ build_shader!(
                 if (neighbor_count > 0u) {
                     local_max = max(local_max, neighbor_count);
                     local_sum += neighbor_count;
+                    local_count += 1;
                 }
-                local_count++;
             }
         }
 

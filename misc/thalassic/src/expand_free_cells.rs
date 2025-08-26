@@ -41,7 +41,7 @@ fn compute_main(@builtin(global_invocation_id) cell: vec3u) {
             let i = xy_to_index(vec2u(x, y));
             if (expanded_obstacle_map[i] == 0) {
                 final_map[center_i] = 1;
-                atomicAdd(&is_known[center_i], 1u);
+                // atomicAdd(&is_known[center_i], 1u);
                 return;
             }
         }

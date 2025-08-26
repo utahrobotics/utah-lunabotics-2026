@@ -44,9 +44,6 @@ build_shader!(
 
         let cell_index = y_index * HEIGHTMAP_WIDTH + x_index;
 
-        if is_known[cell_index] > 0 { // if the point has already been processed skip it
-            return;
-        }
 
         atomicAdd(&obstacle_map[cell_index], 1u);
     }
