@@ -594,7 +594,7 @@ impl DepthCameraTask {
 fn main() {
     println!("Starting RealSense depth camera publisher with occupancy grid");
 
-    std::env::set_var("STRIDE", "15");
+    std::env::set_var("STRIDE", "20");
     // Configure cameras with both point cloud and occupancy grid enabled
     let cameras = vec![DepthCameraInfo {
         serial: "311322302990".to_string(),
