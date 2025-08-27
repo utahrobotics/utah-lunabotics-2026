@@ -680,8 +680,7 @@ impl OccupancyGridPipelineBuilder {
             pipeline,
             cell_count,
             grid_dimensions: self.occupancy_grid_dimensions,
-            bind_grps, // ???m Option<(GpuBufferSet<(..., ..., ..., ...)>, ..., ..., ...)> (u32)
-            //found enum Option<(GpuBufferSet<(..., ..., ..., ...)>, ..., ..., ...)> ([_])
+            bind_grps, 
             occupancy_grid_ref: ThalassicPipelineRef::noop(),
             min_points_for_occupied: self.min_points_for_occupied,
             max_points_threshold: self.max_points_threshold,
