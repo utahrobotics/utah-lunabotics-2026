@@ -313,7 +313,7 @@ impl DepthCameraTask {
                 principal_point_px: Vector2::new(depth_format.ppx(), depth_format.ppy()),
                 max_depth: 3.0,
                 min_stride: 1,
-                max_stride: 10,
+                max_stride: 30,
                 stride_transition_start: 0.05,
                 stride_transition_end: 2.0,
             };
