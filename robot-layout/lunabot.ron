@@ -2,11 +2,11 @@
     "free_origin": [0.0, 0.0, 0.0],
     "free_euler": [0.0, 0.0, 45.0],
     "children": [
-                                            {
-                                            "name": Some("upper_depth_camera"),
-                                            "origin": [0.0, 0.0, -0.037],
-                                            "euler": [0.0, 0.0, 0.0]
-                                        },
+        {
+            "name": Some("upper_depth_camera"),
+            "origin": [0.0, 0.0, -0.037],
+            "euler": [0.0, 0.0, 0.0]
+        },
         {
             "name": Some("cam_side"),
             "origin": [-0.231, 0.0, -0.055],

@@ -529,7 +529,7 @@ impl DepthCameraTask {
                         }
 
                         iceoryx_cloud.publish_count = chunk.len() as u64;
-                        iceoryx_cloud.is_last = chunk_idx == total_chunks - 1;
+                        iceoryx_cloud.is_last = true;
 
                         match cloud_publisher.loan_uninit() {
                             Ok(sample) => {
