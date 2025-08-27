@@ -23,5 +23,5 @@ struct IceoryxPointCloud {
     static constexpr const char* IOX2_TYPE_NAME = "IceoryxPointCloud";
     bool is_last;
     uint64_t publish_count;
-    PointXYZIR points[20000];  // Reduced to match Rust constant and avoid large IPC payloads
+    PointXYZIR points[20000];
 };

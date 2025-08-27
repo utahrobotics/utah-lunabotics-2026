@@ -48,7 +48,6 @@ struct FrameAccumulator {
             first_frame_time = cloud.stamp;
         }
 
-        // Find the time range within this cloud for normalization to [0,1] range
         double min_time = std::numeric_limits<double>::max();
         double max_time = std::numeric_limits<double>::lowest();
         for (const auto &point : cloud.points) {
@@ -57,7 +56,7 @@ struct FrameAccumulator {
         }
 
         double time_range = max_time - min_time;
-        if (time_range <= 0.0) time_range = 1.0; // Avoid division by zero
+        if (time_range <= 0.0) time_range = 1.0;
 
         for (const auto &point : cloud.points) {
             PointXYZIR p;
