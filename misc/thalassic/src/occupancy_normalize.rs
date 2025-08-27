@@ -101,7 +101,7 @@ build_shader!(
                     relative_density_score = 20u + min(20u, (ratio - 100u) / 10u);
                 } else {
                     // Below average but still has points
-                    relative_density_score = (ratio * 20u) / 100u;
+                    relative_density_score = (ratio * 25u) / 100u;
                 }
             }
 
