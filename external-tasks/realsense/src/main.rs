@@ -366,10 +366,12 @@ impl DepthCameraTask {
                     occupancy_grid_dimensions: grid_dimensions,
                     cell_size: THALASSIC_CELL_SIZE,
                     min_points_for_occupied: 10,
-                    max_points_threshold: 50,
+                    max_points_threshold: 10000,
                     neighborhood_radius: 50,
                     min_known_neighbors_ratio: 0,
-                    obstacle_threshold: NonZeroU32::new(50).unwrap(),
+                    obstacle_threshold: NonZeroU32::new(30).unwrap(),
+                    min_weight_distance: 0.40,
+                    max_weight_distance: 3.2,
                 };
 
                 let mut occupancy_pipeline = occupancy_builder.build();
@@ -570,7 +572,17 @@ impl DepthCameraTask {
                         occupancy_publisher.as_ref(),
                     ) {
                         if pipeline.will_process() {
-                            pipeline.process(0.25, THALASSIC_CELL_SIZE, grid);
+                            pipeline.process(
+                                0.25,
+                                THALASSIC_CELL_SIZE,
+                                grid,
+                                &self
+                                    .camera_node_isometry
+                                    .load()
+                                    .to_homogeneous()
+                                    .cast::<f32>()
+                                    .into(),
+                            );
 
                             let mut iceoryx_occupancy = IceoryxOccupancyGrid::default();
                             iceoryx_occupancy.width = THALASSIC_WIDTH;

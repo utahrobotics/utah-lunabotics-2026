@@ -569,6 +569,8 @@ pub struct OccupancyGridPipelineBuilder {
     pub neighborhood_radius: u32,
     pub min_known_neighbors_ratio: u32,
     pub obstacle_threshold: NonZeroU32,
+    pub min_weight_distance: f32,
+    pub max_weight_distance: f32,
 }
 
 impl OccupancyGridPipelineBuilder {
@@ -586,6 +588,8 @@ impl OccupancyGridPipelineBuilder {
             heightmap_width: self.occupancy_grid_dimensions.x,
             cell_count,
             camera_transform: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<1, 5>(),
+            max_weight_distance: self.max_weight_distance,
+            min_weight_distance: self.min_weight_distance,
         }
         .compile();
 
