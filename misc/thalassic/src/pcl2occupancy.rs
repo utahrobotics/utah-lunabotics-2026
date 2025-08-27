@@ -37,7 +37,7 @@ build_shader!(
 
         let distance_from_camera = abs(camera_space_point.z);
 
-        let weight = 1.0 / (distance_from_camera * distance_from_camera);
+        let weight = distance_from_camera * distance_from_camera;
 
         points[index] = vec4f(point.x, point.y, 0.0, point.w);
         let flattened_point = points[index];
@@ -51,7 +51,7 @@ build_shader!(
         }
         let cell_index = y_index * HEIGHTMAP_WIDTH + x_index;
 
-        let weighted_contribution = u32(weight * 100.0);
+        let weighted_contribution = u32(1); // remove weight
         atomicAdd(&obstacle_map[cell_index], max(weighted_contribution, 1u));
     }
     "#
