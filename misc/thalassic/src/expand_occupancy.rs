@@ -5,7 +5,6 @@ build_shader!(
 r#"
 #[buffer] var<storage, read_write> normalized_occupancy_grid: array<u32>;
 #[buffer] var<storage, read_write> expanded_obstacles: array<u32>;
-#[buffer] var<storage, read_write> is_known: array<atomic<u32>>;
 
 
 // radius of the robot in cells

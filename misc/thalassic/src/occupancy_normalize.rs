@@ -10,7 +10,6 @@ build_shader!(
         #[buffer] var<storage, read_write> raw_occupancy: array<u32, CELL_COUNT>;
         // Output: normalized occupancy scores (0-100, 0 = unknown)
         #[buffer] var<storage, read_write> normalized_occupancy: array<u32, CELL_COUNT>;
-        #[buffer] var<storage, read_write> is_known: array<atomic<u32>, CELL_COUNT>;
         #[buffer] var<uniform> min_points_for_occupied: u32;
         #[buffer] var<uniform> max_points_threshold: u32;
         #[buffer] var<uniform> neighborhood_radius: u32;
@@ -29,19 +28,14 @@ build_shader!(
             let y = global_invocation_id.y;
             let cell_index = y * GRID_WIDTH + x;
             let raw_count = raw_occupancy[cell_index];
-            let is_cell_known = atomicLoad(&is_known[cell_index]) > 0u;
 
             // mark as unknown (0)
             if (raw_count == 0u) {
                 // known cell with a positive score, keep the existing score
-                if (is_cell_known && normalized_occupancy[cell_index] > 0u) {
+                if (normalized_occupancy[cell_index] > 0u) {
                     return;
                 }
                 normalized_occupancy[cell_index] = 0u;
-                return;
-            }
-
-            if (is_cell_known && normalized_occupancy[cell_index] > 0u) {
                 return;
             }
 
@@ -67,11 +61,10 @@ build_shader!(
 
                     let neighbor_index = u32(ny) * GRID_WIDTH + u32(nx);
                     let neighbor_count = raw_occupancy[neighbor_index];
-                    let neighbor_is_known = atomicLoad(&is_known[neighbor_index]) > 0u;
 
                     total_neighbors += 1u;
 
-                    if (neighbor_is_known || neighbor_count > 0u) {
+                    if (neighbor_count > 0u) {
                         known_neighbors += 1u;
 
                         if (neighbor_count > 0u) {
@@ -141,10 +134,6 @@ build_shader!(
             let final_score = min(100u, max(1u, total_score));
 
             normalized_occupancy[cell_index] = final_score;
-
-            if (final_score > 0u) {
-                atomicAdd(&is_known[cell_index], 1u);
-            }
         }
     "#
 );
