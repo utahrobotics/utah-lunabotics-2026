@@ -86,7 +86,7 @@ build_shader!(
             if (total_neighbors > 0u) {
                 let known_ratio = (known_neighbors * 100u) / total_neighbors;
                 if (known_ratio < min_known_neighbors_ratio) {
-                    // Too many unknown neighbors, mark this cell as unknown
+                    // Too many unknown neighbors
                     normalized_occupancy[cell_index] = 0u;
                     return;
                 }
