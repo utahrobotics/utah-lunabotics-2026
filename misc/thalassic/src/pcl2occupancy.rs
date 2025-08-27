@@ -38,7 +38,7 @@ build_shader!(
 
         let distance_from_camera = abs(camera_space_point.z);
 
-        let weight = distance_from_camera * distance_from_camera / (MAX_WEIGHT_DISTANCE * MAX_WEIGHT_DISTANCE);
+        let weight = 1.0 / (distance_from_camera * distance_from_camera);
 
         points[index] = vec4f(point.x, point.y, 0.0, point.w);
         let flattened_point = points[index];

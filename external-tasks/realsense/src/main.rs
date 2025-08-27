@@ -312,7 +312,7 @@ impl DepthCameraTask {
                 focal_length_px,
                 principal_point_px: Vector2::new(depth_format.ppx(), depth_format.ppy()),
                 max_depth: 3.0,
-                stride: 5,
+                stride: 1,
             };
 
             let depth_projector = depth_projector_builder.build(self.thalassic_ref.clone());
@@ -365,13 +365,13 @@ impl DepthCameraTask {
                 let occupancy_builder = OccupancyGridPipelineBuilder {
                     occupancy_grid_dimensions: grid_dimensions,
                     cell_size: THALASSIC_CELL_SIZE,
-                    min_points_for_occupied: 10,
-                    max_points_threshold: 10000,
-                    neighborhood_radius: 50,
+                    min_points_for_occupied: 50,
+                    max_points_threshold: 100,
+                    neighborhood_radius: 100,
                     min_known_neighbors_ratio: 20,
                     obstacle_threshold: NonZeroU32::new(30).unwrap(),
-                    min_weight_distance: 0.05,
-                    max_weight_distance: 3.2,
+                    min_weight_distance: 0.0,
+                    max_weight_distance: 4.2,
                 };
 
                 let mut occupancy_pipeline = occupancy_builder.build();
