@@ -312,10 +312,7 @@ impl DepthCameraTask {
                 focal_length_px,
                 principal_point_px: Vector2::new(depth_format.ppx(), depth_format.ppy()),
                 max_depth: 3.0,
-                min_stride: 1,
-                max_stride: 30,
-                stride_transition_start: 0.05,
-                stride_transition_end: 2.0,
+                stride: 10,
             };
 
             let depth_projector = depth_projector_builder.build(self.thalassic_ref.clone());
@@ -368,11 +365,11 @@ impl DepthCameraTask {
                 let occupancy_builder = OccupancyGridPipelineBuilder {
                     occupancy_grid_dimensions: grid_dimensions,
                     cell_size: THALASSIC_CELL_SIZE,
-                    min_points_for_occupied: 5,
+                    min_points_for_occupied: 10,
                     max_points_threshold: 50,
-                    neighborhood_radius: 20,
+                    neighborhood_radius: 50,
                     min_known_neighbors_ratio: 0,
-                    obstacle_threshold: NonZeroU32::new(40).unwrap(),
+                    obstacle_threshold: NonZeroU32::new(50).unwrap(),
                 };
 
                 let mut occupancy_pipeline = occupancy_builder.build();
@@ -534,7 +531,6 @@ impl DepthCameraTask {
 
                         match cloud_publisher.loan_uninit() {
                             Ok(sample) => {
-                                let is_final = iceoryx_cloud.is_last;
                                 let initialized = sample.write_payload(iceoryx_cloud);
                                 match initialized.send() {
                                     Ok(_) => {

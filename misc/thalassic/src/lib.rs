@@ -75,11 +75,12 @@ type BetaBindGroups = (
 );
 
 type Pcl2OccupancyBindGrp = (
-    UniformBuffer<AlignedVec2<u32>>, // image dimensions
-    UniformBuffer<u32>,              // min_points_for_occupied
-    UniformBuffer<u32>,              // max_points_threshold
-    UniformBuffer<u32>,              // neighborhood_radius
-    UniformBuffer<u32>,              // min_known_neighbors_ratio
+    UniformBuffer<AlignedVec2<u32>>,    // image dimensions
+    UniformBuffer<u32>,                 // min_points_for_occupied
+    UniformBuffer<u32>,                 // max_points_threshold
+    UniformBuffer<u32>,                 // neighborhood_radius
+    UniformBuffer<u32>,                 // min_known_neighbors_ratio
+    UniformBuffer<AlignedMatrix4<f32>>, // camera transform
 );
 
 type OccupancyGridBindGroups = (
@@ -97,10 +98,7 @@ pub struct DepthProjectorBuilder {
     pub focal_length_px: f32,
     pub principal_point_px: Vector2<f32>,
     pub max_depth: f32,
-    pub min_stride: u32,
-    pub max_stride: u32,
-    pub stride_transition_start: f32, // in meters
-    pub stride_transition_end: f32,   // in meters
+    pub stride: u32,
 }
 
 impl DepthProjectorBuilder {
@@ -121,10 +119,7 @@ impl DepthProjectorBuilder {
             principal_point_px: self.principal_point_px.into(),
             pixel_count: NonZeroU32::new(pixel_count).unwrap(),
             half_pixel_count: NonZeroU32::new(pixel_count.div_ceil(2)).unwrap(),
-            min_stride: NonZeroU32::new(self.min_stride).unwrap(),
-            max_stride: NonZeroU32::new(self.max_stride).unwrap(),
-            stride_transition_start: self.stride_transition_start,
-            stride_transition_end: self.stride_transition_end,
+            stride: NonZeroU32::new(self.stride).unwrap(),
         }
         .compile();
 
@@ -468,6 +463,7 @@ impl OccupancyGridPipeline {
         robot_radius_m: f32,
         cell_size: f32,
         occupancy_grid_out: &mut [Occupancy],
+        camera_transform: &AlignedMatrix4<f32>,
     ) {
         let mut shared_lock = self.occupancy_grid_ref.shared.lock();
 
@@ -523,6 +519,7 @@ impl OccupancyGridPipeline {
                 bind_grps
                     .1
                     .write::<4, _>(&self.min_known_neighbors_ratio, &mut lock);
+                bind_grps.1.write::<5, _>(camera_transform, &mut lock);
                 let radius_in_cells = (robot_radius_m / cell_size).ceil() as u32;
                 bind_grps.4.write::<1, _>(&radius_in_cells, &mut lock);
                 &mut bind_grps
@@ -588,6 +585,7 @@ impl OccupancyGridPipelineBuilder {
             is_known: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<5, 0>(),
             heightmap_width: self.occupancy_grid_dimensions.x,
             cell_count,
+            camera_transform: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<1, 5>(),
         }
         .compile();
 
@@ -653,7 +651,8 @@ impl OccupancyGridPipelineBuilder {
                 UniformBuffer::new(), // min_points_for_occupied
                 UniformBuffer::new(), // max_points_threshold
                 UniformBuffer::new(), // neighborhood_radius
-                UniformBuffer::new(),
+                UniformBuffer::new(), // min_known_neighbors_ratio
+                UniformBuffer::new(), // camera transform
             )),
             GpuBufferSet::from((StorageBuffer::new_dyn(cell_count.get() as usize).unwrap(),)), // raw occupancy
             GpuBufferSet::from((StorageBuffer::new_dyn(cell_count.get() as usize).unwrap(),)), // normalized occupancy
