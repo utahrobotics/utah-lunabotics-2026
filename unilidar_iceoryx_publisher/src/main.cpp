@@ -24,7 +24,7 @@ using namespace iox2;
 
 constexpr iox::units::Duration CYCLE_TIME = iox::units::Duration::fromMilliseconds(10);
 
-// Helper constants  
+// Helper constants
 constexpr std::size_t MAX_POINTS_PER_CLOUD = 6000;
 
 // Frame accumulation parameters (similar to Point LIO's con_frame mechanism)
@@ -36,18 +36,18 @@ struct FrameAccumulator {
     std::vector<PointXYZIR> accumulated_points;
     int frame_count = 0;
     double first_frame_time = 0.0;
-    
+
     void reset() {
         accumulated_points.clear();
         frame_count = 0;
         first_frame_time = 0.0;
     }
-    
+
     bool addFrame(const PointCloudUnitree &cloud) {
         if (frame_count == 0) {
             first_frame_time = cloud.stamp;
         }
-        
+
         // Find the time range within this cloud for normalization to [0,1] range
         double min_time = std::numeric_limits<double>::max();
         double max_time = std::numeric_limits<double>::lowest();
@@ -55,10 +55,10 @@ struct FrameAccumulator {
             min_time = std::min(min_time, static_cast<double>(point.time));
             max_time = std::max(max_time, static_cast<double>(point.time));
         }
-        
+
         double time_range = max_time - min_time;
         if (time_range <= 0.0) time_range = 1.0; // Avoid division by zero
-        
+
         for (const auto &point : cloud.points) {
             PointXYZIR p;
             p.x = point.x;
@@ -66,15 +66,15 @@ struct FrameAccumulator {
             p.z = point.z;
 
             p.intensity = point.intensity;
-            
+
             // Normalize timestamp to [0,1] range for KISS-ICP deskewing
             // This ensures proper motion compensation within each accumulated frame
             p.time = (point.time - min_time) / time_range;
-            
+
             p.ring = static_cast<std::uint16_t>(point.ring);
             accumulated_points.push_back(p);
         }
-        
+
         frame_count++;
         return frame_count >= ACCUMULATION_COUNT;
     }
@@ -83,7 +83,7 @@ struct FrameAccumulator {
 // Convert accumulated points to the fixed-size Iceoryx structure
 static IceoryxPointCloud toIceoryxPointCloud(const std::vector<PointXYZIR> &points) {
     IceoryxPointCloud dst{}; // zero-initialise all fields
-
+    dst.is_last = true;
     // Cap publish_count if the accumulated cloud is larger than our fixed array
     dst.publish_count = std::min<std::size_t>(points.size(), MAX_POINTS_PER_CLOUD);
 
@@ -108,9 +108,9 @@ static IceoryxPointCloud toIceoryxPointCloudSingle(const PointCloudUnitree &src)
         min_time = std::min(min_time, static_cast<double>(src.points[i].time));
         max_time = std::max(max_time, static_cast<double>(src.points[i].time));
     }
-    
+
     double time_range = max_time - min_time;
-    if (time_range <= 0.0) time_range = 1.0; 
+    if (time_range <= 0.0) time_range = 1.0;
 
     for (std::size_t i = 0; i < dst.publish_count; ++i) {
         const auto &p_src = src.points[i];
@@ -213,18 +213,18 @@ int main() {
                     if (accumulator.addFrame(cloud_raw)) {
                         // Ready to send accumulated cloud
                         IceoryxPointCloud cloud = toIceoryxPointCloud(accumulator.accumulated_points);
-                        std::cout << "Accumulated " << accumulator.frame_count << " frames, total points: " 
+                        std::cout << "Accumulated " << accumulator.frame_count << " frames, total points: "
                                   << cloud.publish_count << " (raw accumulated: " << accumulator.accumulated_points.size() << ")" << std::endl;
-                        
+
                         auto sample      = cloud_publisher.loan_uninit().expect("cloud loan");
                         auto initialized = sample.write_payload(cloud);
                         send(std::move(initialized)).expect("cloud send");
                         std::cout << "Accumulated cloud sent" << std::endl;
-                        
+
                         // Reset accumulator for next batch
                         accumulator.reset();
                     } else {
-                        std::cout << "Frame " << accumulator.frame_count << "/" << ACCUMULATION_COUNT 
+                        std::cout << "Frame " << accumulator.frame_count << "/" << ACCUMULATION_COUNT
                                   << " accumulated (" << cloud_raw.points.size() << " points)" << std::endl;
                     }
                 } else {

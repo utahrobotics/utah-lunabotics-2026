@@ -48,12 +48,13 @@ impl Default for IceoryxOccupancyGrid {
 
 /// Maximum number of points stored in the fixed-size point-cloud message.
 /// Reduced from 130 000 → 20 000 to keep message size (and stack usage in Rust) reasonable.
-pub const MAX_POINT_CLOUD_POINTS: usize = 6000;
+pub const MAX_POINT_CLOUD_POINTS: usize = 20000;
 
 #[repr(C)]
 #[derive(Clone, Debug, ZeroCopySend, Encode, Decode, Serialize)]
 #[type_name("IceoryxPointCloud")]
 pub struct IceoryxPointCloud {
+    pub is_last: bool,
     pub publish_count: u64,
     #[serde(serialize_with = "<[_]>::serialize")]
     pub points: [PointXYZIR; MAX_POINT_CLOUD_POINTS],
@@ -62,9 +63,60 @@ pub struct IceoryxPointCloud {
 impl Default for IceoryxPointCloud {
     fn default() -> Self {
         Self {
+            is_last: true,
             publish_count: 0,
             points: [PointXYZIR::default(); MAX_POINT_CLOUD_POINTS],
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct PointCloudAccumulator {
+    points: Vec<PointXYZIR>,
+}
+
+impl Default for PointCloudAccumulator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl PointCloudAccumulator {
+    pub fn new() -> Self {
+        Self { points: Vec::new() }
+    }
+
+    /// returns Ok(Some(&points)) if this was the last message and point cloud is complete
+    /// returns Ok(None) if more messages are expected
+    /// returns Err if there's a publish count mismatch
+    pub fn add_message(
+        &mut self,
+        cloud: &IceoryxPointCloud,
+    ) -> Result<Option<&[PointXYZIR]>, &'static str> {
+        self.points.extend_from_slice(&cloud.points);
+
+        if cloud.is_last {
+            Ok(Some(&self.points))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn take_completed(&mut self) -> Vec<PointXYZIR> {
+        let points = std::mem::take(&mut self.points);
+        points
+    }
+
+    pub fn point_count(&self) -> usize {
+        self.points.len()
+    }
+
+    pub fn reset(&mut self) {
+        self.points.clear();
+    }
+
+    pub fn accumulated_points(&self) -> &[PointXYZIR] {
+        &self.points
     }
 }
 

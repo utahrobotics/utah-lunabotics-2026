@@ -82,7 +82,7 @@ fn launch_subprocs() {
     if suppress_output {
         unilidar_cmd = unilidar_cmd.with_suppress_output(true);
     }
-    launcher.add_command("unilidar publisher", unilidar_cmd);
+    // launcher.add_command("unilidar publisher", unilidar_cmd);
 
     let mut realsense_cmd = ProcessCommand::new("cargo")
         .with_args(vec!["run", "--release"])

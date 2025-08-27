@@ -97,6 +97,10 @@ pub struct DepthProjectorBuilder {
     pub focal_length_px: f32,
     pub principal_point_px: Vector2<f32>,
     pub max_depth: f32,
+    pub min_stride: u32,
+    pub max_stride: u32,
+    pub stride_transition_start: f32, // in meters
+    pub stride_transition_end: f32,   // in meters
 }
 
 impl DepthProjectorBuilder {
@@ -117,7 +121,10 @@ impl DepthProjectorBuilder {
             principal_point_px: self.principal_point_px.into(),
             pixel_count: NonZeroU32::new(pixel_count).unwrap(),
             half_pixel_count: NonZeroU32::new(pixel_count.div_ceil(2)).unwrap(),
-            stride: NonZeroU32::new(stride).unwrap(),
+            min_stride: NonZeroU32::new(self.min_stride).unwrap(),
+            max_stride: NonZeroU32::new(self.max_stride).unwrap(),
+            stride_transition_start: self.stride_transition_start,
+            stride_transition_end: self.stride_transition_end,
         }
         .compile();
 

@@ -311,7 +311,11 @@ impl DepthCameraTask {
                 ),
                 focal_length_px,
                 principal_point_px: Vector2::new(depth_format.ppx(), depth_format.ppy()),
-                max_depth: 2.0,
+                max_depth: 3.0,
+                min_stride: 1,
+                max_stride: 10,
+                stride_transition_start: 0.05,
+                stride_transition_end: 2.0,
             };
 
             let depth_projector = depth_projector_builder.build(self.thalassic_ref.clone());
@@ -326,11 +330,14 @@ impl DepthCameraTask {
                     &ServiceName::new(&cloud_service_name).expect("Invalid service name"),
                 )
                 .publish_subscribe::<IceoryxPointCloud>()
+                .enable_safe_overflow(false)
+                .subscriber_max_buffer_size(20)
                 .open_or_create()
                 .expect("Failed to create cloud service");
 
             let cloud_publisher = cloud_service
                 .publisher_builder()
+                .unable_to_deliver_strategy(UnableToDeliverStrategy::Block)
                 .create()
                 .expect("Failed to create cloud publisher");
 
@@ -364,7 +371,7 @@ impl DepthCameraTask {
                     min_points_for_occupied: 5,
                     max_points_threshold: 50,
                     neighborhood_radius: 20,
-                    min_known_neighbors_ratio: 20,
+                    min_known_neighbors_ratio: 0,
                     obstacle_threshold: NonZeroU32::new(40).unwrap(),
                 };
 
@@ -493,48 +500,68 @@ impl DepthCameraTask {
                     .into();
 
                 depth_projector.project(slice, &identity_transform, depth_scale, Some(point_cloud));
-
                 if self.depth_enabled {
-                    let mut iceoryx_cloud = IceoryxPointCloud::default();
-                    let mut point_count = 0;
+                    let valid_points: Vec<_> = point_cloud
+                        .iter()
+                        .filter_map(|&point| {
+                            if point.w != 0.0 {
+                                Some(PointXYZIR {
+                                    x: point.x,
+                                    y: point.y,
+                                    z: point.z,
+                                    intensity: 1.0,
+                                    time: 0.5,
+                                    ring: 0,
+                                })
+                            } else {
+                                None
+                            }
+                        })
+                        .collect();
 
-                    for (_idx, &point) in point_cloud.iter().enumerate() {
-                        if point.w != 0.0 && point_count < MAX_POINT_CLOUD_POINTS {
-                            iceoryx_cloud.points[point_count] = PointXYZIR {
-                                x: point.x,
-                                y: point.y,
-                                z: point.z,
-                                intensity: 1.0,
-                                time: 0.5,
-                                ring: 0,
-                            };
-                            point_count += 1;
+                    let chunks: Vec<_> = valid_points.chunks(MAX_POINT_CLOUD_POINTS).collect();
+                    let total_chunks = chunks.len();
+
+                    for (chunk_idx, chunk) in chunks.into_iter().enumerate() {
+                        let mut iceoryx_cloud = IceoryxPointCloud::default();
+
+                        for (i, &point) in chunk.iter().enumerate() {
+                            iceoryx_cloud.points[i] = point;
                         }
-                    }
 
-                    iceoryx_cloud.publish_count = point_count as u64;
+                        iceoryx_cloud.publish_count = chunk.len() as u64;
+                        iceoryx_cloud.is_last = chunk_idx == total_chunks - 1;
 
-                    if point_count > 0 {
                         match cloud_publisher.loan_uninit() {
                             Ok(sample) => {
+                                let is_final = iceoryx_cloud.is_last;
                                 let initialized = sample.write_payload(iceoryx_cloud);
                                 match initialized.send() {
                                     Ok(_) => {
-                                        println!(
-                                            "Published {} points from camera {}",
-                                            point_count, self.serial
-                                        );
+                                        // println!(
+                                        //     "Published {} points (chunk {}/{}) from camera {} {}",
+                                        //     chunk.len(),
+                                        //     chunk_idx + 1,
+                                        //     total_chunks,
+                                        //     self.serial,
+                                        //     if is_final { "[FINAL]" } else { "" }
+                                        // );
                                     }
                                     Err(_e) => {
                                         eprintln!(
-                                            "Failed to send point cloud from camera {}",
+                                            "Failed to send point cloud chunk {} from camera {}",
+                                            chunk_idx + 1,
                                             self.serial
                                         );
                                     }
                                 }
                             }
                             Err(_e) => {
-                                eprintln!("Failed to loan sample for camera {}", self.serial);
+                                eprintln!(
+                                    "Failed to loan sample for camera {} chunk {}",
+                                    self.serial,
+                                    chunk_idx + 1
+                                );
                             }
                         }
                     }
@@ -596,7 +623,6 @@ impl DepthCameraTask {
 fn main() {
     println!("Starting RealSense depth camera publisher with occupancy grid");
 
-    // std::env::set_var("STRIDE", "20");
     // Configure cameras with both point cloud and occupancy grid enabled
     let cameras = vec![DepthCameraInfo {
         serial: "311322302990".to_string(),

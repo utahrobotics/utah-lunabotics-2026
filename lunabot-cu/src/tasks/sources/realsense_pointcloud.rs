@@ -9,7 +9,7 @@ use cu29::{
     output_msg,
     prelude::*,
 };
-use iceoryx_types::{IceoryxPointCloud, PointXYZIR};
+use iceoryx_types::{IceoryxPointCloud, PointCloudAccumulator, PointXYZIR};
 use iceoryx2::node::NodeBuilder;
 use iceoryx2::port::subscriber::Subscriber;
 use iceoryx2::prelude::*;
@@ -23,6 +23,7 @@ pub struct RealSensePointCloudReceiver {
     subscriber: Option<Subscriber<ipc::Service, IceoryxPointCloud, ()>>,
     camera_node: StaticNode,
     last_seen: u64,
+    accumulator: PointCloudAccumulator,
 }
 
 impl Freezable for RealSensePointCloudReceiver {}
@@ -66,6 +67,7 @@ impl CuSrcTask for RealSensePointCloudReceiver {
             subscriber: None,
             camera_node,
             last_seen: 0,
+            accumulator: PointCloudAccumulator::new(),
         })
     }
 
@@ -75,11 +77,14 @@ impl CuSrcTask for RealSensePointCloudReceiver {
             .node
             .service_builder(&self.service_name)
             .publish_subscribe::<IceoryxPointCloud>()
+            .subscriber_max_buffer_size(20)
+            .enable_safe_overflow(false)
             .open_or_create()
             .map_err(|e| CuError::new_with_cause("RealSensePointCloudReceiver: service", e))?;
 
         let subscriber = service
             .subscriber_builder()
+            .buffer_size(19)
             .create()
             .map_err(|e| CuError::new_with_cause("RealSensePointCloudReceiver: subscriber", e))?;
 
@@ -100,30 +105,61 @@ impl CuSrcTask for RealSensePointCloudReceiver {
             .receive()
             .map_err(|e| CuError::new_with_cause("PointCloudIceoryxReceiver: receive", e))?
         {
-            let mut payload = sample.payload().clone();
-            let mut positions = Vec::new();
-            let mut colors = Vec::new();
+            let payload = sample.payload();
 
-            for point in payload.points.iter_mut() {
-                let transformed = point.to_nalgebra();
-                positions.push([
-                    transformed.x as f32,
-                    transformed.y as f32,
-                    transformed.z as f32,
-                ]);
-                colors.push([0, 100, 100]);
-                *point =
-                    PointXYZIR::from_nalgebra(transformed, point.intensity, point.time, point.ring);
+            match self.accumulator.add_message(payload) {
+                Ok(Some(complete_points)) => {
+                    let mut positions = Vec::new();
+                    let mut colors = Vec::new();
+
+                    for point in complete_points.iter() {
+                        if point.x != 0.0 || point.y != 0.0 || point.z != 0.0 {
+                            positions.push([point.x as f32, point.y as f32, point.z as f32]);
+                            colors.push([0, 100, 100]);
+                        }
+                    }
+
+                    if !positions.is_empty() {
+                        if let Err(e) = RECORDER.get().unwrap().recorder.log(
+                            "realsense",
+                            &rerun::Points3D::new(positions)
+                                .with_colors(colors)
+                                .with_radii([0.02f32]),
+                        ) {
+                            warning!(
+                                "Failed to log complete point cloud to Rerun: {}",
+                                e.to_string()
+                            );
+                        }
+                    }
+
+                    let _ = self.accumulator.take_completed();
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    eprintln!("Point cloud accumulator error: {}", e);
+                    self.accumulator.reset();
+
+                    let mut positions = Vec::new();
+                    let mut colors = Vec::new();
+
+                    for point in payload.points[..payload.publish_count as usize].iter() {
+                        positions.push([point.x as f32, point.y as f32, point.z as f32]);
+                        colors.push([0, 100, 100]);
+                    }
+
+                    if let Err(e) = RECORDER.get().unwrap().recorder.log(
+                        "realsense",
+                        &rerun::Points3D::new(positions)
+                            .with_colors(colors)
+                            .with_radii([0.02f32]),
+                    ) {
+                        warning!("Failed to log fallback points to Rerun: {}", e.to_string());
+                    }
+                }
             }
-            if let Err(e) = RECORDER.get().unwrap().recorder.log(
-                "realsense",
-                &rerun::Points3D::new(positions)
-                    .with_colors(colors)
-                    .with_radii([0.02f32]),
-            ) {
-                warning!("Failed to log accumulated map to Rerun: {}", e.to_string());
-            }
-            new_msg.set_payload(payload);
+
+            new_msg.set_payload(payload.clone());
             self.last_seen = clock.now().as_nanos();
         }
 
@@ -140,6 +176,7 @@ impl CuSrcTask for RealSensePointCloudReceiver {
     fn stop(&mut self, _clock: &RobotClock) -> CuResult<()> {
         self.service = None;
         self.subscriber = None;
+        self.accumulator.reset();
         Ok(())
     }
 }

@@ -1,7 +1,7 @@
 use cu29::cutask::{CuSrcTask, Freezable};
 use cu29::prelude::*;
-use iceoryx2::{port::subscriber::Subscriber, prelude::*};
 use iceoryx2::service::port_factory::publish_subscribe::PortFactory;
+use iceoryx2::{port::subscriber::Subscriber, prelude::*};
 
 use iceoryx_types::IceoryxOccupancyGrid;
 use simple_motion::StaticNode;
@@ -43,7 +43,8 @@ impl CuSrcTask for OccupancyGridSource {
 
     fn new(config: Option<&cu29::prelude::ComponentConfig>) -> cu29::CuResult<Self>
     where
-        Self: Sized {
+        Self: Sized,
+    {
         let service_str = config
             .and_then(|c| c.get::<String>("service"))
             .unwrap_or_else(|| "realsense/309622300683/occupancy".to_string());
@@ -82,7 +83,11 @@ impl CuSrcTask for OccupancyGridSource {
         })
     }
 
-    fn process<'o>(&mut self, clock: &cu29::prelude::RobotClock, new_msg: &mut Self::Output<'o>) -> cu29::CuResult<()> {
+    fn process<'o>(
+        &mut self,
+        clock: &cu29::prelude::RobotClock,
+        new_msg: &mut Self::Output<'o>,
+    ) -> cu29::CuResult<()> {
         new_msg.clear_payload();
 
         let subscriber = self
@@ -98,7 +103,6 @@ impl CuSrcTask for OccupancyGridSource {
             .map_err(|e| CuError::new_with_cause("OccupancyGridSource: receive", e))?
         {
             let payload = sample.payload().clone();
-            println!("got occupancy grid");
             new_msg.set_payload(payload);
             self.last_seen = clock.now().as_nanos();
         }
