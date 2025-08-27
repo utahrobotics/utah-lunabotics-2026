@@ -312,7 +312,7 @@ impl DepthCameraTask {
                 focal_length_px,
                 principal_point_px: Vector2::new(depth_format.ppx(), depth_format.ppy()),
                 max_depth: 3.0,
-                stride: 10,
+                stride: 5,
             };
 
             let depth_projector = depth_projector_builder.build(self.thalassic_ref.clone());
@@ -368,9 +368,9 @@ impl DepthCameraTask {
                     min_points_for_occupied: 10,
                     max_points_threshold: 10000,
                     neighborhood_radius: 50,
-                    min_known_neighbors_ratio: 0,
+                    min_known_neighbors_ratio: 20,
                     obstacle_threshold: NonZeroU32::new(30).unwrap(),
-                    min_weight_distance: 0.40,
+                    min_weight_distance: 0.05,
                     max_weight_distance: 3.2,
                 };
 
@@ -573,7 +573,7 @@ impl DepthCameraTask {
                     ) {
                         if pipeline.will_process() {
                             pipeline.process(
-                                0.25,
+                                0.05,
                                 THALASSIC_CELL_SIZE,
                                 grid,
                                 &self
