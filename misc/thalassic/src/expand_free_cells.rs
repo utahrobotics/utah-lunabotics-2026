@@ -5,6 +5,8 @@ build_shader!(
 r#"
 #[buffer] var<storage, read_write> expanded_obstacle_map: array<u32>;
 #[buffer] var<storage, read_write> final_map: array<u32>;
+#[buffer] var<storage, read_write> is_known: array<atomic<u32>>;
+
 
 const GRID_WIDTH: NonZeroU32 = {{grid_width}};
 const GRID_HEIGHT: NonZeroU32 = {{grid_height}};
@@ -39,6 +41,7 @@ fn compute_main(@builtin(global_invocation_id) cell: vec3u) {
             let i = xy_to_index(vec2u(x, y));
             if (expanded_obstacle_map[i] == 0) {
                 final_map[center_i] = 1;
+                // atomicAdd(&is_known[center_i], 1u);
                 return;
             }
         }

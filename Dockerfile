@@ -33,6 +33,7 @@ RUN apt-get update && apt-get install -y \
     libges-1.0-dev \
     # Video4Linux development
     libv4l-dev \
+    libunwind-dev \
     # udev development
     libudev-dev \
     # Additional dependencies that might be needed
