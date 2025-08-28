@@ -30,15 +30,15 @@ build_shader!(
         let camera_translation = camera_transform[3].xyz;
         let camera_space_point = camera_inverse * (point.xyz - camera_translation);
         let distance_from_camera = length(camera_space_point);
-        let weight = distance_from_camera * distance_from_camera;
+        let weight = pow(distance_from_camera/3.2, 2);
         let x_index = u32(point.x / CELL_SIZE);
         let y_index = u32(point.y / CELL_SIZE);
         if (x_index >= HEIGHTMAP_WIDTH || y_index >= (CELL_COUNT / HEIGHTMAP_WIDTH)) {
             return;
         }
         let cell_index = y_index * HEIGHTMAP_WIDTH + x_index;
-        let weighted_value = u32(weight * 1000.0);
-        atomicAdd(&obstacle_map[cell_index], weighted_value);
+        let weighted_value = (f32(obstacle_map[cell_index]) * weight) + 10.0;
+        atomicStore(&obstacle_map[cell_index], u32(weighted_value));
     }
     "#
 );
