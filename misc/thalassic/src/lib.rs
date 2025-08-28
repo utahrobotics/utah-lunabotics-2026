@@ -14,6 +14,8 @@ use gputter::{
 };
 use nalgebra::{Vector2, Vector3};
 
+mod adjust_for_camera_position;
+mod clear_cells;
 mod depth2pcl;
 mod expand_free_cells;
 mod expand_occupancy;
@@ -21,7 +23,6 @@ mod obstaclefilter;
 mod occupancy_normalize;
 mod pcl2obstacle;
 mod pcl2occupancy;
-mod clear_cells;
 
 mod expand_obstacles;
 use expand_obstacles::ExpandObstacles;
@@ -30,7 +31,9 @@ use parking_lot::Mutex;
 use pcl2obstacle::Pcl2Obstacle;
 
 use crate::{
-    clear_cells::ClearCells, expand_occupancy::ExpandOccupancy, occupancy_normalize::OccupancyNormalize, pcl2occupancy::Pcl2Occupancy
+    adjust_for_camera_position::AdjustOccupancyForCameraPosition, clear_cells::ClearCells,
+    expand_occupancy::ExpandOccupancy, occupancy_normalize::OccupancyNormalize,
+    pcl2occupancy::Pcl2Occupancy,
 };
 // use pcl2sum::Pcl2Sum;
 // use sum2height::Sum2Height;
@@ -434,7 +437,7 @@ impl ThalassicPipeline {
 }
 
 pub struct OccupancyGridPipeline {
-    pipeline: ComputePipeline<OccupancyGridBindGroups, 4>,
+    pipeline: ComputePipeline<OccupancyGridBindGroups, 5>,
     cell_count: NonZeroU32,
     grid_dimensions: Vector2<NonZeroU32>,
     bind_grps: Option<(
@@ -442,7 +445,6 @@ pub struct OccupancyGridPipeline {
         GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>, // raw occupancy
         GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>, // normalized occupancy
         GpuBufferSet<ExpanderBindGrp>,
-        GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>, // is_known
     )>,
     pub occupancy_grid_ref: ThalassicPipelineRef,
     // Normalization parameters
@@ -471,7 +473,7 @@ impl OccupancyGridPipeline {
         }
 
         let mut shared = shared_lock.0.take().unwrap();
-        let (uniforms_grp, raw_occupancy_grp, normalized_occupancy_grp, expander_grp, is_known) =
+        let (uniforms_grp, raw_occupancy_grp, normalized_occupancy_grp, expander_grp) =
             self.bind_grps.take().unwrap();
 
         let mut bind_grps: OccupancyGridBindGroups = (
@@ -484,6 +486,11 @@ impl OccupancyGridPipeline {
 
         // Set workgroups for both stages
         self.pipeline.workgroups[0] = Vector3::new(
+            shared.image_dimensions.x.div_ceil(8),
+            shared.image_dimensions.y.div_ceil(8),
+            1,
+        );
+        self.pipeline.workgroups[1] = Vector3::new(
             shared.image_dimensions.x.div_ceil(8),
             shared.image_dimensions.y.div_ceil(8),
             1,
@@ -524,13 +531,8 @@ impl OccupancyGridPipeline {
             })
             .finish();
 
-        let (
-            points_grp,
-            uniforms_grp,
-            raw_occupancy_grp,
-            normalized_occupancy_grp,
-            expander_grp,
-        ) = bind_grps;
+        let (points_grp, uniforms_grp, raw_occupancy_grp, normalized_occupancy_grp, expander_grp) =
+            bind_grps;
 
         // Read the expanded occupancy grid results back to the output buffer
         expander_grp
@@ -544,7 +546,6 @@ impl OccupancyGridPipeline {
             raw_occupancy_grp,
             normalized_occupancy_grp,
             expander_grp,
-            is_known,
         ));
         shared.points = points_grp;
         shared_lock.0.replace(shared);
@@ -583,7 +584,8 @@ impl OccupancyGridPipelineBuilder {
             image_dimensions: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<1, 0>(),
             heightmap_width: self.occupancy_grid_dimensions.x,
             cell_count,
-        }.compile();
+        }
+        .compile();
 
         let [pcl2occupancy] = Pcl2Occupancy {
             cell_size: self.cell_size,
@@ -595,6 +597,17 @@ impl OccupancyGridPipelineBuilder {
             camera_transform: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<1, 5>(),
             max_weight_distance: self.max_weight_distance,
             min_weight_distance: self.min_weight_distance,
+        }
+        .compile();
+
+        let [adjust_for_camera_position] = AdjustOccupancyForCameraPosition {
+            obstacle_map: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<2, 0>(),
+            points: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<0, 0>(),
+            image_dimensions: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<1, 0>(),
+            camera_transform: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<1, 5>(),
+            heightmap_width: self.occupancy_grid_dimensions.x,
+            cell_count,
+            cell_size: self.cell_size,
         }
         .compile();
 
@@ -635,12 +648,18 @@ impl OccupancyGridPipelineBuilder {
             }
             .compile();
 
-        let mut pipeline =
-            ComputePipeline::new([&clear_map, &pcl2occupancy, &occupancy_normalizer, &occupancy_expander]);
+        let mut pipeline = ComputePipeline::new([
+            &clear_map,
+            &pcl2occupancy,
+            &adjust_for_camera_position,
+            &occupancy_normalizer,
+            &occupancy_expander,
+        ]);
 
         pipeline.workgroups = [
-            Vector3::new(1, 1, 1),
-            Vector3::new(1, 1, 1),
+            Vector3::new(1, 1, 1), // set in process()
+            Vector3::new(1, 1, 1), // set in process()
+            Vector3::new(1, 1, 1), // set in process()
             Vector3::new(
                 self.occupancy_grid_dimensions.x.get().div_ceil(8),
                 self.occupancy_grid_dimensions.y.get().div_ceil(8),
@@ -668,7 +687,6 @@ impl OccupancyGridPipelineBuilder {
                 StorageBuffer::new_dyn(cell_count.get() as usize).unwrap(),
                 UniformBuffer::new(),
             )),
-            GpuBufferSet::from((StorageBuffer::new_dyn(cell_count.get() as usize).unwrap(),)),
         ));
 
         OccupancyGridPipeline {

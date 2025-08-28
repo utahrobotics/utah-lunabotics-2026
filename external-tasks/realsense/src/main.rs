@@ -3,7 +3,7 @@ use std::{
     num::NonZeroU32,
     ops::Deref,
     sync::mpsc::{Receiver, Sender, SyncSender},
-    time::Duration,
+    time::Duration, u32::MIN,
 };
 
 use common::{THALASSIC_CELL_SIZE, THALASSIC_HEIGHT, THALASSIC_WIDTH};
@@ -31,6 +31,10 @@ use thalassic::{
     DepthProjector, DepthProjectorBuilder, Occupancy, OccupancyGridPipeline,
     OccupancyGridPipelineBuilder, ThalassicPipelineRef,
 };
+
+pub static ROBOT_RADIUS: f32 = 0.2;
+pub static MIN_KNOWN_NEIGHBORS_RATIO: u32 = 60;
+pub static NEIGHBORHOOD_RADIUS: u32 = 20;
 
 pub struct DepthCameraInfo {
     pub serial: String,
@@ -365,13 +369,13 @@ impl DepthCameraTask {
                 let occupancy_builder = OccupancyGridPipelineBuilder {
                     occupancy_grid_dimensions: grid_dimensions,
                     cell_size: THALASSIC_CELL_SIZE,
-                    min_points_for_occupied: 10,
-                    max_points_threshold: 100,
-                    neighborhood_radius: 20,
-                    min_known_neighbors_ratio: 20,
+                    min_points_for_occupied: 10, // currently not used
+                    max_points_threshold: 100, // currently not used
+                    neighborhood_radius: NEIGHBORHOOD_RADIUS,
+                    min_known_neighbors_ratio: MIN_KNOWN_NEIGHBORS_RATIO,
                     obstacle_threshold: NonZeroU32::new(30).unwrap(),
-                    min_weight_distance: 0.0,
-                    max_weight_distance: 2.2,
+                    min_weight_distance: 0.0, // also not currently used, but left in just in case
+                    max_weight_distance: 2.2, // also not currently used, but left in just in case
                 };
 
                 let mut occupancy_pipeline = occupancy_builder.build();
@@ -573,7 +577,7 @@ impl DepthCameraTask {
                     ) {
                         if pipeline.will_process() {
                             pipeline.process(
-                                0.05,
+                                ROBOT_RADIUS,
                                 THALASSIC_CELL_SIZE,
                                 grid,
                                 &self
