@@ -1,3 +1,4 @@
+use std::fmt::format;
 use std::{sync::OnceLock, time::Instant};
 use std::process::{Command, Stdio};
 use std::net::TcpStream;
@@ -83,8 +84,8 @@ pub fn init_rerun(rerun_viz: RerunViz) -> Result<(), CuError> {
                 level,
             )
         },
-        RerunViz::Grpc(level, url) => (
-            match rerun::RecordingStreamBuilder::new("lunabot").connect_grpc_opts(&url, None) {
+        RerunViz::Grpc(level, ip) => (
+            match rerun::RecordingStreamBuilder::new("lunabot").connect_grpc_opts(&format!("rerun+http://{ip}:9876/proxy"), None) {
                 Ok(x) => {
                     x
                 },

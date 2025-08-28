@@ -1,5 +1,5 @@
 use crate::ROOT_NODE;
-use crate::rerun_viz::RECORDER;
+use crate::rerun_viz::{Level, RECORDER};
 use cu29::cutask::CuMsg;
 use cu29::{
     CuError, CuResult,
@@ -119,7 +119,7 @@ impl CuSrcTask for RealSensePointCloudReceiver {
                         }
                     }
 
-                    if !positions.is_empty() {
+                    if !positions.is_empty() && RECORDER.get().unwrap().level == Level::All {
                         if let Err(e) = RECORDER.get().unwrap().recorder.log(
                             "realsense",
                             &rerun::Points3D::new(positions)
@@ -148,13 +148,15 @@ impl CuSrcTask for RealSensePointCloudReceiver {
                         colors.push([0, 100, 100]);
                     }
 
-                    if let Err(e) = RECORDER.get().unwrap().recorder.log(
-                        "realsense",
-                        &rerun::Points3D::new(positions)
-                            .with_colors(colors)
-                            .with_radii([0.02f32]),
-                    ) {
-                        warning!("Failed to log fallback points to Rerun: {}", e.to_string());
+                    if RECORDER.get().unwrap().level == Level::All {
+                        if let Err(e) = RECORDER.get().unwrap().recorder.log(
+                            "realsense",
+                            &rerun::Points3D::new(positions)
+                                .with_colors(colors)
+                                .with_radii([0.02f32]),
+                        ) {
+                            warning!("Failed to log fallback points to Rerun: {}", e.to_string());
+                        }
                     }
                 }
             }
