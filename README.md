@@ -3,7 +3,7 @@
 *This repo is in the early stages of a rewrite migrating to the copper framework from last years code base: github.com/utahrobotics/lunadev-2025*
 
 ## Architecture Overview
-<img width="4000" height="1114" alt="graphviz(1)" src="https://github.com/user-attachments/assets/9c1381c1-8286-4561-a0cc-5f87f72bd1b4" />
+<img width="4238" height="1064" alt="graphviz(2)" src="https://github.com/user-attachments/assets/1fed9b5c-01c8-4025-a19f-879566554475" />
 
 ##### Check copperconfig.ron to see the definitions of all the tasks running and the datatypes passed between tasks.
 
@@ -23,6 +23,7 @@
    ```
 
 2. Rerun - visualize data produced by the robot.
+3. iox2 cli tool for seeing active iceoryx2 nodes and services.
 
 
 
