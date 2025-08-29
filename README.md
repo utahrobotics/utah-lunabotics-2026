@@ -3,7 +3,7 @@
 *This repo is in the early stages of a rewrite migrating to the copper framework from last years code base: github.com/utahrobotics/lunadev-2025*
 
 ## Architecture Overview
-<img width="4210" height="834" alt="graphviz" src="https://github.com/user-attachments/assets/7a088db9-2914-4817-95a1-f575d1092c70" />
+<img width="4000" height="1114" alt="graphviz(1)" src="https://github.com/user-attachments/assets/9c1381c1-8286-4561-a0cc-5f87f72bd1b4" />
 
 ##### Check copperconfig.ron to see the definitions of all the tasks running and the datatypes passed between tasks.
 
@@ -29,12 +29,11 @@
 
 ## Building and Running
 1. Install rust from rustup.rs
-2. set the rust version ```rustup install nightly-2025-03-18-x86_64-unknown-linux-gnu```
-2. ```rustup default nightly-2025-03-18-x86_64-unknown-linux-gnu```
-3. sometimes you have to increase the stack size for it to compile ```export RUST_MIN_STACK=107108864```
-4. Install dependencies listen in the Dockerfile
-5. run ```make sync``` to build the Unitree L2 publisher
-6. run ```make prod``` to build and run the project
+2. ```rustup default nightly```
+3. On some machines you have to increase the stack size for it to compile ```export RUST_MIN_STACK=107108864```.
+4. Install dependencies listed in the Dockerfile.
+5. run ```make sync``` to build the Unitree L2 publisher.
+6. run ```make prod``` to build and run the project.
 
 ```bash
 make help # see commands for building and running
