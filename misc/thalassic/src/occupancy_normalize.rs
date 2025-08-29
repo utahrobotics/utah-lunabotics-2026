@@ -5,13 +5,12 @@ build_shader!(
         const CELL_COUNT: NonZeroU32 = {{cell_count}};
         const GRID_WIDTH: NonZeroU32 = {{grid_width}};
         const GRID_HEIGHT: NonZeroU32 = {{grid_height}};
+        const min_points_for_occupied: u32 = {{min_points_for_occupied}};
 
         // Input: raw occupancy counts from previous shader
         #[buffer] var<storage, read_write> raw_occupancy: array<u32, CELL_COUNT>;
         // Output: normalized occupancy scores (0-100, 0 = unknown)
         #[buffer] var<storage, read_write> normalized_occupancy: array<u32, CELL_COUNT>;
-        #[buffer] var<uniform> min_points_for_occupied: u32;
-        #[buffer] var<uniform> max_points_threshold: u32;
         #[buffer] var<uniform> neighborhood_radius: u32;
         #[buffer] var<uniform> min_known_neighbors_ratio: u32;
 

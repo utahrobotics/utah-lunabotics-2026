@@ -78,12 +78,10 @@ type BetaBindGroups = (
 );
 
 type Pcl2OccupancyBindGrp = (
-    UniformBuffer<AlignedVec2<u32>>,    // image dimensions
-    UniformBuffer<u32>,                 // min_points_for_occupied
-    UniformBuffer<u32>,                 // max_points_threshold
-    UniformBuffer<u32>,                 // neighborhood_radius
-    UniformBuffer<u32>,                 // min_known_neighbors_ratio
-    UniformBuffer<AlignedMatrix4<f32>>, // camera transform
+    UniformBuffer<AlignedVec2<u32>>,    // 0 - image dimensions
+    UniformBuffer<u32>,                 // 1 - neighborhood_radius
+    UniformBuffer<u32>,                 // 2 - min_known_neighbors_ratio
+    UniformBuffer<AlignedMatrix4<f32>>, // 3 - camera transform
 );
 
 type OccupancyGridBindGroups = (
@@ -447,9 +445,6 @@ pub struct OccupancyGridPipeline {
         GpuBufferSet<ExpanderBindGrp>,
     )>,
     pub occupancy_grid_ref: ThalassicPipelineRef,
-    // Normalization parameters
-    min_points_for_occupied: u32,
-    max_points_threshold: u32,
     neighborhood_radius: u32,
     min_known_neighbors_ratio: u32,
 }
@@ -514,17 +509,11 @@ impl OccupancyGridPipeline {
                     .write::<0, _>(&shared.image_dimensions.into(), &mut lock);
                 bind_grps
                     .1
-                    .write::<1, _>(&self.min_points_for_occupied, &mut lock);
+                    .write::<1, _>(&self.neighborhood_radius, &mut lock);
                 bind_grps
                     .1
-                    .write::<2, _>(&self.max_points_threshold, &mut lock);
-                bind_grps
-                    .1
-                    .write::<3, _>(&self.neighborhood_radius, &mut lock);
-                bind_grps
-                    .1
-                    .write::<4, _>(&self.min_known_neighbors_ratio, &mut lock);
-                bind_grps.1.write::<5, _>(camera_transform, &mut lock);
+                    .write::<2, _>(&self.min_known_neighbors_ratio, &mut lock);
+                bind_grps.1.write::<3, _>(camera_transform, &mut lock);
                 let radius_in_cells = (robot_radius_m / cell_size).ceil() as u32;
                 bind_grps.4.write::<1, _>(&radius_in_cells, &mut lock);
                 &mut bind_grps
@@ -551,24 +540,15 @@ impl OccupancyGridPipeline {
         shared_lock.0.replace(shared);
         shared_lock.1 = false;
     }
-
-    pub fn set_normalization_params(&mut self, min_points: u32, max_points: u32, radius: u32) {
-        self.min_points_for_occupied = min_points;
-        self.max_points_threshold = max_points;
-        self.neighborhood_radius = radius;
-    }
 }
 
 pub struct OccupancyGridPipelineBuilder {
     pub occupancy_grid_dimensions: Vector2<NonZeroU32>,
     pub cell_size: f32,
-    pub min_points_for_occupied: u32,
-    pub max_points_threshold: u32,
     pub neighborhood_radius: u32,
     pub min_known_neighbors_ratio: u32,
+    pub min_points_for_occupied: u32,
     pub obstacle_threshold: NonZeroU32,
-    pub min_weight_distance: f32,
-    pub max_weight_distance: f32,
 }
 
 impl OccupancyGridPipelineBuilder {
@@ -594,9 +574,7 @@ impl OccupancyGridPipelineBuilder {
             image_dimensions: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<1, 0>(),
             heightmap_width: self.occupancy_grid_dimensions.x,
             cell_count,
-            camera_transform: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<1, 5>(),
-            max_weight_distance: self.max_weight_distance,
-            min_weight_distance: self.min_weight_distance,
+            camera_transform: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<1, 3>(),
         }
         .compile();
 
@@ -604,7 +582,7 @@ impl OccupancyGridPipelineBuilder {
             obstacle_map: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<2, 0>(),
             points: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<0, 0>(),
             image_dimensions: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<1, 0>(),
-            camera_transform: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<1, 5>(),
+            camera_transform: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<1, 3>(),
             heightmap_width: self.occupancy_grid_dimensions.x,
             cell_count,
             cell_size: self.cell_size,
@@ -616,20 +594,15 @@ impl OccupancyGridPipelineBuilder {
                 raw_occupancy: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<2, 0>(),
                 normalized_occupancy: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<3, 0>(
                 ),
-                min_points_for_occupied: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<
-                    1,
-                    1,
-                >(),
-                max_points_threshold: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<1, 2>(
-                ),
-                neighborhood_radius: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<1, 3>(
+                min_points_for_occupied: self.min_points_for_occupied,
+                neighborhood_radius: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<1, 1>(
                 ),
                 cell_count,
                 grid_width: self.occupancy_grid_dimensions.x,
                 grid_height: self.occupancy_grid_dimensions.y,
                 min_known_neighbors_ratio: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<
                     1,
-                    4,
+                    2,
                 >(),
             }
             .compile();
@@ -675,8 +648,6 @@ impl OccupancyGridPipelineBuilder {
         let bind_grps = Some((
             GpuBufferSet::from((
                 UniformBuffer::new(), // image_dimensions
-                UniformBuffer::new(), // min_points_for_occupied
-                UniformBuffer::new(), // max_points_threshold
                 UniformBuffer::new(), // neighborhood_radius
                 UniformBuffer::new(), // min_known_neighbors_ratio
                 UniformBuffer::new(), // camera transform
@@ -695,8 +666,6 @@ impl OccupancyGridPipelineBuilder {
             grid_dimensions: self.occupancy_grid_dimensions,
             bind_grps,
             occupancy_grid_ref: ThalassicPipelineRef::noop(),
-            min_points_for_occupied: self.min_points_for_occupied,
-            max_points_threshold: self.max_points_threshold,
             neighborhood_radius: self.neighborhood_radius,
             min_known_neighbors_ratio: self.min_known_neighbors_ratio,
         }

@@ -3,7 +3,8 @@ use std::{
     num::NonZeroU32,
     ops::Deref,
     sync::mpsc::{Receiver, Sender, SyncSender},
-    time::Duration, u32::MIN,
+    time::Duration,
+    u32::MIN,
 };
 
 use common::{THALASSIC_CELL_SIZE, THALASSIC_HEIGHT, THALASSIC_WIDTH};
@@ -16,7 +17,7 @@ use gputter::{
 };
 use iceoryx2::port::subscriber::Subscriber;
 use iceoryx2::prelude::*;
-use nalgebra::{Isometry3, Matrix4, Vector2, Vector4};
+use nalgebra::{Isometry3, Vector2, Vector4};
 pub use realsense_rust;
 use realsense_rust::{
     config::Config,
@@ -369,13 +370,10 @@ impl DepthCameraTask {
                 let occupancy_builder = OccupancyGridPipelineBuilder {
                     occupancy_grid_dimensions: grid_dimensions,
                     cell_size: THALASSIC_CELL_SIZE,
-                    min_points_for_occupied: 10, // currently not used
-                    max_points_threshold: 100, // currently not used
+                    min_points_for_occupied: 10,
                     neighborhood_radius: NEIGHBORHOOD_RADIUS,
                     min_known_neighbors_ratio: MIN_KNOWN_NEIGHBORS_RATIO,
                     obstacle_threshold: NonZeroU32::new(30).unwrap(),
-                    min_weight_distance: 0.0, // also not currently used, but left in just in case
-                    max_weight_distance: 2.2, // also not currently used, but left in just in case
                 };
 
                 let mut occupancy_pipeline = occupancy_builder.build();

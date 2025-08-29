@@ -5,8 +5,6 @@ build_shader!(
     const HEIGHTMAP_WIDTH: NonZeroU32 = {{heightmap_width}};
     const CELL_COUNT: NonZeroU32 = {{cell_count}};
     const CELL_SIZE: f32 = {{cell_size}};
-    const MAX_WEIGHT_DISTANCE: f32 = {{max_weight_distance}};
-    const MIN_WEIGHT_DISTANCE: f32 = {{min_weight_distance}};
 
     #[buffer] var<storage, read_write> obstacle_map: array<atomic<u32>, CELL_COUNT>;
     #[buffer] var<storage, read_write> points: array<vec4f>;
