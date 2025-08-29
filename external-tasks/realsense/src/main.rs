@@ -36,6 +36,7 @@ use thalassic::{
 pub static ROBOT_RADIUS: f32 = 0.2;
 pub static MIN_KNOWN_NEIGHBORS_RATIO: u32 = 60;
 pub static NEIGHBORHOOD_RADIUS: u32 = 20;
+pub static OBSTACLE_THRESHOLD: u32 = 30;
 
 pub struct DepthCameraInfo {
     pub serial: String,
@@ -373,7 +374,7 @@ impl DepthCameraTask {
                     min_points_for_occupied: 10,
                     neighborhood_radius: NEIGHBORHOOD_RADIUS,
                     min_known_neighbors_ratio: MIN_KNOWN_NEIGHBORS_RATIO,
-                    obstacle_threshold: NonZeroU32::new(30).unwrap(),
+                    obstacle_threshold: NonZeroU32::new(OBSTACLE_THRESHOLD).unwrap(),
                 };
 
                 let mut occupancy_pipeline = occupancy_builder.build();
@@ -521,7 +522,6 @@ impl DepthCameraTask {
                         .collect();
 
                     let chunks: Vec<_> = valid_points.chunks(MAX_POINT_CLOUD_POINTS).collect();
-                    let total_chunks = chunks.len();
 
                     for (chunk_idx, chunk) in chunks.into_iter().enumerate() {
                         let mut iceoryx_cloud = IceoryxPointCloud::default();

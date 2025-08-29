@@ -436,7 +436,6 @@ impl ThalassicPipeline {
 
 pub struct OccupancyGridPipeline {
     pipeline: ComputePipeline<OccupancyGridBindGroups, 5>,
-    cell_count: NonZeroU32,
     grid_dimensions: Vector2<NonZeroU32>,
     bind_grps: Option<(
         GpuBufferSet<Pcl2OccupancyBindGrp>, // uniforms
@@ -545,9 +544,16 @@ impl OccupancyGridPipeline {
 pub struct OccupancyGridPipelineBuilder {
     pub occupancy_grid_dimensions: Vector2<NonZeroU32>,
     pub cell_size: f32,
+    /// The radius (in cells) that each cell is compared against to score obsticallyness
     pub neighborhood_radius: u32,
+    /// If a cell has > min_known_neighbors_ratio of cells in its neighborhood that have an unknown status,
+    /// then the cell will also be marked unknown.
     pub min_known_neighbors_ratio: u32,
+    /// The number of points that have to have to fall in a cell for it to be considered to be a known cell
+    /// this prevents outliers from the realsense being less accurate and noisier further away.
     pub min_points_for_occupied: u32,
+    /// Each cell is scored from 1-100 on how occupied it seems to be, and this threshold is what determines
+    /// the limit for what is considered an obstacle and what isnt.
     pub obstacle_threshold: NonZeroU32,
 }
 
@@ -594,7 +600,7 @@ impl OccupancyGridPipelineBuilder {
                 raw_occupancy: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<2, 0>(),
                 normalized_occupancy: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<3, 0>(
                 ),
-                min_points_for_occupied: self.min_points_for_occupied,
+                min_points_for_known: self.min_points_for_occupied,
                 neighborhood_radius: BufferGroupBinding::<_, OccupancyGridBindGroups>::get::<1, 1>(
                 ),
                 cell_count,
@@ -662,7 +668,6 @@ impl OccupancyGridPipelineBuilder {
 
         OccupancyGridPipeline {
             pipeline,
-            cell_count,
             grid_dimensions: self.occupancy_grid_dimensions,
             bind_grps,
             occupancy_grid_ref: ThalassicPipelineRef::noop(),

@@ -5,7 +5,7 @@ build_shader!(
         const CELL_COUNT: NonZeroU32 = {{cell_count}};
         const GRID_WIDTH: NonZeroU32 = {{grid_width}};
         const GRID_HEIGHT: NonZeroU32 = {{grid_height}};
-        const min_points_for_occupied: u32 = {{min_points_for_occupied}};
+        const min_points_for_known: u32 = {{min_points_for_known}};
 
         // Input: raw occupancy counts from previous shader
         #[buffer] var<storage, read_write> raw_occupancy: array<u32, CELL_COUNT>;
@@ -71,7 +71,7 @@ build_shader!(
                             local_sum += neighbor_count;
                             local_count += 1u;
 
-                            if (neighbor_count >= min_points_for_occupied) {
+                            if (neighbor_count >= min_points_for_known) {
                                 occupied_neighbors += 1u;
                             }
                         }
@@ -122,7 +122,7 @@ build_shader!(
 
             // if we meet the minimum threshold, ensure at least a score of 10
             var threshold_bonus = 0u;
-            if (raw_count >= min_points_for_occupied) {
+            if (raw_count >= min_points_for_known) {
                 // this didn't turn out to be helpful
                 // threshold_bonus = 10u;
             }
