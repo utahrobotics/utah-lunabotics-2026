@@ -1,3 +1,4 @@
+# Taken from https://github.com/ulagbulag/kiss-icp-rs credit to @ulagbulag on github for the creation of this crate
 # KISS-ICP
 
 ![kiss-icp-rs Logo](assets/logo.webp)
