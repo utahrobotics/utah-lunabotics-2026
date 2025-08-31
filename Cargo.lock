@@ -666,6 +666,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "bonsai-bt"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f63547ed953e0e97fed1bdb60f66faeb4ad1f87b130759a9ce98ac1555176ff"
+
+[[package]]
 name = "bstr"
 version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3542,6 +3548,7 @@ dependencies = [
  "anyhow",
  "bincode 2.0.1",
  "bitcode",
+ "bonsai-bt",
  "bytemuck",
  "bytes",
  "cakap2",

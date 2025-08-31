@@ -54,7 +54,7 @@
             "name": Some("lift_hinge"),
             "start_euler": [0.0, 0.0, 0.0],
             "origin": [0.0, 0.08, 0.455],
-            "rotation_axis": [1.0, 0.0, 0.0],
+            "rotation_axis": [0.0, 1.0, 0.0],
             "children": [
                 {
                     "name": Some("bucket"),

@@ -26,7 +26,7 @@ pub struct AiSource {
 impl Freezable for AiSource {}
 
 impl CuSrcTask for AiSource {
-    // (Steering, LiftAct, BucketAct) each Option<FromAI>
+    // (Steering, ActuatorCommand)
     type Output<'m> = output_msg!((Option<Steering>, Option<[u8; 5]>));
 
     fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {

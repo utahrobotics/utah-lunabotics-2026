@@ -79,7 +79,7 @@ bitcode = "0.6.6"
 tasker = { path = "../misc/tasker" }
 iceoryx-types = { path = "../misc/iceoryx-types" }
 launcher = { path = "../misc/launcher" }
-vesc-translator = {path = "../misc/vesc-translator"}
+vesc-translator = { path = "../misc/vesc-translator" }
 
 # common
 common = { path = "../common" }
@@ -91,6 +91,7 @@ cobs = "0.4.0"
 bytes = "1.10.1"
 mio = "1.0.4"
 fxhash.workspace = true
+bonsai-bt = "0.10.0"
 
 # Linux-only dependencies
 [target.'cfg(target_os = "linux")'.dependencies]

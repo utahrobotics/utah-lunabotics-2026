@@ -1,3 +1,4 @@
+pub mod ai;
 pub mod april_detection_handler;
 pub mod auto_gstreamer;
 pub mod gst_to_image;
