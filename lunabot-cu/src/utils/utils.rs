@@ -132,6 +132,7 @@ where
     ))
 }
 
+/// this was only used in simulation
 #[derive(Debug, Clone, Copy)]
 pub struct SteeringLerper {
     steering: &'static AtomicCell<Option<Steering>>,

@@ -57,7 +57,7 @@ impl CuSrcTask for AiSource {
             steering_msg_queue: VecDeque::new(),
         })
     }
-    fn process(&mut self, clock: &RobotClock, output: &mut Self::Output<'_>) -> CuResult<()> {
+    fn process(&mut self, _clock: &RobotClock, output: &mut Self::Output<'_>) -> CuResult<()> {
         // Drain the subscriber queue so we always act on the most recent message
         while let Some(sample) = self
             .subscriber

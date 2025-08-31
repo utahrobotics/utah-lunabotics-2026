@@ -6,7 +6,7 @@ use cu29::{
     prelude::*,
 };
 
-use common::{FromAI, Steering};
+use common::Steering;
 use embedded_common::ActuatorCommand;
 
 use crate::PICO_TX;

@@ -95,9 +95,6 @@ impl CuSrcTask for OccupancyGridSource {
             .as_ref()
             .ok_or_else(|| CuError::from("OccupancyGridSource: subscriber missing"))?;
 
-        // Allocate on the heap to keep the stack small in debug builds
-
-        let iso = self.camera_node.get_isometry_from_base();
         while let Some(sample) = subscriber
             .receive()
             .map_err(|e| CuError::new_with_cause("OccupancyGridSource: receive", e))?
