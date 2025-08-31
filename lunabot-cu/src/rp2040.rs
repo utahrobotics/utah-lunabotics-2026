@@ -3,11 +3,13 @@ use std::time::Duration;
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender};
 use cu29::prelude::*;
 use embedded_common::*;
+use futures_util::StreamExt;
 use tasker::{
     BlockOn, get_tokio_handle,
     tokio::{
         self,
         io::{AsyncWriteExt, BufStream},
+        time::timeout,
     },
 };
 use tokio_serial::SerialPortBuilderExt;
@@ -162,47 +164,46 @@ impl V3PicoTask {
         get_tokio_handle().spawn(async move {
             let mut no_reading_count = 0;
             loop {
-
-                //     tokio::time::sleep(std::time::Duration::from_millis(IMU_READING_DELAY_MS - 1))
-                //         .await;
-                //     let Ok(reading) = timeout(Duration::from_millis(200), reader.next()).await else {
-                //         error!("Pico has become unresponsive.");
-                //         let _ = is_broken_tx.send(true);
-                //         break;
-                //     };
-                //     if let Some(Err(e)) = reading {
-                //         let _ = is_broken_tx.send(true);
-                //         error!("failed to read from pico: {}", e.to_string());
-                //         break;
-                //     }
-                //     if let None = reading {
-                //         no_reading_count += 1;
-                //         if no_reading_count <= 5 {
-                //             let _ = is_broken_tx.send(true);
-                //             error!("Pico has become unresponsive. (no reading count)");
-                //             break;
-                //         }
-                //         continue;
-                //     }
-                //     let reading = reading.unwrap().unwrap();
-                //     let Ok(reading) = reading.try_into() else {
-                //         warning!("not 105 bytes");
-                //         continue;
-                //     };
-                //     let Ok(reading) = FromPicoV3::deserialize(reading) else {
-                //         error!("Failed to deserialize message from picov3 serial port");
-                //         let _ = is_broken_tx.send(true);
-                //         match powercycle_ioctl() {
-                //             Ok(_) => {}
-                //             Err(e) => {
-                //                 error!("ioctl failed: {}", e.to_string());
-                //             }
-                //         }
-                //         break;
-                //     };
-                //     if let Err(e) = from_pico_tx.send(reading) {
-                //         error!("Failed to send reading to from_pico_tx: {}", e.to_string());
-                //     }
+                tokio::time::sleep(std::time::Duration::from_millis(IMU_READING_DELAY_MS - 1))
+                    .await;
+                let Ok(reading) = timeout(Duration::from_millis(200), reader.next()).await else {
+                    error!("Pico has become unresponsive.");
+                    let _ = is_broken_tx.send(true);
+                    break;
+                };
+                if let Some(Err(e)) = reading {
+                    let _ = is_broken_tx.send(true);
+                    error!("failed to read from pico: {}", e.to_string());
+                    break;
+                }
+                if let None = reading {
+                    no_reading_count += 1;
+                    if no_reading_count <= 5 {
+                        let _ = is_broken_tx.send(true);
+                        error!("Pico has become unresponsive. (no reading count)");
+                        break;
+                    }
+                    continue;
+                }
+                let reading = reading.unwrap().unwrap();
+                let Ok(reading) = reading.try_into() else {
+                    warning!("not 105 bytes");
+                    continue;
+                };
+                let Ok(reading) = FromPicoV3::deserialize(reading) else {
+                    error!("Failed to deserialize message from picov3 serial port");
+                    let _ = is_broken_tx.send(true);
+                    match powercycle_ioctl() {
+                        Ok(_) => {}
+                        Err(e) => {
+                            error!("ioctl failed: {}", e.to_string());
+                        }
+                    }
+                    break;
+                };
+                if let Err(e) = from_pico_tx.try_send(reading) {
+                    error!("Failed to send reading to from_pico_tx: {}", e.to_string());
+                }
             }
         });
 
