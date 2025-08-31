@@ -9,9 +9,6 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use crate::tasks::NewDevice;
-
-// Re-export CuGstBuffer from the shared cu_gstreamer crate so we don't redefine it and cause
-// type mismatches in Copper's type-matching logic.
 pub use cu_gstreamer::CuGstBuffer;
 
 pub type CuDefaultAutoGStreamer = CuAutoGStreamer<16>;
@@ -19,11 +16,10 @@ pub type CuDefaultAutoGStreamer = CuAutoGStreamer<16>;
 /// Automatically starts a GStreamer pipeline when the desired camera is detected by `UdevMonitor`.
 /// While the pipeline is running it feeds the most recent buffers through a circular queue.
 /// If no frame is received for `timeout_ms` the pipeline is torn down so it can be rebuilt when the
-/// device re-appears (e.g. hot-unplug/plug).
+/// device re-appears
 pub struct CuAutoGStreamer<const N: usize> {
     // Desired USB port – matches `NewDevice.port`.
     desired_port: String,
-    // User-friendly camera identifier (used only for logging).
     _camera_id: String,
     // Template pipeline string – contains the placeholder `<devpath>`.
     pipeline_template: String,
@@ -48,11 +44,7 @@ impl<const N: usize> CuTask for CuAutoGStreamer<N> {
     type Input<'m> = input_msg!(NewDevice);
     type Output<'m> = output_msg!(CuGstBuffer);
 
-    // -------------------------------------------------------------------------------------
-    // Construction
-    // -------------------------------------------------------------------------------------
     fn new(cfg: Option<&ComponentConfig>) -> CuResult<Self> {
-        // Ensure GStreamer is initialised exactly once.
         if !gstreamer::INITIALIZED.load(std::sync::atomic::Ordering::SeqCst) {
             gstreamer::init()
                 .map_err(|e| CuError::new_with_cause("Failed to initialise gstreamer", e))?;
@@ -94,14 +86,12 @@ impl<const N: usize> CuTask for CuAutoGStreamer<N> {
     }
 
     fn preprocess(&mut self, _clock: &RobotClock) -> CuResult<()> {
-        // Handle requested teardowns first
         if self.teardown_requested {
             self.teardown_requested = false;
             info!("GStreamer: Teardown requested");
             self.stop_pipeline();
         }
 
-        // Then handle pipeline creation
         if self.pipeline.is_none() {
             if let Some(dev_path) = self.pending_dev_path.take() {
                 self.open_pipeline(&dev_path)?;
@@ -124,10 +114,12 @@ impl<const N: usize> CuTask for CuAutoGStreamer<N> {
                 }
             }
             output.clear_payload();
-            return Ok(());
+            return Err(CuError::new_with_cause(
+                "no frames received",
+                std::io::Error::other("no frames received"),
+            ));
         }
 
-        // Handle frame timeout without blocking
         if let Some(last) = self.last_frame_time {
             if last.elapsed().as_millis() > self.req_timeout.as_millis() {
                 info!(
@@ -147,6 +139,20 @@ impl<const N: usize> CuTask for CuAutoGStreamer<N> {
             self.last_frame_time = Some(Instant::now());
         } else {
             output.clear_payload();
+        }
+
+        if let Some(frame_time) = self.last_frame_time
+            && frame_time.elapsed().as_millis() > 500
+        {
+            return Err(CuError::new_with_cause(
+                "no frames received in 500 ms",
+                std::io::Error::other("no frames received in 500 ms"),
+            ));
+        } else if self.last_frame_time.is_none() {
+            return Err(CuError::new_with_cause(
+                "no frames received",
+                std::io::Error::other("no frames received"),
+            ));
         }
         Ok(())
     }
