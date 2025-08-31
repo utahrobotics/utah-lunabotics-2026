@@ -9,7 +9,6 @@ use cu29::{
 };
 use std::{
     collections::VecDeque,
-    fs::File,
     net::{IpAddr, SocketAddr},
     str::FromStr,
     sync::Arc,
@@ -19,7 +18,7 @@ use tasker::tokio::sync::mpsc::error::TryRecvError;
 use tasker::tokio::sync::{mpsc, watch};
 
 use crate::comms::{LunabaseConn, PacketBuilder, TELEOP};
-use common::{FromLunabase, FromLunabot, LUNABOT_STAGE, LunabotStage};
+use common::{FromLunabase, LUNABOT_STAGE, LunabotStage};
 
 pub struct Lunabase {
     from_lunabase_rx: mpsc::UnboundedReceiver<FromLunabase>,
@@ -77,8 +76,17 @@ impl CuSrcTask for Lunabase {
                 }
             }
         }
-        if !self.connected.is_connected() && LUNABOT_STAGE.load() != LunabotStage::SoftStop {
-            self.message_buffer.push_back(FromLunabase::SoftStop);
+        let status;
+        if !self.connected.is_connected() {
+            if LUNABOT_STAGE.load() != LunabotStage::SoftStop {
+                self.message_buffer.push_back(FromLunabase::SoftStop);
+            }
+            status = Err(CuError::new_with_cause(
+                "lunabase not connected",
+                std::io::Error::other("lunabase disconnected"),
+            ));
+        } else {
+            status = Ok(())
         }
 
         // Forward message to downstream tasks and keep the global stage in sync so that
@@ -98,7 +106,7 @@ impl CuSrcTask for Lunabase {
         } else {
             output.clear_payload();
         }
-        Ok(())
+        status
     }
 }
 

@@ -152,7 +152,7 @@ impl<F: FnMut(&[u8]) -> bool + Send + 'static> LunabaseConn<F> {
                         if let Some(packet) = packet_rx.recv().await {
                             packet
                         } else {
-                            warning!("Packet channel closed");
+                            // warning!("Packet channel closed");
                             std::future::pending().await
                         }
                     } => {
