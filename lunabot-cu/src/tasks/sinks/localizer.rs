@@ -13,8 +13,7 @@ use iceoryx2::{
     prelude::{ServiceName, UnableToDeliverStrategy},
     service::ipc,
 };
-use nalgebra::{Isometry3, Quaternion, Unit, UnitQuaternion, UnitVector3, Vector3};
-use rerun::Transform3D;
+use nalgebra::{Isometry3, UnitQuaternion, UnitVector3, Vector3};
 use simple_motion::StaticNode;
 
 use crate::{

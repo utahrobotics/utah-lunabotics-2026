@@ -1,7 +1,7 @@
-use common::{Occupancy, THALASSIC_CELL_COUNT, THALASSIC_CELL_SIZE, THALASSIC_WIDTH};
+use common::{Occupancy, THALASSIC_CELL_SIZE, THALASSIC_WIDTH};
 use cu29::prelude::*;
 use iceoryx_types::IceoryxOccupancyGrid;
-use rerun::{Color, Points3D, Position3D};
+use rerun::{Color, Points3D};
 
 use crate::rerun_viz::RECORDER;
 
@@ -52,7 +52,7 @@ impl CuSinkTask for OccupancyGridSink {
 
                 colors.push(color);
             }
-            RECORDER.get().unwrap().recorder.log(
+            let _ = RECORDER.get().unwrap().recorder.log(
                 "occupancy",
                 &Points3D::new(positions)
                     .with_colors(colors)

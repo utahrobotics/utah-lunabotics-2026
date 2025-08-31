@@ -26,3 +26,15 @@ Generates point clouds from an array of depths.
 
 ### Outputs
 1. A pointcloud.
+
+
+## Configuring the size of the arena
+
+Change these constants to shrink or grow the arena:
+
+```rust
+// currently set to the size of the arena in UCF
+pub const THALASSIC_CELL_SIZE: f32 = 0.03125;
+pub const THALASSIC_WIDTH: u32 = 160;
+pub const THALASSIC_HEIGHT: u32 = 224;
+```

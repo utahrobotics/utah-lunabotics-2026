@@ -3,6 +3,7 @@ pub mod comms;
 mod motors;
 pub mod rerun_viz;
 mod rp2040;
+pub mod simple_monitor;
 pub mod tasks;
 pub mod utils;
 
@@ -13,7 +14,7 @@ use embedded_common::{ActuatorCommand, FromPicoV3};
 use launcher::ProcessCommand;
 use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
 use std::path::{Path, PathBuf};
-use std::sync::{OnceLock, mpsc};
+use std::sync::OnceLock;
 use std::thread::sleep;
 use std::time::Duration;
 
@@ -45,8 +46,11 @@ fn main() {
     )
     .expect("Failed to setup logger.");
 
-    rerun_viz::init_rerun(rerun_viz::RerunViz::Grpc(rerun_viz::Level::Minimal, "192.168.0.100".to_string()))
-        .expect("Failed to initialize rerun viz.");
+    rerun_viz::init_rerun(rerun_viz::RerunViz::Grpc(
+        rerun_viz::Level::Minimal,
+        "192.168.0.100".to_string(),
+    ))
+    .expect("Failed to initialize rerun viz.");
 
     let (pico_tx, pico_rx) = enumerate_v3picos();
 

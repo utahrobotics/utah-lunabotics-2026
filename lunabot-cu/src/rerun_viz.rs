@@ -1,8 +1,7 @@
-use std::fmt::format;
-use std::{sync::OnceLock, time::Instant};
-use std::process::{Command, Stdio};
 use std::net::TcpStream;
+use std::process::{Command, Stdio};
 use std::time::Duration;
+use std::{sync::OnceLock, time::Instant};
 
 use crossbeam::atomic::AtomicCell;
 use cu29::CuError;
@@ -17,12 +16,12 @@ pub static RECORDER: OnceLock<RecorderData> = OnceLock::new();
 pub struct RecorderData {
     pub recorder: RecordingStream,
     pub level: Level,
-    pub last_logged_obstacle_map: AtomicCell<Instant> // used to throttle the logging to conserve bandwidth
+    pub last_logged_obstacle_map: AtomicCell<Instant>, // used to throttle the logging to conserve bandwidth
 }
 
 #[derive(Deserialize, Default, Debug)]
 pub enum RerunViz {
-    Grpc(Level,String),
+    Grpc(Level, String),
     Log(Level),
     Viz(Level),
     #[default]
@@ -60,7 +59,9 @@ pub fn init_rerun(rerun_viz: RerunViz) -> Result<(), CuError> {
             let port = opts.port;
 
             // Only spawn if no process is currently listening on the port.
-            let viewer_running = TcpStream::connect_timeout(&opts.connect_addr(), Duration::from_millis(200)).is_ok();
+            let viewer_running =
+                TcpStream::connect_timeout(&opts.connect_addr(), Duration::from_millis(200))
+                    .is_ok();
             if !viewer_running {
                 let _ = Command::new(&opts.executable_path())
                     .arg(format!("--port={port}"))
@@ -78,19 +79,25 @@ pub fn init_rerun(rerun_viz: RerunViz) -> Result<(), CuError> {
                 match rerun::RecordingStreamBuilder::new("lunabot").connect_grpc_opts(&url, None) {
                     Ok(x) => x,
                     Err(e) => {
-                        return Err(CuError::new_with_cause("Failed to connect to rerun viewer", e));
+                        return Err(CuError::new_with_cause(
+                            "Failed to connect to rerun viewer",
+                            e,
+                        ));
                     }
                 },
                 level,
             )
-        },
+        }
         RerunViz::Grpc(level, ip) => (
-            match rerun::RecordingStreamBuilder::new("lunabot").connect_grpc_opts(&format!("rerun+http://{ip}:9876/proxy"), None) {
-                Ok(x) => {
-                    x
-                },
+            match rerun::RecordingStreamBuilder::new("lunabot")
+                .connect_grpc_opts(&format!("rerun+http://{ip}:9876/proxy"), None)
+            {
+                Ok(x) => x,
                 Err(e) => {
-                    return Err(CuError::new_with_cause("Failed to make recording stream", e));
+                    return Err(CuError::new_with_cause(
+                        "Failed to make recording stream",
+                        e,
+                    ));
                 }
             },
             level,
@@ -99,13 +106,19 @@ pub fn init_rerun(rerun_viz: RerunViz) -> Result<(), CuError> {
             match rerun::RecordingStreamBuilder::new("lunabot").save("recording.rrd") {
                 Ok(x) => x,
                 Err(e) => {
-                    return Err(CuError::new_with_cause("Failed to start rerun file logging", e));
+                    return Err(CuError::new_with_cause(
+                        "Failed to start rerun file logging",
+                        e,
+                    ));
                 }
             },
             level,
         ),
         RerunViz::Disabled => {
-            return Err(CuError::new_with_cause("Rerun visualization disabled", std::io::Error::new(std::io::ErrorKind::Other, "Rerun visualization disabled")));
+            return Err(CuError::new_with_cause(
+                "Rerun visualization disabled",
+                std::io::Error::new(std::io::ErrorKind::Other, "Rerun visualization disabled"),
+            ));
         }
     };
     let result: RecordingStreamResult<()> = try {
@@ -117,10 +130,17 @@ pub fn init_rerun(rerun_viz: RerunViz) -> Result<(), CuError> {
         )?;
     };
     if let Err(e) = result {
-        return Err(CuError::new_with_cause("Failed to setup rerun environment", e));
+        return Err(CuError::new_with_cause(
+            "Failed to setup rerun environment",
+            e,
+        ));
     }
 
-    let _ = RECORDER.set(RecorderData { recorder, level, last_logged_obstacle_map: AtomicCell::new(Instant::now())});
+    let _ = RECORDER.set(RecorderData {
+        recorder,
+        level,
+        last_logged_obstacle_map: AtomicCell::new(Instant::now()),
+    });
 
     std::thread::spawn(|| {
         let recorder = &RECORDER.get().unwrap().recorder;
@@ -128,12 +148,18 @@ pub fn init_rerun(rerun_viz: RerunViz) -> Result<(), CuError> {
         let asset = match Asset3D::from_file_path("3d-models/simplify_lunabot.stl") {
             Ok(x) => x,
             Err(e) => {
-                return Err(CuError::new_with_cause("Failed to open 3d-models/simplify_lunabot.stl", e));
+                return Err(CuError::new_with_cause(
+                    "Failed to open 3d-models/simplify_lunabot.stl",
+                    e,
+                ));
             }
         };
 
         if let Err(e) = recorder.log_static(format!("{ROBOT_STRUCTURE}/mesh"), &asset) {
-            return Err(CuError::new_with_cause("Failed to log robot structure mesh", e));
+            return Err(CuError::new_with_cause(
+                "Failed to log robot structure mesh",
+                e,
+            ));
         }
 
         Ok(())
