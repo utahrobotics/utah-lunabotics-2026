@@ -49,7 +49,7 @@ impl<T: Loggable, E: std::fmt::Display> Loggable for Result<T, E> {
     fn log(&self) {
         match self {
             Ok(t) => t.log(),
-            Err(e) => error!("{e}"),
+            Err(e) => error!("{}", e.to_string()),
         }
     }
 }
