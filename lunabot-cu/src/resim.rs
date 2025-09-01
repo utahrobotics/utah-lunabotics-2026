@@ -32,12 +32,17 @@ fn default_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::CamSide(_) => SimOverride::ExecutedBySim,
         default::SimStep::CamBack(_) => SimOverride::ExecutedBySim,
         default::SimStep::CamLaptopFront(_) => SimOverride::ExecutedBySim,
+        default::SimStep::GstConvertBack(_) => SimOverride::ExecutedBySim,
+        default::SimStep::GstConvertSide(_) => SimOverride::ExecutedBySim,
+        default::SimStep::GstConvertLaptopFront(_) => SimOverride::ExecutedBySim,
         default::SimStep::L2Pointcloud(_) => SimOverride::ExecutedBySim,
         default::SimStep::L2Imu(_) => SimOverride::ExecutedBySim,
         default::SimStep::RealsensePointcloud(_) => SimOverride::ExecutedBySim,
         default::SimStep::ActuatorCtrl(_) => SimOverride::ExecutedBySim,
         default::SimStep::MotorCtrl(_) => SimOverride::ExecutedBySim,
-        default::SimStep::DetectionHandler(_) => SimOverride::ExecutedBySim,
+        default::SimStep::DetectorCamBack(_) => SimOverride::ExecutedBySim,
+        default::SimStep::DetectorCamSide(_) => SimOverride::ExecutedBySim,
+        default::SimStep::DetectorCamLaptopFront(_) => SimOverride::ExecutedBySim,
         // May want to temporarily add override for obstacle map recv until lidar simulation works
         _ => SimOverride::ExecuteByRuntime,
     }
@@ -89,23 +94,13 @@ fn run_one_copperlist(
             }
             default::SimStep::UdevMonitor(..) => SimOverride::ExecutedBySim,
 
-            default::SimStep::CamSide(CuTaskCallbackState::Process(_, output)) => {
-                *output = msgs.get_cam_side_output().clone();
-                SimOverride::ExecutedBySim
-            }
             default::SimStep::CamSide(..) => SimOverride::ExecutedBySim,
-
-            default::SimStep::CamBack(CuTaskCallbackState::Process(_, output)) => {
-                *output = msgs.get_cam_back_output().clone();
-                SimOverride::ExecutedBySim
-            }
             default::SimStep::CamBack(..) => SimOverride::ExecutedBySim,
 
-            default::SimStep::CamLaptopFront(CuTaskCallbackState::Process(_, output)) => {
-                *output = msgs.get_cam_laptop_front_output().clone();
-                SimOverride::ExecutedBySim
-            }
             default::SimStep::CamLaptopFront(..) => SimOverride::ExecutedBySim,
+            default::SimStep::GstConvertBack(..) => SimOverride::ExecutedBySim,
+            default::SimStep::GstConvertSide(..) => SimOverride::ExecutedBySim,
+            default::SimStep::GstConvertLaptopFront(..) => SimOverride::ExecutedBySim,
 
             default::SimStep::L2Pointcloud(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_l_2_pointcloud_output().clone();
@@ -136,12 +131,22 @@ fn run_one_copperlist(
                 SimOverride::ExecutedBySim
             }
             default::SimStep::MotorCtrl(..) => SimOverride::ExecutedBySim,
-
-            default::SimStep::DetectionHandler(CuTaskCallbackState::Process(_, output)) => {
-                *output = msgs.get_detection_handler_output().clone();
+            default::SimStep::DetectorCamBack(CuTaskCallbackState::Process(_, output)) => {
+                *output = msgs.get_detector_cam_back_output().clone();
                 SimOverride::ExecutedBySim
             }
-
+            default::SimStep::DetectorCamBack(..) => SimOverride::ExecutedBySim,
+            default::SimStep::DetectorCamSide(CuTaskCallbackState::Process(_, output)) => {
+                *output = msgs.get_detector_cam_side_output().clone();
+                SimOverride::ExecutedBySim
+            }
+            default::SimStep::DetectorCamSide(..) => SimOverride::ExecutedBySim,
+            default::SimStep::DetectorCamLaptopFront(CuTaskCallbackState::Process(_, output)) => {
+                *output = msgs.get_detector_cam_laptop_front_output().clone();
+                SimOverride::ExecutedBySim
+            }
+            default::SimStep::DetectorCamLaptopFront(..) => SimOverride::ExecutedBySim,
+            // May want to temporarily add override for obstacle map recv until lidar simulation works
             _ => SimOverride::ExecuteByRuntime,
         }
     };
