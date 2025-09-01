@@ -17,6 +17,10 @@ debug:
 sync:
 	cd $(UNILIDAR_DIR) && CARGO_BAZEL_REPIN=1 bazel sync --only=crate_index
 
+# run re-simulation
+resim:
+	cd lunabot-cu && cargo run --release --bin lunabot-resim --features resim
+
 # Clean build and sync, then build everything
 clean-build: clean sync
 	cd $(UNILIDAR_DIR) && RULES_RUST_TOOLCHAIN_VERSION=$(RUST_TOOLCHAIN_VERSION) bazel build //:unilidar_publisher $(BAZEL_BUILD_FLAGS)

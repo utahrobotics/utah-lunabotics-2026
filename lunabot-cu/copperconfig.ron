@@ -14,7 +14,7 @@
             type:"crate::tasks::sources::PointCloudIceoryxReceiver",
             config:{},
             logging: (
-                enabled: false
+                enabled: true
             ),
         ),
         // subscribes to imu information from the unilidar_iceoryx_publisher
@@ -32,7 +32,7 @@
                 "camera_node": "upper_depth_camera"
             },
             logging: (
-                enabled: false
+                enabled: true
             ),
         ),
         (
@@ -43,14 +43,14 @@
                 "camera_node": "upper_depth_camera"
             },
             logging: (
-                enabled: false
+                enabled: true
             ),
         ),
         (
             id:"realsense_occupancy_logger",
             type: "crate::tasks::sinks::OccupancyGridSink",
             logging: (
-                enabled: false
+                enabled: true
             ),
         ),
         // registers point clouds into a global map, and estimates the isometry of the lidar node.
@@ -70,7 +70,7 @@
                 "map_log_interval_secs": 1.0,
             },
             logging: (
-                enabled: false
+                enabled: true
             ),
             background: true
         ),
@@ -91,7 +91,7 @@
                 "map_log_interval_secs": 1.0,
             },
             logging: (
-                enabled: false
+                enabled: true
             ),
             background: true
         ),
@@ -145,7 +145,7 @@
             id: "detection_handler",
             type: "crate::tasks::AprilDetectionHandler",
             logging: (
-                enabled: false
+                enabled: true
             ),
         )
     ],
@@ -164,7 +164,7 @@
             dst: "localizer",
             msg: "Box<std::collections::HashMap<String, cu_spatial_payloads::EncodableIsometry>>"
         ),
-        (src:"realsense_occupancy",dst:"realsense_occupancy_logger",msg:"iceoryx_types::IceoryxOccupancyGrid")
+        (src:"realsense_occupancy",dst:"realsense_occupancy_logger",msg:"iceoryx_types::IceoryxOccupancyGrid"),
     ],
     includes:[
         // starts a gstreamer pipeline that waits for a message from udev_monitor and then starts the pipeline accordingly
@@ -184,6 +184,9 @@
                 "udp_host":"127.0.0.1",
                 "udp_port":5004,
             },
+            logging: (
+                enabled: true,
+            )
         ),
         (
             path:"camera_configs/camera_template_gstreamer.ron",
@@ -199,6 +202,9 @@
                 "udp_host":"127.0.0.1",
                 "udp_port":5003,
             },
+            logging: (
+                enabled: true,
+            )
         ),
         (
             path:"camera_configs/camera_template_gstreamer.ron",
@@ -214,6 +220,9 @@
                 "udp_host":"127.0.0.1",
                 "udp_port":5006,
             },
+            logging: (
+                enabled: true,
+            )
         ),
     ],
     //monitor:(type:"cu_cursive_consolemon::CuCursiveConsoleMon"),

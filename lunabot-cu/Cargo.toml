@@ -20,6 +20,12 @@ required-features = ["logreader"]
 [features]
 default = []
 logreader = ["dep:cu29-export"]
+resim = ["dep:cu29-export"]
+
+[[bin]]
+name = "lunabot-resim"
+path = "src/resim.rs"
+required-features = ["resim"]
 
 [dependencies]
 
@@ -27,7 +33,7 @@ logreader = ["dep:cu29-export"]
 cu29.workspace = true
 bincode.workspace = true
 cu29-helpers.workspace = true
-cu29-export = { git = "https://github.com/matthewashton-k/copper-rs.git", package = "cu29-export", optional = true }
+cu29-export = { workspace = true, optional = true }
 cu-apriltag.workspace = true
 # cu_cursiveconsolemon.workspace = true
 # cu-consolemon.workspace = true
