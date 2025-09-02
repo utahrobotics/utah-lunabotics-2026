@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use common::{FromLunabase, Steering};
+use common::{FromLunabase, LunabotStage, Steering};
 use embedded_common::ActuatorCommand;
 use iceoryx_types::IceoryxOccupancyGrid;
 use simple_motion::StaticNode;
@@ -16,6 +16,7 @@ pub struct LunabotBlackboard {
     /// Queue of actuator commands to be sent to the actuator and motor control tasks
     pub outgoing_actuator_msg_queue: VecDeque<ActuatorCommand>,
     pub outgoing_steering_msg_queue: VecDeque<Steering>,
+    pub lunabot_stage: LunabotStage,
 }
 
 impl Default for LunabotBlackboard {
@@ -28,6 +29,7 @@ impl Default for LunabotBlackboard {
             last_steering: None,
             outgoing_actuator_msg_queue: VecDeque::new(),
             outgoing_steering_msg_queue: VecDeque::new(),
+            lunabot_stage: LunabotStage::SoftStop,
         }
     }
 }

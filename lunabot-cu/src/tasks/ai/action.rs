@@ -1,13 +1,12 @@
+use common::Steering;
+use embedded_common::ActuatorCommand;
+
 #[derive(Clone, Debug)]
 pub enum LunabotAction {
-    /// default state, goes into soft stop when disconnected
-    SoftStop,
-    /// navigational autonomy
-    Navigate(f64, f64),
-    /// reverse if stuck
-    Reverse,
-    /// Dig cycle
-    Dig,
-    /// Dump cycle
-    Dump,
+    SetSteering(Steering),
+    SetActuators(ActuatorCommand),
+    /// actions for checking the lunabot stage (dig, dump, manual, soft stop, navigate)
+    IsSoftStop,
+    IsAutonomy,
+    IsTeleOp,
 }

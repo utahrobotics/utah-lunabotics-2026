@@ -439,27 +439,8 @@ pub enum ParseError {
 #[derive(Debug, Clone, Copy, Pod, Zeroable, PartialEq, Eq)]
 pub struct Occupancy(pub u32);
 
-pub enum OccupancyType {
-    /// occupancy scores are normalized from 1-10,
-    /// occupied is above 5
-    Occupied(u32),
-    /// occupancy scores are normalized from 1-10, free is > 5 but not 0
-    Free(u32),
-    Unknown,
-}
-
 impl Occupancy {
-    pub const UNKNOWN: Self = Self(0);
-
-    pub fn occupancy_type(self) -> OccupancyType {
-        if self == Self::UNKNOWN {
-            return OccupancyType::Unknown;
-        } else if self.0 >= 5 {
-            return OccupancyType::Occupied(self.0);
-        } else {
-            return OccupancyType::Free(self.0);
-        }
-    }
+    const UNKNOWN: Occupancy = Occupancy(0);
 }
 
 #[derive(Debug)]

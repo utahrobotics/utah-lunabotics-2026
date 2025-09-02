@@ -1,7 +1,7 @@
-use bonsai_bt::Behavior::Action;
-use bonsai_bt::Status::Running;
+use bonsai_bt::Behavior::{self, Action};
+use bonsai_bt::Status::{Running, Success};
 use bonsai_bt::{BT, Event, Status, UpdateArgs};
-use common::{FromLunabase, Steering};
+use common::{FromLunabase, LUNABOT_STAGE, LunabotStage, Steering};
 use cu29::prelude::*;
 use cu29::{
     cutask::{CuTask, Freezable},
@@ -11,6 +11,7 @@ use cu29::{
 use std::sync::mpsc::Receiver;
 
 use crate::tasks::ai::action::LunabotAction;
+use crate::tasks::ai::behaviors::teleop::teleop_behavior;
 use crate::tasks::ai::blackboard::LunabotBlackboard;
 use crate::utils::nanos_to_secs;
 
@@ -40,8 +41,7 @@ impl CuTask for LunabotAi {
         Self: Sized,
     {
         let blackboard = LunabotBlackboard::default();
-        // for now just always stay in soft stop until we implement more behaviors
-        let behavior = Action(LunabotAction::SoftStop);
+        let behavior = teleop_behavior(&blackboard);
         Ok(Self {
             state: LunabotAiState {
                 soft_stop: None,
@@ -71,14 +71,24 @@ impl CuTask for LunabotAi {
         .into();
 
         self.bt.tick(&e, &mut |args, blackboard| {
-            // match *args.action {
-            //     LunabotAction::SoftStop => todo!(),
-            //     LunabotAction::Navigate(_, _) => todo!(),
-            //     LunabotAction::Reverse => todo!(),
-            //     LunabotAction::Dig => todo!(),
-            //     LunabotAction::Dump => todo!(),
-            // }
-            (Running, args.dt)
+            let mut status = Running;
+            match *args.action {
+                LunabotAction::SetSteering(steering) => todo!(),
+                LunabotAction::SetActuators(actuator_command) => todo!(),
+                LunabotAction::IsSoftStop => match LUNABOT_STAGE.load() {
+                    LunabotStage::SoftStop => status = Running,
+                    _ => status = Success,
+                },
+                LunabotAction::IsAutonomy => match LUNABOT_STAGE.load() {
+                    LunabotStage::Autonomy => status = Running,
+                    _ => status = Success,
+                },
+                LunabotAction::IsTeleOp => match LUNABOT_STAGE.load() {
+                    LunabotStage::TeleOp => status = Running,
+                    _ => status = Success,
+                },
+            }
+            (status, args.dt)
         });
 
         // TODO: make sure backpressure isnt bad here, maybe we should drain the queue before advancing to the next tick of the blackboard?
