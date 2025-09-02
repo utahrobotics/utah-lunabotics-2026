@@ -52,39 +52,10 @@ fn run_one_copperlist(
     copper_app: &mut LunabotApplication,
     robot_clock: &mut RobotClockMock,
     copper_list: CopperList<default::CuStampedDataSet>,
+    start: Instant,
 ) {
     let msgs = &copper_list.msgs;
-    let process_time = if !msgs
-        .get_motor_ctrl_output()
-        .metadata
-        .process_time
-        .start
-        .is_none()
-    {
-        msgs.get_motor_ctrl_output()
-            .metadata
-            .process_time
-            .start
-            .unwrap()
-            .0
-    } else if !msgs
-        .get_actuator_ctrl_output()
-        .metadata
-        .process_time
-        .start
-        .is_none()
-    {
-        msgs.get_actuator_ctrl_output()
-            .metadata
-            .process_time
-            .start
-            .unwrap()
-            .0
-    } else {
-        0
-    };
-
-    robot_clock.set_value(process_time);
+    robot_clock.set_value(start.elapsed().as_nanos() as u64);
 
     let mut sim_callback = move |step: default::SimStep| -> SimOverride {
         match step {
@@ -104,45 +75,53 @@ fn run_one_copperlist(
 
             default::SimStep::L2Pointcloud(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_l_2_pointcloud_output().clone();
+                output.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
             default::SimStep::L2Pointcloud(..) => SimOverride::ExecutedBySim,
 
             default::SimStep::L2Imu(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_l_2_imu_output().clone();
+                output.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
             default::SimStep::L2Imu(..) => SimOverride::ExecutedBySim,
 
             default::SimStep::RealsensePointcloud(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_realsense_pointcloud_output().clone();
+                output.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
             default::SimStep::RealsensePointcloud(..) => SimOverride::ExecutedBySim,
 
             default::SimStep::ActuatorCtrl(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_actuator_ctrl_output().clone();
+                output.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
             default::SimStep::ActuatorCtrl(..) => SimOverride::ExecutedBySim,
 
             default::SimStep::MotorCtrl(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_motor_ctrl_output().clone();
+                output.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
             default::SimStep::MotorCtrl(..) => SimOverride::ExecutedBySim,
             default::SimStep::DetectorCamBack(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_detector_cam_back_output().clone();
+                output.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
             default::SimStep::DetectorCamBack(..) => SimOverride::ExecutedBySim,
             default::SimStep::DetectorCamSide(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_detector_cam_side_output().clone();
+                output.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
             default::SimStep::DetectorCamSide(..) => SimOverride::ExecutedBySim,
             default::SimStep::DetectorCamLaptopFront(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_detector_cam_laptop_front_output().clone();
+                output.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
             default::SimStep::DetectorCamLaptopFront(..) => SimOverride::ExecutedBySim,
@@ -213,8 +192,9 @@ fn main() {
     let mut reader = UnifiedLoggerIOReader::new(dl, UnifiedLogType::CopperList);
     let copperlists = copperlists_reader::<default::CuStampedDataSet>(&mut reader);
 
+    let start = Instant::now();
     for copper_list in copperlists {
-        run_one_copperlist(&mut application, &mut robot_clock_mock, copper_list);
+        run_one_copperlist(&mut application, &mut robot_clock_mock, copper_list, start);
     }
 
     application
