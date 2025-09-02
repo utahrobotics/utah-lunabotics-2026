@@ -22,6 +22,7 @@ exclude = ["kiss-icp-rs"]
 cu29 = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu29", features = [
     "log-level-info",
     "log-level-error",
+    "macro_debug",
 ] }
 cu29-export = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu29-export" }
 

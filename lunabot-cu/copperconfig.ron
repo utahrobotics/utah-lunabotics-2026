@@ -144,9 +144,6 @@
         (
             id: "detection_handler",
             type: "crate::tasks::AprilDetectionHandler",
-            logging: (
-                enabled: true
-            ),
         )
     ],
     cnx:[
@@ -184,9 +181,6 @@
                 "udp_host":"127.0.0.1",
                 "udp_port":5004,
             },
-            logging: (
-                enabled: true,
-            )
         ),
         (
             path:"camera_configs/camera_template_gstreamer.ron",
@@ -202,9 +196,6 @@
                 "udp_host":"127.0.0.1",
                 "udp_port":5003,
             },
-            logging: (
-                enabled: true,
-            )
         ),
         (
             path:"camera_configs/camera_template_gstreamer.ron",
@@ -219,17 +210,14 @@
                 "height":720,
                 "udp_host":"127.0.0.1",
                 "udp_port":5006,
-            },
-            logging: (
-                enabled: true,
-            )
+            }
         ),
     ],
     //monitor:(type:"cu_cursive_consolemon::CuCursiveConsoleMon"),
     // monitor:(type:"cu_consolemon::CuConsoleMon"),
     monitor: (type:"simple_monitor::SimpleMonitor"),
     logging:(
-        enable_task_logging:false,
+        enable_task_logging:true,
         section_size_mib:100,
     ),
 )
