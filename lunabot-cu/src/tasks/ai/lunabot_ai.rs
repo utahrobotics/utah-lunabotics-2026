@@ -16,16 +16,8 @@ use crate::tasks::ai::blackboard::LunabotBlackboard;
 use crate::utils::nanos_to_secs;
 
 pub struct LunabotAi {
-    state: LunabotAiState,
     bt: BT<LunabotAction, LunabotBlackboard>,
     last_tick_nanos: u64,
-}
-
-pub struct LunabotAiState {
-    pub soft_stop: Option<Receiver<Status>>,
-    pub navigate: Option<Receiver<Status>>,
-    pub dig_dump: Option<Receiver<Status>>,
-    pub manual_control: Option<Receiver<Status>>,
 }
 
 impl Freezable for LunabotAi {}
@@ -41,14 +33,8 @@ impl CuTask for LunabotAi {
         Self: Sized,
     {
         let blackboard = LunabotBlackboard::default();
-        let behavior = teleop_behavior(&blackboard);
+        let behavior = teleop_behavior();
         Ok(Self {
-            state: LunabotAiState {
-                soft_stop: None,
-                navigate: None,
-                dig_dump: None,
-                manual_control: None,
-            },
             bt: BT::new(behavior, blackboard),
             last_tick_nanos: 0,
         })
