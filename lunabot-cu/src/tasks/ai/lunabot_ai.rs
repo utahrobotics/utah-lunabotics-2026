@@ -135,7 +135,7 @@ impl CuTask for LunabotAi {
                 }
                 LunabotAction::IsSoftStop => match blackboard.current_mission {
                     LunabotStage::SoftStop => Running,
-                    _ => Success,
+                    _ => Failure,
                 },
                 LunabotAction::IsAutonomy => match blackboard.current_mission {
                     LunabotStage::Autonomy => Running,
