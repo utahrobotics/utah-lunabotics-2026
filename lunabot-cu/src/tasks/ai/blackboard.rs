@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use common::{FromLunabase, LunabotStage, Steering};
+use common::{FromLunabase, LUNABOT_STAGE, LunabotStage, Steering};
 use embedded_common::ActuatorCommand;
 use iceoryx_types::IceoryxOccupancyGrid;
 use simple_motion::StaticNode;
@@ -15,8 +15,15 @@ pub struct LunabotBlackboard {
     pub last_steering: Option<Steering>,
     /// Queue of actuator commands to be sent to the actuator and motor control tasks
     pub outgoing_actuator_msg_queue: VecDeque<ActuatorCommand>,
-    pub outgoing_steering_msg_queue: VecDeque<Steering>,
-    pub lunabot_stage: LunabotStage,
+    /// we only care about the latest steering msg
+    /// the outgoing steering msg will really always be the same as the last_steering msg in manual mode
+    /// but for autonomy we can't know that
+    pub outgoing_steering_msg: Option<Steering>,
+
+    /// when the user clicks continue mission in lunabase, the stage stored here is what the bot wil continue with
+    pub last_mission: LunabotStage,
+
+    pub current_mission: LunabotStage,
 }
 
 impl Default for LunabotBlackboard {
@@ -28,34 +35,52 @@ impl Default for LunabotBlackboard {
             last_bucket: None,
             last_steering: None,
             outgoing_actuator_msg_queue: VecDeque::new(),
-            outgoing_steering_msg_queue: VecDeque::new(),
-            lunabot_stage: LunabotStage::SoftStop,
+            outgoing_steering_msg: Some(Steering::new(0.0, 0.0, 0.0)),
+
+            // when the user clicks continue mission for the first time, we move to manual
+            last_mission: LunabotStage::Manual,
+            current_mission: LunabotStage::SoftStop,
         }
     }
 }
 
 impl LunabotBlackboard {
     pub fn update_with_msg(&mut self, msg: &common::FromLunabase) {
-        if let Some([lift_actuator1, lift_actuator2]) = msg.get_lift_actuator_commands()
-            && let FromLunabase::LiftActuators(val) = msg
-        {
+        if let FromLunabase::LiftActuators(val) = msg {
             self.last_lift = Some(*val);
-            self.outgoing_actuator_msg_queue.push_back(lift_actuator1);
-            self.outgoing_actuator_msg_queue.push_back(lift_actuator2);
         }
 
-        if let Some([bucket_actuator1, bucket_actuator2]) = msg.get_bucket_actuator_commands()
-            && let FromLunabase::BucketActuators(val) = msg
-        {
+        if let FromLunabase::BucketActuators(val) = msg {
             self.last_bucket = Some(*val);
-            self.outgoing_actuator_msg_queue.push_back(bucket_actuator1);
-            self.outgoing_actuator_msg_queue.push_back(bucket_actuator2);
         }
 
         match msg {
             common::FromLunabase::Steering(steering) => {
                 self.last_steering = Some(*steering);
             }
+            common::FromLunabase::Navigate(..) => {
+                self.last_mission = LunabotStage::Autonomy;
+                self.current_mission = LunabotStage::Autonomy;
+                LUNABOT_STAGE.store(LunabotStage::Autonomy);
+            }
+            common::FromLunabase::DigDump(..) => {
+                self.last_mission = LunabotStage::Autonomy;
+                self.current_mission = LunabotStage::Autonomy;
+                LUNABOT_STAGE.store(LunabotStage::Autonomy);
+            }
+
+            // for now if the user cancels autonomy we dump them back into manual on continue mission
+            common::FromLunabase::SoftStop => {
+                self.last_mission = LunabotStage::Manual;
+                self.current_mission = LunabotStage::SoftStop;
+                LUNABOT_STAGE.store(LunabotStage::SoftStop);
+            }
+            common::FromLunabase::Disconnect => {
+                eprintln!("Lunabase Disconnected");
+                self.current_mission = LunabotStage::SoftStop;
+                LUNABOT_STAGE.store(LunabotStage::SoftStop);
+            }
+            common::FromLunabase::ContinueMission => self.current_mission = self.last_mission,
             _ => {}
         }
     }

@@ -8,5 +8,9 @@ pub enum LunabotAction {
     /// actions for checking the lunabot stage (dig, dump, manual, soft stop, navigate)
     IsSoftStop,
     IsAutonomy,
-    IsTeleOp,
+    IsManual,
+
+    /// Actions to check if there is a steering or actuator command waiting to be processed from the lunabase
+    UseLastSteering,
+    UseLastActuator,
 }

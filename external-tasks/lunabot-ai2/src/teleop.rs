@@ -16,7 +16,7 @@ struct SoftStopped {
 }
 
 pub async fn teleop(host_handle: &mut HostHandle) {
-    host_handle.write_to_host(FromAI::SetStage(LunabotStage::TeleOp));
+    host_handle.write_to_host(FromAI::SetStage(LunabotStage::Manual));
     let mut last_lift = FromLunabase::set_lift_actuator(0.0);
     let mut last_bucket = FromLunabase::set_bucket_actuator(0.0);
     let mut last_steering = Steering::default();
@@ -63,13 +63,13 @@ pub async fn teleop(host_handle: &mut HostHandle) {
             }
             FromLunabase::Navigate((x, y)) => {
                 eprintln!("Navigational autonomy not implemented");
-                host_handle.write_to_host(FromAI::SetStage(LunabotStage::TeleOp));
+                host_handle.write_to_host(FromAI::SetStage(LunabotStage::Manual));
             }
             FromLunabase::DigDump(_) => {
                 if dig_dump_simple::dig_dump_simple(host_handle).await.called {
                     break;
                 }
-                host_handle.write_to_host(FromAI::SetStage(LunabotStage::TeleOp));
+                host_handle.write_to_host(FromAI::SetStage(LunabotStage::Manual));
             }
             FromLunabase::SoftStop => break,
             FromLunabase::StartPercuss => host_handle.write_to_host(FromAI::StartPercuss),

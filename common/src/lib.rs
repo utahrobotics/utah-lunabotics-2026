@@ -171,7 +171,7 @@ impl CellsRect {
     Serialize,
 )]
 pub enum LunabotStage {
-    TeleOp = 0,
+    Manual = 0,
     SoftStop = 1,
     Autonomy = 2,
 }
@@ -181,7 +181,7 @@ impl TryFrom<u8> for LunabotStage {
 
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         match value {
-            0 => Ok(Self::TeleOp),
+            0 => Ok(Self::Manual),
             1 => Ok(Self::SoftStop),
             2 => Ok(Self::Autonomy),
             _ => Err(()),
@@ -204,6 +204,10 @@ pub enum FromLunabase {
     SoftStop,
     StartPercuss,
     StopPercuss,
+
+    /// disconnect events are technically not from the lunabase, they are manually enqueued in the lunabase copper task
+    /// when the last seen packet from the lunabase exceeds the timeout
+    Disconnect,
 }
 
 impl ToString for FromLunabase {
@@ -321,7 +325,7 @@ impl FromLunabot {
     }
 
     pub fn write_code_sheet(mut w: impl Write) -> std::io::Result<()> {
-        FromLunabot::Ping(LunabotStage::TeleOp).write_code(&mut w)?;
+        FromLunabot::Ping(LunabotStage::Manual).write_code(&mut w)?;
         FromLunabot::Ping(LunabotStage::SoftStop).write_code(&mut w)?;
         FromLunabot::Ping(LunabotStage::Autonomy).write_code(&mut w)?;
         Ok(())
@@ -665,7 +669,9 @@ mod tests {
     }
 }
 
-// Add global shared Lunabot stage atomic cell to synchronize stage information across components.
+/// global shared Lunabot stage atomic cell to synchronize stage information across components.
+/// every ping sent to the lunabase contains a byte saying which stage the lunabot is in so it knows the status of the lunabot at all times.
+/// this static is set by the behavior tree
 pub static LUNABOT_STAGE: Lazy<Arc<AtomicCell<LunabotStage>>> =
     Lazy::new(|| Arc::new(AtomicCell::new(LunabotStage::SoftStop)));
 

@@ -78,9 +78,8 @@ impl CuSrcTask for Lunabase {
         }
         let status;
         if !self.connected.is_connected() {
-            if LUNABOT_STAGE.load() != LunabotStage::SoftStop {
-                self.message_buffer.push_back(FromLunabase::SoftStop);
-            }
+            self.message_buffer.clear();
+            self.message_buffer.push_back(FromLunabase::Disconnect);
             status = Err(CuError::new_with_cause(
                 "lunabase not connected",
                 std::io::Error::other("lunabase disconnected"),
@@ -93,15 +92,6 @@ impl CuSrcTask for Lunabase {
         // Ping packets always advertise the correct mode, even if the AI-side SetStage
         // packet was lost in transport.
         if let Some(ref msg) = self.message_buffer.pop_front() {
-            match msg {
-                FromLunabase::SoftStop => LUNABOT_STAGE.store(LunabotStage::SoftStop),
-                FromLunabase::ContinueMission => LUNABOT_STAGE.store(LunabotStage::TeleOp),
-                FromLunabase::Navigate(_) | FromLunabase::DigDump(_) => {
-                    LUNABOT_STAGE.store(LunabotStage::Autonomy)
-                }
-                _ => {}
-            }
-
             output.set_payload(Some(*msg));
         } else {
             output.clear_payload();

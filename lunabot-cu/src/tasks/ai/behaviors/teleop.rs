@@ -1,13 +1,20 @@
-use bonsai_bt::Behavior::{self, WaitForever};
+use bonsai_bt::Behavior::{self, Action, Sequence, WaitForever};
 
 use crate::tasks::ai::{
     action::LunabotAction,
-    blackboard::{self, LunabotBlackboard},
+    behaviors::{
+        autonomy::autonomy_main::autonomy_main, manual_ctrl_behavior, soft_stop::soft_stop_behavior,
+    },
+    blackboard::LunabotBlackboard,
 };
 
-pub fn teleop_behavior() -> Behavior<LunabotAction> {
-    // stay in manual control unless the lunabot stage goes to SoftStop
-    // stay in soft stop unless the lunabot stage goes to Autonomy or TeleOp (lets just ignore Autonomy stage for now)
-    // go back to soft stop if the lunabot stage is soft stop
-    todo!()
+pub fn teleop_behavior(bb: &mut LunabotBlackboard) -> Behavior<LunabotAction> {
+    Behavior::While(
+        Box::new(WaitForever),
+        vec![Sequence(vec![
+            soft_stop_behavior(),
+            manual_ctrl_behavior(),
+            autonomy_main(),
+        ])],
+    )
 }

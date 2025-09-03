@@ -7,6 +7,7 @@ use cu29::{
     cutask::{CuTask, Freezable},
     input_msg,
 };
+use embedded_common::{Actuator, ActuatorCommand};
 
 use std::sync::mpsc::Receiver;
 
@@ -32,8 +33,8 @@ impl CuTask for LunabotAi {
     where
         Self: Sized,
     {
-        let blackboard = LunabotBlackboard::default();
-        let behavior = teleop_behavior();
+        let mut blackboard = LunabotBlackboard::default();
+        let behavior = teleop_behavior(&mut blackboard);
         Ok(Self {
             bt: BT::new(behavior, blackboard),
             last_tick_nanos: 0,
@@ -55,12 +56,76 @@ impl CuTask for LunabotAi {
             dt: nanos_to_secs(clock.now().as_nanos() - self.last_tick_nanos),
         }
         .into();
+        if let Some(from_lunabase) = input.payload() {
+            self.bt.blackboard_mut().update_with_msg(from_lunabase);
+        }
 
         self.bt.tick(&e, &mut |args, blackboard| {
             let mut status = Running;
             match *args.action {
-                LunabotAction::SetSteering(steering) => todo!(),
-                LunabotAction::SetActuators(actuator_command) => todo!(),
+                LunabotAction::SetSteering(steering) => {
+                    blackboard.outgoing_steering_msg = Some(steering);
+                    status = Success;
+                }
+                LunabotAction::SetActuators(actuator_command) => {
+                    blackboard
+                        .outgoing_actuator_msg_queue
+                        .push_back(actuator_command);
+                    status = Success;
+                }
+                LunabotAction::UseLastSteering => {
+                    blackboard.outgoing_steering_msg = blackboard.last_steering;
+                    status = Success;
+                }
+                LunabotAction::UseLastActuator => {
+                    if let Some(value) = blackboard.last_bucket {
+                        let [direciton_cmd, speed_cmd] = if value < 0 {
+                            [
+                                ActuatorCommand::backward(Actuator::Bucket),
+                                ActuatorCommand::set_speed(
+                                    value as f64 / i8::MIN as f64,
+                                    Actuator::Bucket,
+                                ),
+                            ]
+                        } else {
+                            [
+                                ActuatorCommand::forward(Actuator::Lift),
+                                ActuatorCommand::set_speed(
+                                    value as f64 / i8::MAX as f64,
+                                    Actuator::Bucket,
+                                ),
+                            ]
+                        };
+                        blackboard
+                            .outgoing_actuator_msg_queue
+                            .push_back(direciton_cmd);
+                        blackboard.outgoing_actuator_msg_queue.push_back(speed_cmd);
+                    }
+                    if let Some(value) = blackboard.last_lift {
+                        let [direciton_cmd, speed_cmd] = if value < 0 {
+                            [
+                                ActuatorCommand::backward(Actuator::Lift),
+                                ActuatorCommand::set_speed(
+                                    value as f64 / i8::MIN as f64,
+                                    Actuator::Lift,
+                                ),
+                            ]
+                        } else {
+                            [
+                                ActuatorCommand::forward(Actuator::Lift),
+                                ActuatorCommand::set_speed(
+                                    value as f64 / i8::MAX as f64,
+                                    Actuator::Lift,
+                                ),
+                            ]
+                        };
+                        blackboard
+                            .outgoing_actuator_msg_queue
+                            .push_back(direciton_cmd);
+                        blackboard.outgoing_actuator_msg_queue.push_back(speed_cmd);
+                    }
+                    status = Success;
+                }
                 LunabotAction::IsSoftStop => match LUNABOT_STAGE.load() {
                     LunabotStage::SoftStop => status = Running,
                     _ => status = Success,
@@ -69,8 +134,8 @@ impl CuTask for LunabotAi {
                     LunabotStage::Autonomy => status = Running,
                     _ => status = Success,
                 },
-                LunabotAction::IsTeleOp => match LUNABOT_STAGE.load() {
-                    LunabotStage::TeleOp => status = Running,
+                LunabotAction::IsManual => match LUNABOT_STAGE.load() {
+                    LunabotStage::Manual => status = Running,
                     _ => status = Success,
                 },
             }
@@ -87,12 +152,7 @@ impl CuTask for LunabotAi {
         {
             payload.1 = Some(actuator_cmd.serialize());
         }
-        if let Some(steering_cmd) = self
-            .bt
-            .blackboard_mut()
-            .outgoing_steering_msg_queue
-            .pop_front()
-        {
+        if let Some(steering_cmd) = self.bt.blackboard_mut().outgoing_steering_msg.take() {
             payload.0 = Some(steering_cmd);
         }
         if payload.0.is_some() || payload.1.is_some() {
