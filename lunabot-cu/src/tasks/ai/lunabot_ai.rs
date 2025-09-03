@@ -1,5 +1,5 @@
 use bonsai_bt::Behavior::{self, Action};
-use bonsai_bt::Status::{Running, Success};
+use bonsai_bt::Status::{Failure, Running, Success};
 use bonsai_bt::{BT, Event, Status, UpdateArgs};
 use common::{FromLunabase, LUNABOT_STAGE, LunabotStage, Steering};
 use cu29::prelude::*;
@@ -124,6 +124,24 @@ impl CuTask for LunabotAi {
                     _ => status = Success,
                 },
                 LunabotAction::None => status = Success,
+                LunabotAction::IsObstacleMapReady => {
+                    if blackboard.latest_obstacle_map.is_some() {
+                        status = Success;
+                    } else {
+                        status = Failure;
+                    }
+                }
+                LunabotAction::IsInOccupiedCell => todo!(),
+                LunabotAction::IsInFreeCell => todo!(),
+                LunabotAction::IsInUnknownCell => todo!(),
+                LunabotAction::CalculatePath => todo!(),
+                LunabotAction::FollowPathFor(meters) => {
+                    // this will be a long running task in a different thread
+                    // the task will live in the jobs folder, and be pollable to get the Status
+                    todo!()
+                }
+                LunabotAction::CheckNavigation => todo!(),
+                LunabotAction::GetUnstuck => todo!(),
             }
             (status, args.dt)
         });

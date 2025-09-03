@@ -9,10 +9,15 @@ use crate::ROOT_NODE;
 
 pub struct LunabotBlackboard {
     pub root_node: StaticNode,
-    pub latest_obstacle_map: IceoryxOccupancyGrid,
+    pub latest_obstacle_map: Option<IceoryxOccupancyGrid>,
     pub last_lift: Option<i8>,
     pub last_bucket: Option<i8>,
     pub last_steering: Option<Steering>,
+
+    /// populated when the navigate command comes in
+    /// there will likely be enough pathfinding params that this will end up encapsulated by some pathfinder struct
+    pub navigate_destination: Option<(f32, f32)>,
+
     /// Queue of actuator commands to be sent to the actuator and motor control tasks
     pub outgoing_actuator_msg_queue: VecDeque<ActuatorCommand>,
     /// we only care about the latest steering msg
@@ -30,16 +35,12 @@ impl Default for LunabotBlackboard {
     fn default() -> Self {
         Self {
             root_node: *ROOT_NODE.get().expect("ROOT_NODE not initialized"), // we should always have the root node, and if not then we might as well abort
-            latest_obstacle_map: IceoryxOccupancyGrid::default(),
-            last_lift: None,
-            last_bucket: None,
-            last_steering: None,
             outgoing_actuator_msg_queue: VecDeque::new(),
             outgoing_steering_msg: Some(Steering::new(0.0, 0.0, 0.0)),
-
             // when the user clicks continue mission for the first time, we move to manual
             last_mission: LunabotStage::Manual,
             current_mission: LunabotStage::SoftStop,
+            ..Default::default()
         }
     }
 }
@@ -58,10 +59,11 @@ impl LunabotBlackboard {
             common::FromLunabase::Steering(steering) => {
                 self.last_steering = Some(*steering);
             }
-            common::FromLunabase::Navigate(..) => {
+            common::FromLunabase::Navigate(destination) => {
                 self.last_mission = LunabotStage::Autonomy;
                 self.current_mission = LunabotStage::Autonomy;
                 LUNABOT_STAGE.store(LunabotStage::Autonomy);
+                self.navigate_destination = Some(*destination);
             }
             common::FromLunabase::DigDump(..) => {
                 self.last_mission = LunabotStage::Autonomy;
