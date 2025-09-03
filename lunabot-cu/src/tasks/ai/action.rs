@@ -3,6 +3,7 @@ use embedded_common::ActuatorCommand;
 
 #[derive(Clone, Debug)]
 pub enum LunabotAction {
+    Yield,
     SetSteering(Steering),
     SetLastSteering,
     SetLastLift,

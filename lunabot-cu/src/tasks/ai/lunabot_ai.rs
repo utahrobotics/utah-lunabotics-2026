@@ -73,15 +73,17 @@ impl CuTask for LunabotAi {
         } else {
             output.clear_payload();
         }
+        let dt =nanos_to_secs(clock.now().as_nanos() - self.last_tick_nanos);
 
         let e: Event = UpdateArgs {
-            dt: nanos_to_secs(clock.now().as_nanos() - self.last_tick_nanos),
+            dt,
         }
         .into();
         if let Some(Some(from_lunabase)) = input.payload() {
             self.bt.blackboard_mut().update_with_msg(from_lunabase);
         }
 
+        let mut remaining_dt =  0.0;
         self.bt.tick(&e, &mut |args, blackboard| {
             let status = match *args.action {
                 LunabotAction::SetSteering(steering) => {
@@ -135,15 +137,15 @@ impl CuTask for LunabotAi {
                 }
                 LunabotAction::IsSoftStop => match blackboard.current_mission {
                     LunabotStage::SoftStop => Running,
-                    _ => Failure,
+                    _ => Success,
                 },
                 LunabotAction::IsAutonomy => match blackboard.current_mission {
                     LunabotStage::Autonomy => Running,
-                    _ => Failure,
+                    _ => Success,
                 },
                 LunabotAction::IsManual => match blackboard.current_mission {
                     LunabotStage::Manual => Running,
-                    _ => Failure,
+                    _ => Success,
                 },
                 LunabotAction::None => Success,
                 LunabotAction::IsObstacleMapReady => {
@@ -164,8 +166,17 @@ impl CuTask for LunabotAi {
                 }
                 LunabotAction::CheckNavigation => todo!(),
                 LunabotAction::GetUnstuck => todo!(),
+                LunabotAction::Yield => {
+                    if !blackboard.yielded {
+                        blackboard.yielded = true;
+                        Running
+                    } else {
+                        blackboard.yielded = false;
+                        Success
+                    }
+                }
             };
-            (status, args.dt)
+            (status, remaining_dt) //passing 0.0 consumes all the remaining time for a tick
         });
         self.last_tick_nanos = clock.now().into();
         Ok(())

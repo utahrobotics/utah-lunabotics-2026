@@ -30,6 +30,8 @@ pub struct LunabotBlackboard {
     pub last_mission: LunabotStage,
 
     pub current_mission: LunabotStage,
+
+    pub yielded: bool,
 }
 
 impl Default for LunabotBlackboard {
@@ -46,6 +48,7 @@ impl Default for LunabotBlackboard {
             last_bucket: None,
             last_steering: None,
             navigate_destination: None,
+            yielded: false
         }
     }
 }
