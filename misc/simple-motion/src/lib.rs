@@ -50,12 +50,13 @@ pub enum RotationRestriction {
     },
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct LinearDynamicState {
     current_origin: Point3<f64>,
     current_length: f64,
 }
 
+#[derive(Debug)]
 enum TranslationRestrictionState {
     Fixed {
         origin: Point3<f64>,
@@ -113,12 +114,13 @@ impl From<TranslationRestriction> for TranslationRestrictionState {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 struct OneAxisDynamicState {
     current_rotation: UnitQuaternion<f64>,
     current_angle: f64,
 }
 
+#[derive(Debug)]
 enum RotationRestrictionState {
     Fixed {
         rotation: UnitQuaternion<f64>,
@@ -176,12 +178,14 @@ impl From<RotationRestriction> for RotationRestrictionState {
     }
 }
 
+#[derive(Debug)]
 pub struct ImmutableTransformable {
     translation_restriction: TranslationRestrictionState,
     rotation_restriction: RotationRestrictionState,
 }
 
 #[repr(transparent)]
+#[derive(Debug)]
 pub struct Transformable(ImmutableTransformable);
 
 impl ImmutableTransformable {
@@ -382,13 +386,14 @@ impl Deref for Transformable {
     }
 }
 
+#[derive(Debug)]
 pub struct NodeData {
     transformable: ImmutableTransformable,
     parent: Option<usize>,
     name: Option<Box<str>>,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct ImmutableNode<S = Arc<[NodeData]>> {
     arena: S,
     index: usize,
@@ -453,7 +458,7 @@ impl<S: Deref<Target = [NodeData]> + Clone> ImmutableNode<S> {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 #[repr(transparent)]
 pub struct Node<S = Arc<[NodeData]>>(ImmutableNode<S>);
 

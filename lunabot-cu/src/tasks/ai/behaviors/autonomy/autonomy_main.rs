@@ -1,13 +1,13 @@
-use bonsai_bt::Behavior;
+use bonsai_bt::Behavior::{self, Action, While};
 
-use crate::tasks::ai::{action::LunabotAction, blackboard::LunabotBlackboard};
+use crate::tasks::ai::{
+    action::LunabotAction,
+    behaviors::autonomy::navigate::{self, navigate_behavior},
+};
 
 pub fn autonomy_main() -> Behavior<LunabotAction> {
-    // loop{
-    //  navigate
-    //  dig cycle
-    //  navigate
-    //  dump cycle
-    // }
-    todo!()
+    While(
+        Box::new(Action(LunabotAction::IsAutonomy)),
+        vec![navigate_behavior()],
+    )
 }

@@ -24,7 +24,7 @@ pub struct LunabotAi {
 impl Freezable for LunabotAi {}
 
 impl CuTask for LunabotAi {
-    type Input<'m> = input_msg!(FromLunabase);
+    type Input<'m> = input_msg!(Option<FromLunabase>);
 
     // (Steering, ActuatorCommand)
     type Output<'m> = output_msg!((Option<Steering>, Option<[u8; 5]>));
@@ -35,8 +35,11 @@ impl CuTask for LunabotAi {
     {
         let mut blackboard = LunabotBlackboard::default();
         let behavior = teleop_behavior(&mut blackboard);
+        let mut bt = BT::new(behavior, blackboard);
+        let viz = bt.get_graphviz();
+        println!("GRAPHVIZ: {viz}");
         Ok(Self {
-            bt: BT::new(behavior, blackboard),
+            bt: bt,
             last_tick_nanos: 0,
         })
     }
@@ -56,7 +59,7 @@ impl CuTask for LunabotAi {
             dt: nanos_to_secs(clock.now().as_nanos() - self.last_tick_nanos),
         }
         .into();
-        if let Some(from_lunabase) = input.payload() {
+        if let Some(Some(from_lunabase)) = input.payload() {
             self.bt.blackboard_mut().update_with_msg(from_lunabase);
         }
 

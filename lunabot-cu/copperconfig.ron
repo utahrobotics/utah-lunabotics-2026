@@ -4,6 +4,11 @@
         // camera tasks can open the device if the port from the reported event
         // matches the port from the camera task config
         (
+            id: "new_ai",
+            type: "crate::tasks::ai::lunabot_ai::LunabotAi",
+            config: {},
+        ),
+        (
             id:"udev_monitor",
             type:"crate::tasks::UdevMonitor",
             config:{}
@@ -108,13 +113,13 @@
             },
         ),
         // subscribes to messages published by external-tasks/lunabot-ai2
-        (
-            id:"ai_source", type:"crate::tasks::sources::AiSource", config:{}
-        ),
+        // (
+        //     id:"ai_source", type:"crate::tasks::sources::AiSource", config:{}
+        // ),
         // messages sent to the ai_sink are sent over IPC to lunabot-ai2
-        (
-            id:"ai_sink", type:"crate::tasks::sinks::AiSink", config:{}
-        ),
+        //(
+        //    id:"ai_sink", type:"crate::tasks::sinks::AiSink", config:{}
+        //),
         // receives messages from the ai_source and sends them over serial to the pico which then moves the actuators
         (
             id:"actuator_ctrl", type:"crate::tasks::sinks::ActuatorController", config:{}
@@ -152,10 +157,10 @@
         (src:"realsense_pointcloud", dst: "realsense_kiss_icp", msg:"iceoryx_types::IceoryxPointCloud"),
         (src:"l2_kiss_icp", dst:"localizer", msg:"cu_spatial_payloads::EncodableIsometry"),
         (src:"realsense_kiss_icp", dst:"localizer", msg:"cu_spatial_payloads::EncodableIsometry"),
-        (src:"lunabase", dst:"ai_sink", msg:"Option<common::FromLunabase>"),
+        (src:"lunabase", dst:"new_ai", msg:"Option<common::FromLunabase>"),
         // copper doesn't support multiple outputs on a single task so for now we just put them in a tuple and ignore one side
-        (src:"ai_source", dst:"motor_ctrl", msg:"(Option<common::Steering>, Option<[u8; 5]>)"),
-        (src:"ai_source", dst:"actuator_ctrl", msg:"(Option<common::Steering>, Option<[u8; 5]>)"),
+        (src:"new_ai", dst:"motor_ctrl", msg:"(Option<common::Steering>, Option<[u8; 5]>)"),
+        (src:"new_ai", dst:"actuator_ctrl", msg:"(Option<common::Steering>, Option<[u8; 5]>)"),
         (
             src: "detection_handler",
             dst: "localizer",

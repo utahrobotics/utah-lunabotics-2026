@@ -7,6 +7,7 @@ use simple_motion::StaticNode;
 
 use crate::ROOT_NODE;
 
+#[derive(Clone, Debug)]
 pub struct LunabotBlackboard {
     pub root_node: StaticNode,
     pub latest_obstacle_map: Option<IceoryxOccupancyGrid>,
@@ -40,7 +41,11 @@ impl Default for LunabotBlackboard {
             // when the user clicks continue mission for the first time, we move to manual
             last_mission: LunabotStage::Manual,
             current_mission: LunabotStage::SoftStop,
-            ..Default::default()
+            latest_obstacle_map: None,
+            last_lift: None,
+            last_bucket: None,
+            last_steering: None,
+            navigate_destination: None,
         }
     }
 }
