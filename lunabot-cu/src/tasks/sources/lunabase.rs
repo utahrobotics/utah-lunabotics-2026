@@ -88,9 +88,6 @@ impl CuSrcTask for Lunabase {
             status = Ok(())
         }
 
-        // Forward message to downstream tasks and keep the global stage in sync so that
-        // Ping packets always advertise the correct mode, even if the AI-side SetStage
-        // packet was lost in transport.
         if let Some(ref msg) = self.message_buffer.pop_front() {
             output.set_payload(Some(*msg));
         } else {

@@ -13,7 +13,7 @@ pub fn teleop_behavior(bb: &mut LunabotBlackboard) -> Behavior<LunabotAction> {
         Box::new(WaitForever),
         vec![Sequence(vec![
             soft_stop_behavior(),
-            manual_ctrl_behavior(),
+            manual_ctrl_behavior(bb),
             autonomy_main(),
         ])],
     )
