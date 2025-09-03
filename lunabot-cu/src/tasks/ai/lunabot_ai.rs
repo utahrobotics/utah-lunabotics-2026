@@ -120,7 +120,6 @@ impl CuTask for LunabotAi {
                     Success
                 }
                 LunabotAction::SetBucket(value) => {
-                    println!("setting bucket");
                     let [direction, speed] = actuator_commands_from_i8(value, Actuator::Bucket);
                     blackboard.last_bucket = None;
                     blackboard.outgoing_actuator_msg_queue.push_back(direction);
@@ -128,7 +127,6 @@ impl CuTask for LunabotAi {
                     Success
                 }
                 LunabotAction::SetLift(value) => {
-                    println!("setting lift");
                     let [direction, speed] = actuator_commands_from_i8(value, Actuator::Lift);
                     blackboard.last_lift = None;
                     blackboard.outgoing_actuator_msg_queue.push_back(direction);
@@ -169,6 +167,7 @@ impl CuTask for LunabotAi {
             };
             (status, args.dt)
         });
+        self.last_tick_nanos = clock.now().into();
         Ok(())
     }
 }
