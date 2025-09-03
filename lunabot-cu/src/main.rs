@@ -51,8 +51,10 @@ fn main() {
     //     "192.168.0.100".to_string(),
     // ))
     // .expect("Failed to initialize rerun viz.");
-    rerun_viz::init_rerun(rerun_viz::RerunViz::Viz(rerun_viz::Level::All))
-        .expect("Failed to initialize rerun viz.");
+    // rerun_viz::init_rerun(rerun_viz::RerunViz::Viz(rerun_viz::Level::All))
+    //     .expect("Failed to initialize rerun viz.");
+    // rerun_viz::init_rerun(rerun_viz::RerunViz::Viz(rerun_viz::Level::All))
+    //     .expect("Failed to initialize rerun viz.");
 
     let (pico_tx, pico_rx) = enumerate_v3picos();
 

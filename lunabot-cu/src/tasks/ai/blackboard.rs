@@ -87,7 +87,10 @@ impl LunabotBlackboard {
                 self.current_mission = LunabotStage::SoftStop;
                 LUNABOT_STAGE.store(LunabotStage::SoftStop);
             }
-            common::FromLunabase::ContinueMission => self.current_mission = self.last_mission,
+            common::FromLunabase::ContinueMission => {
+                LUNABOT_STAGE.store(self.last_mission);
+                self.current_mission = self.last_mission;
+            }
             _ => {}
         }
     }

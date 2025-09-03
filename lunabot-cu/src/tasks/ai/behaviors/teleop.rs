@@ -5,7 +5,6 @@ use crate::tasks::ai::{
     behaviors::{
         autonomy::autonomy_main::autonomy_main, manual_ctrl_behavior, soft_stop::soft_stop_behavior,
     },
-    blackboard::LunabotBlackboard,
 };
 
 pub fn teleop_behavior() -> Behavior<LunabotAction> {

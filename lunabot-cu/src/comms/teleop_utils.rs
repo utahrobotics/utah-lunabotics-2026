@@ -13,7 +13,7 @@ use tasker::tokio::{self, net::UdpSocket, sync::mpsc};
 
 use common::{FromLunabot, LunabotStage};
 
-use crate::comms::TELEOP;
+use crate::comms::{LUNABASE_SIM_TELEOP, TELEOP};
 
 #[derive(Clone)]
 pub struct PacketBuilder {

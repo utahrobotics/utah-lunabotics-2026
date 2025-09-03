@@ -133,17 +133,17 @@ impl CuTask for LunabotAi {
                     blackboard.outgoing_actuator_msg_queue.push_back(speed);
                     Success
                 }
-                LunabotAction::IsSoftStop => match LUNABOT_STAGE.load() {
+                LunabotAction::IsSoftStop => match blackboard.current_mission {
                     LunabotStage::SoftStop => Running,
                     _ => Success,
                 },
-                LunabotAction::IsAutonomy => match LUNABOT_STAGE.load() {
+                LunabotAction::IsAutonomy => match blackboard.current_mission {
                     LunabotStage::Autonomy => Running,
-                    _ => Success,
+                    _ => Failure,
                 },
-                LunabotAction::IsManual => match LUNABOT_STAGE.load() {
+                LunabotAction::IsManual => match blackboard.current_mission {
                     LunabotStage::Manual => Running,
-                    _ => Success,
+                    _ => Failure,
                 },
                 LunabotAction::None => Success,
                 LunabotAction::IsObstacleMapReady => {
