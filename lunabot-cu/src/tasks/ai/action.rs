@@ -4,6 +4,9 @@ use embedded_common::ActuatorCommand;
 #[derive(Clone, Debug)]
 pub enum LunabotAction {
     SetSteering(Steering),
+    SetLastSteering,
+    SetLastLift,
+    SetLastBucket,
     SetLift(i8),
     SetBucket(i8),
     // actions for checking the lunabot stage (dig, dump, manual, soft stop, navigate)

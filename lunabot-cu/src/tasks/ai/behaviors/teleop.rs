@@ -8,12 +8,12 @@ use crate::tasks::ai::{
     blackboard::LunabotBlackboard,
 };
 
-pub fn teleop_behavior(bb: &mut LunabotBlackboard) -> Behavior<LunabotAction> {
+pub fn teleop_behavior() -> Behavior<LunabotAction> {
     Behavior::While(
         Box::new(WaitForever),
         vec![Sequence(vec![
             soft_stop_behavior(),
-            manual_ctrl_behavior(bb),
+            manual_ctrl_behavior(),
             autonomy_main(),
         ])],
     )

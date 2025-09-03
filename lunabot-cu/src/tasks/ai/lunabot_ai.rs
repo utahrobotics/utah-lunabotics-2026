@@ -34,7 +34,7 @@ impl CuTask for LunabotAi {
         Self: Sized,
     {
         let mut blackboard = LunabotBlackboard::default();
-        let behavior = teleop_behavior(&mut blackboard);
+        let behavior = teleop_behavior();
         let mut bt = BT::new(behavior, blackboard);
         let viz = bt.get_graphviz();
         println!("GRAPHVIZ: {viz}");
@@ -70,46 +70,42 @@ impl CuTask for LunabotAi {
                     blackboard.outgoing_steering_msg = Some(steering);
                     status = Success;
                 }
+                LunabotAction::SetLastSteering => {
+                    if let Some(steering) = blackboard.last_steering {
+                        blackboard.outgoing_steering_msg = Some(steering);
+                        blackboard.last_steering = None;
+                    }
+                }
+                LunabotAction::SetLastBucket => {
+                    if let Some(value) = blackboard.last_bucket {
+                        let commands = actuator_commands_from_i8(value, Actuator::Bucket);
+                        blackboard
+                            .outgoing_actuator_msg_queue
+                            .push_back(commands[0]);
+                        blackboard
+                            .outgoing_actuator_msg_queue
+                            .push_back(commands[1]);
+                    }
+                }
+                LunabotAction::SetLastLift => {
+                    if let Some(value) = blackboard.last_lift {
+                        let commands = actuator_commands_from_i8(value, Actuator::Lift);
+                        blackboard
+                            .outgoing_actuator_msg_queue
+                            .push_back(commands[0]);
+                        blackboard
+                            .outgoing_actuator_msg_queue
+                            .push_back(commands[1]);
+                    }
+                }
                 LunabotAction::SetBucket(value) => {
-                    let [direction, speed] = if value < 0 {
-                        [
-                            ActuatorCommand::backward(Actuator::Bucket),
-                            ActuatorCommand::set_speed(
-                                value as f64 / i8::MIN as f64,
-                                Actuator::Bucket,
-                            ),
-                        ]
-                    } else {
-                        [
-                            ActuatorCommand::forward(Actuator::Bucket),
-                            ActuatorCommand::set_speed(
-                                value as f64 / i8::MAX as f64,
-                                Actuator::Bucket,
-                            ),
-                        ]
-                    };
+                    let [direction, speed] = actuator_commands_from_i8(value, Actuator::Bucket);
                     blackboard.last_bucket = None;
                     blackboard.outgoing_actuator_msg_queue.push_back(direction);
                     blackboard.outgoing_actuator_msg_queue.push_back(speed);
                 }
                 LunabotAction::SetLift(value) => {
-                    let [direction, speed] = if value < 0 {
-                        [
-                            ActuatorCommand::backward(Actuator::Lift),
-                            ActuatorCommand::set_speed(
-                                value as f64 / i8::MIN as f64,
-                                Actuator::Lift,
-                            ),
-                        ]
-                    } else {
-                        [
-                            ActuatorCommand::forward(Actuator::Lift),
-                            ActuatorCommand::set_speed(
-                                value as f64 / i8::MAX as f64,
-                                Actuator::Lift,
-                            ),
-                        ]
-                    };
+                    let [direction, speed] = actuator_commands_from_i8(value, Actuator::Lift);
                     blackboard.last_lift = None;
                     blackboard.outgoing_actuator_msg_queue.push_back(direction);
                     blackboard.outgoing_actuator_msg_queue.push_back(speed);
@@ -168,5 +164,19 @@ impl CuTask for LunabotAi {
             output.clear_payload();
         }
         Ok(())
+    }
+}
+
+fn actuator_commands_from_i8(value: i8, actuator: Actuator) -> [ActuatorCommand; 2] {
+    if value < 0 {
+        [
+            ActuatorCommand::backward(actuator),
+            ActuatorCommand::set_speed(value as f64 / i8::MIN as f64, actuator),
+        ]
+    } else {
+        [
+            ActuatorCommand::forward(actuator),
+            ActuatorCommand::set_speed(value as f64 / i8::MAX as f64, actuator),
+        ]
     }
 }

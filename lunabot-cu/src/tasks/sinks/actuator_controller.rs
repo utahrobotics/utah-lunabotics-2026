@@ -31,7 +31,7 @@ impl CuSinkTask for ActuatorController {
             && let Ok(actuator_cmd) = ActuatorCommand::deserialize(*cmd_bytes)
         {
             if let Err(err) = pico_tx.try_send(actuator_cmd) {
-                eprintln!("Failed to send actuator command: {}", err.to_string());
+                // eprintln!("Failed to send actuator command: {}", err.to_string());
             }
         }
         Ok(())
