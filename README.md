@@ -10,7 +10,7 @@
 
 ## Dependencies
 
-### Required Dependencies (See non linux setup for other targets)
+### Required Dependencies (See non linux setup for other targets, or if you only need log replay / simulation)
 
 1. See dockerfile, anything installed there is a dependency.
 
