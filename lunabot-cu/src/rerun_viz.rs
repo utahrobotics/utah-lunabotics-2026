@@ -5,7 +5,9 @@ use std::{sync::OnceLock, time::Instant};
 
 use crossbeam::atomic::AtomicCell;
 use cu29::CuError;
-use rerun::{Asset3D, RecordingStream, RecordingStreamResult, SpawnOptions, ViewCoordinates};
+use rerun::{
+    Asset3D, RecordingStream, RecordingStreamResult, SpawnOptions, Transform3D, ViewCoordinates,
+};
 use serde::Deserialize;
 
 pub const ROBOT: &str = "/robot";
@@ -156,6 +158,15 @@ pub fn init_rerun(rerun_viz: RerunViz) -> Result<(), CuError> {
         };
 
         if let Err(e) = recorder.log_static(format!("{ROBOT_STRUCTURE}/mesh"), &asset) {
+            return Err(CuError::new_with_cause(
+                "Failed to log robot structure mesh",
+                e,
+            ));
+        }
+        if let Err(e) = recorder.log_static(
+            format!("{ROBOT_STRUCTURE}/mesh"),
+            &Transform3D::from_translation([-0.50, 0.20, 0.0]),
+        ) {
             return Err(CuError::new_with_cause(
                 "Failed to log robot structure mesh",
                 e,
