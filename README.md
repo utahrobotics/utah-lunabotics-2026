@@ -10,7 +10,7 @@
 
 ## Dependencies
 
-### Required Dependencies
+### Required Dependencies (See non linux setup for other targets)
 
 1. See dockerfile, anything installed there is a dependency.
 
@@ -54,3 +54,7 @@ make discover-cameras
 2. console monitor stuff
 3. rerun stuff
 
+## Non Linux Log Replay Quick Setup
+1. ```curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh``` (select the nightly version)
+2. install lapack and openblas using vcpkg or brew depending on if you are on windows or macos
+3. use ```make resim``` for log replay
