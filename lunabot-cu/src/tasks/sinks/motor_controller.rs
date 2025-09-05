@@ -8,7 +8,10 @@ use cu29::{
 
 use common::Steering;
 
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use crate::motors::{MotorRef, VescIDs, VescPair, enumerate_motors};
+
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 
 pub struct MotorController {
     motor_ref: &'static MotorRef,
@@ -16,6 +19,7 @@ pub struct MotorController {
 
 impl Freezable for MotorController {}
 
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 impl CuSinkTask for MotorController {
     // steering, actuators (just ignore the actuators here for now)
     type Input<'m> = input_msg!((Option<Steering>, Option<[u8; 5]>));
@@ -67,6 +71,29 @@ impl CuSinkTask for MotorController {
                 self.motor_ref.set_speed(left as f32, right as f32);
             }
         }
+        Ok(())
+    }
+}
+
+#[cfg(any(not(target_os = "linux"), feature = "resim", feature = "sim"))]
+pub struct MotorController;
+
+#[cfg(any(not(target_os = "linux"), feature = "resim", feature = "sim"))]
+impl CuSinkTask for MotorController {
+    type Input<'m> = input_msg!((Option<Steering>, Option<[u8; 5]>));
+    fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
+        Ok(Self {})
+    }
+
+    fn start(&mut self, _clock: &RobotClock) -> CuResult<()> {
+        Ok(())
+    }
+
+    fn postprocess(&mut self, _clock: &RobotClock) -> CuResult<()> {
+        Ok(())
+    }
+
+    fn stop(&mut self, _clock: &RobotClock) -> CuResult<()> {
         Ok(())
     }
 }

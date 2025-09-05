@@ -2,6 +2,7 @@ use cu29::prelude::*;
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use gstreamer::prelude::*;
 
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use circular_buffer::CircularBuffer;
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use gstreamer::{BufferRef, Caps, FlowSuccess, Pipeline, parse};

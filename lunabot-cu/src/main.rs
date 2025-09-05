@@ -1,7 +1,11 @@
 #![feature(try_blocks, f16, mpmc_channel)]
 pub mod comms;
+
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 mod motors;
 pub mod rerun_viz;
+
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 mod rp2040;
 pub mod simple_monitor;
 pub mod tasks;
