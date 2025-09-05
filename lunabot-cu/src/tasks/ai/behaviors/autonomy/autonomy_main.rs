@@ -8,10 +8,10 @@ use crate::tasks::ai::{
 pub fn autonomy_main() -> Behavior<LunabotAction> {
     While(
         Box::new(Action(LunabotAction::IsAutonomy)),
-        vec![If(
-            Box::new(navigate_behavior()),
-            Box::new(todo!("dig behavior not yet implemented")),
-            Box::new(todo!("navigate failiure handle not yet implemented")),
-        )],
+        vec![
+            navigate_behavior(), // todo: wrap this in an if statement
+                                 // Box::new(todo!("dig behavior not yet implemented")),
+                                 // Box::new(todo!("navigate failiure handle not yet implemented")),
+        ],
     )
 }
