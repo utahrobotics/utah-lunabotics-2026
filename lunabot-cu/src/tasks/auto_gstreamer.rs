@@ -1,14 +1,21 @@
 use cu29::prelude::*;
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use gstreamer::prelude::*;
 
 use circular_buffer::CircularBuffer;
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use gstreamer::{BufferRef, Caps, FlowSuccess, Pipeline, parse};
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use gstreamer_app::{AppSink, AppSinkCallbacks};
 use std::str::FromStr;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+#[cfg(any(not(target_os = "linux"), feature = "resim", feature = "sim"))]
+use serde::{Deserialize, Serialize};
+
 use crate::tasks::NewDevice;
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 pub use cu_gstreamer::CuGstBuffer;
 
 pub type CuDefaultAutoGStreamer = CuAutoGStreamer<16>;
@@ -17,6 +24,7 @@ pub type CuDefaultAutoGStreamer = CuAutoGStreamer<16>;
 /// While the pipeline is running it feeds the most recent buffers through a circular queue.
 /// If no frame is received for `timeout_ms` the pipeline is torn down so it can be rebuilt when the
 /// device re-appears
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 pub struct CuAutoGStreamer<const N: usize> {
     // Desired USB port – matches `NewDevice.port`.
     desired_port: String,
@@ -38,8 +46,10 @@ pub struct CuAutoGStreamer<const N: usize> {
     teardown_requested: bool,
 }
 
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 impl<const N: usize> Freezable for CuAutoGStreamer<N> {}
 
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 impl<const N: usize> CuTask for CuAutoGStreamer<N> {
     type Input<'m> = input_msg!(NewDevice);
     type Output<'m> = output_msg!(CuGstBuffer);
@@ -163,6 +173,7 @@ impl<const N: usize> CuTask for CuAutoGStreamer<N> {
     }
 }
 
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 impl<const N: usize> CuAutoGStreamer<N> {
     fn open_pipeline(&mut self, dev_path: &str) -> CuResult<()> {
         let pipeline_str = self.pipeline_template.replace("<devpath>", dev_path);
@@ -219,5 +230,53 @@ impl<const N: usize> CuAutoGStreamer<N> {
         self._appsink = None;
         self.circular_buffer.lock().unwrap().clear();
         self.last_frame_time = None;
+    }
+}
+
+#[cfg(any(not(target_os = "linux"), feature = "resim", feature = "sim"))]
+pub struct CuAutoGStreamer<const N: usize> {}
+
+#[cfg(any(not(target_os = "linux"), feature = "resim", feature = "sim"))]
+#[derive(Debug, Clone, bincode::Encode, bincode::Decode, Serialize, Deserialize, Default)]
+pub struct CuGstBuffer {}
+
+#[cfg(any(not(target_os = "linux"), feature = "resim", feature = "sim"))]
+impl<const N: usize> Freezable for CuAutoGStreamer<N> {}
+
+#[cfg(any(not(target_os = "linux"), feature = "resim", feature = "sim"))]
+impl<const N: usize> CuTask for CuAutoGStreamer<N> {
+    type Input<'m> = input_msg!(NewDevice);
+    type Output<'m> = output_msg!(CuGstBuffer);
+
+    fn new(_cfg: Option<&ComponentConfig>) -> CuResult<Self>
+    where
+        Self: Sized,
+    {
+        Ok(Self {})
+    }
+
+    fn start(&mut self, _clock: &RobotClock) -> CuResult<()> {
+        Ok(())
+    }
+
+    fn preprocess(&mut self, _clock: &RobotClock) -> CuResult<()> {
+        Ok(())
+    }
+
+    fn process(
+        &mut self,
+        _clock: &RobotClock,
+        _input: &Self::Input<'_>,
+        output: &mut Self::Output<'_>,
+    ) -> CuResult<()> {
+        output.clear_payload();
+        Err(CuError::new_with_cause(
+            "no frames received",
+            std::io::Error::other("no frames received"),
+        ))
+    }
+
+    fn stop(&mut self, _clock: &RobotClock) -> CuResult<()> {
+        Ok(())
     }
 }

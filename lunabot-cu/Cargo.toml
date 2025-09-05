@@ -21,6 +21,7 @@ required-features = ["logreader"]
 default = []
 logreader = ["dep:cu29-export"]
 resim = ["dep:cu29-export"]
+sim = []
 
 [[bin]]
 name = "lunabot-resim"
@@ -34,14 +35,13 @@ cu29.workspace = true
 bincode.workspace = true
 cu29-helpers.workspace = true
 cu29-export = { workspace = true, optional = true }
-cu-apriltag.workspace = true
 # cu_cursiveconsolemon.workspace = true
 # cu-consolemon.workspace = true
 cu-sensor-payloads.workspace = true
 cu-spatial-payloads.workspace = true
 # cu-dynthreshold.workspace = true
 cu29-runtime.workspace = true
-cu-gstreamer.workspace = true
+cu-apriltag.workspace = true
 
 
 image = { version = "0.24", default-features = false, features = ["jpeg"] }
@@ -58,9 +58,6 @@ kiss-icp-ops = { path = "../kiss-icp-rs/ops", features = ["openblas"] }
 rayon = "1.10"
 
 crossbeam.workspace = true
-gstreamer = "0.24.0"
-circular-buffer = "1.1.0"
-gstreamer-app = "0.24.0"
 
 rerun = { version = "0.23.2", features = [
     "nasm",
@@ -104,6 +101,11 @@ bonsai-bt = { git = "https://github.com/Sollimann/bonsai.git", features = [
 # Linux-only dependencies
 [target.'cfg(target_os = "linux")'.dependencies]
 udev = { version = "0.9", features = ["mio10"] }
+gstreamer = "0.24.0"
+circular-buffer = "1.1.0"
+gstreamer-app = "0.24.0"
+cu-gstreamer.workspace = true
+
 
 [build-dependencies]
 ron.workspace = true

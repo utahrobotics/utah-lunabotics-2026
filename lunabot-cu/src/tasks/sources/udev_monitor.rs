@@ -9,10 +9,10 @@ use cu29::{
     output_msg,
 };
 use serde::{Deserialize, Serialize};
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use udev::{EventType, Udev};
 
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 pub struct UdevMonitor {
     monitor_socket: Option<udev::MonitorSocket>,
     initial_enumerated: Vec<NewDevice>,
@@ -33,10 +33,10 @@ impl Default for NewDevice {
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 impl Freezable for UdevMonitor {}
 
-#[cfg(target_os = "linux")]
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 impl CuSrcTask for UdevMonitor {
     type Output<'m> = output_msg!(NewDevice);
 
@@ -186,14 +186,14 @@ impl CuSrcTask for UdevMonitor {
 }
 
 // Non-Linux stub -----------------------------------------------------------
-#[cfg(not(target_os = "linux"))]
+#[cfg(any(not(target_os = "linux"), feature = "resim", feature = "sim"))]
 #[derive(Default)]
 pub struct UdevMonitor;
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(any(not(target_os = "linux"), feature = "resim", feature = "sim"))]
 impl Freezable for UdevMonitor {}
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(any(not(target_os = "linux"), feature = "resim", feature = "sim"))]
 impl CuSrcTask for UdevMonitor {
     type Output<'m> = output_msg!(NewDevice);
 

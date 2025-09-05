@@ -1,11 +1,12 @@
-use cu_gstreamer::CuGstBuffer;
+use crate::tasks::auto_gstreamer::CuGstBuffer;
 use cu_sensor_payloads::{CuImage, CuImageBufferFormat};
 use cu29::prelude::*;
 use std::ops::DerefMut;
 use std::sync::Arc;
 
-/// A fast task that converts CuGstBuffer to CuImage<Vec<u8>> using memory pool optimization.
+/// A fastish task that converts CuGstBuffer to CuImage<Vec<u8>> using memory pool optimization.
 /// Uses pre-allocated buffers and fast memory copy to minimize overhead.
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 pub struct GstToImage {
     pool: Arc<CuHostMemoryPool<Vec<u8>>>,
     width: u32,
@@ -14,8 +15,10 @@ pub struct GstToImage {
     expected_buffer_size: usize,
 }
 
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 impl Freezable for GstToImage {}
 
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 impl CuTask for GstToImage {
     type Input<'m> = input_msg!(CuGstBuffer);
     type Output<'m> = output_msg!(CuImage<Vec<u8>>);
@@ -125,6 +128,46 @@ impl CuTask for GstToImage {
 
         output.tov = input.tov;
         output.set_payload(image);
+        Ok(())
+    }
+}
+
+#[cfg(any(not(target_os = "linux"), feature = "resim", feature = "sim"))]
+pub struct GstToImage;
+
+#[cfg(any(not(target_os = "linux"), feature = "resim", feature = "sim"))]
+impl Freezable for GstToImage {}
+
+#[cfg(any(not(target_os = "linux"), feature = "resim", feature = "sim"))]
+impl CuTask for GstToImage {
+    type Input<'m> = input_msg!(CuGstBuffer);
+    type Output<'m> = output_msg!(CuImage<Vec<u8>>);
+
+    fn new(_config: Option<&ComponentConfig>) -> CuResult<Self>
+    where
+        Self: Sized,
+    {
+        Ok(Self {})
+    }
+    fn start(&mut self, _clock: &RobotClock) -> CuResult<()> {
+        Ok(())
+    }
+    fn preprocess(&mut self, _clock: &RobotClock) -> CuResult<()> {
+        Ok(())
+    }
+    fn process(
+        &mut self,
+        _clock: &RobotClock,
+        _input: &Self::Input<'_>,
+        output: &mut Self::Output<'_>,
+    ) -> CuResult<()> {
+        output.clear_payload();
+        Err(CuError::new_with_cause(
+            "no frames received",
+            std::io::Error::other("no frames received"),
+        ))
+    }
+    fn stop(&mut self, _clock: &RobotClock) -> CuResult<()> {
         Ok(())
     }
 }

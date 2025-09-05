@@ -8,14 +8,13 @@ use cu29::{
     CuResult, clock::RobotClock, config::ComponentConfig, cutask::Freezable, input_msg, prelude::*,
 };
 
-use cu_spatial_payloads::{EncodableIsometry, Transform3D, Transform3DCast};
-use gstreamer::message::Tag;
+use cu_spatial_payloads::EncodableIsometry;
 use ron::de::from_str as ron_from_str;
 use serde::Deserialize;
 use std::fs;
 use std::path::Path;
 
-use crate::rerun_viz::{self, RECORDER};
+use crate::rerun_viz;
 
 /// Data definition that mirrors the contents of a `.ron` apriltag isometry file.
 /// The field names are intentionally kept simple so that we can be flexible with

@@ -58,5 +58,6 @@ help:
 	@echo "  clean             - Clean Bazel build artifacts"
 	@echo "  kill              - Kill any lunabot sub processes that may still be running"
 	@echo "  help              - Show this help message"
+	@echo "  resim			   - Run re-simulation from logs/lunabot.copper"
 
 .PHONY: prod debug sync clean-build build-publisher discover-cameras check clean help
