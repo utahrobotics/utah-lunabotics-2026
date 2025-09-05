@@ -79,6 +79,8 @@ impl CuSinkTask for MotorController {
 pub struct MotorController;
 
 #[cfg(any(not(target_os = "linux"), feature = "resim", feature = "sim"))]
+#[cfg(any(not(target_os = "linux"), feature = "resim", feature = "sim"))]
+
 impl CuSinkTask for MotorController {
     type Input<'m> = input_msg!((Option<Steering>, Option<[u8; 5]>));
     fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {

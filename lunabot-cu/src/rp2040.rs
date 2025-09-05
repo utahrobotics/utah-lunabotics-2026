@@ -1,3 +1,4 @@
+#![cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use std::time::Duration;
 
 use crossbeam_channel::{Receiver, RecvTimeoutError, Sender};

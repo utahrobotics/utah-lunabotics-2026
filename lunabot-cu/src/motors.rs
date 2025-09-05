@@ -1,3 +1,4 @@
+#![cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use crate::utils::udev_poll;
 use core::f32;
 use crossbeam::{atomic::AtomicCell, utils::Backoff};

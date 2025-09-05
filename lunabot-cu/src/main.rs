@@ -3,6 +3,7 @@ pub mod comms;
 
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 mod motors;
+
 pub mod rerun_viz;
 
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
