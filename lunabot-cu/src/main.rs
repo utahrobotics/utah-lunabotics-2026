@@ -88,14 +88,14 @@ fn main() {
 
 fn launch_subprocs() {
     let mut launcher = launcher::ProcessLauncher::new();
-    let suppress_output = false;
+    let suppress_output = true;
     let mut unilidar_cmd = ProcessCommand::new("./unilidar_publisher")
         .with_detach(true)
         .with_working_directory("../unilidar_iceoryx_publisher/bazel-bin/");
     if suppress_output {
         unilidar_cmd = unilidar_cmd.with_suppress_output(true);
     }
-    // launcher.add_command("unilidar publisher", unilidar_cmd);
+    launcher.add_command("unilidar publisher", unilidar_cmd);
 
     let mut realsense_cmd = ProcessCommand::new("cargo")
         .with_args(vec!["run", "--release"])

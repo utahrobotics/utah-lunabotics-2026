@@ -224,7 +224,6 @@ int main()
                 auto sample = imu_publisher.loan_uninit().expect("imu loan");
                 auto initialized = sample.write_payload(msg);
                 send(std::move(initialized)).expect("imu send");
-                // std::cout << "imu sent" << std::endl;
             }
             break;
         }

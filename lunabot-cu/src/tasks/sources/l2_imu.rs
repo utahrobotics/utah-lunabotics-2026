@@ -61,6 +61,7 @@ impl CuSrcTask for ImuIceoryxReceiver {
             .node
             .service_builder(&self.service_name)
             .publish_subscribe::<ImuMsg>()
+            .enable_safe_overflow(true)
             .open_or_create()
             .map_err(|e| CuError::new_with_cause("ImuIceoryxReceiver: service", e))?;
 
