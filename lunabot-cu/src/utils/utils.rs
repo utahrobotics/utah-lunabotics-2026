@@ -10,6 +10,7 @@ use nalgebra::{
 use spin_sleep::SpinSleeper;
 
 use common::Steering;
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use udev::Event;
 
 pub fn nanos_to_secs(nanos: u64) -> f64 {
@@ -214,6 +215,7 @@ mod tests {
     }
 }
 
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 pub fn udev_poll(mut socket: udev::MonitorSocket) -> impl Iterator<Item = Event> {
     let mut poll = Poll::new().unwrap();
     let mut events = Events::with_capacity(1024);
