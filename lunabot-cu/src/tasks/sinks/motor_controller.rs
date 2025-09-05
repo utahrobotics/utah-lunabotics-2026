@@ -93,6 +93,10 @@ impl CuSinkTask for MotorController {
         Ok(())
     }
 
+    fn process(&mut self, _clock: &RobotClock, _input: &Self::Input<'_>) -> CuResult<()> {
+        Ok(())
+    }
+
     fn stop(&mut self, _clock: &RobotClock) -> CuResult<()> {
         Ok(())
     }
