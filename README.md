@@ -12,6 +12,7 @@
 
 ### Production env (Linux only)
 1. See dockerfile, anything installed there is a dependency for running the robot in production.
+2. Apriltag C library and librealsense
 
 ### Log Replay (Unix)
 
