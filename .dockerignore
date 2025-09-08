@@ -1,2 +1,6 @@
-**/.vscode/settings.json
 target/
+**/target/
+.git/
+**/.git/
+.vscode/
+**/.vscode/
