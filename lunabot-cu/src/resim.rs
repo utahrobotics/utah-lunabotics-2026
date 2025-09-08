@@ -154,8 +154,14 @@ fn main() {
     )
     .expect("Failed to setup logger.");
 
-    rerun_viz::init_rerun(rerun_viz::RerunViz::Viz(rerun_viz::Level::All))
-        .expect("Failed to initialize rerun viz.");
+    // uncomment to use with docker
+    // rerun_viz::init_rerun(rerun_viz::RerunViz::Grpc(
+    //     rerun_viz::Level::All,
+    //     "host.docker.internal".to_string(),
+    // ))
+    // .expect("Failed to initialize rerun viz.");
+
+    rerun_viz::init_rerun(rerun_viz::RerunViz::Viz(rerun_viz::Level::All));
 
     let (pico_tx, pico_rx) = mock_enumerate_picos();
 
