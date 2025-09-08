@@ -13,7 +13,7 @@
 ### Production env (Linux only)
 1. See dockerfile, anything installed there is a dependency for running the robot in production.
 
-### Log Replay (Unix only, use wsl on windows)
+### Log Replay (Unix)
 
 1. ```make``` command 
 2. git - just google how to install this
@@ -22,6 +22,13 @@
 5. rust - install from rustup.rs (select nightly version)
 
 NOTE: If you are on macos you can install git, libclang, and make by running ```xcode-select --install```
+
+### Log Replay (Docker)
+1. ```docker build -t lunabot . && docker run --network=host -it lunabot /bin/bash```
+2. Find the docker container id with ```host$ docker container ls```
+3. Copy log files from host to container ```host$ docker cp  path/to/lunabot-cu/logs container_id:/workspace/lunabot-cu/logs```
+4. Start rerun on host.
+5. Run replay ```container$ make resim``` 
 
 ### Optional Dependencies
 
