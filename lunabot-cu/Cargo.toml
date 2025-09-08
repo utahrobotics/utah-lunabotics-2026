@@ -20,7 +20,7 @@ required-features = ["logreader"]
 [features]
 default = []
 logreader = ["dep:cu29-export"]
-resim = ["dep:cu29-export"]
+resim = ["dep:cu29-export", "cu-apriltag/resim"]
 sim = []
 
 [[bin]]
