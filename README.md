@@ -1,6 +1,6 @@
 # Lunabot
 
-*This repo is in the early stages of a rewrite migrating to the copper framework from last years code base: github.com/utahrobotics/lunadev-2025*
+*This repo is in the earlyish stages of a rewrite migrating to the copper framework from last years code base: github.com/utahrobotics/lunadev-2025*
 
 ## Architecture Overview
 <img width="4238" height="1064" alt="graphviz(2)" src="https://github.com/user-attachments/assets/1fed9b5c-01c8-4025-a19f-879566554475" />
@@ -10,10 +10,18 @@
 
 ## Dependencies
 
-### Required Dependencies (See non linux setup for other targets, or if you only need log replay / simulation)
+### Production env (Linux only)
+1. See dockerfile, anything installed there is a dependency for running the robot in production.
 
-1. See dockerfile, anything installed there is a dependency.
+### Log Replay (Unix only, use wsl on windows)
 
+1. ```make``` command 
+2. git - just google how to install this
+3. rerun - download binary from their github releases page and add "rerun" command to Path.
+4. libclang-dev
+5. rust - install from rustup.rs (select nightly version)
+
+NOTE: If you are on macos you can install git, libclang, and make by running ```xcode-select --install```
 
 ### Optional Dependencies
 
@@ -21,21 +29,25 @@
    ```bash
    https://github.com/copper-project/copper-rs/tree/master/support/cargo_cubuild
    ```
+2. iox2 cli tool for seeing active iceoryx2 nodes and services.
+3. cargo flamegraph + perf for profiling
+4. gdb
+5. lz4 for compressing logs
 
-2. Rerun - visualize data produced by the robot.
-3. iox2 cli tool for seeing active iceoryx2 nodes and services.
+
+## Running
+
+### Production env
+1. On some machines you have to increase the stack size for it to compile ```export RUST_MIN_STACK=107108864```.
+2. run ```make sync``` to build the Unitree L2 publisher.
+3. run ```make prod``` to build and run the project.
+
+### Log replay
+1. Ensure there are valid log files in lunabot-cu/logs
+1. run ```make resim```
 
 
-
-
-## Building and Running
-1. Install rust from rustup.rs
-2. ```rustup default nightly```
-3. On some machines you have to increase the stack size for it to compile ```export RUST_MIN_STACK=107108864```.
-4. Install dependencies listed in the Dockerfile.
-5. run ```make sync``` to build the Unitree L2 publisher.
-6. run ```make prod``` to build and run the project.
-
+### Help
 ```bash
 make help # see commands for building and running
 ```
@@ -47,14 +59,3 @@ make help # see commands for building and running
 ```bash
 make discover-cameras
 ```
-
-
-## TODO: everything logging related
-1. copper log macros only print in debug builds (I likely will change this)
-2. console monitor stuff
-3. rerun stuff
-
-## Non Linux Log Replay Quick Setup
-1. ```curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh``` (select the nightly version)
-2. install lapack and openblas using vcpkg or brew depending on if you are on windows or macos
-3. use ```make resim``` for log replay
