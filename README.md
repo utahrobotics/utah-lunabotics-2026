@@ -27,9 +27,9 @@ NOTE: If you are on macos you can install git, libclang, and make by running ```
 1. ```docker build -t lunabot . && docker run --network=host -it lunabot /bin/bash```
 2. Find the docker container id with ```host$ docker container ls```
 3. Copy log files from host to container ```host$ docker cp  path/to/lunabot-cu/logs container_id:/workspace/lunabot-cu/logs```
-4. Comment out the rerun init viz line in lunabot-cu/main.rs, and uncomment the line above with the Grpc configuration, replacing the ip with host.docker.internal
-4. Start rerun on host.
-5. Run replay ```container$ make resim``` 
+4. Comment out the rerun init viz line in lunabot-cu/main.rs, and uncomment the line above with the Grpc configuration, replacing the ip with host.docker.internal (install an editor of your choice to do this)
+5. Start rerun on host.
+6. Run replay ```container$ make resim``` 
 
 ### Optional Dependencies
 
