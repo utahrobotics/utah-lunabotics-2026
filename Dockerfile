@@ -39,6 +39,9 @@ RUN apt-get update && apt-get install -y \
     # udev development
     libudev-dev \
     unzip \
+    net-tools \
+    software-properties-common \
+    iputils-ping \
     && rm -rf /var/lib/apt/lists/*
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly
