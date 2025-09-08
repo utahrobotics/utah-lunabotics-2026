@@ -6,12 +6,12 @@ UNILIDAR_DIR = unilidar_iceoryx_publisher
 # Build the unilidar_publisher with Bazel and run the main cargo project
 prod:
 	cd $(UNILIDAR_DIR) && RULES_RUST_TOOLCHAIN_VERSION=$(RUST_TOOLCHAIN_VERSION) bazel build //:unilidar_publisher $(BAZEL_BUILD_FLAGS)
-	cd lunabot-cu && cargo run --release
+	cd lunabot-cu && cargo run --release --features hardware
 
 # Build the unilidar_publisher with Bazel and run the main cargo project in debug mode
 debug:
 	cd $(UNILIDAR_DIR) && RULES_RUST_TOOLCHAIN_VERSION=$(RUST_TOOLCHAIN_VERSION) bazel build //:unilidar_publisher $(BAZEL_BUILD_FLAGS)
-	cd lunabot-cu && cargo run
+	cd lunabot-cu && cargo run --features hardware
 
 # Sync Bazel dependencies (useful to run before first build or when dependencies change)
 sync:
