@@ -105,14 +105,6 @@ fn launch_subprocs() {
     }
     launcher.add_command("realsense publisher", realsense_cmd);
 
-    let mut ai_cmd = ProcessCommand::new("cargo")
-        .with_args(vec!["run", "--release"])
-        .with_working_directory("../external-tasks/lunabot-ai2");
-    if suppress_output {
-        ai_cmd = ai_cmd.with_suppress_output(true);
-    }
-    launcher.add_command("lunabot ai", ai_cmd);
-
     launcher.launch_all().expect("failed to launch commands");
     let pids = launcher.pids.clone();
     std::panic::set_hook(Box::new(move |info| {

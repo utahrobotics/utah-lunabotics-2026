@@ -112,14 +112,6 @@
                 "max_pong_delay_ms": 500,
             },
         ),
-        // subscribes to messages published by external-tasks/lunabot-ai2
-        // (
-        //     id:"ai_source", type:"crate::tasks::sources::AiSource", config:{}
-        // ),
-        // messages sent to the ai_sink are sent over IPC to lunabot-ai2
-        //(
-        //    id:"ai_sink", type:"crate::tasks::sinks::AiSink", config:{}
-        //),
         // receives messages from the ai_source and sends them over serial to the pico which then moves the actuators
         (
             id:"actuator_ctrl", type:"crate::tasks::sinks::ActuatorController", config:{}

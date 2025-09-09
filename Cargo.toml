@@ -14,7 +14,6 @@ members = [
     "lunabot-cu",
     "embedded_common",
     "external-tasks/realsense",
-    "external-tasks/lunabot-ai2",
 ]
 exclude = ["kiss-icp-rs"]
 # Shared dependencies across workspace members

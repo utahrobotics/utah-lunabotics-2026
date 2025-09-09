@@ -3470,21 +3470,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "lunabot-ai2"
-version = "0.1.0"
-dependencies = [
- "bincode 2.0.1",
- "common",
- "embedded_common",
- "fxhash",
- "iceoryx-types",
- "iceoryx2",
- "indexmap 2.11.0",
- "nalgebra",
- "tokio",
-]
-
-[[package]]
 name = "lunabot-cu"
 version = "0.1.0"
 dependencies = [
