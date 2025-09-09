@@ -50,12 +50,13 @@ Prerequisites: git, docker, git bash if on windows, rerun binary downloaded from
 
 ### Production env
 1. On some machines you have to increase the stack size for it to compile ```export RUST_MIN_STACK=107108864```.
-2. run ```make sync``` to build the Unitree L2 publisher.
+2. run ```make sync``` to build/sync deps for the Unitree L2 publisher.
 3. run ```make prod``` to build and run the project.
 
 ### Log replay
+Note: first install dependencies needed for log replay for your environment: docker (for windows users), or Unix.
 1. Ensure there are valid log files in lunabot-cu/logs
-1. run ```make resim```
+2. run ```make resim```
 
 
 ### Help
@@ -69,4 +70,111 @@ make help # see commands for building and running
 
 ```bash
 make discover-cameras
+```
+
+
+# Crate Layout
+
+## Entry points
+### lunabot-cu/src/main.rs
+* Launches exernal processes.
+* Sets up rerun
+* Serializes the robot chain. 
+* Builds and runs the lunabot application.
+
+### lunabot-cu/src/resim.rs
+* Reads in copperlist logs from lunabot-cu/logs. These logs contain messages passed between copper tasks.
+* Runs the lunabot in simulation mode which allows you to selectively decide which task's process functions are simulated "Mocked", and which tasks process functions are not.
+* Allows you to set a task with a mocked process function to output to whatever was read in from the logs, effectively allowing for deterministic replay of whatever was captured.
+
+### external-tasks/realsense
+* Launched by lunabot-cu. 
+* Detects when a realsense device is plugged in, automatically opens device and publishes point clouds.
+* Not compiled or launched in log replay mode.
+
+### unilidar_iceoryx_publisher
+* Launched by lunabot-cu
+* Connects to L2 and publishes imu data and pointclouds from it.
+* Not compiled or executed in log replay mode.
+
+## misc/ 
+Contains libraries for kinematics, network protocols, GPU utilites/Shader pipelines, camera auto discovery, behavior trees, and interaction with VESC boards.
+
+## lunabot-cu/src/tasks/sources
+Contains source tasks for:
+
+* Receiving messages from sensors in external tasks (Realsense, L2 lidar)
+* Handling the connection to the lunabase.
+
+## lunabot-cu/src/tasks/sinks
+* Sink tasks for interacting with the actuators and motors
+* localizer
+* logger placeholder task for testing obstacle map generation
+
+## lunabot-cu/src/tasks/ai
+* Takes in readings from the lunabase. 
+* Keeps track of what the robot is currently doing (see LunabotAction enum)
+* Keeps track of state (the blackboard) associated with the lunabot: robot chain, last messages seen from lunabase, latest obstacle map, (and more to come)
+* Decides how to control the motors and actuators based on all that information.
+
+## lunabot-cu/src/tasks (not the source or sinks ones)
+Tasks that lie between the sources and sinks for:
+* Image processing for apriltag detection.
+* Automatically opening camera devices as they become available.
+* Point cloud processing (KISS-ICP)
+
+## lunabot-cu/src/utils
+Helper functions for:
+* Framed codec for talking with rp2040
+* Udev polling
+* Linear interpolation
+* Converting between units/types.
+
+## lunabot-cu/src/comms
+* Structures and helpers used for connecting to the base station.
+
+## common/ 
+Legacy code containing structures that are used by the lunabase and the lunabot. (and the old behavior tree). \\
+*This will be useful when we actually move the lunabase to this repo*
+
+## embedded_common
+A no_std crate containing structures used by the embedded code as well as our tasks. 
+*there is no embedded code in this repo yet because we don't know what electrical team will throw our way quite yet*
+
+## Others
+
+### lunabot-cu/src/rerun_viz.rs
+Utilities for connecting to rerun.
+
+### lunabot-cu/src/rp2040.rs
+Legacy code for connecting to a rpi pico that is in charge of actuator control and IMUs. \\ 
+
+The enumerate_v3picos() starts a thread that is in charge of communicating with the pico, and returns a Tx Rx pair such that you can:
+* Command the actuators by sending messages to tx
+* Read messages from the pico by recv from rx.
+The tx side is used in the actuator_ctrl task.
+
+### lunabot-cu/src/motors.rs
+Legacy code for controlling motors via VESC. \\
+The enumerate_motors() function (used by the motor_ctrl task) returns a structure that you can use to command the motors.
+
+### lunabot-cu/src/simple_monitor.rs
+Hooks into the copper runtime and prints messages when a task's process, preprocess, etc return Err.
+
+Example output:
+```
+=== ERRORED TASKS ===
+Task 10: lunabase (State: Process) - lunabase not connected
+   context:lunabase disconnected
+Task 17: cam_side (State: Process) - no frames received
+   context:no frames received
+Task 14: cam_back (State: Process) - no frames received
+   context:no frames received
+Task 4: realsense_pointcloud (State: Process) - No points seen in 600 ms
+   context:No points seen in 600 ms
+Task 5: realsense_occupancy (State: Process) - No occupancy grid seen in 600 ms
+   context:No occupancy grid seen in 600 ms
+Task 2: l2_pointcloud (State: Process) - No points seen in 600 ms
+   context:No points seen in 600 ms
+=====================
 ```
