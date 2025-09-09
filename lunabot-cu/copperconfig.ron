@@ -160,6 +160,7 @@
         ),
         (src:"realsense_occupancy",dst:"realsense_occupancy_logger",msg:"iceoryx_types::IceoryxOccupancyGrid"),
     ],
+    
     includes:[
         // starts a gstreamer pipeline that waits for a message from udev_monitor and then starts the pipeline accordingly
         // sends frames through a dynamic threshold and then to the apriltag detector, then to the detection handler.
