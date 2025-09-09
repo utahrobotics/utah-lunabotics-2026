@@ -35,7 +35,7 @@ discover-cameras:
 
 # Check the main cargo project
 check:
-	cd lunabot-cu && cargo check
+	cd lunabot-cu && cargo check --bin lunabot-resim --features resim
 
 # Clean Bazel build artifacts
 clean:
