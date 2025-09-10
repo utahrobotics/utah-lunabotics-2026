@@ -28,7 +28,7 @@ NOTE: If you are on macos you can install git, libclang, and make by running ```
 Prerequisites: git, docker, git bash if on windows, rerun binary downloaded from the rerun github releases.
 
 0. Clone the repository.
-1. From the repository root run ```docker run --network=host -it -v $(pwd):/workspace -v cargo-cache:/workspace/target -v cargo-registry:/usr/local/cargo/registry --name lunabot lunabot```
+1. From the repository root first build the docker container with ```docker build -t lunabot .``` then run with ```docker run --network=host -it -v $(pwd):/workspace -v cargo-cache:/workspace/target -v cargo-registry:/usr/local/cargo/registry --name lunabot lunabot```
 2. Comment out the rerun init function call in lunabot-cu/src/resim.rs, and uncomment the line above with the Grpc config.
 3. Start rerun on host.
 4. Run replay with ```container$ make resim```
