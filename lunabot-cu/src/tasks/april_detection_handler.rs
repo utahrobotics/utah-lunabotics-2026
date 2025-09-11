@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 use std::f64::consts::PI;
 
-use chrono::SubsecRound;
 use cu_apriltag::AprilTagDetections;
 use cu29::cutask::CuMsg;
 use cu29::{
@@ -14,7 +13,7 @@ use serde::Deserialize;
 use std::fs;
 use std::path::Path;
 
-use crate::rerun_viz;
+use crate::rerun_viz::RECORDER;
 
 /// Data definition that mirrors the contents of a `.ron` apriltag isometry file.
 /// The field names are intentionally kept simple so that we can be flexible with
@@ -23,40 +22,30 @@ use crate::rerun_viz;
 struct TagDef {
     tag_id: usize,
     origin: (f64, f64, f64),
-    forward_axis: (f64, f64, f64),
-    #[serde(default)]
-    roll: f64,
+    // roll pitch yaw
+    euler: (f64, f64, f64),
 }
 
 impl TagDef {
     pub fn get_quat(self) -> UnitQuaternion<f64> {
-        let forward_axis = Vector3::new(
-            self.forward_axis.0,
-            self.forward_axis.1,
-            self.forward_axis.2,
-        );
-        // First rotation to face along the forward axis
-        let rotation1 =
-            UnitQuaternion::rotation_between(&Vector3::new(0.0, 0.0, -1.0), &forward_axis)
-                .unwrap_or(UnitQuaternion::from_scaled_axis(Vector3::new(0.0, PI, 0.0)));
-
-        let cross_axis = forward_axis.cross(&Vector3::new(0.0, 1.0, 0.0));
-        let true_up = cross_axis.cross(&forward_axis);
-
-        // Second rotation to rotate the up axis to face directly up
-        let actual_up = rotation1 * Vector3::new(0.0, 1.0, 0.0);
-        let rotation2 = UnitQuaternion::rotation_between(&actual_up, &true_up).unwrap();
-
-        // Third rotation to roll the tag
-        let rotation3 = UnitQuaternion::from_scaled_axis(forward_axis.normalize() * self.roll);
-
-        rotation3 * rotation2 * rotation1
+        from_euler_angles(self.euler.0, self.euler.1, self.euler.2)
     }
 }
 
-/// Reads every `*.ron` file in `apriltag_isometries/` (located next to the
-/// executable when it is run) and returns a mapping from tag ID to its global
-/// `Isometry3`.
+fn from_euler_angles(roll: f64, pitch: f64, yaw: f64) -> UnitQuaternion<f64> {
+    let roll_rad = roll.to_radians();
+    let pitch_rad = pitch.to_radians();
+    let yaw_rad = yaw.to_radians();
+
+    let rot_z = UnitQuaternion::from_scaled_axis(Vector3::z() * yaw_rad);
+    let rot_y = UnitQuaternion::from_scaled_axis(Vector3::y() * pitch_rad);
+    let rot_x = UnitQuaternion::from_scaled_axis(Vector3::x() * roll_rad);
+
+    rot_z * rot_y * rot_x
+}
+
+/// Reads every `*.ron` file in `apriltag_isometries/`
+///  and returns a mapping from tag ID to its global `Isometry3`.
 fn load_known_apriltag_isometries() -> CuResult<HashMap<usize, Isometry3<f64>>> {
     let search_paths = [
         Path::new("apriltag_isometries").to_path_buf(),
@@ -80,18 +69,6 @@ fn load_known_apriltag_isometries() -> CuResult<HashMap<usize, Isometry3<f64>>> 
             let contents = fs::read_to_string(&path).map_err(|e| e.to_string())?;
             let def: TagDef = ron_from_str(&contents).map_err(|e| e.to_string())?;
 
-            // Debug output for tag definitions
-            println!(
-                "Loading tag {}: origin=({:.3}, {:.3}, {:.3}), forward=({:.3}, {:.3}, {:.3})",
-                def.tag_id,
-                def.origin.0,
-                def.origin.1,
-                def.origin.2,
-                def.forward_axis.0,
-                def.forward_axis.1,
-                def.forward_axis.2
-            );
-
             let translation = Vector3::new(def.origin.0, def.origin.1, def.origin.2);
             let id = def.tag_id;
             let rotation = def.get_quat();
@@ -99,7 +76,6 @@ fn load_known_apriltag_isometries() -> CuResult<HashMap<usize, Isometry3<f64>>> 
             known_tags.insert(id, Isometry3::from_parts(translation.into(), rotation));
         }
 
-        // Prefer the first directory that exists & contains files.
         if !known_tags.is_empty() {
             break;
         }
@@ -191,9 +167,34 @@ impl CuTask for AprilDetectionHandler {
 }
 
 impl AprilDetectionHandler {
+    fn transform_cv_to_physics(cv_pose: Isometry3<f64>) -> Isometry3<f64> {
+        let cv_translation = cv_pose.translation.vector;
+        let cv_x = cv_translation[0];
+        let cv_y = cv_translation[1];
+        let cv_z = cv_translation[2];
+
+        let physics_x = cv_z;
+        let physics_y = -cv_x;
+        let physics_z = -cv_y;
+
+        let physics_translation = Vector3::new(physics_x, physics_y, physics_z);
+
+        let cv_rotation_matrix = cv_pose.rotation.to_rotation_matrix().matrix().clone();
+
+        let coord_transform = nalgebra::Matrix3::new(0.0, 0.0, 1.0, -1.0, 0.0, 0.0, 0.0, -1.0, 0.0);
+
+        let physics_rotation_matrix =
+            coord_transform * cv_rotation_matrix * coord_transform.transpose();
+        let physics_rotation = UnitQuaternion::from_rotation_matrix(
+            &Rotation3::from_matrix_unchecked(physics_rotation_matrix),
+        );
+
+        Isometry3::from_parts(physics_translation.into(), physics_rotation)
+    }
+
     /// estimates the observers isometry from each observation individually, and then averages them all together
     /// additionally logs the tags known global coords to rerun with a timestamp so we know the tag has been seen recently.
-    /// filters out tags that are more than 2m away
+    /// filters out tags that are more than 3m away
     fn estimate_observer_isometry_from_observations(
         &self,
         observations: &[TagObservation],
@@ -201,53 +202,13 @@ impl AprilDetectionHandler {
         let mut observer_isometries = Vec::new();
 
         for observation in observations {
-            // Look up the global pose of this tag.
-            let tag_global_isometry = observation.tag_global_isometry;
-
-            // Log the tag position in global coordinates for visualization.
-            let location = (
-                tag_global_isometry.translation.x as f32,
-                tag_global_isometry.translation.y as f32,
-                tag_global_isometry.translation.z as f32,
-            );
-            let seen_at = chrono::Local::now().time().trunc_subsecs(0);
-            let quaternion_vec = tag_global_isometry
-                .rotation
-                .quaternion()
-                .as_vector()
-                .iter()
-                .map(|val| *val as f32)
-                .collect::<Vec<f32>>();
-
-            if let Err(e) = rerun_viz::RECORDER.get().unwrap().recorder.log(
-                format!(
-                    "apriltags/{}/{}/location",
-                    observation.camera_id, observation.tag_id
-                ),
-                &Boxes3D::from_centers_and_half_sizes([(location)], [(0.1, 0.01, 0.1)])
-                    .with_quaternions([[
-                        quaternion_vec[0],
-                        quaternion_vec[1],
-                        quaternion_vec[2],
-                        quaternion_vec[3],
-                    ]])
-                    .with_labels([format!("{}", seen_at)]),
-            ) {
-                return Err(CuError::new_with_cause(
-                    &format!("Couldn't log april tag: {e}"),
-                    std::io::Error::new(std::io::ErrorKind::Other, "Rerun logging failed"),
-                ));
-            }
-
-            // Compute the camera pose from the tag's known global pose and the observed local pose.
             let isometry_of_observer = observation.get_isometry_of_observer();
 
-            // filter out tags that are too far away to be reliable
             if isometry_of_observer
                 .translation
                 .vector
                 .metric_distance(&observation.tag_global_isometry.translation.vector)
-                > 2.0
+                > 3.0
             {
                 println!(
                     "apriltag too far away, distance: {}",
@@ -286,17 +247,34 @@ impl AprilDetectionHandler {
                 continue;
             };
 
-            let mut tag_local_isometry: Isometry3<f64> = pose;
-            let tag_global_isometry = *self.known_tags.get(&id).unwrap();
-            tag_local_isometry.translation.y *= -1.0;
-            tag_local_isometry.translation.z *= -1.0;
-            let mut scaled_axis = tag_local_isometry.rotation.scaled_axis();
-            scaled_axis.y *= -1.0;
-            scaled_axis.z *= -1.0;
-            tag_local_isometry.rotation = UnitQuaternion::from_scaled_axis(scaled_axis);
-            tag_local_isometry.rotation = UnitQuaternion::from_scaled_axis(
-                tag_local_isometry.rotation * Vector3::new(0.0, PI, 0.0),
-            ) * tag_local_isometry.rotation;
+            let tag_local_isometry: Isometry3<f64> = Self::transform_cv_to_physics(pose);
+            let tag_global_isometry = self.known_tags.get(&id).unwrap();
+
+            let tag_center = (
+                tag_global_isometry.translation.x as f32,
+                tag_global_isometry.translation.y as f32,
+                tag_global_isometry.translation.z as f32,
+            );
+            let tag_half_size = (0.002, 0.08, 0.08);
+
+            RECORDER
+                .get()
+                .unwrap()
+                .recorder
+                .log(
+                    format!("apriltags/{}/{}/location", camera_id, id),
+                    &Boxes3D::from_centers_and_half_sizes(vec![tag_center], vec![tag_half_size])
+                        .with_colors([rerun::Color::from_rgb(255, 255, 255)])
+                        .with_labels([format!("id: {}", id)]),
+                )
+                .unwrap();
+
+            let yaw_180 = UnitQuaternion::from_euler_angles(0., 0.0, PI);
+
+            let tag_global_isometry = Isometry3::from_parts(
+                tag_global_isometry.translation,
+                yaw_180 * tag_global_isometry.rotation,
+            );
 
             apriltags.push(TagObservation {
                 tag_local_isometry,
@@ -335,7 +313,6 @@ fn combine_isometries(isometries: &[Isometry3<f64>]) -> Isometry3<f64> {
     Isometry3::from_parts(Translation3::from(mean_translation), mean_rotation)
 }
 
-/// Proper quaternion averaging using rotation matrix approach
 /// This method converts quaternions to rotation matrices, averages them, and converts back
 fn average_quaternions(quaternions: &[UnitQuaternion<f64>]) -> UnitQuaternion<f64> {
     if quaternions.is_empty() {
@@ -400,7 +377,7 @@ fn average_quaternions_component_based(quaternions: &[UnitQuaternion<f64>]) -> U
 
 use nalgebra::{
     Isometry3, Matrix3, Matrix4, Quaternion, Rotation, Rotation3, Translation3, UnitQuaternion,
-    Vector3,
+    UnitVector3, Vector3,
 };
 use rerun::{Archetype, Arrows3D, Boxes3D, Vector3D};
 
@@ -436,34 +413,12 @@ impl std::fmt::Debug for TagObservation {
 }
 
 impl TagObservation {
-    /// Get the isometry of the observer.
     pub fn get_isometry_of_observer(&self) -> Isometry3<f64> {
-        // let mut observer_pose = self.tag_local_isometry;
-        // observer_pose.translation.vector = self.tag_global_isometry.translation.vector
-        //     + self.tag_global_isometry.rotation
-        //         * observer_pose.rotation.inverse()
-        //         * observer_pose.translation.vector;
-        // observer_pose.rotation = self.tag_global_isometry.rotation
-        //     * UnitQuaternion::from_axis_angle(&(observer_pose.rotation * Vector3::y_axis()), PI)
-        //     * observer_pose.rotation;
-        // observer_pose
         let inv_rotation = self.tag_local_isometry.rotation.inverse();
-        let observer_iso = self.tag_global_isometry
+        self.tag_global_isometry
             * Isometry3::from_parts(
                 (inv_rotation * -self.tag_local_isometry.translation.vector).into(),
                 inv_rotation,
-            );
-
-        // lmao
-        let transform = Matrix3::new(0.0, 0.0, -1.0, -1.0, 0.0, 0.0, 0.0, 1.0, 0.0);
-
-        let new_translation = transform * observer_iso.translation.vector;
-
-        let new_rotation =
-            transform * observer_iso.rotation.to_rotation_matrix().matrix() * transform.transpose();
-        Isometry3::from_parts(
-            Vector3::new(new_translation.x, new_translation.y, new_translation.z).into(),
-            UnitQuaternion::from_matrix(&new_rotation),
-        )
+            )
     }
 }

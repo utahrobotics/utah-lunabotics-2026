@@ -43,7 +43,6 @@ impl CuSinkTask for Localizer {
     type Input<'m> = input_msg!('m,
         ImuMsg, // l2 imu
         EncodableIsometry, // l2 kiss icp
-        EncodableIsometry, // realsense icp
         Box<HashMap<String, EncodableIsometry>>);
 
     fn new(_config: Option<&cu29::prelude::ComponentConfig>) -> cu29::CuResult<Self>
@@ -121,7 +120,7 @@ impl CuSinkTask for Localizer {
             None
         };
 
-        let apriltag_components = if let Some(estimated_camera_isometries) = input.3.payload() {
+        let apriltag_components = if let Some(estimated_camera_isometries) = input.2.payload() {
             self.compute_apriltag_swing_twist(estimated_camera_isometries)
         } else {
             None
@@ -135,7 +134,6 @@ impl CuSinkTask for Localizer {
             && (clock.now().as_nanos() - icp.1) < 1_000_000
         {
             let correction = Self::transformation_between(icp.0, fused_isometry);
-
             if let Some(rec) = RECORDER.get() {
                 rec.recorder
                     .log(
@@ -189,7 +187,6 @@ impl CuSinkTask for Localizer {
         }
 
         if clock.now().as_nanos() - self.last_rerun_log >= 16_666_667 {
-            // log + publish isometry at 60 hz
             let isometry = self.root_node.get_global_isometry();
             let encodeable_isometry = EncodableIsometry::from_na(&isometry);
             if let Err(e) = self

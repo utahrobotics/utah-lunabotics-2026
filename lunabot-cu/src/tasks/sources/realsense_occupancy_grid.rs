@@ -4,9 +4,11 @@ use iceoryx2::service::port_factory::publish_subscribe::PortFactory;
 use iceoryx2::{port::subscriber::Subscriber, prelude::*};
 
 use iceoryx_types::IceoryxOccupancyGrid;
+use rerun::{Archetype, Arrows3D, Points3D, Transform3D};
 use simple_motion::StaticNode;
 
 use crate::ROOT_NODE;
+use crate::rerun_viz::RECORDER;
 
 pub struct OccupancyGridSource {
     service_name: ServiceName,
@@ -99,6 +101,7 @@ impl CuSrcTask for OccupancyGridSource {
             .receive()
             .map_err(|e| CuError::new_with_cause("OccupancyGridSource: receive", e))?
         {
+            let cam_isometry_nalgebra = self.camera_node.get_global_isometry();
             let payload = sample.payload().clone();
             new_msg.set_payload(payload);
             self.last_seen = clock.now().as_nanos();

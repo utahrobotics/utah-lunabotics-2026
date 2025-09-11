@@ -1,4 +1,4 @@
-use common::{Occupancy, THALASSIC_CELL_SIZE, THALASSIC_WIDTH};
+use common::{Occupancy, THALASSIC_CELL_SIZE, THALASSIC_HEIGHT, THALASSIC_WIDTH};
 use cu29::prelude::*;
 use iceoryx_types::IceoryxOccupancyGrid;
 use rerun::{Color, Points3D};
@@ -11,6 +11,34 @@ impl Freezable for OccupancyGridSink {}
 
 impl CuSinkTask for OccupancyGridSink {
     type Input<'m> = input_msg!(IceoryxOccupancyGrid);
+
+    fn start(&mut self, _clock: &RobotClock) -> CuResult<()> {
+        let width = THALASSIC_WIDTH;
+        let height = THALASSIC_HEIGHT;
+
+        let center = (
+            (width as f32 * THALASSIC_CELL_SIZE) / 2.0,
+            (height as f32 * THALASSIC_CELL_SIZE) / 2.0,
+            0.0,
+        );
+        let half_size = (
+            (width as f32 * THALASSIC_CELL_SIZE) / 2.0,
+            (height as f32 * THALASSIC_CELL_SIZE) / 2.0,
+            0.01,
+        );
+
+        RECORDER
+            .get()
+            .unwrap()
+            .recorder
+            .log_static(
+                "arena",
+                &rerun::Boxes3D::from_centers_and_half_sizes(vec![center], vec![half_size]),
+            )
+            .unwrap();
+
+        Ok(())
+    }
 
     fn new(_config: Option<&ComponentConfig>) -> CuResult<Self>
     where

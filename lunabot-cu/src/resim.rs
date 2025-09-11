@@ -36,7 +36,6 @@ fn default_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::GstConvertLaptopFront(_) => SimOverride::ExecutedBySim,
         default::SimStep::L2Pointcloud(_) => SimOverride::ExecutedBySim,
         default::SimStep::L2Imu(_) => SimOverride::ExecutedBySim,
-        default::SimStep::RealsensePointcloud(_) => SimOverride::ExecutedBySim,
         default::SimStep::ActuatorCtrl(_) => SimOverride::ExecutedBySim,
         default::SimStep::MotorCtrl(_) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamBack(_) => SimOverride::ExecutedBySim,
@@ -85,13 +84,6 @@ fn run_one_copperlist(
                 SimOverride::ExecutedBySim
             }
             default::SimStep::L2Imu(..) => SimOverride::ExecutedBySim,
-
-            default::SimStep::RealsensePointcloud(CuTaskCallbackState::Process(_, output)) => {
-                *output = msgs.get_realsense_pointcloud_output().clone();
-                output.tov = robot_clock.now().into();
-                SimOverride::ExecutedBySim
-            }
-            default::SimStep::RealsensePointcloud(..) => SimOverride::ExecutedBySim,
 
             default::SimStep::ActuatorCtrl(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_actuator_ctrl_output().clone();
@@ -142,7 +134,6 @@ fn main() {
             std::fs::create_dir_all(parent).expect("Failed to create logs directory");
         }
     }
-
     // Create mock robot clock for simulation
     let (robot_clock, mut robot_clock_mock) = RobotClock::mock();
 

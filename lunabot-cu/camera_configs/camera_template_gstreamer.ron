@@ -21,7 +21,7 @@
                 "width": {{width}},
                 "height": {{height}},
                 "pixel_format": "GRAY",
-                "block_radius": 100,
+                "block_radius": 50,
             },
             logging: (
                 enabled: false
@@ -33,7 +33,7 @@
             type: "cu_apriltag::AprilTags",
             config: {
                 "family": "tag36h11",
-                "tag_size": 0.05,
+                "tag_size": 0.03,
                 "fx": {{fx}},
                 "fy": {{fy}},
                 "cx": {{cx}},
