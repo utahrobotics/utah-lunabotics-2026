@@ -77,6 +77,7 @@ impl CuTask for GstToImage {
     ) -> CuResult<()> {
         if input.payload().is_none() {
             debug!("GstToImage: No payload in input message, skipping.");
+            output.clear_payload();
             return Ok(());
         }
 
