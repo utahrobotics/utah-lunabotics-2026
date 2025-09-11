@@ -29,17 +29,19 @@
             config:{}
         ),
         // subscribes to pointclouds from the external_tasks/realsense process
-        (
-            id:"realsense_pointcloud",
-            type:"crate::tasks::sources::RealSensePointCloudReceiver",
-            config:{
-                "service": "realsense/311322302990/cloud",
-                "camera_node": "upper_depth_camera"
-            },
-            logging: (
-                enabled: true
-            ),
-        ),
+        // not in use yet because the occupancy grid generation is in a separate process
+        // and we dont use the pointcloud for icp 
+        // (
+        //     id:"realsense_pointcloud",
+        //     type:"crate::tasks::sources::RealSensePointCloudReceiver",
+        //     config:{
+        //         "service": "realsense/311322302990/cloud",
+        //         "camera_node": "upper_depth_camera"
+        //     },
+        //     logging: (
+        //         enabled: true
+        //     ),
+        // ),
         (
             id:"realsense_occupancy",
             type: "crate::tasks::sources::OccupancyGridSource",
@@ -72,27 +74,6 @@
                 "min_motion_th": 0.2,
                 "max_threshold": 5.0,
                 "enable_deskewing": true,
-                "map_log_interval_secs": 1.0,
-            },
-            logging: (
-                enabled: true
-            ),
-            background: true
-        ),
-        // KISS ICP isn't really build for point clouds from RGB-D, so
-        // eventually we will probably end up only using the realsense for obstacle detection
-        (
-            id:"realsense_kiss_icp",
-            type:"crate::tasks::KissIcp", config:{
-                "voxel_size": 0.15,
-                "max_range": 100.0,
-                "min_range": 0.,
-                "max_points_per_voxel": 20,
-                "initial_threshold": 2.0,
-                "min_motion_th": 0.1,
-                "min_threshold": 0.05,
-                "max_threshold": 5.0,
-                "enable_deskewing": false,
                 "map_log_interval_secs": 1.0,
             },
             logging: (
@@ -146,9 +127,7 @@
     cnx:[
         (src:"l2_imu", dst:"localizer", msg:"iceoryx_types::ImuMsg"),
         (src:"l2_pointcloud", dst: "l2_kiss_icp", msg:"iceoryx_types::IceoryxPointCloud"),
-        (src:"realsense_pointcloud", dst: "realsense_kiss_icp", msg:"iceoryx_types::IceoryxPointCloud"),
         (src:"l2_kiss_icp", dst:"localizer", msg:"cu_spatial_payloads::EncodableIsometry"),
-        (src:"realsense_kiss_icp", dst:"localizer", msg:"cu_spatial_payloads::EncodableIsometry"),
         (src:"lunabase", dst:"new_ai", msg:"Option<common::FromLunabase>"),
         // copper doesn't support multiple outputs on a single task so for now we just put them in a tuple and ignore one side
         (src:"new_ai", dst:"motor_ctrl", msg:"(Option<common::Steering>, Option<[u8; 5]>)"),
