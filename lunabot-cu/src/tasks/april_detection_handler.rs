@@ -263,9 +263,29 @@ impl AprilDetectionHandler {
                 .recorder
                 .log(
                     format!("apriltags/{}/{}/location", camera_id, id),
-                    &Boxes3D::from_centers_and_half_sizes(vec![tag_center], vec![tag_half_size])
+                    &Boxes3D::from_centers_and_half_sizes(vec![(0., 0., 0.)], vec![tag_half_size])
                         .with_colors([rerun::Color::from_rgb(255, 255, 255)])
                         .with_labels([format!("id: {}", id)]),
+                )
+                .unwrap();
+
+            RECORDER
+                .get()
+                .unwrap()
+                .recorder
+                .log(
+                    format!("apriltags/{}/{}/location", camera_id, id),
+                    &rerun::Transform3D::from_translation_rotation(
+                        tag_global_isometry.translation.vector.cast::<f32>().data.0[0],
+                        rerun::Quaternion::from_xyzw(
+                            tag_global_isometry
+                                .rotation
+                                .as_vector()
+                                .cast::<f32>()
+                                .data
+                                .0[0],
+                        ),
+                    ),
                 )
                 .unwrap();
 
