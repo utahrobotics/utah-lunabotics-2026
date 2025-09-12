@@ -250,11 +250,6 @@ impl AprilDetectionHandler {
             let tag_local_isometry: Isometry3<f64> = Self::transform_cv_to_physics(pose);
             let tag_global_isometry = self.known_tags.get(&id).unwrap();
 
-            let tag_center = (
-                tag_global_isometry.translation.x as f32,
-                tag_global_isometry.translation.y as f32,
-                tag_global_isometry.translation.z as f32,
-            );
             let tag_half_size = (0.002, 0.08, 0.08);
 
             RECORDER
