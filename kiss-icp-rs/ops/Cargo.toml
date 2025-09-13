@@ -19,11 +19,6 @@ version = { workspace = true }
 [features]
 default = []
 
-# For BLAS/LAPACK
-accelerate = ["kiss-icp-ops-eigen/accelerate"]
-intel-mkl = ["kiss-icp-ops-eigen/intel-mkl"]
-netlib = ["kiss-icp-ops-eigen/netlib"]
-openblas = ["kiss-icp-ops-eigen/openblas"]
 
 [dependencies]
 kiss-icp-ops-core = { workspace = true }

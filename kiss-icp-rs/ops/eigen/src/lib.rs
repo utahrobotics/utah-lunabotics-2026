@@ -1,8 +1,7 @@
 use std::ops::MulAssign;
 
 use kiss_icp_ops_core::matrix::MatrixVectorOps;
-use nalgebra::{Matrix3xX, Matrix4, Vector3};
-use nalgebra_lapack::SVD;
+use nalgebra::{Matrix3xX, Matrix4, Vector3, SVD};
 
 pub fn umeyama(src: &Matrix3xX<f64>, dst: &Matrix3xX<f64>, with_scaling: bool) -> Matrix4<f64> {
     let n = src.ncols(); // number of measurements
@@ -30,9 +29,9 @@ pub fn umeyama(src: &Matrix3xX<f64>, dst: &Matrix3xX<f64>, with_scaling: bool) -
 
     let SVD {
         u,
-        vt: v_t,
+        v_t,
         singular_values,
-    } = SVD::new(sigma).unwrap();
+    } = SVD::new(sigma, true, true);
 
     // Initialize the resulting transformation with an identity matrix...
     let mut rt = Matrix4::identity();
@@ -40,12 +39,12 @@ pub fn umeyama(src: &Matrix3xX<f64>, dst: &Matrix3xX<f64>, with_scaling: bool) -
     // Eq. (39)
     let mut s = Vector3::<f64>::from_element(1.0);
 
-    if u.determinant() * v_t.transpose().determinant() < 0.0 {
+    if u.unwrap().determinant() * v_t.unwrap().transpose().determinant() < 0.0 {
         s[2] = -1.0;
     }
 
     // Eq. (40) and (43)
-    let rot = u.vector_mul(&s) * v_t;
+    let rot = u.unwrap().vector_mul(&s) * v_t.unwrap();
     rt.fixed_view_mut::<3, 3>(0, 0).copy_from(&rot);
 
     let mut block = rt.fixed_view_mut::<3, 1>(0, 3);

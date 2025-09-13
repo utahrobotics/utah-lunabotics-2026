@@ -21,11 +21,6 @@ default = []
 
 nightly = ["hashbrown/nightly"]
 
-# For BLAS/LAPACK
-accelerate = ["kiss-icp-ops/accelerate", "nalgebra-lapack/accelerate"]
-intel-mkl = ["kiss-icp-ops/intel-mkl", "nalgebra-lapack/intel-mkl"]
-netlib = ["kiss-icp-ops/netlib", "nalgebra-lapack/netlib"]
-openblas = ["kiss-icp-ops/openblas", "nalgebra-lapack/openblas"]
 
 [dependencies]
 kiss-icp-ops = { workspace = true }
@@ -33,6 +28,5 @@ kiss-icp-ops = { workspace = true }
 hashbrown = { workspace = true }
 itertools = { workspace = true }
 nalgebra = { workspace = true }
-nalgebra-lapack = { workspace = true }
 ordered-float = { workspace = true }
 rayon = { workspace = true }

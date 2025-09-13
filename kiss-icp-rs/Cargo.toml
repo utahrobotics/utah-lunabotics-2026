@@ -3,7 +3,7 @@
 ###########################
 
 [workspace]
-members = [".", "core", "ops", "ops/core", "ops/eigen", "ops/sophus", "pyo3"]
+members = [".", "core", "ops", "ops/core", "ops/eigen", "ops/sophus"]
 resolver = "2"
 
 [workspace.package]
@@ -34,7 +34,6 @@ hashbrown = { version = "0.14", features = ["ahash", "inline-more", "rayon"] }
 hwlocality = { version = "1.0.0-alpha.1" }
 itertools = { version = "0.12" }
 nalgebra = { version = "0.34" }
-nalgebra-lapack = { version = "0.26", default-features = false }
 numpy = { version = "0.20", features = ["nalgebra"] }
 ordered-float = { version = "4.2" }
 pyo3 = { version = "0.20" }

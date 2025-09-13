@@ -19,14 +19,7 @@ version = { workspace = true }
 [features]
 default = []
 
-# For BLAS/LAPACK
-accelerate = ["nalgebra-lapack/accelerate"]
-intel-mkl = ["nalgebra-lapack/intel-mkl"]
-netlib = ["nalgebra-lapack/netlib"]
-openblas = ["nalgebra-lapack/openblas"]
-
 [dependencies]
 kiss-icp-ops-core = { workspace = true }
 
 nalgebra = { workspace = true }
-nalgebra-lapack = { workspace = true }

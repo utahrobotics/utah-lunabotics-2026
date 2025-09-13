@@ -1,0 +1,23 @@
+{
+    "build": {
+        "dockerfile": "../Dockerfile"
+    },
+    // Makes it straightforward to access peripherals
+    "privileged": true,
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "rust-lang.rust-analyzer",
+                "tamasfe.even-better-toml"
+            ],
+            "settings": {
+                "rust-analyzer.cargo.features": [
+                    "resim"
+                ]
+            }
+        }
+    },
+    "hostRequirements": {
+        "gpu": false
+    }
+}
