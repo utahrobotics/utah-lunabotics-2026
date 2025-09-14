@@ -11,9 +11,7 @@ use cu29::prelude::*;
 use tasker::get_tokio_handle;
 use tasker::tokio::{self, net::UdpSocket, sync::mpsc};
 
-use common::{FromLunabot, LunabotStage};
-
-use crate::comms::{LUNABASE_SIM_TELEOP, TELEOP};
+use common::{FromLunabot, LunabotStage, ports::TELEOP};
 
 #[derive(Clone)]
 pub struct PacketBuilder {

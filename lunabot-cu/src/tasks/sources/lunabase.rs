@@ -17,8 +17,8 @@ use std::{
 use tasker::tokio::sync::mpsc::error::TryRecvError;
 use tasker::tokio::sync::{mpsc, watch};
 
-use crate::comms::{LunabaseConn, PacketBuilder, TELEOP};
-use common::{FromLunabase, LUNABOT_STAGE, LunabotStage};
+use crate::comms::{LunabaseConn, PacketBuilder};
+use common::{FromLunabase, LUNABOT_STAGE, LunabotStage, ports::TELEOP};
 
 pub struct Lunabase {
     from_lunabase_rx: mpsc::UnboundedReceiver<FromLunabase>,

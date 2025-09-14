@@ -1,4 +1,4 @@
-use common::{Occupancy, THALASSIC_CELL_SIZE, THALASSIC_HEIGHT, THALASSIC_WIDTH};
+use common::{THALASSIC_CELL_SIZE, THALASSIC_HEIGHT, THALASSIC_WIDTH};
 use cu29::prelude::*;
 use iceoryx_types::IceoryxOccupancyGrid;
 use rerun::{Color, Points3D};
@@ -60,16 +60,16 @@ impl CuSinkTask for OccupancyGridSink {
                         y as f32 * THALASSIC_CELL_SIZE,
                         0.0,
                     ),
-                    Occupancy(*score),
+                    *score,
                 )
             }) {
                 positions.push(point);
-                labels.push(score.0.to_string());
-                let color = match score.0 {
+                labels.push(score.to_string());
+                let color = match score {
                     0 => Color::from_rgb(128, 128, 128), // Grey for unknown
                     1..=100 => {
                         // Gradient from green (1) to red (100)
-                        let t = (score.0 - 1) as f32 / 99.0; // Normalize to 0-1
+                        let t = (score - 1) as f32 / 99.0; // Normalize to 0-1
                         let r = (255.0 * t) as u8;
                         let g = (255.0 * (1.0 - t)) as u8;
                         let b = 0u8;
