@@ -25,10 +25,9 @@
 NOTE: If you are on macos you can install git, libclang, and make by running ```xcode-select --install```
 
 ### Log Replay (Docker)
-1. ```make``` command
-2. git
-3. rerun 
-4. docker
+1. git
+2. rerun 
+3. docker
 
 ### Optional Dependencies
 
