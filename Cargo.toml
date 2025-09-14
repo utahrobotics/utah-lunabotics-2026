@@ -21,7 +21,6 @@ exclude = ["kiss-icp-rs"]
 cu29 = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu29", features = [
     "log-level-info",
     "log-level-error",
-    # "macro_debug",
 ] }
 cu29-export = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu29-export" }
 
@@ -37,7 +36,7 @@ cu29-runtime = { git = "https://github.com/matthewashton-k/copper-rs.git", branc
 cu-gstreamer = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu-gstreamer", features = [
     "gst",
 ] }
-iceoryx2 = { version = "0.6.1" }
+iceoryx2 = { version = "0.7.0" }
 crossbeam = "0.8"
 
 nalgebra = { version = "0.34.0", features = [

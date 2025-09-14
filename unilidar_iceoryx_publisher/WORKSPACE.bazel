@@ -31,11 +31,11 @@ load("@rules_cc//cc:repositories.bzl", "rules_cc_dependencies")
 rules_cc_dependencies()
 
 # Load iceoryx2 rules
-ICEORYX2_VERSION = "0.6.1"
+ICEORYX2_VERSION = "0.7.0"
 
 http_archive(
     name = "iceoryx2",
-    sha256 = "a00886f431c728b17a30d89559ee623d6cfbb4dbb1ee3f717ba27842e3ec4b14",
+    sha256 = "f61d3d4b3998cf8dac3250cc27d206d36508ccff52010763169daad1cd8d9bc7",
     strip_prefix = "iceoryx2-{}".format(ICEORYX2_VERSION),
     urls = [
         "https://github.com/eclipse-iceoryx/iceoryx2/archive/v{}.tar.gz".format(ICEORYX2_VERSION),
@@ -114,14 +114,14 @@ crates_repository(
         "@iceoryx2//:Cargo.toml",
         "@iceoryx2//:benchmarks/event/Cargo.toml",
         "@iceoryx2//:benchmarks/publish-subscribe/Cargo.toml",
-        "@iceoryx2//:benchmarks/queue/Cargo.toml",  # <-- ADD
-        "@iceoryx2//:benchmarks/request-response/Cargo.toml",  # <-- ADD
+        "@iceoryx2//:benchmarks/queue/Cargo.toml", 
+        "@iceoryx2//:benchmarks/request-response/Cargo.toml",
         "@iceoryx2//:examples/Cargo.toml",
         "@iceoryx2//:iceoryx2/Cargo.toml",
         "@iceoryx2//:iceoryx2-bb/container/Cargo.toml",
         "@iceoryx2//:iceoryx2-bb/derive-macros/Cargo.toml",
         "@iceoryx2//:iceoryx2-bb/elementary/Cargo.toml",
-        "@iceoryx2//:iceoryx2-bb/elementary-traits/Cargo.toml",  # <-- ADD
+        "@iceoryx2//:iceoryx2-bb/elementary-traits/Cargo.toml",
         "@iceoryx2//:iceoryx2-bb/lock-free/Cargo.toml",
         "@iceoryx2//:iceoryx2-bb/log/Cargo.toml",
         "@iceoryx2//:iceoryx2-bb/memory/Cargo.toml",
@@ -133,12 +133,16 @@ crates_repository(
         "@iceoryx2//:iceoryx2-cal/Cargo.toml",
         "@iceoryx2//:iceoryx2-cli/Cargo.toml",
         "@iceoryx2//:iceoryx2-ffi/ffi-macros/Cargo.toml",
-        "@iceoryx2//:iceoryx2-ffi/ffi/Cargo.toml",
+        "@iceoryx2//:iceoryx2-ffi/c/Cargo.toml",
+        "@iceoryx2//:iceoryx2-ffi/python/Cargo.toml",
         "@iceoryx2//:iceoryx2-pal/concurrency-sync/Cargo.toml",
         "@iceoryx2//:iceoryx2-pal/configuration/Cargo.toml",
         "@iceoryx2//:iceoryx2-pal/posix/Cargo.toml",
-        "@iceoryx2//:iceoryx2-pal/testing/Cargo.toml",  # <-- ADD
-        "@iceoryx2//:iceoryx2-services/discovery/Cargo.toml",  # <-- ADD
+        "@iceoryx2//:iceoryx2-pal/testing/Cargo.toml",
+        "@iceoryx2//:iceoryx2-services/discovery/Cargo.toml",
+        "@iceoryx2//:iceoryx2-tunnels/end-to-end-testing/Cargo.toml",
+        "@iceoryx2//:iceoryx2-tunnels/zenoh/Cargo.toml",
+        "@iceoryx2//:iceoryx2-userland/record-and-replay/Cargo.toml"
     ],
 )
 
