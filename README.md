@@ -14,25 +14,21 @@
 1. See dockerfile, anything installed there is a dependency for running the robot in production.
 2. Apriltag C library and librealsense
 
-### Log Replay (Unix)
+### Log Replay (Native)
 
 1. ```make``` command 
-2. git - just google how to install this
+2. git
 3. rerun - download binary from their github releases page and add "rerun" command to Path.
-4. libclang-dev
+4. clang - for windows install with ```choco install llvm```, linux use ```apt install libclang-dev``` 
 5. rust - install from rustup.rs (select nightly version)
 
 NOTE: If you are on macos you can install git, libclang, and make by running ```xcode-select --install```
 
 ### Log Replay (Docker)
-Prerequisites: git, docker, git bash if on windows, rerun binary downloaded from the rerun github releases.
-
-0. Clone the repository.
-1. From the repository root first build the docker container with ```docker build -t lunabot .``` then if using bash/gitbash run with ```docker run --network=host -it -v $(pwd):/workspace -v cargo-cache:/workspace/target -v cargo-registry:/usr/local/cargo/registry --name lunabot lunabot``` otherwise run with ```docker run --network=host -it -v "${PWD}:/workspace" -v cargo-cache:/workspace/target -v cargo-registry:/usr/local/cargo/registry --name lunabot lunabot```
-2. Comment out the rerun init function call in lunabot-cu/src/resim.rs, and uncomment the line above with the Grpc config.
-3. Start rerun on host.
-4. Run replay with ```container$ make resim```
-5. After taking a million years to compile, if there are valid logs in lunabot-cu/logs then the replay starts and you should see things pop up in rerun.
+1. ```make``` command
+2. git
+3. rerun 
+4. docker
 
 ### Optional Dependencies
 
@@ -53,11 +49,16 @@ Prerequisites: git, docker, git bash if on windows, rerun binary downloaded from
 2. run ```make sync``` to build/sync deps for the Unitree L2 publisher.
 3. run ```make prod``` to build and run the project.
 
-### Log replay
-Note: first install dependencies needed for log replay for your environment: docker (for windows users), or Unix.
+### Log replay (Native)
 1. Ensure there are valid log files in lunabot-cu/logs
 2. run ```make resim```
 
+### Log replay (Docker)
+1. Ensure there are valid log files in lunabot-cu/logs
+2. From the repository root first build the docker container with ```docker build -t lunabot .``` then if using bash/gitbash run with ```docker run --network=host -it -v $(pwd):/workspace -v cargo-cache:/workspace/target -v cargo-registry:/usr/local/cargo/registry --name lunabot lunabot``` otherwise run with ```docker run --network=host -it -v "${PWD}:/workspace" -v cargo-cache:/workspace/target -v cargo-registry:/usr/local/cargo/registry --name lunabot lunabot```
+3. Comment out the rerun init function call in lunabot-cu/src/resim.rs, and uncomment the line above with the Grpc config.
+4. Start rerun on host.
+5. Run replay with ```container$ make resim```
 
 ### Help
 ```bash
