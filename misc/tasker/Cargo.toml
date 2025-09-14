@@ -7,4 +7,3 @@ edition = "2021"
 parking_lot = { workspace = true }
 tokio = { workspace = true }
 crossbeam = { workspace = true }
-cu29.workspace = true

@@ -1,5 +1,3 @@
-use cu29::prelude::*;
-
 #[deprecated]
 pub trait SyncTask: Send + Sized + 'static {
     type Output;
@@ -35,13 +33,13 @@ impl Loggable for ! {
 
 impl Loggable for String {
     fn log(&self) {
-        info!("{self}");
+        println!("{self}");
     }
 }
 
 impl Loggable for &'static str {
     fn log(&self) {
-        info!("{self}");
+        println!("{self}");
     }
 }
 
@@ -49,7 +47,7 @@ impl<T: Loggable, E: std::fmt::Display> Loggable for Result<T, E> {
     fn log(&self) {
         match self {
             Ok(t) => t.log(),
-            Err(e) => error!("{}", e.to_string()),
+            Err(e) => eprintln!("{}", e.to_string()),
         }
     }
 }

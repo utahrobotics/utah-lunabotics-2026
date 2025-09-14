@@ -22,8 +22,6 @@ use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 pub use tokio;
 use tokio::{runtime::Handle, sync::Notify};
 
-use cu29::prelude::*;
-
 pub mod callbacks;
 pub mod shared;
 pub mod task;
@@ -104,7 +102,8 @@ fn with_tokio_runtime_handle<T>(
         std::thread::spawn(move || {
             runtime.block_on(async {
                 end_runtime.notified().await;
-                let mut attached_guards: Vec<RuntimeDropGuardInner> = Vec::with_capacity(attached_guards.len());
+                let mut attached_guards: Vec<RuntimeDropGuardInner> =
+                    Vec::with_capacity(attached_guards.len());
                 while let Some(guard) = attached_guards.pop() {
                     attached_guards.push(guard);
                 }
@@ -119,8 +118,8 @@ fn with_tokio_runtime_handle<T>(
                         for drop_notify in &attached_guards {
                             backtraces.push_str(&format!("{:?}\n\n", drop_notify.backtrace));
                         }
-                        warning!(
-                            "The following guards have not dropped after {:.1} seconds\n\n{}",
+                        eprintln!(
+                            "The following guards have not dropped after {:.1} seconds\n\n",
                             config.thread_delayed_warning.as_secs_f32()
                         );
                         for drop_notify in &attached_guards {
@@ -133,7 +132,7 @@ fn with_tokio_runtime_handle<T>(
             std::thread::spawn(move || {
                 std::thread::sleep(config.shutdown_delayed_warning);
                 if !runtime_ended2.notified.load(Ordering::Acquire) {
-                    warning!(
+                    eprintln!(
                         "Tokio runtime has not ended after {:.1} seconds",
                         config.shutdown_delayed_warning.as_secs_f32()
                     );
