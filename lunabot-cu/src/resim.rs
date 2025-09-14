@@ -127,75 +127,83 @@ fn run_one_copperlist(
 }
 
 fn main() {
-    // Setup logging path for resimulation
-    let logger_path = "logs/lunabotsim.copper";
-    if let Some(parent) = Path::new(logger_path).parent() {
-        if !parent.exists() {
-            std::fs::create_dir_all(parent).expect("Failed to create logs directory");
-        }
-    }
-    // Create mock robot clock for simulation
-    let (robot_clock, mut robot_clock_mock) = RobotClock::mock();
+    std::thread::Builder::new()
+        .stack_size(20 * 1000000) // this size will depend on how big the copper list is
+        .spawn(move || {
+            // Setup logging path for resimulation
+            let logger_path = "logs/lunabotsim.copper";
+            if let Some(parent) = Path::new(logger_path).parent() {
+                if !parent.exists() {
+                    std::fs::create_dir_all(parent).expect("Failed to create logs directory");
+                }
+            }
+            // Create mock robot clock for simulation
+            let (robot_clock, mut robot_clock_mock) = RobotClock::mock();
 
-    let copper_ctx = basic_copper_setup(
-        &PathBuf::from(&logger_path),
-        PREALLOCATED_STORAGE_SIZE,
-        true,
-        Some(robot_clock.clone()),
-    )
-    .expect("Failed to setup logger.");
+            let copper_ctx = basic_copper_setup(
+                &PathBuf::from(&logger_path),
+                PREALLOCATED_STORAGE_SIZE,
+                true,
+                Some(robot_clock.clone()),
+            )
+            .expect("Failed to setup logger.");
 
-    // uncomment to use with docker
-    // rerun_viz::init_rerun(rerun_viz::RerunViz::Grpc(
-    //     rerun_viz::Level::All,
-    //     "host.docker.internal".to_string(),
-    // ))
-    // .expect("Failed to initialize rerun viz.");
+            // uncomment to use with docker
+            // rerun_viz::init_rerun(rerun_viz::RerunViz::Grpc(
+            //     rerun_viz::Level::All,
+            //     "host.docker.internal".to_string(),
+            // ))
+            // .expect("Failed to initialize rerun viz.");
 
-    rerun_viz::init_rerun(rerun_viz::RerunViz::Viz(rerun_viz::Level::All));
+            rerun_viz::init_rerun(rerun_viz::RerunViz::Viz(rerun_viz::Level::All));
 
-    let (pico_tx, pico_rx) = mock_enumerate_picos();
+            let (pico_tx, pico_rx) = mock_enumerate_picos();
 
-    PICO_RX.set(pico_rx).expect("Failed to set PICO_RX");
-    PICO_TX.set(pico_tx).expect("Failed to set PICO_TX");
+            PICO_RX.set(pico_rx).expect("Failed to set PICO_RX");
+            PICO_TX.set(pico_tx).expect("Failed to set PICO_TX");
 
-    let robot_chain = NodeSerde::from_reader(
-        std::fs::File::open("../robot-layout/lunabot.ron").expect("Failed to read robot chain"),
-    )
-    .expect("Failed to parse robot chain");
+            let robot_chain = NodeSerde::from_reader(
+                std::fs::File::open("../robot-layout/lunabot.ron")
+                    .expect("Failed to read robot chain"),
+            )
+            .expect("Failed to parse robot chain");
 
-    let robot_chain = ChainBuilder::from(robot_chain).finish_static();
-    let _ = ROOT_NODE.set(robot_chain);
+            let robot_chain = ChainBuilder::from(robot_chain).finish_static();
+            let _ = ROOT_NODE.set(robot_chain);
 
-    let mut application = LunabotApplicationBuilder::new()
-        .with_sim_callback(&mut default_callback)
-        .with_context(&copper_ctx)
-        .build()
-        .expect("Failed to create application.");
+            let mut application = LunabotApplicationBuilder::new()
+                .with_sim_callback(&mut default_callback)
+                .with_context(&copper_ctx)
+                .build()
+                .expect("Failed to create application.");
 
-    application
-        .start_all_tasks(&mut default_callback)
-        .expect("Failed to start all tasks.");
+            application
+                .start_all_tasks(&mut default_callback)
+                .expect("Failed to start all tasks.");
 
-    let UnifiedLogger::Read(dl) = UnifiedLoggerBuilder::new()
-        .file_base_name(Path::new("logs/lunabot.copper"))
-        .build()
-        .expect("Failed to create logger")
-    else {
-        panic!("Failed to create logger");
-    };
+            let UnifiedLogger::Read(dl) = UnifiedLoggerBuilder::new()
+                .file_base_name(Path::new("logs/lunabot.copper"))
+                .build()
+                .expect("Failed to create logger")
+            else {
+                panic!("Failed to create logger");
+            };
 
-    let mut reader = UnifiedLoggerIOReader::new(dl, UnifiedLogType::CopperList);
-    let copperlists = copperlists_reader::<default::CuStampedDataSet>(&mut reader);
+            let mut reader = UnifiedLoggerIOReader::new(dl, UnifiedLogType::CopperList);
+            let copperlists = copperlists_reader::<default::CuStampedDataSet>(&mut reader);
 
-    let start = Instant::now();
-    for copper_list in copperlists {
-        run_one_copperlist(&mut application, &mut robot_clock_mock, copper_list, start);
-    }
+            let start = Instant::now();
+            for copper_list in copperlists {
+                run_one_copperlist(&mut application, &mut robot_clock_mock, copper_list, start);
+            }
 
-    application
-        .stop_all_tasks(&mut default_callback)
-        .expect("Failed to stop all tasks.");
+            application
+                .stop_all_tasks(&mut default_callback)
+                .expect("Failed to stop all tasks.");
+        })
+        .expect("failed to spawn main thread")
+        .join()
+        .expect(".join() on main thread failed");
 
     debug!("End of log replay.");
 }
