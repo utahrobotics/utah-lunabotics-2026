@@ -1,7 +1,6 @@
 [workspace]
 resolver = "3"
 members = [
-    "misc/rerun-types-wrapper",
     "misc/simple-motion",
     "misc/cakap2",
     "misc/tasker",
