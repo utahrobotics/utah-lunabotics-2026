@@ -41,12 +41,13 @@ NOTE: If you are on macos you can install git, libclang, and make by running ```
 5. lz4 for compressing logs
 
 
-## Running
+## Building and Running
+First install the dependencies listed in the dependencies section. \\
+NOTE: On some machines you have to increase the stack size for it to compile ```export RUST_MIN_STACK=107108864```.
 
 ### Production env
-1. On some machines you have to increase the stack size for it to compile ```export RUST_MIN_STACK=107108864```.
-2. run ```make sync``` to build/sync deps for the Unitree L2 publisher.
-3. run ```make prod``` to build and run the project.
+1. run ```make sync``` to build/sync deps for the Unitree L2 publisher.
+2. run ```make prod``` to build and run the project.
 
 ### Log replay (Native)
 1. Ensure there are valid log files in lunabot-cu/logs
