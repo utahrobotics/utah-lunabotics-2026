@@ -42,8 +42,10 @@ NOTE: If you are on macos you can install git, libclang, and make by running ```
 
 
 ## Building and Running
-First install the dependencies listed in the dependencies section. \\
-NOTE: On some machines you have to increase the stack size for it to compile ```export RUST_MIN_STACK=107108864```.
+First install the dependencies listed in the dependencies section. 
+
+
+*NOTE: On some machines you have to increase the stack size for it to compile ```export RUST_MIN_STACK=107108864```.*
 
 ### Production env
 1. run ```make sync``` to build/sync deps for the Unitree L2 publisher.
