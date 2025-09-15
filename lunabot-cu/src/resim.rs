@@ -50,7 +50,6 @@ fn run_one_copperlist(
     copper_app: &mut LunabotApplication,
     robot_clock: &mut RobotClockMock,
     copper_list: CopperList<default::CuStampedDataSet>,
-    start: Instant,
 ) {
     let msgs = &copper_list.msgs;
     let now = msgs
@@ -60,7 +59,6 @@ fn run_one_copperlist(
         .start
         .unwrap()
         .as_nanos();
-    println!("{now}");
     robot_clock.set_value(now);
 
     let mut sim_callback = move |step: default::SimStep| -> SimOverride {
@@ -201,9 +199,8 @@ fn main() {
             let mut reader = UnifiedLoggerIOReader::new(dl, UnifiedLogType::CopperList);
             let copperlists = copperlists_reader::<default::CuStampedDataSet>(&mut reader);
 
-            let start = Instant::now();
             for copper_list in copperlists {
-                run_one_copperlist(&mut application, &mut robot_clock_mock, copper_list, start);
+                run_one_copperlist(&mut application, &mut robot_clock_mock, copper_list);
             }
 
             application

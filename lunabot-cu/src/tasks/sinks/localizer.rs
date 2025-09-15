@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use cu_spatial_payloads::EncodableIsometry;
 use cu29::{
     CuError,
+    clock::Instant,
     cutask::{CuMsg, CuSinkTask, Freezable},
     input_msg,
 };
@@ -14,6 +15,7 @@ use iceoryx2::{
     service::ipc,
 };
 use nalgebra::{Isometry3, UnitQuaternion, UnitVector3, Vector3};
+use rerun::Instance;
 use simple_motion::StaticNode;
 
 use crate::{
@@ -27,7 +29,7 @@ const LOCALIZATION_DELTA: f64 = 1.0 / 60.0;
 
 pub struct Localizer {
     root_node: StaticNode,
-    last_rerun_log: u64,
+    last_rerun_log: Instant,
     kiss_icp_correction: Option<Isometry3<f64>>,
     last_icp_reading: Option<(Isometry3<f64>, u64)>,
     last_imu_orientation: Option<(OrientationComponents, u64)>,
@@ -87,7 +89,7 @@ impl CuSinkTask for Localizer {
         if let Some(root_node) = ROOT_NODE.get() {
             return Ok(Self {
                 root_node: root_node.clone(),
-                last_rerun_log: 0,
+                last_rerun_log: Instant::now(),
                 kiss_icp_correction: None,
                 last_icp_reading: None,
                 last_imu_orientation: None,
@@ -186,7 +188,7 @@ impl CuSinkTask for Localizer {
             self.root_node.set_isometry(iso);
         }
 
-        if clock.now().as_nanos() - self.last_rerun_log >= 16_666_667 {
+        if self.last_rerun_log.elapsed().as_nanos() > 16_666_667 {
             let isometry = self.root_node.get_global_isometry();
             let encodeable_isometry = EncodableIsometry::from_na(&isometry);
             if let Err(e) = self
@@ -206,7 +208,7 @@ impl CuSinkTask for Localizer {
             {
                 eprintln!("localizer publish err: {e}");
             }
-            self.last_rerun_log = clock.now().as_nanos();
+            self.last_rerun_log = Instant::now();
             if let Some(recorder) = rerun_viz::RECORDER.get() {
                 if let Err(e) = recorder.recorder.log(
                     rerun_viz::ROBOT_STRUCTURE,
