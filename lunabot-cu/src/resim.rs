@@ -53,7 +53,15 @@ fn run_one_copperlist(
     start: Instant,
 ) {
     let msgs = &copper_list.msgs;
-    robot_clock.set_value(start.elapsed().as_nanos() as u64);
+    let now = msgs
+        .get_lunabase_output()
+        .metadata()
+        .process_time()
+        .start
+        .unwrap()
+        .as_nanos();
+    println!("{now}");
+    robot_clock.set_value(now);
 
     let mut sim_callback = move |step: default::SimStep| -> SimOverride {
         match step {

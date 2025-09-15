@@ -111,11 +111,9 @@ impl CuSrcTask for Lunabase {
             status = Ok(());
         }
 
-        if let Some(ref msg) = self.message_buffer.pop_front() {
-            output.set_payload(Some(*msg));
-        } else {
-            output.clear_payload();
-        }
+        output.set_payload(self.message_buffer.pop_front());
+        output.metadata.process_time.start = clock.now().into();
+
         status
     }
 }
