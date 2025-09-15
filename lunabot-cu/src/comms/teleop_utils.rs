@@ -1,3 +1,4 @@
+#![cfg(feature = "production")]
 use std::{
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
     ops::Deref,
@@ -8,10 +9,10 @@ use std::{
 use cakap2::{Event, PeerStateMachine, RecommendedAction, packet::Action};
 use crossbeam::atomic::AtomicCell;
 use cu29::prelude::*;
-use tasker::get_tokio_handle;
 use tasker::tokio::{self, net::UdpSocket, sync::mpsc};
+use tasker::{get_tokio_handle, tokio::sync::watch};
 
-use common::{FromLunabot, LunabotStage, ports::TELEOP};
+use common::{FromLunabase, FromLunabot, LunabotStage, ports::TELEOP};
 
 #[derive(Clone)]
 pub struct PacketBuilder {
@@ -188,4 +189,74 @@ impl<F: FnMut(&[u8]) -> bool + Send + 'static> LunabaseConn<F> {
             packet_tx,
         }
     }
+}
+
+pub fn default_max_pong_delay_ms() -> u64 {
+    1500
+}
+
+#[derive(Clone)]
+pub struct LunabotConnected {
+    connected: watch::Receiver<bool>,
+}
+
+impl LunabotConnected {
+    pub fn is_connected(&self) -> bool {
+        *self.connected.borrow()
+    }
+}
+
+pub fn create_packet_builder(
+    lunabase_address: Option<SocketAddr>,
+    lunabot_stage: Arc<AtomicCell<LunabotStage>>,
+    max_pong_delay_ms: u64,
+) -> (
+    PacketBuilder,
+    mpsc::UnboundedReceiver<FromLunabase>,
+    LunabotConnected,
+) {
+    let (from_lunabase_tx, from_lunabase_rx) = mpsc::unbounded_channel();
+    let mut bitcode_buffer = bitcode::Buffer::new();
+    let (pinged_tx, pinged_rx) = std::sync::mpsc::channel::<()>();
+
+    let packet_builder = LunabaseConn {
+        lunabase_address,
+        on_msg: move |bytes: &[u8]| match bitcode_buffer.decode(bytes) {
+            Ok(msg) => {
+                if msg == FromLunabase::Pong {
+                    let _ = pinged_tx.send(());
+                } else {
+                    let _ = from_lunabase_tx.send(msg);
+                }
+                true
+            }
+            Err(e) => {
+                error!("Failed to decode from lunabase: {}", e.to_string());
+                false
+            }
+        },
+        lunabot_stage,
+    }
+    .connect_to_lunabase();
+
+    let (connected_tx, connected_rx) = watch::channel(false);
+
+    std::thread::spawn(move || {
+        loop {
+            match pinged_rx.recv_timeout(Duration::from_millis(max_pong_delay_ms)) {
+                Ok(()) => {
+                    let _ = connected_tx.send(true);
+                }
+                Err(_) => {
+                    let _ = connected_tx.send(false);
+                }
+            }
+        }
+    });
+
+    let connected = LunabotConnected {
+        connected: connected_rx,
+    };
+
+    (packet_builder, from_lunabase_rx, connected)
 }

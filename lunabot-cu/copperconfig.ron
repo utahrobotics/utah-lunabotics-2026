@@ -11,7 +11,9 @@
         (
             id:"udev_monitor",
             type:"crate::tasks::UdevMonitor",
-            config:{}
+            config:{},
+            // task is stubbed out in sim mode
+            run_in_sim: false
         ),
         // subscribes to  point clouds from iceoryx2, published from c++ by the unilidar_iceoryx_publisher
         (
@@ -21,12 +23,16 @@
             logging: (
                 enabled: true
             ),
+            // task is stubbed in sim mode
+            run_in_sim: false,
         ),
         // subscribes to imu information from the unilidar_iceoryx_publisher
         (
             id:"l2_imu",
             type:"crate::tasks::sources::ImuIceoryxReceiver",
-            config:{}
+            config:{},
+            // task gets stubbed out in sim mode
+            run_in_sim: false,
         ),
         // subscribes to pointclouds from the external_tasks/realsense process
         // not in use yet because the occupancy grid generation is in a separate process
@@ -52,6 +58,7 @@
             logging: (
                 enabled: true
             ),
+            run_in_sim: false
         ),
         (
             id:"realsense_occupancy_logger",
@@ -59,6 +66,8 @@
             logging: (
                 enabled: true
             ),
+            // task should not be stubbed out in sim mode
+            run_in_sim: true
         ),
         // registers point clouds into a global map, and estimates the isometry of the lidar node.
         // the isometry is relative to the robots starting position, not actual global coordinates
@@ -77,7 +86,7 @@
                 "map_log_interval_secs": 1.0,
             },
             logging: (
-                enabled: true
+                enabled: false
             ),
             background: true
         ),
@@ -85,13 +94,16 @@
         // position is logged to rerun at 60 hz
         (
             id:"localizer", type:"crate::tasks::sinks::Localizer",
-            config:{}
+            config:{},
+            // task does not get stubbed out in sim mode
+            run_in_sim: true,
         ),
         // receives messages from the lunabase over UDP
         (
             id:"lunabase", type:"crate::tasks::sources::Lunabase", config:{
                 "max_pong_delay_ms": 500,
             },
+            run_in_sim: false,
         ),
         // receives messages from the ai_source and sends them over serial to the pico which then moves the actuators
         (
@@ -116,7 +128,8 @@
                         mask2: Left
                     )"
                 ]
-            }
+            },
+            run_in_sim: false,
         ),
         // handles apriltag detections from all the cameras, combining them and then sending them over to the localizer
         (
@@ -194,7 +207,7 @@
     // monitor:(type:"cu_consolemon::CuConsoleMon"),
     monitor: (type:"simple_monitor::SimpleMonitor"),
     logging:(
-        enable_task_logging:true,
+        enable_task_logging: true,
         section_size_mib:100,
     ),
 )

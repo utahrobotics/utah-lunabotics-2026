@@ -156,7 +156,7 @@ fn main() {
             // ))
             // .expect("Failed to initialize rerun viz.");
 
-            rerun_viz::init_rerun(rerun_viz::RerunViz::Viz(rerun_viz::Level::All));
+            let _ = rerun_viz::init_rerun(rerun_viz::RerunViz::Viz(rerun_viz::Level::All));
 
             let (pico_tx, pico_rx) = mock_enumerate_picos();
 

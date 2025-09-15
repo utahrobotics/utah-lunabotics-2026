@@ -3,6 +3,7 @@
 use std::ops::{Add, Mul, Sub};
 
 use crossbeam::atomic::AtomicCell;
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use mio::{Events, Interest, Poll, Token};
 use nalgebra::{
     Quaternion, RealField, SimdRealField, UnitQuaternion, UnitVector3, Vector2, Vector3,

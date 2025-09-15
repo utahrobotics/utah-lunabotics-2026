@@ -12,7 +12,8 @@
             },
             logging: (
                 enabled: false
-            )
+            ),
+            run_in_sim: false
         ),
         (
             id: "gst_convert_{{id}}",
