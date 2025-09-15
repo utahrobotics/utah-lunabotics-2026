@@ -58,6 +58,7 @@ fn run_one_copperlist(
     let mut sim_callback = move |step: default::SimStep| -> SimOverride {
         match step {
             default::SimStep::UdevMonitor(CuTaskCallbackState::Process(_, output)) => {
+                output.tov = robot_clock.now().into();
                 *output = msgs.get_udev_monitor_output().clone();
                 SimOverride::ExecutedBySim
             }
