@@ -19,50 +19,58 @@
 #include <cstring>
 #include <vector>
 #include <limits>
+#include <ctime>
 
 using namespace iox2;
 
 constexpr iox::units::Duration CYCLE_TIME = iox::units::Duration::fromMilliseconds(10);
 
-// Helper constants
-constexpr std::size_t MAX_POINTS_PER_CLOUD = 6000;
 
-// Frame accumulation parameters (similar to Point LIO's con_frame mechanism)
-constexpr bool ACCUMULATE_FRAMES = false; // Enable frame accumulation for higher point density
-constexpr int ACCUMULATION_COUNT = 5;     // Accumulate 5 frames for ~25k points per cloud
+constexpr int ACCUMULATION_COUNT = 2;
+constexpr time_t WARMUP_DURATION_SECONDS = 3;
+constexpr bool ACCUMULATE_FRAMES = true;
 
-// Frame accumulation state
 struct FrameAccumulator
 {
     std::vector<PointXYZIR> accumulated_points;
     int frame_count = 0;
-    double first_frame_time = 0.0;
+    time_t first_frame_time = 0;
+    bool warmup_complete = false;
+    bool warmup_started = false;
 
     void reset()
     {
         accumulated_points.clear();
         frame_count = 0;
-        first_frame_time = 0.0;
+        // Don't reset first_frame_time and warmup flags during normal reset
     }
 
-    bool addFrame(const PointCloudUnitree &cloud)
+    bool isWarmupComplete() const
     {
+        if (!warmup_started) return false;
+        double current_time = static_cast<double>(std::time(nullptr)); // fallback if no frame time available
+        return (current_time - first_frame_time) >= WARMUP_DURATION_SECONDS;
+    }
+
+    bool addFrame(const PointCloudUnitree &cloud, int accumulation_count)
+    {
+        // Start warmup on first frame
         if (frame_count == 0)
         {
-            first_frame_time = cloud.stamp;
+            if (!warmup_started)
+            {
+                std::time(&first_frame_time);
+                warmup_started = true;
+            }
         }
 
-        double min_time = std::numeric_limits<double>::max();
-        double max_time = std::numeric_limits<double>::lowest();
-        for (const auto &point : cloud.points)
+        // Update warmup status
+        if (!warmup_complete && warmup_started)
         {
-            min_time = std::min(min_time, static_cast<double>(point.time));
-            max_time = std::max(max_time, static_cast<double>(point.time));
+            time_t now;
+            std::time(&now);
+            warmup_complete = (now - first_frame_time) >= WARMUP_DURATION_SECONDS;
         }
-
-        double time_range = max_time - min_time;
-        if (time_range <= 0.0)
-            time_range = 1.0;
 
         for (const auto &point : cloud.points)
         {
@@ -73,16 +81,16 @@ struct FrameAccumulator
 
             p.intensity = point.intensity;
 
-            // Normalize timestamp to [0,1] range for KISS-ICP deskewing
-            // This ensures proper motion compensation within each accumulated frame
-            p.time = (point.time - min_time) / time_range;
+            p.time = point.time;
 
             p.ring = static_cast<std::uint16_t>(point.ring);
             accumulated_points.push_back(p);
         }
 
         frame_count++;
-        return frame_count >= ACCUMULATION_COUNT;
+        
+        int target_count = warmup_complete ? 1 : accumulation_count;
+        return frame_count >= target_count;
     }
 };
 
@@ -91,52 +99,31 @@ static IceoryxPointCloud toIceoryxPointCloud(const std::vector<PointXYZIR> &poin
 {
     IceoryxPointCloud dst{}; // zero-initialise all fields
     dst.is_last = true;
-    // Cap publish_count if the accumulated cloud is larger than our fixed array
+    double min_time = std::numeric_limits<double>::max();
+    double max_time = std::numeric_limits<double>::lowest();
+    for (const auto &point : points)
+    {
+        min_time = std::min(min_time, static_cast<double>(point.time));
+        max_time = std::max(max_time, static_cast<double>(point.time));
+    }
+    double time_range = max_time - min_time;
+    if (time_range <= 0.0)
+        time_range = 1.0;
+
+    if (points.size() > MAX_POINTS_PER_CLOUD) {
+        std::cout << "WARNING: max points per cloud set too low." << std::endl;
+    }
     dst.publish_count = std::min<std::size_t>(points.size(), MAX_POINTS_PER_CLOUD);
 
     for (std::size_t i = 0; i < dst.publish_count; ++i)
     {
         dst.points[i] = points[i];
-    }
-
-    // The remaining entries of dst.points are already zero due to the initialisation above.
-    return dst;
-}
-
-// Original conversion function for single frames
-static IceoryxPointCloud toIceoryxPointCloudSingle(const PointCloudUnitree &src)
-{
-    IceoryxPointCloud dst{};
-
-    dst.publish_count = std::min<std::size_t>(src.points.size(), MAX_POINTS_PER_CLOUD);
-
-    // Find time range for normalization to [0,1] range for KISS-ICP deskewing
-    double min_time = std::numeric_limits<double>::max();
-    double max_time = std::numeric_limits<double>::lowest();
-    for (std::size_t i = 0; i < dst.publish_count; ++i)
-    {
-        min_time = std::min(min_time, static_cast<double>(src.points[i].time));
-        max_time = std::max(max_time, static_cast<double>(src.points[i].time));
-    }
-
-    double time_range = max_time - min_time;
-    if (time_range <= 0.0)
-        time_range = 1.0;
-
-    for (std::size_t i = 0; i < dst.publish_count; ++i)
-    {
-        const auto &p_src = src.points[i];
-        auto &p_dst = dst.points[i];
-        p_dst.x = p_src.x;
-        p_dst.y = p_src.y;
-        p_dst.z = p_src.z;
-        p_dst.intensity = p_src.intensity;
-        p_dst.time = (p_src.time - min_time) / time_range;
-        p_dst.ring = static_cast<std::uint16_t>(p_src.ring);
+        dst.points[i].time = (points[i].time - min_time) / time_range;
     }
 
     return dst;
 }
+
 
 int main()
 {
@@ -154,7 +141,7 @@ int main()
     const unsigned short local_port = 6201;      // Target PC receive port
     const std::string local_ip = "192.168.1.2";  // PC NIC IP (must match NIC config)
 
-    const uint16_t cloud_scan_num = 18; // default: one full 360° sweep (18×300 = 5400 pts)
+    const uint16_t cloud_scan_num = 8;
     const bool use_system_timestamp = true;
     const float range_min = 0.0f;
     const float range_max = 100.0f;
@@ -200,12 +187,6 @@ int main()
     PointCloudUnitree cloud_raw;
     FrameAccumulator accumulator;
 
-    std::cout << "Frame accumulation: " << (ACCUMULATE_FRAMES ? "ENABLED" : "DISABLED") << std::endl;
-    if (ACCUMULATE_FRAMES)
-    {
-        std::cout << "Accumulating " << ACCUMULATION_COUNT << " frames before sending" << std::endl;
-    }
-
     while (true)
     {
         int parse_result = lreader->runParse();
@@ -233,10 +214,8 @@ int main()
             {
                 if (ACCUMULATE_FRAMES)
                 {
-                    // Accumulate frames
-                    if (accumulator.addFrame(cloud_raw))
+                    if (accumulator.addFrame(cloud_raw, ACCUMULATION_COUNT))
                     {
-                        // Ready to send accumulated cloud
                         IceoryxPointCloud cloud = toIceoryxPointCloud(accumulator.accumulated_points);
                         std::cout << "Accumulated " << accumulator.frame_count << " frames, total points: "
                                   << cloud.publish_count << " (raw accumulated: " << accumulator.accumulated_points.size() << ")" << std::endl;
@@ -246,7 +225,6 @@ int main()
                         send(std::move(initialized)).expect("cloud send");
                         std::cout << "Accumulated cloud sent" << std::endl;
 
-                        // Reset accumulator for next batch
                         accumulator.reset();
                     }
                     else
@@ -254,16 +232,6 @@ int main()
                         std::cout << "Frame " << accumulator.frame_count << "/" << ACCUMULATION_COUNT
                                   << " accumulated (" << cloud_raw.points.size() << " points)" << std::endl;
                     }
-                }
-                else
-                {
-                    // Send individual frames (original behavior)
-                    IceoryxPointCloud cloud = toIceoryxPointCloudSingle(cloud_raw);
-                    std::cout << "publish_count: " << cloud.publish_count << std::endl;
-                    auto sample = cloud_publisher.loan_uninit().expect("cloud loan");
-                    auto initialized = sample.write_payload(cloud);
-                    send(std::move(initialized)).expect("cloud send");
-                    std::cout << "cloud sent" << std::endl;
                 }
             }
             break;

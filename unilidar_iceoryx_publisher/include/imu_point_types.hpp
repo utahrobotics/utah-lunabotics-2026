@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 #pragma once
 #include <cstdint>
+constexpr std::size_t MAX_POINTS_PER_CLOUD = 10000;
 
 struct ImuMsg {
     static constexpr const char* IOX2_TYPE_NAME = "ImuMsg";
@@ -23,5 +24,5 @@ struct IceoryxPointCloud {
     static constexpr const char* IOX2_TYPE_NAME = "IceoryxPointCloud";
     bool is_last;
     uint64_t publish_count;
-    PointXYZIR points[10000];
+    PointXYZIR points[MAX_POINTS_PER_CLOUD];
 };
