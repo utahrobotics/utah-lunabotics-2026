@@ -51,6 +51,9 @@ kill:
 clear-simlogs:
 	cd lunabot-cu/logs && rm lunabotsim*
 
+clear-logs:
+	rm lunabot-cu/logs/*
+
 # Help target to show available commands
 help:
 	@echo "Available targets:"
