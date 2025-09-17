@@ -42,6 +42,8 @@ fn default_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::DetectorCamBack(_) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamSide(_) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamLaptopFront(_) => SimOverride::ExecutedBySim,
+        default::SimStep::RealsenseOccupancy(_) => SimOverride::ExecutedBySim,
+        default::SimStep::Lunabase(_) => SimOverride::ExecutedBySim,
         // May want to temporarily add override for obstacle map recv until lidar simulation works
         _ => SimOverride::ExecuteByRuntime,
     }
@@ -123,7 +125,20 @@ fn run_one_copperlist(
                 output.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
+            default::SimStep::RealsenseOccupancy(CuTaskCallbackState::Process(_, output)) => {
+                *output = msgs.get_realsense_occupancy_output().clone();
+                output.tov = robot_clock.now().into();
+                SimOverride::ExecutedBySim
+            }
+            default::SimStep::RealsenseOccupancy(..) => SimOverride::ExecutedBySim,
+            default::SimStep::Lunabase(CuTaskCallbackState::Process(_, output)) => {
+                *output = msgs.get_lunabase_output().clone();
+                output.tov = robot_clock.now().into();
+                SimOverride::ExecutedBySim
+            }
+            default::SimStep::Lunabase(..) => SimOverride::ExecutedBySim,
             default::SimStep::DetectorCamLaptopFront(..) => SimOverride::ExecutedBySim,
+
             // May want to temporarily add override for obstacle map recv until lidar simulation works
             _ => SimOverride::ExecuteByRuntime,
         }
