@@ -1,4 +1,7 @@
 (
+    runtime: (
+        rate_target_hz: 1000
+    ),
     tasks:[
         // waits for v4l udev add events, and reports them to the camera tasks
         // camera tasks can open the device if the port from the reported event
@@ -88,7 +91,7 @@
             logging: (
                 enabled: false
             ),
-            background: true
+            background: false
         ),
         // fuses information from IMUs, Apriltags, and ICP algos providing one global robot position.
         // position is logged to rerun at 60 hz

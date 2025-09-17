@@ -21,6 +21,7 @@ pub static ROOT_NODE: OnceLock<StaticNode> = OnceLock::new();
 
 pub static PICO_TX: OnceLock<Sender<ActuatorCommand>> = OnceLock::new();
 pub static PICO_RX: OnceLock<Receiver<FromPicoV3>> = OnceLock::new();
+pub static TARGET_HZ: usize = 1000; // MUST BE THE SAME AS THE TARGET HZ IN COPPERCONFIG.RON
 
 #[copper_runtime(config = "copperconfig.ron", sim_mode = true)]
 struct LunabotApplication {}
@@ -199,8 +200,17 @@ fn main() {
             let mut reader = UnifiedLoggerIOReader::new(dl, UnifiedLogType::CopperList);
             let copperlists = copperlists_reader::<default::CuStampedDataSet>(&mut reader);
 
+            let target_duration = std::time::Duration::from_nanos(1_000_000_000 / TARGET_HZ as u64);
+            let mut last_time = std::time::Instant::now();
+
             for copper_list in copperlists {
                 run_one_copperlist(&mut application, &mut robot_clock_mock, copper_list);
+
+                let elapsed = last_time.elapsed();
+                if elapsed < target_duration {
+                    std::thread::sleep(target_duration - elapsed);
+                }
+                last_time = std::time::Instant::now();
             }
 
             application

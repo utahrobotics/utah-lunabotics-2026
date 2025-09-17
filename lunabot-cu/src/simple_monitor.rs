@@ -67,7 +67,22 @@ impl CuMonitor for SimpleMonitor {
         Ok(())
     }
 
-    fn process_copperlist(&self, _msgs: &[&CuMsgMetadata]) -> CuResult<()> {
+    fn process_copperlist(&self, msgs: &[&CuMsgMetadata]) -> CuResult<()> {
+        for (task_id, msg) in msgs
+            .iter()
+            .filter(|msg| !msg.process_time.start.is_none() && !msg.process_time.end.is_none())
+            .enumerate()
+        {
+            let process_duration =
+                msg.process_time.end.unwrap().0 - msg.process_time.start.unwrap().0;
+            if process_duration > 2_000_000 {
+                warning!(
+                    "Task {} process duration took suspiciously long: {} microseconds",
+                    self.tasks[task_id],
+                    (msg.process_time.end.unwrap().0 - msg.process_time.start.unwrap().0) / 1000
+                );
+            }
+        }
         Ok(())
     }
 

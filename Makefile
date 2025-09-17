@@ -48,6 +48,9 @@ clean:
 kill:
 	killall realsense unilidar_publisher lunabot-ai2
 
+clear-simlogs:
+	cd lunabot-cu/logs && rm lunabotsim*
+
 # Help target to show available commands
 help:
 	@echo "Available targets:"
