@@ -52,44 +52,18 @@ pub fn init_rerun(rerun_viz: RerunViz) -> Result<(), CuError> {
         ..Default::default()
     };
     let (recorder, level) = match rerun_viz {
-        RerunViz::Viz(level) => {
-            // First try to spawn a Rerun viewer process, but with stdout/stderr redirected to
-            // `/dev/null` so that its banner and logs do not pollute our own stdout.
-            // If the viewer is already running, spawning will fail (port in use) – that is
-            // fine, we will simply connect to it.
-
-            let port = opts.port;
-
-            // Only spawn if no process is currently listening on the port.
-            let viewer_running =
-                TcpStream::connect_timeout(&opts.connect_addr(), Duration::from_millis(200))
-                    .is_ok();
-            if !viewer_running {
-                let _ = Command::new(&opts.executable_path())
-                    .arg(format!("--port={port}"))
-                    .arg(format!("--memory-limit={}", opts.memory_limit))
-                    .arg("--expect-data-soon")
-                    .arg("--hide-welcome-screen")
-                    .stdin(Stdio::null())
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null())
-                    .spawn();
-            }
-
-            let url = format!("rerun+http://127.0.0.1:{port}/proxy");
-            (
-                match rerun::RecordingStreamBuilder::new("lunabot").connect_grpc_opts(&url, None) {
-                    Ok(x) => x,
-                    Err(e) => {
-                        return Err(CuError::new_with_cause(
-                            "Failed to connect to rerun viewer",
-                            e,
-                        ));
-                    }
-                },
-                level,
-            )
-        }
+        RerunViz::Viz(level) => (
+            match rerun::RecordingStreamBuilder::new("lunabot").spawn_opts(&opts, None) {
+                Ok(rec) => rec,
+                Err(e) => {
+                    return Err(CuError::new_with_cause(
+                        "Failed to make recording stream",
+                        e,
+                    ));
+                }
+            },
+            level,
+        ),
         RerunViz::Grpc(level, ip) => (
             match rerun::RecordingStreamBuilder::new("lunabot")
                 .connect_grpc_opts(&format!("rerun+http://{ip}:9876/proxy"), None)
