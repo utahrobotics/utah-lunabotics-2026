@@ -19,8 +19,6 @@ const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 
 pub static ROOT_NODE: OnceLock<StaticNode> = OnceLock::new();
 
-pub static PICO_TX: OnceLock<Sender<ActuatorCommand>> = OnceLock::new();
-pub static PICO_RX: OnceLock<Receiver<FromPicoV3>> = OnceLock::new();
 pub static TARGET_HZ: usize = 1000; // MUST BE THE SAME AS THE TARGET HZ IN COPPERCONFIG.RON
 
 #[copper_runtime(config = "copperconfig.ron", sim_mode = true)]
@@ -37,7 +35,7 @@ fn default_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::GstConvertLaptopFront(_) => SimOverride::ExecutedBySim,
         default::SimStep::L2Pointcloud(_) => SimOverride::ExecutedBySim,
         default::SimStep::L2Imu(_) => SimOverride::ExecutedBySim,
-        default::SimStep::ActuatorCtrl(_) => SimOverride::ExecutedBySim,
+        default::SimStep::V3Pico(_) => SimOverride::ExecutedBySim,
         default::SimStep::MotorCtrl(_) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamBack(_) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamSide(_) => SimOverride::ExecutedBySim,
@@ -95,12 +93,12 @@ fn run_one_copperlist(
             }
             default::SimStep::L2Imu(..) => SimOverride::ExecutedBySim,
 
-            default::SimStep::ActuatorCtrl(CuTaskCallbackState::Process(_, output)) => {
-                *output = msgs.get_actuator_ctrl_output().clone();
+            default::SimStep::V3Pico(CuTaskCallbackState::Process(_, output)) => {
+                *output = msgs.get_v_3_pico_output().clone();
                 output.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
-            default::SimStep::ActuatorCtrl(..) => SimOverride::ExecutedBySim,
+            default::SimStep::V3Pico(..) => SimOverride::ExecutedBySim,
 
             default::SimStep::MotorCtrl(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_motor_ctrl_output().clone();
@@ -180,11 +178,6 @@ fn main() {
 
             let _ = rerun_viz::init_rerun(rerun_viz::RerunViz::Viz(rerun_viz::Level::All));
 
-            let (pico_tx, pico_rx) = mock_enumerate_picos();
-
-            PICO_RX.set(pico_rx).expect("Failed to set PICO_RX");
-            PICO_TX.set(pico_tx).expect("Failed to set PICO_TX");
-
             let robot_chain = NodeSerde::from_reader(
                 std::fs::File::open("../robot-layout/lunabot.ron")
                     .expect("Failed to read robot chain"),
@@ -237,10 +230,4 @@ fn main() {
         .expect(".join() on main thread failed");
 
     debug!("End of log replay.");
-}
-
-fn mock_enumerate_picos() -> (Sender<ActuatorCommand>, Receiver<FromPicoV3>) {
-    let (tx, _) = crossbeam_channel::unbounded();
-    let (_, rx) = crossbeam_channel::unbounded();
-    (tx, rx)
 }
