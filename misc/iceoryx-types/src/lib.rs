@@ -60,6 +60,14 @@ pub struct PointVector {
     pub vector: FixedSizeVec<PointXYZIR, MAX_POINT_CLOUD_POINTS>
 }
 
+impl Default for PointVector {
+    fn default() -> Self {
+        Self {
+            vector: FixedSizeVec::default()
+        }
+    }
+}
+
 impl<Context> Decode<Context> for PointVector {
     fn decode<D: bincode::de::Decoder<Context = Context>>(decoder: &mut D) -> Result<Self, bincode::error::DecodeError> {
         todo!()
@@ -96,7 +104,7 @@ impl Default for IceoryxPointCloud {
         Self {
             is_last: true,
             publish_count: 0,
-            points: [PointXYZIR::default(); MAX_POINT_CLOUD_POINTS],
+            points: PointVector::default(),
         }
     }
 }
@@ -124,7 +132,7 @@ impl PointCloudAccumulator {
         &mut self,
         cloud: &IceoryxPointCloud,
     ) -> Result<Option<&[PointXYZIR]>, &'static str> {
-        self.points.extend_from_slice(&cloud.points);
+        self.points.extend_from_slice(&cloud.points.vector.as_slice());
 
         if cloud.is_last {
             Ok(Some(&self.points))
