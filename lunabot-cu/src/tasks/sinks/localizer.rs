@@ -96,7 +96,6 @@ impl CuSinkTask for Localizer {
                 kiss_icp_correction: None,
                 last_icp_reading: None,
                 last_imu_orientation: None,
-                last_corrected_icp: None,
                 root_node_publisher: publisher,
                 realsense_node_publisher: publisher_realsense,
             });
