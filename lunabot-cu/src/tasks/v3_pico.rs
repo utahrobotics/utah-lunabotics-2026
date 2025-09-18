@@ -141,7 +141,6 @@ impl CuTask for V3PicoTask {
         let from_pico = Arc::new(&*Box::leak(Box::new(ArrayQueue::new(50))));
         Ok(Self {
             path_rx,
-            last_seen: 0,
             is_broken: None,
             from_pico,
             serial_port_writer: None,
