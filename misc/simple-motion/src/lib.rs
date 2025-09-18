@@ -1,17 +1,3 @@
-//! Simple Motion Crate - Robot Kinematic Chain Library
-//!
-//! # Coordinate System Convention
-//! This crate uses a right-handed coordinate system with the following convention:
-//! - **+X axis**: Forward (robot's forward direction)
-//! - **+Y axis**: Left (robot's left direction)
-//! - **+Z axis**: Up (robot's upward direction)
-//!
-//! # Euler Angle Convention
-//! Euler angles are applied in the order: Yaw-Pitch-Roll (ZYX extrinsic)
-//! - **Roll**: Rotation around X-axis (forward axis)
-//! - **Pitch**: Rotation around Y-axis (left axis)
-//! - **Yaw**: Rotation around Z-axis (up axis)
-
 use std::{collections::VecDeque, ops::Deref, sync::Arc};
 
 use crossbeam::atomic::AtomicCell;
