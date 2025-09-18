@@ -6,8 +6,8 @@ use once_cell::sync::Lazy;
 use crate::LunabotStage;
 
 pub const THALASSIC_CELL_SIZE: f32 = 0.03125;
-pub const THALASSIC_WIDTH: u32 = 160;
-pub const THALASSIC_HEIGHT: u32 = 224;
+pub const THALASSIC_WIDTH: u32 = 224;
+pub const THALASSIC_HEIGHT: u32 = 160;
 pub const THALASSIC_CELL_COUNT: u32 = THALASSIC_WIDTH * THALASSIC_HEIGHT;
 
 /// global shared Lunabot stage atomic cell to synchronize stage information across components.
