@@ -55,7 +55,7 @@
             id:"realsense_occupancy",
             type: "crate::tasks::sources::OccupancyGridSource",
             config: {
-                "service": "realsense/311322302990/occupancy",
+                "service": "realsense/044422250424/occupancy",
                 "camera_node": "upper_depth_camera"
             },
             logging: (
@@ -91,7 +91,7 @@
             logging: (
                 enabled: false
             ),
-            background: false
+            background: true
         ),
         // fuses information from IMUs, Apriltags, and ICP algos providing one global robot position.
         // position is logged to rerun at 60 hz
