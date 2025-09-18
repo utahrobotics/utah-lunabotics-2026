@@ -1,2 +1,6 @@
 **/.vscode/settings.json
 target/
+build/CMakeCache.txt
+build/.cmake/api/v1/query/client-vscode/
+build/.cmake/api/v1/reply/
+build/CMakeFiles/cmake.check_cache
