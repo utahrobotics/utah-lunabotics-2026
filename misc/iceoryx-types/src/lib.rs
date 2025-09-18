@@ -8,14 +8,15 @@
 //! Keeping the same memory layout allows zero-copy transfer between the
 //! languages.
 
-use bincode::{Decode, Encode};
+use bincode::{BorrowDecode, Decode, Encode};
 use common::{THALASSIC_CELL_COUNT, THALASSIC_HEIGHT, THALASSIC_WIDTH};
-use iceoryx2::prelude::ZeroCopySend;
+use iceoryx2::prelude::{PlacementDefault, ZeroCopySend};
+use iceoryx2_bb_container::vec::FixedSizeVec;
 use nalgebra::Point3;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, Encode, Decode, ZeroCopySend, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Encode, Decode, ZeroCopySend, Serialize, Deserialize)]
 #[type_name("PointXYZIR")]
 pub struct PointXYZIR {
     pub x: f32,
@@ -27,7 +28,7 @@ pub struct PointXYZIR {
 }
 
 #[repr(C)]
-#[derive(Clone, Debug, ZeroCopySend, Encode, Decode, Serialize)]
+#[derive(Clone, Debug, ZeroCopySend, PlacementDefault, Encode, Decode, Serialize)]
 #[type_name("IceoryxOccupancyGrid")]
 pub struct IceoryxOccupancyGrid {
     pub width: u32,
@@ -50,14 +51,44 @@ impl Default for IceoryxOccupancyGrid {
 /// Reduced from 130 000 → 20 000 to keep message size (and stack usage in Rust) reasonable.
 pub const MAX_POINT_CLOUD_POINTS: usize = 10000;
 
+/// Wraps iceoryx2_bb_container::vec::FixedSizeVec so that bincode::Encode
+/// and bincode::Decode can be implemented. Also fixes type to facilitate
+/// the wrapping.
 #[repr(C)]
-#[derive(Clone, Debug, ZeroCopySend, Encode, Decode, Serialize)]
+#[derive(Clone, Debug, ZeroCopySend, PlacementDefault, Serialize)]
+pub struct PointVector {
+    pub vector: FixedSizeVec<PointXYZIR, MAX_POINT_CLOUD_POINTS>
+}
+
+impl<Context> Decode<Context> for PointVector {
+    fn decode<D: bincode::de::Decoder<Context = Context>>(decoder: &mut D) -> Result<Self, bincode::error::DecodeError> {
+        todo!()
+    }
+}
+
+impl<'de, Context> BorrowDecode<'de, Context> for PointVector {
+    fn borrow_decode<D: bincode::de::BorrowDecoder<'de, Context = Context>>(
+        decoder: &mut D,
+    ) -> Result<Self, bincode::error::DecodeError> {
+        todo!()
+    }
+}
+
+impl Encode for PointVector {
+    fn encode<E: bincode::enc::Encoder>(&self, encoder: &mut E) -> Result<(), bincode::error::EncodeError> {
+        todo!()
+    }
+}
+
+
+#[repr(C)]
+#[derive(Clone, Debug, ZeroCopySend, PlacementDefault, Encode, Decode, Serialize)]
 #[type_name("IceoryxPointCloud")]
 pub struct IceoryxPointCloud {
     pub is_last: bool,
     pub publish_count: u64,
-    #[serde(serialize_with = "<[_]>::serialize")]
-    pub points: [PointXYZIR; MAX_POINT_CLOUD_POINTS],
+    //#[serde(serialize_with = "<[_]>::serialize")]
+    pub points: PointVector,
 }
 
 impl Default for IceoryxPointCloud {
