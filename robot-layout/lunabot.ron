@@ -4,8 +4,8 @@
     "children": [
         {
             "name": Some("l2_front"),
-            "origin": [0.50, 0.0, 0.0],
-            "euler": [0.0, 0.0, 0.0]
+            "origin": [0.50, 0.0, 0.50],
+            "euler": [0.0, 0.20, 90.0]
         },
         {
             "name": Some("upper_depth_camera"),

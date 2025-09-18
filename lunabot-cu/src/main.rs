@@ -6,8 +6,6 @@ mod motors;
 
 pub mod rerun_viz;
 
-#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
-mod rp2040;
 pub mod simple_monitor;
 pub mod tasks;
 pub mod utils;
@@ -23,14 +21,9 @@ use std::sync::OnceLock;
 use std::thread::sleep;
 use std::time::Duration;
 
-use crate::rp2040::enumerate_v3picos;
-
 const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 
 pub static ROOT_NODE: OnceLock<StaticNode> = OnceLock::new();
-
-pub static PICO_TX: OnceLock<Sender<ActuatorCommand>> = OnceLock::new();
-pub static PICO_RX: OnceLock<Receiver<FromPicoV3>> = OnceLock::new();
 
 #[copper_runtime(config = "copperconfig.ron")]
 struct LunabotApplication {}
@@ -60,11 +53,6 @@ fn main() {
         .expect("Failed to initialize rerun viz.");
     // rerun_viz::init_rerun(rerun_viz::RerunViz::Viz(rerun_viz::Level::All))
     //     .expect("Failed to initialize rerun viz.");
-
-    let (pico_tx, pico_rx) = enumerate_v3picos();
-
-    PICO_RX.set(pico_rx).expect("Failed to set PICO_RX");
-    PICO_TX.set(pico_tx).expect("Failed to set PICO_TX");
 
     let robot_chain = NodeSerde::from_reader(
         std::fs::File::open("../robot-layout/lunabot.ron").expect("Failed to read robot chain"),

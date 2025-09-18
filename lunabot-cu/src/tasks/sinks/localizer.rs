@@ -7,6 +7,7 @@ use cu29::{
     cutask::{CuMsg, CuSinkTask, Freezable},
     input_msg,
 };
+use embedded_common::FromPicoV3;
 use iceoryx_types::ImuMsg;
 use iceoryx2::{
     node::NodeBuilder,
@@ -15,7 +16,6 @@ use iceoryx2::{
     service::ipc,
 };
 use nalgebra::{Isometry3, UnitQuaternion, UnitVector3, Vector3};
-use rerun::Instance;
 use simple_motion::StaticNode;
 
 use crate::{
@@ -24,7 +24,8 @@ use crate::{
     utils::{lerp, lerp_value, swing_twist_decomposition},
 };
 
-const ACCELEROMETER_LERP_SPEED: f64 = 100.0;
+const ACCELEROMETER_LERP_SPEED: f64 = 150.0;
+const ICP_FILTER_SPEED: f64 = 100.0;
 const LOCALIZATION_DELTA: f64 = 1.0 / 60.0;
 
 pub struct Localizer {
@@ -33,6 +34,7 @@ pub struct Localizer {
     kiss_icp_correction: Option<Isometry3<f64>>,
     last_icp_reading: Option<(Isometry3<f64>, u64)>,
     last_imu_orientation: Option<(OrientationComponents, u64)>,
+    last_corrected_icp: Option<Isometry3<f64>>,
     // publishes EncodableIsometry at 60hz
     root_node_publisher: Publisher<ipc::Service, [f64; 16], ()>,
     realsense_node_publisher: Publisher<ipc::Service, [f64; 16], ()>,
@@ -45,7 +47,9 @@ impl CuSinkTask for Localizer {
     type Input<'m> = input_msg!('m,
         ImuMsg, // l2 imu
         EncodableIsometry, // l2 kiss icp
-        Box<HashMap<String, EncodableIsometry>>);
+        FromPicoV3,
+        Box<HashMap<String, EncodableIsometry>> // apriltag detections
+    );
 
     fn new(_config: Option<&cu29::prelude::ComponentConfig>) -> cu29::CuResult<Self>
     where
@@ -93,6 +97,7 @@ impl CuSinkTask for Localizer {
                 kiss_icp_correction: None,
                 last_icp_reading: None,
                 last_imu_orientation: None,
+                last_corrected_icp: None,
                 root_node_publisher: publisher,
                 realsense_node_publisher: publisher_realsense,
             });
@@ -122,7 +127,7 @@ impl CuSinkTask for Localizer {
             None
         };
 
-        let apriltag_components = if let Some(estimated_camera_isometries) = input.2.payload() {
+        let apriltag_components = if let Some(estimated_camera_isometries) = input.3.payload() {
             self.compute_apriltag_swing_twist(estimated_camera_isometries)
         } else {
             None
@@ -162,6 +167,33 @@ impl CuSinkTask for Localizer {
             } else {
                 kiss_icp_iso
             };
+
+            // Apply low-pass filter to the corrected ICP
+            let filtered_corrected_icp = if let Some(last_corrected) = self.last_corrected_icp {
+                // Interpolate translation
+                let filtered_translation = lerp(
+                    last_corrected.translation.vector,
+                    corrected_icp.translation.vector,
+                    LOCALIZATION_DELTA,
+                    ICP_FILTER_SPEED,
+                );
+
+                // Interpolate rotation using quaternion slerp
+                let filtered_rotation = UnitQuaternion::new_normalize(lerp(
+                    last_corrected.rotation.into_inner(),
+                    corrected_icp.rotation.into_inner(),
+                    LOCALIZATION_DELTA,
+                    ICP_FILTER_SPEED,
+                ));
+
+                Isometry3::from_parts(filtered_translation.into(), filtered_rotation)
+            } else {
+                corrected_icp
+            };
+
+            // Store the filtered result for next iteration
+            self.last_corrected_icp = Some(filtered_corrected_icp);
+            let corrected_icp = filtered_corrected_icp;
 
             if let Some((imu_components, imu_time)) = &self.last_imu_orientation {
                 if clock.now().as_nanos() - imu_time < 50_000_000 {

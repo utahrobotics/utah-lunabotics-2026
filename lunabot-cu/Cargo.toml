@@ -82,7 +82,7 @@ chrono = "0.4.41"
 unicode-width = "=0.2.0"
 
 # embedded
-embedded_common = { path = "../embedded_common" }
+embedded_common = { path = "../embedded_common", features = ["std"] }
 
 # RON deserialization at runtime
 ron.workspace = true

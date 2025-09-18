@@ -7,6 +7,8 @@ use cu29::{
 };
 
 use common::Steering;
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+use embedded_common::ActuatorCommand;
 
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use crate::motors::{MotorRef, VescIDs, VescPair, enumerate_motors};
@@ -22,7 +24,7 @@ impl Freezable for MotorController {}
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 impl CuSinkTask for MotorController {
     // steering, actuators (just ignore the actuators here for now)
-    type Input<'m> = input_msg!((Option<Steering>, Option<[u8; 5]>));
+    type Input<'m> = input_msg!((Option<Steering>, Option<ActuatorCommand>));
 
     fn new(config: Option<&ComponentConfig>) -> CuResult<Self> {
         let motor_ref;

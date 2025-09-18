@@ -27,7 +27,7 @@ impl CuTask for LunabotAi {
     type Input<'m> = input_msg!(Option<FromLunabase>);
 
     // (Steering, ActuatorCommand)
-    type Output<'m> = output_msg!((Option<Steering>, Option<[u8; 5]>));
+    type Output<'m> = output_msg!((Option<Steering>, Option<ActuatorCommand>));
 
     fn new(_config: Option<&cu29::prelude::ComponentConfig>) -> cu29::CuResult<Self>
     where
@@ -62,7 +62,7 @@ impl CuTask for LunabotAi {
             .outgoing_actuator_msg_queue
             .pop_front()
         {
-            payload.1 = Some(actuator_cmd.serialize());
+            payload.1 = Some(actuator_cmd);
         }
         if let Some(steering_cmd) = self.bt.blackboard_mut().outgoing_steering_msg.take() {
             payload.0 = Some(steering_cmd);
@@ -73,17 +73,14 @@ impl CuTask for LunabotAi {
         } else {
             output.clear_payload();
         }
-        let dt =nanos_to_secs(clock.now().as_nanos() - self.last_tick_nanos);
+        let dt = nanos_to_secs(clock.now().as_nanos() - self.last_tick_nanos);
 
-        let e: Event = UpdateArgs {
-            dt,
-        }
-        .into();
+        let e: Event = UpdateArgs { dt }.into();
         if let Some(Some(from_lunabase)) = input.payload() {
             self.bt.blackboard_mut().update_with_msg(from_lunabase);
         }
 
-        let mut remaining_dt =  0.0;
+        let mut remaining_dt = 0.0;
         self.bt.tick(&e, &mut |args, blackboard| {
             let status = match *args.action {
                 LunabotAction::SetSteering(steering) => {

@@ -2,7 +2,6 @@
 pub mod comms;
 mod motors;
 pub mod rerun_viz;
-mod rp2040;
 pub mod simple_monitor;
 pub mod tasks;
 pub mod utils;
@@ -21,9 +20,6 @@ use std::time::Duration;
 
 pub static ROOT_NODE: OnceLock<StaticNode> = OnceLock::new();
 const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
-
-pub static PICO_TX: OnceLock<Sender<ActuatorCommand>> = OnceLock::new();
-pub static PICO_RX: OnceLock<Receiver<FromPicoV3>> = OnceLock::new();
 
 // This will create the CuMsgs that is specific to your copper project.
 // It is used to instruct the log reader how to decode the logs.

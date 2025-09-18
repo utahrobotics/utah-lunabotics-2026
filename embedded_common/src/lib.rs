@@ -7,6 +7,10 @@ pub const IMU_READING_DELAY_MS: u64 = 10;
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[repr(u8)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(
+    feature = "std",
+    derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
+)]
 pub enum Direction {
     Forward = 0,
     Backward = 1,
@@ -16,6 +20,10 @@ pub enum Direction {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[repr(u8)]
 /// Used to specify which actuator a command is meant for.
+#[cfg_attr(
+    feature = "std",
+    derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
+)]
 pub enum Actuator {
     /// the lift
     Lift = 0,
@@ -23,19 +31,28 @@ pub enum Actuator {
     Bucket = 1,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(
+    feature = "std",
+    derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
+)]
 pub enum ActuatorCommand {
     SetSpeed(u16, Actuator),
     SetDirection(Direction, Actuator),
     Shake,
     StartPercuss,
+    #[default]
     StopPercuss,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 /// adc readings
+#[cfg_attr(
+    feature = "std",
+    derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
+)]
 pub struct ActuatorReading {
     pub m1_reading: u16,
     pub m2_reading: u16,
@@ -43,22 +60,35 @@ pub struct ActuatorReading {
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(
+    feature = "std",
+    derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
+)]
 pub enum FromIMU {
     Reading(AngularRate, AccelerationNorm),
     NoDataReady,
     Error,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Default)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(
+    feature = "std",
+    derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
+)]
 pub enum FromPicoV3 {
     Reading([FromIMU; 4], ActuatorReading),
+    #[default]
     Error,
 }
 
 /// Radians per second
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(
+    feature = "std",
+    derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
+)]
 pub struct AngularRate {
     pub x: f32,
     pub y: f32,
@@ -70,6 +100,10 @@ pub struct AngularRate {
 /// In the default orientation, should be [0.0, -9.81, 0.0]
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(
+    feature = "std",
+    derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
+)]
 pub struct AccelerationNorm {
     pub x: f32,
     pub y: f32,
@@ -154,7 +188,8 @@ impl FromIMU {
 }
 
 impl ActuatorCommand {
-    pub fn deserialize(bytes: [u8; 5]) -> Result<Self, &'static str> {
+    pub const SIZE: usize = 5;
+    pub fn deserialize(bytes: [u8; Self::SIZE]) -> Result<Self, &'static str> {
         let actuator = {
             if bytes[3] == Actuator::Lift as u8 {
                 Actuator::Lift
@@ -191,10 +226,10 @@ impl ActuatorCommand {
         }
     }
 
-    pub fn serialize(&self) -> [u8; 5] {
+    pub fn serialize(&self) -> [u8; Self::SIZE] {
         match self {
             ActuatorCommand::SetSpeed(speed, actuator) => {
-                let mut bytes = [0u8; 5];
+                let mut bytes = [0u8; Self::SIZE];
                 bytes[0] = 0;
                 bytes[1..=2].copy_from_slice(&speed.to_le_bytes());
                 bytes[3] = *actuator as u8;

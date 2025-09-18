@@ -26,6 +26,7 @@
             logging: (
                 enabled: false
             ),
+            background: true
         ),
         (
             id: "detector_cam_{{id}}",
@@ -42,6 +43,7 @@
             logging: (
                 enabled: true
             ),
+            background: true,
         )
     ],
     cnx: [
