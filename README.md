@@ -3,10 +3,9 @@
 *This repo is in the earlyish stages of a rewrite migrating to the copper framework from last years code base: github.com/utahrobotics/lunadev-2025*
 
 ## Architecture Overview
-<img width="3880" height="946" alt="graphviz(4)" src="https://github.com/user-attachments/assets/a403ef4e-9198-4120-a0da-43c36a812f3b" />
+<img width="3606" height="1022" alt="graphviz(5)" src="https://github.com/user-attachments/assets/e0c4f52b-d28d-44f6-87a7-19d9b6063672" />
 
 ##### Check copperconfig.ron to see the definitions of all the tasks running and the datatypes passed between tasks.
-
 
 ## Dependencies
 
