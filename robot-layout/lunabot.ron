@@ -1,11 +1,13 @@
-{ // roll, pitch, yaw
-    "free_origin": [1.0, 1.0, 0.0], // moves the robot starting position 1 meter in the negative y direction?
+{ // euler angles are declared in roll, pitch, yaw order, and by default applied in yaw, pitch, roll order, but you can change that order with the "euler_order" field
+    "free_origin": [0.0, 0.0, 0.0], // moves the robot starting position 1 meter in the negative y direction?
     "free_euler": [0.0, 0.0, 0.0],  // starts facing world negative y? should be facing world positive x
     "children": [
         {
             "name": Some("l2_front"),
             "origin": [0.50, 0.0, 0.50],
-            "euler": [0.0, 0.20, 90.0]
+            "euler":  [0.0, 45., 20.0],
+            // dont question my decision to add this field
+            "euler_order": ["pitch","yaw","roll"]
         },
         {
             "name": Some("upper_depth_camera"),
@@ -14,8 +16,8 @@
         },
         {
             "name": Some("cam_laptop_front"),
-            "origin": [0.0, 0.0, 0.0],
-            "euler": [0.0, 0.0, 0.0]
+            "origin": [0.2, 0.0, 0.0],
+            "euler": [0.0, 0.0, 180.0]
         },
         {
             "name": Some("cam_side"),

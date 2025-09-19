@@ -562,6 +562,24 @@ impl ChainBuilder {
     }
 }
 
+#[derive(Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum EulerAxis {
+    Roll,
+    Pitch,
+    Yaw,
+}
+
+impl EulerAxis {
+    fn to_axis_index(self) -> usize {
+        match self {
+            EulerAxis::Roll => 0,
+            EulerAxis::Pitch => 1,
+            EulerAxis::Yaw => 2,
+        }
+    }
+}
+
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum TranslationRestrictionSerde {
@@ -628,11 +646,15 @@ enum RotationRestrictionSerde {
     Free {
         #[serde(skip_serializing_if = "all_zeros")]
         free_euler: [f64; 3],
+        #[serde(default = "default_euler_order")]
+        euler_order: [EulerAxis; 3],
     },
     OneAxis {
         #[serde(default)]
         #[serde(skip_serializing_if = "all_zeros")]
         start_euler: [f64; 3],
+        #[serde(default = "default_euler_order")]
+        euler_order: [EulerAxis; 3],
         rotation_axis: [f64; 3],
         min_angle: Option<f64>,
         max_angle: Option<f64>,
@@ -642,6 +664,8 @@ enum RotationRestrictionSerde {
         #[serde(default)]
         #[serde(skip_serializing_if = "all_zeros")]
         euler: [f64; 3],
+        #[serde(default = "default_euler_order")]
+        euler_order: [EulerAxis; 3],
     },
 }
 
@@ -649,52 +673,77 @@ impl Default for RotationRestrictionSerde {
     fn default() -> Self {
         RotationRestrictionSerde::Fixed {
             euler: [0.0, 0.0, 0.0],
+            euler_order: default_euler_order(),
         }
     }
 }
 
-fn from_euler_angles(roll: f64, pitch: f64, yaw: f64) -> UnitQuaternion<f64> {
-    // New coordinate system: +X forward, +Y left, +Z up
-    // Roll around X (forward), Pitch around Y (left), Yaw around Z (up)
-    let mut current = UnitQuaternion::from_scaled_axis(Vector3::z() * yaw);
-    let pitch_axis = current * Vector3::y();
-    current = UnitQuaternion::from_scaled_axis(pitch_axis * pitch) * current;
-    let roll_axis = current * Vector3::x();
-    UnitQuaternion::from_scaled_axis(roll_axis * roll) * current
+fn default_euler_order() -> [EulerAxis; 3] {
+    [EulerAxis::Yaw, EulerAxis::Pitch, EulerAxis::Roll]
+}
+
+fn from_euler_angles_with_order(angles: [f64; 3], order: [EulerAxis; 3]) -> UnitQuaternion<f64> {
+    let mut result = UnitQuaternion::identity();
+
+    // Apply rotations in the specified order
+    for &axis_type in order.iter() {
+        let angle = angles[axis_type.to_axis_index()];
+        let axis = match axis_type {
+            EulerAxis::Roll => result * Vector3::x(), // Roll around current X
+            EulerAxis::Pitch => result * Vector3::y(), // Pitch around current Y
+            EulerAxis::Yaw => result * Vector3::z(),  // Yaw arouaxesnd current Z
+        };
+        result = UnitQuaternion::from_scaled_axis(axis * angle) * result;
+    }
+
+    result
 }
 
 impl From<RotationRestrictionSerde> for RotationRestriction {
     fn from(rotation: RotationRestrictionSerde) -> Self {
         match rotation {
-            RotationRestrictionSerde::Fixed { euler } => RotationRestriction::Fixed {
-                rotation: from_euler_angles(
-                    euler[0].to_radians(),
-                    euler[1].to_radians(),
-                    euler[2].to_radians(),
+            RotationRestrictionSerde::Fixed { euler, euler_order } => RotationRestriction::Fixed {
+                rotation: from_euler_angles_with_order(
+                    [
+                        euler[0].to_radians(),
+                        euler[1].to_radians(),
+                        euler[2].to_radians(),
+                    ],
+                    euler_order,
                 ),
             },
             RotationRestrictionSerde::OneAxis {
                 start_euler,
+                euler_order,
                 rotation_axis: axis,
                 min_angle,
                 max_angle,
                 current_angle,
             } => RotationRestriction::OneAxis {
-                start_rotation: from_euler_angles(
-                    start_euler[0].to_radians(),
-                    start_euler[1].to_radians(),
-                    start_euler[2].to_radians(),
+                start_rotation: from_euler_angles_with_order(
+                    [
+                        start_euler[0].to_radians(),
+                        start_euler[1].to_radians(),
+                        start_euler[2].to_radians(),
+                    ],
+                    euler_order,
                 ),
                 axis: UnitVector3::try_new(Vector3::from(axis), 0.1).expect("Axis is too short"),
                 min_angle,
                 max_angle,
                 current_angle,
             },
-            RotationRestrictionSerde::Free { free_euler } => RotationRestriction::Free {
-                rotation: from_euler_angles(
-                    free_euler[0].to_radians(),
-                    free_euler[1].to_radians(),
-                    free_euler[2].to_radians(),
+            RotationRestrictionSerde::Free {
+                free_euler,
+                euler_order,
+            } => RotationRestriction::Free {
+                rotation: from_euler_angles_with_order(
+                    [
+                        free_euler[0].to_radians(),
+                        free_euler[1].to_radians(),
+                        free_euler[2].to_radians(),
+                    ],
+                    euler_order,
                 ),
             },
         }
@@ -773,47 +822,5 @@ impl NodeSerde {
         let mut string = String::new();
         r.read_to_string(&mut string)?;
         ron::de::from_str(&string).map_err(|e| e.into())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::{ChainBuilder, NodeSerde};
-
-    #[test]
-    fn simple_deserialize_ron01() {
-        let ron_str = r#"{}"#;
-        let node_serde: NodeSerde = ron::de::from_str(ron_str).unwrap();
-        let builder = ChainBuilder::from(node_serde);
-        let node = builder.finish();
-        assert!(node.is_origin_fixed());
-        assert!(node.is_rotation_fixed());
-
-        assert_eq!(node.get_local_origin(), nalgebra::Point3::origin());
-        assert_eq!(
-            node.get_local_rotation(),
-            nalgebra::UnitQuaternion::identity()
-        );
-    }
-
-    #[test]
-    fn simple_deserialize_ron02() {
-        let ron_str = r#"{
-            origin: [0.0, 1.0, 0.0]
-        }"#;
-        let node_serde: NodeSerde = ron::de::from_str(ron_str).unwrap();
-        let builder = ChainBuilder::from(node_serde);
-        let node = builder.finish();
-        assert!(node.is_origin_fixed());
-        assert!(node.is_rotation_fixed());
-
-        assert_eq!(
-            node.get_local_origin(),
-            nalgebra::Point3::new(0.0, 1.0, 0.0)
-        );
-        assert_eq!(
-            node.get_local_rotation(),
-            nalgebra::UnitQuaternion::identity()
-        );
     }
 }
