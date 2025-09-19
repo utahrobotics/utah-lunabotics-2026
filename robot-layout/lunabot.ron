@@ -12,7 +12,7 @@
         {
             "name": Some("upper_depth_camera"),
             "origin": [0.5, 0.0, 0.5],
-            "euler": [0.0, 10.0, 0.0]
+            "euler": [0.0, 20.0, 0.0]
         },
         {
             "name": Some("cam_laptop_front"),

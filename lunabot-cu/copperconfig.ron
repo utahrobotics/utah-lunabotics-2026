@@ -56,7 +56,7 @@
             config: {
                 "camera_node": "upper_depth_camera",
                 "robot_radius": 0.2,
-                "min_known_neighbors_ratio": 50,
+                "min_known_neighbors_ratio": 0,
                 "neighborhood_radius": 20,
                 "obstacle_threshold": 65,
                 "focal_length": 383,
