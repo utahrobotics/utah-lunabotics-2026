@@ -227,6 +227,36 @@ impl CuSinkTask for Localizer {
                         std::io::Error::new(std::io::ErrorKind::Other, "Rerun logging failed"),
                     ));
                 }
+                let isometry = self
+                    .root_node
+                    .get_node_with_name("l2_front")
+                    .unwrap()
+                    .get_global_isometry();
+                recorder
+                    .recorder
+                    .log_static(
+                        "l2_node",
+                        &rerun::Arrows3D::from_vectors([
+                            [0.2, 0.0, 0.0],
+                            [0.0, 0.2, 0.0],
+                            [0.0, 0.0, 0.2],
+                        ])
+                        .with_colors([[255, 0, 0], [0, 255, 0], [0, 0, 255]])
+                        .with_labels(vec!["x", "y", "z"]),
+                    )
+                    .unwrap();
+                recorder
+                    .recorder
+                    .log(
+                        "l2_node",
+                        &rerun::Transform3D::from_translation_rotation(
+                            isometry.translation.vector.cast::<f32>().data.0[0],
+                            rerun::Quaternion::from_xyzw(
+                                isometry.rotation.as_vector().cast::<f32>().data.0[0],
+                            ),
+                        ),
+                    )
+                    .unwrap();
             }
         }
 

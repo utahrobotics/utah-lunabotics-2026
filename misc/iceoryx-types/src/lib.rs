@@ -39,6 +39,7 @@ pub struct IceoryxDepthFrame<const SIZE: usize> {
     #[serde(serialize_with = "<[_]>::serialize")]
     pub depths: [u16; SIZE],
     pub depth_scale: f32,
+    pub focal_len: (f32, f32),
 }
 
 impl<const SIZE: usize> Default for IceoryxDepthFrame<SIZE> {
@@ -46,6 +47,7 @@ impl<const SIZE: usize> Default for IceoryxDepthFrame<SIZE> {
         Self {
             depths: [0; SIZE],
             depth_scale: 0.0,
+            focal_len: (383.0, 383.0),
         }
     }
 }

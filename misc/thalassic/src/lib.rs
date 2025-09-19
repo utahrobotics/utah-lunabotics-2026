@@ -178,6 +178,7 @@ impl DepthProjector {
                 &mut bind_grps
             })
             .finish();
+
         let (depth_grp, points_grp) = bind_grps;
         if let Some(point_cloud) = point_cloud {
             points_grp.buffers.0.read(point_cloud);
@@ -275,7 +276,18 @@ impl ThalassicBuilder {
 }
 
 #[repr(transparent)]
-#[derive(Debug, Clone, Copy, Pod, Zeroable, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Pod,
+    Zeroable,
+    PartialEq,
+    Eq,
+    bincode::Encode,
+    bincode::Decode,
+    serde::Serialize,
+)]
 /// likelyhood of being occupied on a scale of 0-10
 pub struct Occupancy(pub u32);
 

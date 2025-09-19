@@ -1,5 +1,7 @@
+use std::io::pipe;
 use std::num::NonZeroU32;
 
+use bincode::Encode;
 use common::{THALASSIC_CELL_COUNT, THALASSIC_CELL_SIZE, THALASSIC_HEIGHT, THALASSIC_WIDTH};
 use cu29::cutask::Freezable;
 use cu29::prelude::*;
@@ -7,6 +9,7 @@ use cu29::prelude::*;
 use gputter::types::{AlignedMatrix4, AlignedVec4};
 use iceoryx_types::{IceoryxDepthFrame, IceoryxOccupancyGrid};
 use nalgebra::{Vector2, Vector4};
+use rerun::{Color, Points3D};
 use simple_motion::StaticNode;
 use thalassic::{
     DepthProjector, DepthProjectorBuilder, Occupancy, OccupancyGridPipeline,
@@ -14,25 +17,64 @@ use thalassic::{
 };
 
 use crate::ROOT_NODE;
+use crate::rerun_viz::RECORDER;
 use crate::tasks::{DEPTH_FRAME_HEIGHT, DEPTH_FRAME_SIZE, DEPTH_FRAME_WIDTH};
 
-pub struct OccupancyGridSource {
+pub struct OccupancyGridTask {
     camera_node: StaticNode,
     depth_projector_pipeline: DepthProjector,
     occupancy_grid_pipeline: OccupancyGridPipeline,
     robot_radius: f64,
-    min_known_neighbors_ratio: u32,
-    neighborhood_radius: u32,
-    obstacle_threshold: u32,
 }
 
-impl Freezable for OccupancyGridSource {}
+#[derive(Serialize, Encode, bincode::Decode, Clone, Copy, Debug)]
+pub struct OccupancyGrid {
+    pub width: u32,
+    pub height: u32,
+    #[serde(serialize_with = "<[_]>::serialize")]
+    pub occupancy: [Occupancy; THALASSIC_CELL_COUNT as usize],
+}
 
-impl CuTask for OccupancyGridSource {
+impl Default for OccupancyGrid {
+    fn default() -> Self {
+        OccupancyGrid {
+            width: 0,
+            height: 0,
+            occupancy: [Occupancy::UNKNOWN; THALASSIC_CELL_COUNT as usize],
+        }
+    }
+}
+
+impl Freezable for OccupancyGridTask {}
+
+impl CuTask for OccupancyGridTask {
     type Input<'m> = input_msg!(IceoryxDepthFrame<DEPTH_FRAME_SIZE>);
-    type Output<'m> = output_msg!(IceoryxOccupancyGrid);
+    type Output<'m> = output_msg!(OccupancyGrid);
 
     fn start(&mut self, _clock: &RobotClock) -> CuResult<()> {
+        let width = THALASSIC_WIDTH;
+        let height = THALASSIC_HEIGHT;
+
+        let center = (
+            (width as f32 * THALASSIC_CELL_SIZE) / 2.0,
+            (height as f32 * THALASSIC_CELL_SIZE) / 2.0,
+            0.0,
+        );
+        let half_size = (
+            (width as f32 * THALASSIC_CELL_SIZE) / 2.0,
+            (height as f32 * THALASSIC_CELL_SIZE) / 2.0,
+            0.01,
+        );
+
+        RECORDER
+            .get()
+            .unwrap()
+            .recorder
+            .log_static(
+                "arena",
+                &rerun::Boxes3D::from_centers_and_half_sizes(vec![center], vec![half_size]),
+            )
+            .unwrap();
         Ok(())
     }
 
@@ -59,8 +101,15 @@ impl CuTask for OccupancyGridSource {
             .unwrap_or_else(|| 60);
 
         let focal_length_px = config
-            .and_then(|c| c.get::<f64>("obstacle_threshold"))
-            .expect("specify camera focal length") as f32;
+            .and_then(|c| c.get::<f64>("focal_length"))
+            .expect("specify focal length") as f32;
+
+        let ppx = config
+            .and_then(|c| c.get::<f64>("ppx"))
+            .expect("specify depth format ppx") as f32;
+        let ppy = config
+            .and_then(|c| c.get::<f64>("ppy"))
+            .expect("specify depth format ppy") as f32;
 
         let camera_node = ROOT_NODE
             .get()
@@ -73,10 +122,6 @@ impl CuTask for OccupancyGridSource {
                 ))
             })?
             .clone();
-
-        // experimentally find these
-        let ppx = todo!();
-        let ppy = todo!();
 
         if !gputter::is_gputter_initialized() {
             gputter::init_gputter_blocking().expect("Failed to initialize gputter");
@@ -103,7 +148,7 @@ impl CuTask for OccupancyGridSource {
             NonZeroU32::new(THALASSIC_HEIGHT).unwrap(),
         );
 
-        let occupancy_grid_pipeline = OccupancyGridPipelineBuilder {
+        let mut occupancy_grid_pipeline = OccupancyGridPipelineBuilder {
             occupancy_grid_dimensions: grid_dimensions,
             cell_size: THALASSIC_CELL_SIZE,
             min_points_for_occupied: 10,
@@ -113,14 +158,13 @@ impl CuTask for OccupancyGridSource {
         }
         .build();
 
+        occupancy_grid_pipeline.occupancy_grid_ref = pipeline_shared.clone();
+
         Ok(Self {
             camera_node,
             depth_projector_pipeline,
             occupancy_grid_pipeline,
             robot_radius,
-            min_known_neighbors_ratio,
-            neighborhood_radius,
-            obstacle_threshold,
         })
     }
 
@@ -131,6 +175,7 @@ impl CuTask for OccupancyGridSource {
         output: &mut Self::Output<'o>,
     ) -> CuResult<()> {
         let Some(depth_frame) = input.payload() else {
+            output.clear_payload();
             return Ok(());
         };
 
@@ -159,6 +204,7 @@ impl CuTask for OccupancyGridSource {
             std::iter::repeat_n(Occupancy::UNKNOWN, THALASSIC_CELL_COUNT as usize)
                 .collect::<Vec<_>>();
 
+        // since our pipeline is all synchronous, we likely do not need the will_process signal anymore
         if self.occupancy_grid_pipeline.will_process() {
             self.occupancy_grid_pipeline.process(
                 self.robot_radius as f32,
@@ -166,8 +212,61 @@ impl CuTask for OccupancyGridSource {
                 &mut occupancy_grid_out,
                 &depth_camera_transform,
             );
-        }
+            let mut positions = Vec::new();
+            let mut colors = Vec::new();
+            let mut labels = Vec::new();
+            for (point, score) in occupancy_grid_out.iter().enumerate().map(|(i, score)| {
+                let (x, y) = index_to_xy(i);
+                (
+                    rerun::Position3D::new(
+                        x as f32 * THALASSIC_CELL_SIZE,
+                        y as f32 * THALASSIC_CELL_SIZE,
+                        0.0,
+                    ),
+                    *score,
+                )
+            }) {
+                positions.push(point);
+                labels.push(score.0.to_string());
+                let color = match score.0 {
+                    0 => Color::from_rgb(128, 128, 128), // Grey for unknown
+                    1..=100 => {
+                        // Gradient from green (1) to red (100)
+                        let t = (score.0 - 1) as f32 / 99.0; // Normalize to 0-1
+                        let r = (255.0 * t) as u8;
+                        let g = (255.0 * (1.0 - t)) as u8;
+                        let b = 0u8;
+                        Color::from_rgb(r, g, b)
+                    }
+                    _ => Color::from_rgb(255, 0, 0), // Fallback to red for any value > 100
+                };
 
-        todo!()
+                colors.push(color);
+            }
+            let _ = RECORDER.get().unwrap().recorder.log(
+                "occupancy",
+                &Points3D::new(positions)
+                    .with_colors(colors)
+                    .with_labels(labels),
+            );
+            output.set_payload(OccupancyGrid {
+                width: THALASSIC_WIDTH,
+                height: THALASSIC_HEIGHT,
+                occupancy: occupancy_grid_out.try_into().map_err(|_| {
+                    CuError::new_with_cause(
+                        "occupancy grid out was the wrong size",
+                        std::io::Error::other("size mismatch"),
+                    )
+                })?,
+            });
+        }
+        Ok(())
     }
+}
+
+fn index_to_xy(index: usize) -> (usize, usize) {
+    (
+        index % THALASSIC_WIDTH as usize,
+        index / THALASSIC_WIDTH as usize,
+    )
 }

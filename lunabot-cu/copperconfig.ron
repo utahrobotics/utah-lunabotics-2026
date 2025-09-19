@@ -37,25 +37,12 @@
             // task gets stubbed out in sim mode
             run_in_sim: false,
         ),
-        // subscribes to pointclouds from the external_tasks/realsense process
-        // not in use yet because the occupancy grid generation is in a separate process
-        // and we dont use the pointcloud for icp 
-        // (
-        //     id:"realsense_pointcloud",
-        //     type:"crate::tasks::sources::RealSensePointCloudReceiver",
-        //     config:{
-        //         "service": "realsense/311322302990/cloud",
-        //         "camera_node": "upper_depth_camera"
-        //     },
-        //     logging: (
-        //         enabled: true
-        //     ),
-        // ),
+        // subscribes to depth frames from the external_tasks/realsense process
         (
-            id:"realsense_occupancy",
-            type: "crate::tasks::sources::OccupancyGridSource",
+            id:"realsense_depth",
+            type: "crate::tasks::sources::RealsenseDepth",
             config: {
-                "service": "realsense/044422250424/occupancy",
+                "service": "realsense/044422250424/depth",
                 "camera_node": "upper_depth_camera"
             },
             logging: (
@@ -64,13 +51,21 @@
             run_in_sim: false
         ),
         (
-            id:"realsense_occupancy_logger",
-            type: "crate::tasks::sinks::OccupancyGridSink",
-            logging: (
-                enabled: true
-            ),
-            // task should not be stubbed out in sim mode
-            run_in_sim: true
+            id:"occupancy_grid_pipeline",
+            type: "crate::tasks::OccupancyGridTask",
+            config: {
+                "camera_node": "upper_depth_camera",
+                "robot_radius": 0.2,
+                "min_known_neighbors_ratio": 60,
+                "neighborhood_radius": 20,
+                "obstacle_threshold": 65,
+                "focal_length": 383,
+                "ppx": 317.44882,
+                "ppy": 245.91605,
+            },
+            // FIXME: use a custom backrounding implementation instead of going through copper for support, because
+            // in resimulation mode the pipeline process will take way too long
+            background: true,
         ),
         // registers point clouds into a global map, and estimates the isometry of the lidar node.
         // the isometry is relative to the robots starting position, not actual global coordinates
@@ -145,6 +140,8 @@
         (src:"l2_kiss_icp", dst:"localizer", msg:"cu_spatial_payloads::EncodableIsometry"),
         (src:"lunabase", dst:"new_ai", msg:"Option<common::FromLunabase>"),
         // copper doesn't support multiple outputs on a single task so for now we just put them in a tuple and ignore one side
+        (src:"realsense_depth",dst:"occupancy_grid_pipeline", msg:"iceoryx_types::IceoryxDepthFrame<307200>"),
+        (src:"occupancy_grid_pipeline", dst: "new_ai", msg: "crate::tasks::OccupancyGrid"),
         (src:"new_ai", dst:"motor_ctrl", msg:"(Option<common::Steering>, Option<embedded_common::ActuatorCommand>)"),
         (src:"new_ai", dst:"v3_pico", msg:"(Option<common::Steering>, Option<embedded_common::ActuatorCommand>)"),
         (src: "v3_pico", dst:"localizer", msg:"embedded_common::FromPicoV3"),
@@ -153,7 +150,6 @@
             dst: "localizer",
             msg: "Box<std::collections::HashMap<String, cu_spatial_payloads::EncodableIsometry>>"
         ),
-        (src:"realsense_occupancy",dst:"realsense_occupancy_logger",msg:"iceoryx_types::IceoryxOccupancyGrid"),
     ],
     
     includes:[

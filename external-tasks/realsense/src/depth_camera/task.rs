@@ -126,9 +126,13 @@ impl DepthCameraTask {
                         frame.width() * frame.height(),
                     );
                 }
+                let Ok(depth_scale) = frame.depth_units() else {
+                    continue;
+                };
                 depth_publisher.send_copy(IceoryxDepthFrame {
                     depths: slice.try_into().unwrap(),
-                    depth_scale: frame.depth_units(),
+                    depth_scale,
+                    focal_len: (focal_length_px, focal_length_px),
                 });
             }
         }

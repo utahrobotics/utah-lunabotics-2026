@@ -18,7 +18,7 @@ pub fn create_depth_frame_publisher<const SIZE: usize>(
     node: &iceoryx2::node::Node<ipc::Service>,
     serial: &str,
 ) -> Publisher<ipc::Service, IceoryxDepthFrame<SIZE>, ()> {
-    let depth_service_name = format!("realsense/{}/depths", serial);
+    let depth_service_name = format!("realsense/{}/depth", serial);
     let depth_service = node
         .service_builder(&ServiceName::new(&depth_service_name).expect("Invalid service name"))
         .publish_subscribe::<IceoryxDepthFrame<SIZE>>()

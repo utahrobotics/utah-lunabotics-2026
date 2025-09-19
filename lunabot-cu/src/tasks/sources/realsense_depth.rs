@@ -31,6 +31,8 @@ impl CuSrcTask for RealsenseDepth {
         let service_str = config
             .and_then(|c| c.get::<String>("service"))
             .unwrap_or_else(|| "realsense/depth".to_string());
+
+        println!("using service string: {service_str}");
         let service_name = ServiceName::new(&service_str)
             .map_err(|e| CuError::new_with_cause("invalid service name", e))?;
 
@@ -38,11 +40,12 @@ impl CuSrcTask for RealsenseDepth {
             .create::<ipc::Service>()
             .map_err(|e| CuError::new_with_cause("node create faliure", e))?;
 
-        set_log_level(LogLevel::Trace);
+        set_log_level(LogLevel::Debug);
         let service = node
             .service_builder(&service_name)
             .publish_subscribe::<IceoryxDepthFrame<DEPTH_FRAME_SIZE>>()
             .enable_safe_overflow(true)
+            .subscriber_max_buffer_size(20)
             .open_or_create()
             .map_err(|e| CuError::new_with_cause("service open error", e))?;
 

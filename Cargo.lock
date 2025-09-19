@@ -6003,11 +6003,13 @@ dependencies = [
 name = "thalassic"
 version = "0.1.0"
 dependencies = [
+ "bincode 2.0.1",
  "bytemuck",
  "fxhash",
  "gputter",
  "nalgebra",
  "parking_lot",
+ "serde",
 ]
 
 [[package]]
