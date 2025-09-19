@@ -1,5 +1,5 @@
 { // euler angles are declared in roll, pitch, yaw order, and by default applied in yaw, pitch, roll order, but you can change that order with the "euler_order" field
-    "free_origin": [0.0, 0.0, 0.0], // moves the robot starting position 1 meter in the negative y direction?
+    "free_origin": [0.0, 2.0, 0.0], // moves the robot starting position 1 meter in the negative y direction?
     "free_euler": [0.0, 0.0, 0.0],  // starts facing world negative y? should be facing world positive x
     "children": [
         {
