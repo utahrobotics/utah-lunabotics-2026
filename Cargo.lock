@@ -5177,18 +5177,13 @@ dependencies = [
  "chrono",
  "common",
  "crossbeam",
- "cu-spatial-payloads",
  "fxhash",
- "gputter",
  "iceoryx-types",
  "iceoryx2",
  "nalgebra",
  "parking_lot",
  "realsense-rust",
  "serde",
- "simple-motion",
- "tasker",
- "thalassic",
 ]
 
 [[package]]
