@@ -38,11 +38,15 @@ pub struct IceoryxOccupancyGrid {
 pub struct IceoryxDepthFrame<const SIZE: usize> {
     #[serde(serialize_with = "<[_]>::serialize")]
     pub depths: [u16; SIZE],
+    pub depth_scale: f32,
 }
 
 impl<const SIZE: usize> Default for IceoryxDepthFrame<SIZE> {
     fn default() -> Self {
-        Self { depths: [0; SIZE] }
+        Self {
+            depths: [0; SIZE],
+            depth_scale: 0.0,
+        }
     }
 }
 

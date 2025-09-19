@@ -128,6 +128,7 @@ impl DepthCameraTask {
                 }
                 depth_publisher.send_copy(IceoryxDepthFrame {
                     depths: slice.try_into().unwrap(),
+                    depth_scale: frame.depth_units(),
                 });
             }
         }
