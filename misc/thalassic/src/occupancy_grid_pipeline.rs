@@ -15,8 +15,8 @@ use nalgebra::{Vector2, Vector3};
 use crate::{
     adjust_for_camera_position::AdjustOccupancyForCameraPosition, clear_cells::ClearCells,
     expand_occupancy::ExpandOccupancy, occupancy_normalize::OccupancyNormalize,
-    pcl2occupancy::Pcl2Occupancy, ExpanderBindGrp, Occupancy, OccupancyGridBindGroups,
-    Pcl2OccupancyBindGrp, ThalassicPipelineRef,
+    pcl2occupancy::Pcl2Occupancy, PipelineSharedItems, ExpanderBindGrp, Occupancy,
+    OccupancyGridBindGroups, Pcl2OccupancyBindGrp,
 };
 
 pub struct OccupancyGridPipeline {
@@ -28,7 +28,7 @@ pub struct OccupancyGridPipeline {
         GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>, // normalized occupancy
         GpuBufferSet<ExpanderBindGrp>,
     )>,
-    pub occupancy_grid_ref: ThalassicPipelineRef,
+    pub occupancy_grid_ref: PipelineSharedItems,
     neighborhood_radius: u32,
     min_known_neighbors_ratio: u32,
 }
@@ -252,7 +252,7 @@ impl OccupancyGridPipelineBuilder {
             pipeline,
             grid_dimensions: self.occupancy_grid_dimensions,
             bind_grps,
-            occupancy_grid_ref: ThalassicPipelineRef::noop(),
+            occupancy_grid_ref: PipelineSharedItems::noop(),
             neighborhood_radius: self.neighborhood_radius,
             min_known_neighbors_ratio: self.min_known_neighbors_ratio,
         }
