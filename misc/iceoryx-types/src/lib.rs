@@ -1,6 +1,3 @@
-// Copyright (c) 2024
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-
 //! Common point types shared between C++ and Rust for iceoryx2 publish-subscribe.
 //!
 //! The struct layout **must** match the C++ definition used by the Unilidar
@@ -34,6 +31,19 @@ pub struct IceoryxOccupancyGrid {
     pub height: u32,
     #[serde(serialize_with = "<[_]>::serialize")]
     pub data: [u32; THALASSIC_CELL_COUNT as usize],
+}
+
+#[repr(C)]
+#[derive(Clone, Debug, ZeroCopySend, Encode, Decode, Serialize)]
+pub struct IceoryxDepthFrame<const SIZE: usize> {
+    #[serde(serialize_with = "<[_]>::serialize")]
+    pub depths: [u16; SIZE],
+}
+
+impl<const SIZE: usize> Default for IceoryxDepthFrame<SIZE> {
+    fn default() -> Self {
+        Self { depths: [0; SIZE] }
+    }
 }
 
 impl Default for IceoryxOccupancyGrid {
