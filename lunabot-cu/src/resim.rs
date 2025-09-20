@@ -227,7 +227,15 @@ fn main() {
         })
         .expect("failed to spawn main thread")
         .join()
-        .expect(".join() on main thread failed");
+        .unwrap_or_else(|e| {
+            if let Some(panic_msg) = e.downcast_ref::<&str>() {
+                panic!("Thread panicked with message: {}", panic_msg);
+            } else if let Some(panic_msg) = e.downcast_ref::<String>() {
+                panic!("Thread panicked with message: {}", panic_msg);
+            } else {
+                panic!("Thread panicked with unknown error: {:?}", e);
+            }
+        });
 
     debug!("End of log replay.");
 }
