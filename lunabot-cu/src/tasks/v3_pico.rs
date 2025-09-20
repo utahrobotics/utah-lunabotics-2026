@@ -41,13 +41,12 @@ mod prod_impl {
 
     impl CuTask for V3PicoTask {
         // input is the actuator command as bytes
-        // ActuatorCommand doesn't implement Serialize or Decode due to being no_std
-        // the reason this is a tuple is a hack to get around the fact that copper doesnt support one task having multiple outputs in the same way it does multiple inputs
+        // the reason this is a tuple is a hack to get around the fact that copper doesnt support one task
+        // having multiple outputs in the same way it does multiple inputs
         type Input<'m> = input_msg!((
             Option<common::Steering>, // ignore steering in this task
             Option<embedded_common::ActuatorCommand>
         ));
-        // output is the FromPicoV3 struct serialized as bytes
         type Output<'m> = output_msg!(FromPicoV3);
 
         fn new(_config: Option<&ComponentConfig>) -> CuResult<Self>
