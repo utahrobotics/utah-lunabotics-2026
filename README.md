@@ -5,8 +5,8 @@
 ## Architecture Overview
 <img width="4150" height="818" alt="graphviz(8)" src="https://github.com/user-attachments/assets/a53d91de-1872-44cc-9cf0-02a6a0bba5c2" />
 
-##### Check copperconfig.ron to see the definitions of all the tasks running and the datatypes passed between tasks.
 
+##### Check copperconfig.ron to see the definitions of all the tasks running and the datatypes passed between tasks.
 
 ## Dependencies
 
