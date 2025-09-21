@@ -1,6 +1,5 @@
 #[cfg(feature = "production")]
 mod prod_impl {
-    use core::task;
     use std::sync::Arc;
     use std::time::Duration;
 
@@ -13,7 +12,6 @@ mod prod_impl {
     use embedded_common::FromPicoV3;
     use embedded_common::IMU_READING_DELAY_MS;
     use futures_util::StreamExt;
-    use tasker::BlockOn;
     use tasker::get_tokio_handle;
     use tasker::tokio;
     use tasker::tokio::io::AsyncWriteExt;
@@ -159,7 +157,7 @@ mod prod_impl {
             };
 
             let port = get_tokio_handle().block_on(async {
-                let mut port = match tokio_serial::new(&path_str, 150000)
+                let port = match tokio_serial::new(&path_str, 150000)
                     .flow_control(tokio_serial::FlowControl::Hardware)
                     .open_native_async()
                 {
@@ -199,12 +197,14 @@ mod prod_impl {
                 tokio::io::ReadHalf<BufStream<tokio_serial::SerialStream>>,
                 tokio::io::WriteHalf<BufStream<tokio_serial::SerialStream>>,
             ) = tokio::io::split(port);
-            let mut reader: FramedRead<
+            let reader: FramedRead<
                 tokio::io::ReadHalf<BufStream<tokio_serial::SerialStream>>,
                 CobsCodec,
             > = FramedRead::new(reader, CobsCodec {});
             let (is_broken_tx, is_broken_rx) = watch::channel(false);
             spawn_reader_thread(reader, is_broken_tx, self.from_pico.clone());
+            self.is_broken = Some(is_broken_rx);
+            self.serial_port_writer = Some(writer);
             Ok(())
         }
 
@@ -217,7 +217,7 @@ mod prod_impl {
             if let Some((_, Some(actuator_cmd))) = input.payload()
                 && let Some(ref mut writer) = self.serial_port_writer
             {
-                get_tokio_handle().block_on(async {
+                let _ = get_tokio_handle().block_on(async {
                     if let Err(e) = writer
                         .write(&ActuatorCommand::serialize(&actuator_cmd))
                         .await
@@ -228,12 +228,21 @@ mod prod_impl {
                         return Err(CuError::new_with_cause("failed to flush to serial port", e));
                     }
                     return Ok(());
-                });
+                })?;
             }
             if let Some(reading) = self.from_pico.pop() {
                 output.set_payload(reading);
             } else {
                 output.clear_payload();
+            }
+
+            if let Some(is_broken) = &self.is_broken
+                && *is_broken.borrow()
+            {
+                return Err(CuError::new_with_cause(
+                    "failed to flush to serial port",
+                    std::io::Error::other("pico reader reported error"),
+                ));
             }
 
             Ok(())
