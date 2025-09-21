@@ -151,6 +151,9 @@ mod prod_impl {
             })
         }
 
+        /// pre process checks if self.path_rx has a value queued up, and if so opens the serial port, splits it
+        /// into a read half and a write half, then sets self.serial_port_writer and spawns a reader async task that will
+        /// produce messages from the pico
         fn preprocess(&mut self, _clock: &RobotClock) -> CuResult<()> {
             let Ok(path_str) = self.path_rx.try_recv() else {
                 return Ok(());
@@ -208,6 +211,9 @@ mod prod_impl {
             Ok(())
         }
 
+        /// If there is an actuator command available, and self.serial_port_writer is set, then
+        /// the actuator command is written to the serial port.
+        /// Messages from the pico are popped off the queue and sent to the downstream task.
         fn process<'i, 'o>(
             &mut self,
             _clock: &RobotClock,
@@ -236,17 +242,10 @@ mod prod_impl {
                 output.clear_payload();
             }
 
-            if let Some(is_broken) = &self.is_broken
-                && *is_broken.borrow()
-            {
-                return Err(CuError::new_with_cause(
-                    "failed to flush to serial port",
-                    std::io::Error::other("pico reader reported error"),
-                ));
-            }
-
             Ok(())
         }
+
+        /// If the reader async task reports an error, return it.
 
         fn postprocess(&mut self, _clock: &RobotClock) -> CuResult<()> {
             if let Some(ref is_broken) = self.is_broken
