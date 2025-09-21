@@ -10,10 +10,8 @@ pub mod simple_monitor;
 pub mod tasks;
 pub mod utils;
 
-use crossbeam_channel::{Receiver, Sender};
 use cu29::prelude::*;
 use cu29_helpers::basic_copper_setup;
-use embedded_common::{ActuatorCommand, FromPicoV3};
 use launcher::ProcessCommand;
 use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
 use std::path::{Path, PathBuf};
