@@ -3,13 +3,16 @@ pub mod april_detection_handler;
 pub mod auto_gstreamer;
 pub mod gst_to_image;
 pub mod kiss_icp;
+pub mod realsense_occupancy_grid;
 pub mod sinks;
 pub mod sources;
 pub mod v3_pico;
+
 pub use april_detection_handler::AprilDetectionHandler;
 pub use auto_gstreamer::*;
 pub use gst_to_image::GstToImage;
 pub use kiss_icp::*;
+pub use realsense_occupancy_grid::*;
 pub use sinks::*;
 pub use sources::*;
 pub use v3_pico::*;

@@ -11,6 +11,7 @@ use embedded_common::{Actuator, ActuatorCommand};
 
 use std::sync::mpsc::Receiver;
 
+use crate::tasks::OccupancyGrid;
 use crate::tasks::ai::action::LunabotAction;
 use crate::tasks::ai::behaviors::teleop::teleop_behavior;
 use crate::tasks::ai::blackboard::LunabotBlackboard;
@@ -24,7 +25,7 @@ pub struct LunabotAi {
 impl Freezable for LunabotAi {}
 
 impl CuTask for LunabotAi {
-    type Input<'m> = input_msg!(Option<FromLunabase>);
+    type Input<'m> = input_msg!('m, Option<FromLunabase>, OccupancyGrid);
 
     // (Steering, ActuatorCommand)
     type Output<'m> = output_msg!((Option<Steering>, Option<ActuatorCommand>));
@@ -76,8 +77,12 @@ impl CuTask for LunabotAi {
         let dt = nanos_to_secs(clock.now().as_nanos() - self.last_tick_nanos);
 
         let e: Event = UpdateArgs { dt }.into();
-        if let Some(Some(from_lunabase)) = input.payload() {
+        if let Some(Some(from_lunabase)) = input.0.payload() {
             self.bt.blackboard_mut().update_with_msg(from_lunabase);
+        }
+
+        if let Some(_) = input.1.payload() {
+            // info!("got occupancy grid in the ai");
         }
 
         let mut remaining_dt = 0.0;
@@ -88,14 +93,13 @@ impl CuTask for LunabotAi {
                     Success
                 }
                 LunabotAction::SetLastSteering => {
-                    if let Some(steering) = blackboard.last_steering {
+                    if let Some(steering) = blackboard.last_steering.take() {
                         blackboard.outgoing_steering_msg = Some(steering);
-                        blackboard.last_steering = None;
                     }
                     Success
                 }
                 LunabotAction::SetLastBucket => {
-                    if let Some(value) = blackboard.last_bucket {
+                    if let Some(value) = blackboard.last_bucket.take() {
                         let commands = actuator_commands_from_i8(value, Actuator::Bucket);
                         blackboard
                             .outgoing_actuator_msg_queue
@@ -107,7 +111,7 @@ impl CuTask for LunabotAi {
                     Success
                 }
                 LunabotAction::SetLastLift => {
-                    if let Some(value) = blackboard.last_lift {
+                    if let Some(value) = blackboard.last_lift.take() {
                         let commands = actuator_commands_from_i8(value, Actuator::Lift);
                         blackboard
                             .outgoing_actuator_msg_queue

@@ -40,7 +40,7 @@ fn default_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::DetectorCamBack(_) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamSide(_) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamLaptopFront(_) => SimOverride::ExecutedBySim,
-        default::SimStep::RealsenseOccupancy(_) => SimOverride::ExecutedBySim,
+        default::SimStep::RealsenseDepth(_) => SimOverride::ExecutedBySim,
         default::SimStep::Lunabase(_) => SimOverride::ExecutedBySim,
         // May want to temporarily add override for obstacle map recv until lidar simulation works
         _ => SimOverride::ExecuteByRuntime,
@@ -123,12 +123,12 @@ fn run_one_copperlist(
                 output.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
-            default::SimStep::RealsenseOccupancy(CuTaskCallbackState::Process(_, output)) => {
-                *output = msgs.get_realsense_occupancy_output().clone();
+            default::SimStep::RealsenseDepth(CuTaskCallbackState::Process(_, output)) => {
+                *output = msgs.get_realsense_depth_output().clone();
                 output.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
-            default::SimStep::RealsenseOccupancy(..) => SimOverride::ExecutedBySim,
+            default::SimStep::RealsenseDepth(..) => SimOverride::ExecutedBySim,
             default::SimStep::Lunabase(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_lunabase_output().clone();
                 output.tov = robot_clock.now().into();
@@ -227,7 +227,15 @@ fn main() {
         })
         .expect("failed to spawn main thread")
         .join()
-        .expect(".join() on main thread failed");
+        .unwrap_or_else(|e| {
+            if let Some(panic_msg) = e.downcast_ref::<&str>() {
+                panic!("Thread panicked with message: {}", panic_msg);
+            } else if let Some(panic_msg) = e.downcast_ref::<String>() {
+                panic!("Thread panicked with message: {}", panic_msg);
+            } else {
+                panic!("Thread panicked with unknown error: {:?}", e);
+            }
+        });
 
     debug!("End of log replay.");
 }

@@ -96,6 +96,8 @@ tasker = { path = "../misc/tasker" }
 iceoryx-types = { path = "../misc/iceoryx-types" }
 launcher = { path = "../misc/launcher", optional = true }
 vesc-translator = { path = "../misc/vesc-translator", optional = true }
+thalassic = { path = "../misc/thalassic" }
+gputter = { path = "../misc/gputter" }
 
 # common
 common = { path = "../common" }

@@ -12,7 +12,6 @@ mod prod_impl {
     use embedded_common::FromPicoV3;
     use embedded_common::IMU_READING_DELAY_MS;
     use futures_util::StreamExt;
-    use tasker::BlockOn;
     use tasker::get_tokio_handle;
     use tasker::tokio;
     use tasker::tokio::io::AsyncWriteExt;
@@ -152,46 +151,69 @@ mod prod_impl {
             })
         }
 
+        /// pre process checks if self.path_rx has a value queued up, and if so opens the serial port, splits it
+        /// into a read half and a write half, then sets self.serial_port_writer and spawns a reader async task that will
+        /// produce messages from the pico
         fn preprocess(&mut self, _clock: &RobotClock) -> CuResult<()> {
             let Ok(path_str) = self.path_rx.try_recv() else {
                 return Ok(());
             };
-            let mut port = match tokio_serial::new(&path_str, 150000)
-                .flow_control(tokio_serial::FlowControl::Hardware)
-                .open_native_async()
-            {
-                Ok(x) => x,
-                Err(e) => {
-                    error!(
-                        "Failed to open V3Pico controller port {}: {}",
-                        path_str,
-                        e.to_string()
-                    );
-                    return Err(CuError::new_with_cause("failed to open V3Pico port", e));
-                }
-            };
-            if let Err(e) = port.set_exclusive(true) {
-                warning!(
-                    "Failed to set V3Pico controller port {} exclusive: {}",
-                    path_str,
-                    e.to_string()
-                );
+
+            let port = get_tokio_handle().block_on(async {
+                let port = match tokio_serial::new(&path_str, 150000)
+                    .flow_control(tokio_serial::FlowControl::Hardware)
+                    .open_native_async()
+                {
+                    Ok(mut x) => {
+                        if let Err(e) = x.set_exclusive(true) {
+                            warning!(
+                                "Failed to set V3Pico controller port {} exclusive: {}",
+                                path_str,
+                                e.to_string()
+                            );
+                        }
+                        Some(x)
+                    }
+                    Err(e) => {
+                        eprintln!(
+                            "Failed to open V3Pico controller port {}: {}",
+                            path_str,
+                            e.to_string()
+                        );
+                        None
+                    }
+                };
+
+                port
+            });
+            if port.is_none() {
+                return Err(CuError::new_with_cause(
+                    "fialed to open port",
+                    std::io::Error::other("failed to open port"),
+                ));
             }
+
+            let port = port.unwrap();
 
             let port = BufStream::new(port);
             let (reader, writer): (
                 tokio::io::ReadHalf<BufStream<tokio_serial::SerialStream>>,
                 tokio::io::WriteHalf<BufStream<tokio_serial::SerialStream>>,
             ) = tokio::io::split(port);
-            let mut reader: FramedRead<
+            let reader: FramedRead<
                 tokio::io::ReadHalf<BufStream<tokio_serial::SerialStream>>,
                 CobsCodec,
             > = FramedRead::new(reader, CobsCodec {});
             let (is_broken_tx, is_broken_rx) = watch::channel(false);
             spawn_reader_thread(reader, is_broken_tx, self.from_pico.clone());
+            self.is_broken = Some(is_broken_rx);
+            self.serial_port_writer = Some(writer);
             Ok(())
         }
 
+        /// If there is an actuator command available, and self.serial_port_writer is set, then
+        /// the actuator command is written to the serial port.
+        /// Messages from the pico are popped off the queue and sent to the downstream task.
         fn process<'i, 'o>(
             &mut self,
             _clock: &RobotClock,
@@ -201,23 +223,18 @@ mod prod_impl {
             if let Some((_, Some(actuator_cmd))) = input.payload()
                 && let Some(ref mut writer) = self.serial_port_writer
             {
-                if let Err(e) = writer
-                    .write(&ActuatorCommand::serialize(&actuator_cmd))
-                    .block_on()
-                {
-                    warning!(
-                        "Failed to write actuator command to serial port: {}",
-                        e.to_string()
-                    );
-                    return Err(CuError::new_with_cause("failed to write to serial port", e));
-                }
-                if let Err(e) = writer.flush().block_on() {
-                    warning!(
-                        "Failed to flush actuator command to serial port: {}",
-                        e.to_string()
-                    );
-                    return Err(CuError::new_with_cause("failed to flush to serial port", e));
-                }
+                let _ = get_tokio_handle().block_on(async {
+                    if let Err(e) = writer
+                        .write(&ActuatorCommand::serialize(&actuator_cmd))
+                        .await
+                    {
+                        return Err(CuError::new_with_cause("failed to write to serial port", e));
+                    }
+                    if let Err(e) = writer.flush().await {
+                        return Err(CuError::new_with_cause("failed to flush to serial port", e));
+                    }
+                    return Ok(());
+                })?;
             }
             if let Some(reading) = self.from_pico.pop() {
                 output.set_payload(reading);
@@ -227,6 +244,8 @@ mod prod_impl {
 
             Ok(())
         }
+
+        /// If the reader async task reports an error, return it.
 
         fn postprocess(&mut self, _clock: &RobotClock) -> CuResult<()> {
             if let Some(ref is_broken) = self.is_broken
