@@ -19,7 +19,7 @@ const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 
 pub static ROOT_NODE: OnceLock<StaticNode> = OnceLock::new();
 
-pub static TARGET_HZ: usize = 1000; // MUST BE THE SAME AS THE TARGET HZ IN COPPERCONFIG.RON
+pub static TARGET_HZ: usize = 100000; // MUST BE THE SAME AS THE TARGET HZ IN COPPERCONFIG.RON
 
 #[copper_runtime(config = "copperconfig.ron", sim_mode = true)]
 struct LunabotApplication {}
