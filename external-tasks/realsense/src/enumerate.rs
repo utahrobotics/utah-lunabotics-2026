@@ -1,6 +1,4 @@
-use crate::camera_info::DepthCameraInfo;
 use crate::depth_camera::DepthCameraTask;
-use crate::thalassic::spawn_minimal_thalassic_pipeline;
 use fxhash::FxHashMap;
 use realsense_rust::{
     config::Config,
@@ -8,18 +6,18 @@ use realsense_rust::{
     kind::{Rs2CameraInfo, Rs2Format, Rs2StreamKind},
     pipeline::{ActivePipeline, InactivePipeline},
 };
-use std::{cell::OnceCell, sync::mpsc::SyncSender};
+use std::sync::mpsc::SyncSender;
 
-pub fn enumerate_depth_cameras(cameras: impl IntoIterator<Item = DepthCameraInfo>) {
-    let thalassic_ref = spawn_minimal_thalassic_pipeline();
+/// waits for a realsense to be plugged in and then starts a depth camera task that will publish depth frames
+pub fn enumerate_depth_cameras(serial_numbers: &[&str]) {
     let (init_tx, init_rx) = std::sync::mpsc::channel::<&'static str>();
-    let mut threads: FxHashMap<&str, SyncSender<(Device, ActivePipeline)>> = cameras
+    // start one depth camera task thread per serial number
+    let mut threads: FxHashMap<&str, SyncSender<(Device, ActivePipeline)>> = serial_numbers
         .into_iter()
-        .filter_map(|camera_info| {
-            let serial: &'static str = Box::leak(camera_info.serial.into_boxed_str());
+        .filter_map(|serial| {
+            let serial: &'static str = Box::leak((*serial).to_string().into_boxed_str());
             let (tx, rx) = std::sync::mpsc::sync_channel(1);
             let init_tx = init_tx.clone();
-            let thalassic_ref = thalassic_ref.clone();
 
             std::thread::Builder::new()
                 .stack_size(16 * 1024 * 1024)
@@ -27,14 +25,7 @@ pub fn enumerate_depth_cameras(cameras: impl IntoIterator<Item = DepthCameraInfo
                     let mut camera_task = DepthCameraTask {
                         pipeline: rx,
                         serial,
-                        state: OnceCell::new(),
-                        thalassic_ref,
                         init_tx,
-                        depth_enabled: camera_info.depth_enabled,
-                        occupancy_enabled: camera_info.occupancy_enabled,
-                        camera_node_isometry: crossbeam::atomic::AtomicCell::new(
-                            nalgebra::Isometry3::identity(),
-                        ),
                     };
                     camera_task.run();
                 })
@@ -58,6 +49,7 @@ pub fn enumerate_depth_cameras(cameras: impl IntoIterator<Item = DepthCameraInfo
         }
     };
 
+    // Waits until a depth camera task asks for initialization, then sets up the device enabling the right streams and sends the pipeline back over to the depth camera task
     std::thread::Builder::new()
         .stack_size(16 * 1024 * 1024)
         .spawn(move || loop {

@@ -10,10 +10,8 @@ pub mod simple_monitor;
 pub mod tasks;
 pub mod utils;
 
-use crossbeam_channel::{Receiver, Sender};
 use cu29::prelude::*;
 use cu29_helpers::basic_copper_setup;
-use embedded_common::{ActuatorCommand, FromPicoV3};
 use launcher::ProcessCommand;
 use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
 use std::path::{Path, PathBuf};
@@ -76,7 +74,7 @@ fn main() {
 
 fn launch_subprocs() {
     let mut launcher = launcher::ProcessLauncher::new();
-    let suppress_output = true;
+    let suppress_output = false;
     let mut unilidar_cmd = ProcessCommand::new("./unilidar_publisher")
         .with_detach(true)
         .with_working_directory("../unilidar_iceoryx_publisher/bazel-bin/");

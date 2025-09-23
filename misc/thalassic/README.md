@@ -34,7 +34,7 @@ Change these constants to shrink or grow the arena:
 
 ```rust
 // currently set to the size of the arena in UCF
-pub const THALASSIC_CELL_SIZE: f32 = 0.03125;
-pub const THALASSIC_WIDTH: u32 = 160;
-pub const THALASSIC_HEIGHT: u32 = 224;
+pub const THALASSIC_CELL_SIZE: f32 = 0.0625;
+pub const THALASSIC_WIDTH: u32 = 112;
+pub const THALASSIC_HEIGHT: u32 = 80;
 ```

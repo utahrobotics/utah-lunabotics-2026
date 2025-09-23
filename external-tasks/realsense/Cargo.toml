@@ -13,13 +13,8 @@ fxhash.workspace = true
 parking_lot.workspace = true
 
 # Dependencies from misc crates
-gputter = { path = "../../misc/gputter" }
-simple-motion = { path = "../../misc/simple-motion" }
-tasker = { path = "../../misc/tasker" }
-thalassic = { path = "../../misc/thalassic" }
 iceoryx-types = { path = "../../misc/iceoryx-types" }
 
-cu-spatial-payloads.workspace = true
 crossbeam.workspace = true
 common.workspace = true
 serde.workspace = true

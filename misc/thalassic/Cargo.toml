@@ -5,6 +5,8 @@ edition = "2021"
 
 [dependencies]
 gputter = { path = "../gputter" }
+bincode.workspace = true
+serde.workspace = true
 bytemuck.workspace = true
 nalgebra.workspace = true
 fxhash.workspace = true

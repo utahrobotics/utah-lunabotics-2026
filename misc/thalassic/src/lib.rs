@@ -99,12 +99,8 @@ pub struct DepthProjectorBuilder {
 }
 
 impl DepthProjectorBuilder {
-    pub fn build(self, thalassic_ref: ThalassicPipelineRef) -> DepthProjector {
+    pub fn build(self, thalassic_ref: PipelineSharedItems) -> DepthProjector {
         let pixel_count = self.image_size.x.get() * self.image_size.y.get();
-        let stride = std::env::var("STRIDE")
-            .unwrap_or("4".into())
-            .parse::<u32>()
-            .expect("STRIDE MUST BE A U32");
         let [depth_fn] = Depth2Pcl {
             depths: BufferGroupBinding::<_, AlphaBindGroups>::get::<0, 0>(),
             points: BufferGroupBinding::<_, AlphaBindGroups>::get::<1, 0>(),
@@ -150,7 +146,7 @@ pub struct DepthProjector {
     image_size: Vector2<NonZeroU32>,
     pipeline: ComputePipeline<AlphaBindGroups, 1>,
     depth_bind_grp: Option<GpuBufferSet<DepthBindGrp>>,
-    thalassic_ref: ThalassicPipelineRef,
+    thalassic_ref: PipelineSharedItems,
 }
 
 impl DepthProjector {
@@ -182,6 +178,7 @@ impl DepthProjector {
                 &mut bind_grps
             })
             .finish();
+
         let (depth_grp, points_grp) = bind_grps;
         if let Some(point_cloud) = point_cloud {
             points_grp.buffers.0.read(point_cloud);
@@ -270,7 +267,7 @@ impl ThalassicBuilder {
             bind_grps: Some(bind_grps),
             new_radius: Some(0.25),
             new_max_gradient: Some(45.0f32.to_radians()),
-            thalassic_ref: ThalassicPipelineRef {
+            thalassic_ref: PipelineSharedItems {
                 shared: Arc::new(Mutex::new((None, false))),
             },
             cell_count,
@@ -279,7 +276,18 @@ impl ThalassicBuilder {
 }
 
 #[repr(transparent)]
-#[derive(Debug, Clone, Copy, Pod, Zeroable, PartialEq, Eq)]
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    Pod,
+    Zeroable,
+    PartialEq,
+    Eq,
+    bincode::Encode,
+    bincode::Decode,
+    serde::Serialize,
+)]
 /// likelyhood of being occupied on a scale of 0-10
 pub struct Occupancy(pub u32);
 
@@ -312,11 +320,13 @@ struct Shared {
 }
 
 #[derive(Clone)]
-pub struct ThalassicPipelineRef {
+/// Structure for sharing points across multiple threads
+pub struct PipelineSharedItems {
+    // the boolean will be set to true once the depth projector is done, signaling that the next pipeline can use the points
     shared: Arc<Mutex<(Option<Shared>, bool)>>,
 }
 
-impl ThalassicPipelineRef {
+impl PipelineSharedItems {
     pub fn noop() -> Self {
         Self {
             shared: Arc::new(Mutex::new((None, false))),
@@ -335,7 +345,7 @@ pub struct ThalassicPipeline {
     new_radius: Option<f32>,
     cell_size: f32,
     new_max_gradient: Option<f32>,
-    thalassic_ref: ThalassicPipelineRef,
+    thalassic_ref: PipelineSharedItems,
     cell_count: NonZeroU32,
 }
 
@@ -426,7 +436,7 @@ impl ThalassicPipeline {
         self.new_radius = Some(radius);
     }
 
-    pub fn get_ref(&self) -> ThalassicPipelineRef {
+    pub fn get_ref(&self) -> PipelineSharedItems {
         self.thalassic_ref.clone()
     }
 }

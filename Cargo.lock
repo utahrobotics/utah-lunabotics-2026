@@ -3393,6 +3393,7 @@ dependencies = [
  "embedded_common",
  "futures-util",
  "fxhash",
+ "gputter",
  "gstreamer",
  "gstreamer-app",
  "iceoryx-types",
@@ -3409,6 +3410,7 @@ dependencies = [
  "simple-motion",
  "spin_sleep",
  "tasker",
+ "thalassic",
  "tokio-serial",
  "tokio-util",
  "udev",
@@ -5177,18 +5179,13 @@ dependencies = [
  "chrono",
  "common",
  "crossbeam",
- "cu-spatial-payloads",
  "fxhash",
- "gputter",
  "iceoryx-types",
  "iceoryx2",
  "nalgebra",
  "parking_lot",
  "realsense-rust",
  "serde",
- "simple-motion",
- "tasker",
- "thalassic",
 ]
 
 [[package]]
@@ -6006,11 +6003,13 @@ dependencies = [
 name = "thalassic"
 version = "0.1.0"
 dependencies = [
+ "bincode 2.0.1",
  "bytemuck",
  "fxhash",
  "gputter",
  "nalgebra",
  "parking_lot",
+ "serde",
 ]
 
 [[package]]
