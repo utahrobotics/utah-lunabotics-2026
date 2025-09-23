@@ -182,12 +182,14 @@ mod prod_impl {
                 tokio::io::ReadHalf<BufStream<tokio_serial::SerialStream>>,
                 tokio::io::WriteHalf<BufStream<tokio_serial::SerialStream>>,
             ) = tokio::io::split(port);
-            let mut reader: FramedRead<
+            let reader: FramedRead<
                 tokio::io::ReadHalf<BufStream<tokio_serial::SerialStream>>,
                 CobsCodec,
             > = FramedRead::new(reader, CobsCodec {});
             let (is_broken_tx, is_broken_rx) = watch::channel(false);
             spawn_reader_thread(reader, is_broken_tx, self.from_pico.clone());
+            self.is_broken = Some(is_broken_rx);
+            self.serial_port_writer = Some(writer);
             Ok(())
         }
 
@@ -293,7 +295,7 @@ mod prod_impl {
                 };
                 if let Err(_) = from_pico.push(reading) {
                     error!("From Pico queue full, dropping reading");
-                    is_broken_tx.send(true).unwrap();
+                    // is_broken_tx.send(true).unwrap();
                     break;
                 }
             }
