@@ -55,6 +55,43 @@ First install the dependencies listed in the dependencies section.
 1. Ensure there are valid log files in lunabot-cu/logs
 2. run ```make resim```
 
+### Log replay and development tools (MacOS)
+
+#### Dependencies for log replay
+
+1. Git
+
+   This is pre installed on macOS. Just set it up with either a personal access token or SSH keys.
+
+2. `make`
+
+   Run `xcode-select --install` if you haven't before. This will install `make` along with many other useful development tools.
+
+3. Rerun
+
+   Download the latest macOS binary from releases section on <https://github.com/rerun-io/rerun>. The latest version is 0.24.1 at the time of writing. `rerun-cli-0.24.1-x86_64-apple-darwin` if you are on an Intel Mac, or `rerun-cli-0.24.1-aarch64-apple-darwin` if you are on Apple Silicon. Make it executable with `chmod +x`. Rename the file to `rerun` and move it to `~/.local/bin`. Assuming you are using zsh, `echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc` and `source ~/.zshrc` to add it to your PATH. `which rerun` to ensure it is recognized.
+
+4. clang
+
+   This is pre installed on macOS.
+
+5. Rust
+
+   Install from [rustup.rs.](rustup.rs). After installation, switch to the nightly release using `rustup default nightly`.
+
+#### Other development tools
+
+Recommended IDE : [VS Code](https://code.visualstudio.com)
+
+Brew - This is a useful package manager for macOS. It will be helpful. Install from [brew.sh](https://brew.sh)
+
+#### Running
+
+   1. Clone the repository.
+   2. Run `rerun` in your terminal to launch the GUI. If it is the first time running, you may need to go into privacy settings and approve it, since it is an unsigned app.
+   3. In a new terminal window, in the repo directory, run `make resim`. It will take a few minutes to build and then launch the simulation in Rerun's GUI.
+
+
 ### Log replay (Docker)
 1. Ensure there are valid log files in lunabot-cu/logs
 2. From the repository root first build the docker container with ```docker build -t lunabot .``` then if using bash/gitbash run with ```docker run --network=host -it -v $(pwd):/workspace -v cargo-cache:/workspace/target -v cargo-registry:/usr/local/cargo/registry --name lunabot lunabot``` otherwise run with ```docker run --network=host -it -v "${PWD}:/workspace" -v cargo-cache:/workspace/target -v cargo-registry:/usr/local/cargo/registry --name lunabot lunabot```
