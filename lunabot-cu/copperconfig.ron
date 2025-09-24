@@ -81,8 +81,9 @@
                 "min_motion_th": 0.2,
                 "enable_deskewing": true,
                 "max_num_threads": 10,
-                "convergence_criterion": 0.001,
-                "max_num_iterations": 1000
+                "convergence_criterion": 0.0001,
+                "max_num_iterations": 1000,
+                "max_accumulation": 3
             },
             logging: (
                 enabled: false

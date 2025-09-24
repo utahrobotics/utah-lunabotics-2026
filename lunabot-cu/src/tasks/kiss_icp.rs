@@ -61,7 +61,7 @@ impl CuTask for KissIcp {
 
         let max_accumulation = config
             .and_then(|c| c.get::<i32>("max_accumulation"))
-            .unwrap_or(20) as usize;
+            .unwrap_or(2) as usize;
 
         let config = Config {
             voxel_size,
