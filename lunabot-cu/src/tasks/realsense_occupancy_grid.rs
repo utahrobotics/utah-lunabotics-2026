@@ -183,10 +183,6 @@ impl CuTask for OccupancyGridTask {
             return Ok(());
         };
 
-        if let Some(ref imu_msg) = input_msg.1 {
-            println!("got imu msg: {:?}", imu_msg);
-        }
-
         // TODO: utilize imu messages from the realsense here
 
         let depth_camera_transform: AlignedMatrix4<f32> = self
