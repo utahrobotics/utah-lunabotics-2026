@@ -37,7 +37,7 @@
             // task gets stubbed out in sim mode
             run_in_sim: false,
         ),
-        // subscribes to depth frames from the external_tasks/realsense process
+        // subscribes to depth frames and imu data from the external_tasks/realsense process
         (
             id:"realsense_subscriber",
             type: "crate::tasks::sources::RealsenseSubscriber",
@@ -50,6 +50,9 @@
             ),
             run_in_sim: false
         ),
+
+        // takes depth frames and imu information from the realsense subscriber and uses obstacle detection to create an occupancy grid
+        // the size of the arena
         (
             id:"occupancy_grid_pipeline",
             type: "crate::tasks::OccupancyGridTask",
