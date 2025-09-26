@@ -11,7 +11,6 @@ production = []
 realsense-rust = "1.2"
 iceoryx2 = { workspace = true }
 nalgebra.workspace = true
-chrono = { version = "0.4", features = ["serde"] }
 fxhash.workspace = true
 parking_lot.workspace = true
 
