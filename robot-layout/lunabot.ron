@@ -5,7 +5,7 @@
         {
             "name": Some("l2_front"),
             "origin": [0.50, 0.0, 0.50],
-            "euler":  [0.0, 61., 185.0],
+            "euler":  [0.0, 61., 175.0],
             // dont question my decision to add this field
             "euler_order": ["pitch","yaw","roll"]
         },
