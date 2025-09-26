@@ -128,6 +128,8 @@
             },
             run_in_sim: false,
         ),
+        // uses async tasks to communicate with the pico on the v3 pcb that electrical team designed.
+        // controls actuators and sends imu data to the localizer
         (
             id:"v3_pico", type: "crate::tasks::V3PicoTask", config:{}
         ),
