@@ -1,4 +1,3 @@
-use std::io::pipe;
 use std::num::NonZeroU32;
 
 use bincode::Encode;
@@ -7,7 +6,7 @@ use cu29::cutask::Freezable;
 use cu29::prelude::*;
 
 use gputter::types::{AlignedMatrix4, AlignedVec4};
-use iceoryx_types::{IceoryxDepthFrame, IceoryxOccupancyGrid};
+use iceoryx_types::{IceoryxDepthFrame, ImuMsg};
 use nalgebra::{Vector2, Vector4};
 use rerun::{Color, Points3D};
 use simple_motion::StaticNode;
@@ -48,7 +47,7 @@ impl Default for OccupancyGrid {
 impl Freezable for OccupancyGridTask {}
 
 impl CuTask for OccupancyGridTask {
-    type Input<'m> = input_msg!(IceoryxDepthFrame<DEPTH_FRAME_SIZE>);
+    type Input<'m> = input_msg!((Option<IceoryxDepthFrame<DEPTH_FRAME_SIZE>>, Option<ImuMsg>));
     type Output<'m> = output_msg!(OccupancyGrid);
 
     fn start(&mut self, _clock: &RobotClock) -> CuResult<()> {
@@ -174,10 +173,21 @@ impl CuTask for OccupancyGridTask {
         input: &Self::Input<'i>,
         output: &mut Self::Output<'o>,
     ) -> CuResult<()> {
-        let Some(depth_frame) = input.payload() else {
+        let Some(input_msg) = input.payload() else {
             output.clear_payload();
             return Ok(());
         };
+
+        let Some(ref depth_frame) = input_msg.0 else {
+            output.clear_payload();
+            return Ok(());
+        };
+
+        if let Some(ref imu_msg) = input_msg.1 {
+            println!("got imu msg: {:?}", imu_msg);
+        }
+
+        // TODO: utilize imu messages from the realsense here
 
         let depth_camera_transform: AlignedMatrix4<f32> = self
             .camera_node

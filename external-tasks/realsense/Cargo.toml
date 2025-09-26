@@ -4,6 +4,9 @@ version = "0.1.0"
 edition = "2021"
 build = "build.rs"
 
+[features]
+production = []
+
 [dependencies]
 realsense-rust = "1.2"
 iceoryx2 = { workspace = true }
