@@ -186,13 +186,6 @@ A no_std crate containing structures used by the embedded code as well as our ta
 ### lunabot-cu/src/rerun_viz.rs
 Utilities for connecting to rerun.
 
-### lunabot-cu/src/rp2040.rs
-Legacy code for connecting to a rpi pico that is in charge of actuator control and IMUs. \\ 
-
-The enumerate_v3picos() starts a thread that is in charge of communicating with the pico, and returns a Tx Rx pair such that you can:
-* Command the actuators by sending messages to tx
-* Read messages from the pico by recv from rx.
-The tx side is used in the actuator_ctrl task.
 
 ### lunabot-cu/src/motors.rs
 Legacy code for controlling motors via VESC. \\
