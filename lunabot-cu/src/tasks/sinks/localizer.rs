@@ -136,7 +136,7 @@ impl CuSinkTask for Localizer {
         if let Some(fused_isometry) = fused_isometry
             && apriltag_components.is_some()
             && let Some(icp) = self.last_icp_reading
-            && (clock.now().as_nanos() - icp.1) < 4_000_000
+            && (clock.now().as_nanos() - icp.1) < 50_000_000
         {
             let correction = Self::transformation_between(icp.0, fused_isometry);
             if let Some(rec) = RECORDER.get() {

@@ -40,7 +40,7 @@ fn default_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::DetectorCamBack(_) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamSide(_) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamLaptopFront(_) => SimOverride::ExecutedBySim,
-        default::SimStep::RealsenseDepth(_) => SimOverride::ExecutedBySim,
+        default::SimStep::RealsenseSubscriber(_) => SimOverride::ExecutedBySim,
         default::SimStep::Lunabase(_) => SimOverride::ExecutedBySim,
         // May want to temporarily add override for obstacle map recv until lidar simulation works
         _ => SimOverride::ExecuteByRuntime,
@@ -123,12 +123,12 @@ fn run_one_copperlist(
                 output.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
-            default::SimStep::RealsenseDepth(CuTaskCallbackState::Process(_, output)) => {
-                *output = msgs.get_realsense_depth_output().clone();
+            default::SimStep::RealsenseSubscriber(CuTaskCallbackState::Process(_, output)) => {
+                *output = msgs.get_realsense_subscriber_output().clone();
                 output.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
-            default::SimStep::RealsenseDepth(..) => SimOverride::ExecutedBySim,
+            default::SimStep::RealsenseSubscriber(..) => SimOverride::ExecutedBySim,
             default::SimStep::Lunabase(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_lunabase_output().clone();
                 output.tov = robot_clock.now().into();

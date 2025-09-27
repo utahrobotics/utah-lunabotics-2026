@@ -122,7 +122,6 @@ impl CuSrcTask for ImuIceoryxReceiver {
                     quat[3] as f32,
                 ],
             };
-
             new_msg.set_payload(actual_message);
         }
         Ok(())

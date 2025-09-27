@@ -1,5 +1,5 @@
 use crate::ROOT_NODE;
-use crate::rerun_viz::RECORDER;
+use crate::rerun_viz::{Level, RECORDER};
 use cu29::cutask::CuMsg;
 use cu29::{
     CuError, CuResult,
@@ -107,13 +107,15 @@ impl CuSrcTask for PointCloudIceoryxReceiver {
                 *point =
                     PointXYZIR::from_nalgebra(transformed, point.intensity, point.time, point.ring);
             }
-            if let Err(e) = RECORDER.get().unwrap().recorder.log(
-                "l2_pcl",
-                &rerun::Points3D::new(positions)
-                    .with_colors(colors)
-                    .with_radii([0.02f32]),
-            ) {
-                warning!("Failed to log accumulated map to Rerun: {}", e.to_string());
+            if RECORDER.get().unwrap().level == Level::All {
+                if let Err(e) = RECORDER.get().unwrap().recorder.log(
+                    "l2_pcl",
+                    &rerun::Points3D::new(positions)
+                        .with_colors(colors)
+                        .with_radii([0.02f32]),
+                ) {
+                    warning!("Failed to log accumulated map to Rerun: {}", e.to_string());
+                }
             }
             new_msg.set_payload(payload);
             self.last_seen = clock.now().as_nanos();

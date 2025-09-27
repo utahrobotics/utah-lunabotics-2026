@@ -37,12 +37,12 @@
             // task gets stubbed out in sim mode
             run_in_sim: false,
         ),
-        // subscribes to depth frames from the external_tasks/realsense process
+        // subscribes to depth frames and imu data from the external_tasks/realsense process
         (
-            id:"realsense_depth",
-            type: "crate::tasks::sources::RealsenseDepth",
+            id:"realsense_subscriber",
+            type: "crate::tasks::sources::RealsenseSubscriber",
             config: {
-                "service": "realsense/044422250424/depth",
+                "serial_num": "044422250424",
                 "camera_node": "upper_depth_camera"
             },
             logging: (
@@ -50,6 +50,9 @@
             ),
             run_in_sim: false
         ),
+
+        // takes depth frames and imu information from the realsense subscriber and uses obstacle detection to create an occupancy grid
+        // the size of the arena
         (
             id:"occupancy_grid_pipeline",
             type: "crate::tasks::OccupancyGridTask",
@@ -127,6 +130,8 @@
             },
             run_in_sim: false,
         ),
+        // uses async tasks to communicate with the pico on the v3 pcb that electrical team designed.
+        // controls actuators and sends imu data to the localizer
         (
             id:"v3_pico", type: "crate::tasks::V3PicoTask", config:{}
         ),
@@ -142,7 +147,7 @@
         (src:"l2_kiss_icp", dst:"localizer", msg:"cu_spatial_payloads::EncodableIsometry"),
         (src:"lunabase", dst:"new_ai", msg:"Option<common::FromLunabase>"),
         // copper doesn't support multiple outputs on a single task so for now we just put them in a tuple and ignore one side
-        (src:"realsense_depth",dst:"occupancy_grid_pipeline", msg:"iceoryx_types::IceoryxDepthFrame<307200>"),
+        (src:"realsense_subscriber",dst:"occupancy_grid_pipeline", msg:"(Option<iceoryx_types::IceoryxDepthFrame<307200>>, Option<iceoryx_types::ImuMsg>)"),
         (src:"occupancy_grid_pipeline", dst: "new_ai", msg: "crate::tasks::OccupancyGrid"),
         (src:"new_ai", dst:"motor_ctrl", msg:"(Option<common::Steering>, Option<embedded_common::ActuatorCommand>)"),
         (src:"new_ai", dst:"v3_pico", msg:"(Option<common::Steering>, Option<embedded_common::ActuatorCommand>)"),

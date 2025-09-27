@@ -5,12 +5,12 @@ use std::{
 
 use crate::{
     constants::DEPTH_FRAME_SIZE,
-    iceoryx_utils::{create_depth_frame_publisher, create_node},
+    iceoryx_utils::{create_depth_frame_publisher, create_imu_frame_publisher, create_node},
 };
-use iceoryx_types::IceoryxDepthFrame;
+use iceoryx_types::{IceoryxDepthFrame, ImuMsg};
 use realsense_rust::{
     device::Device,
-    frame::{DepthFrame, PixelKind},
+    frame::{self, DepthFrame, PixelKind},
     kind::Rs2Format,
     pipeline::{ActivePipeline, FrameWaitError},
 };
@@ -53,7 +53,6 @@ impl DepthCameraTask {
             let is_depth = match stream.format() {
                 Rs2Format::Z16 => true,
                 _format => {
-                    eprintln!("Unexpected format {_format:?} for {}", self.serial);
                     continue;
                 }
             };
@@ -92,7 +91,7 @@ impl DepthCameraTask {
 
         let node = create_node();
         let depth_publisher = create_depth_frame_publisher::<DEPTH_FRAME_SIZE>(&node, self.serial);
-
+        let imu_publisher = create_imu_frame_publisher(&node, self.serial);
         println!("RealSense Camera {} opened with (fx, fy) = ({:.0}, {:.0}), (width, height) = ({:.0}, {:.0})",
               self.serial, depth_format.fx(), depth_format.fy(), depth_format.width(), depth_format.height());
 
@@ -110,6 +109,17 @@ impl DepthCameraTask {
                     break;
                 }
             };
+
+            for frame in frames.frames_of_type::<frame::AccelFrame>() {
+                let accel = frame.acceleration();
+                if let Err(e) = imu_publisher.send_copy(ImuMsg {
+                    quaternion: [0.0; 4],
+                    angular_velocity: [0.0; 3],
+                    linear_acceleration: *accel,
+                }) {
+                    eprintln!("Failed to publish imu msg: {e}");
+                }
+            }
 
             for frame in frames.frames_of_type::<DepthFrame>() {
                 if !matches!(frame.get(0, 0), Some(PixelKind::Z16 { .. })) {
@@ -129,11 +139,13 @@ impl DepthCameraTask {
                 let Ok(depth_scale) = frame.depth_units() else {
                     continue;
                 };
-                depth_publisher.send_copy(IceoryxDepthFrame {
+                if let Err(e) = depth_publisher.send_copy(IceoryxDepthFrame {
                     depths: slice.try_into().unwrap(),
                     depth_scale,
                     focal_len: (focal_length_px, focal_length_px),
-                });
+                }) {
+                    eprintln!("failed to publish depth fraime: {e}");
+                }
             }
         }
 

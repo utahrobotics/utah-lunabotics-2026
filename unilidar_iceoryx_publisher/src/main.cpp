@@ -25,7 +25,6 @@ using namespace iox2;
 
 constexpr iox::units::Duration CYCLE_TIME = iox::units::Duration::fromMilliseconds(10);
 
-
 constexpr int ACCUMULATION_COUNT = 2;
 constexpr time_t WARMUP_DURATION_SECONDS = 3;
 constexpr bool ACCUMULATE_FRAMES = true;
@@ -47,7 +46,8 @@ struct FrameAccumulator
 
     bool isWarmupComplete() const
     {
-        if (!warmup_started) return false;
+        if (!warmup_started)
+            return false;
         double current_time = static_cast<double>(std::time(nullptr)); // fallback if no frame time available
         return (current_time - first_frame_time) >= WARMUP_DURATION_SECONDS;
     }
@@ -88,7 +88,7 @@ struct FrameAccumulator
         }
 
         frame_count++;
-        
+
         int target_count = warmup_complete ? 1 : accumulation_count;
         return frame_count >= target_count;
     }
@@ -110,7 +110,8 @@ static IceoryxPointCloud toIceoryxPointCloud(const std::vector<PointXYZIR> &poin
     if (time_range <= 0.0)
         time_range = 1.0;
 
-    if (points.size() > MAX_POINTS_PER_CLOUD) {
+    if (points.size() > MAX_POINTS_PER_CLOUD)
+    {
         std::cout << "WARNING: max points per cloud set too low." << std::endl;
     }
     dst.publish_count = std::min<std::size_t>(points.size(), MAX_POINTS_PER_CLOUD);
@@ -123,7 +124,6 @@ static IceoryxPointCloud toIceoryxPointCloud(const std::vector<PointXYZIR> &poin
 
     return dst;
 }
-
 
 int main()
 {
@@ -217,20 +217,15 @@ int main()
                     if (accumulator.addFrame(cloud_raw, ACCUMULATION_COUNT))
                     {
                         IceoryxPointCloud cloud = toIceoryxPointCloud(accumulator.accumulated_points);
-                        std::cout << "Accumulated " << accumulator.frame_count << " frames, total points: "
-                                  << cloud.publish_count << " (raw accumulated: " << accumulator.accumulated_points.size() << ")" << std::endl;
 
                         auto sample = cloud_publisher.loan_uninit().expect("cloud loan");
                         auto initialized = sample.write_payload(cloud);
                         send(std::move(initialized)).expect("cloud send");
-                        std::cout << "Accumulated cloud sent" << std::endl;
 
                         accumulator.reset();
                     }
                     else
                     {
-                        std::cout << "Frame " << accumulator.frame_count << "/" << ACCUMULATION_COUNT
-                                  << " accumulated (" << cloud_raw.points.size() << " points)" << std::endl;
                     }
                 }
             }

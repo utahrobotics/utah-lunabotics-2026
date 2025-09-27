@@ -1,6 +1,3 @@
-use std::net::TcpStream;
-use std::process::{Command, Stdio};
-use std::time::Duration;
 use std::{sync::OnceLock, time::Instant};
 
 use crossbeam::atomic::AtomicCell;
@@ -53,7 +50,7 @@ pub fn init_rerun(rerun_viz: RerunViz) -> Result<(), CuError> {
     };
     let (recorder, level) = match rerun_viz {
         RerunViz::Viz(level) => (
-            match rerun::RecordingStreamBuilder::new("lunabot").spawn_opts(&opts, None) {
+            match rerun::RecordingStreamBuilder::new("lunabot").spawn_opts(&opts) {
                 Ok(rec) => rec,
                 Err(e) => {
                     return Err(CuError::new_with_cause(
@@ -66,7 +63,7 @@ pub fn init_rerun(rerun_viz: RerunViz) -> Result<(), CuError> {
         ),
         RerunViz::Grpc(level, ip) => (
             match rerun::RecordingStreamBuilder::new("lunabot")
-                .connect_grpc_opts(&format!("rerun+http://{ip}:9876/proxy"), None)
+                .connect_grpc_opts(&format!("rerun+http://{ip}:9876/proxy"))
             {
                 Ok(x) => x,
                 Err(e) => {

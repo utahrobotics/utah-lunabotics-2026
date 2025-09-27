@@ -1,3 +1,4 @@
+#![cfg(feature = "production")]
 use bytes::Buf;
 use cobs::decode_vec;
 use tokio_util::codec::Decoder;

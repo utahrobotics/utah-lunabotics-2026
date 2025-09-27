@@ -122,6 +122,13 @@ pub fn enumerate_depth_cameras(serial_numbers: &[&str]) {
                     continue;
                 }
 
+                if let Err(e) =
+                    config.enable_stream(Rs2StreamKind::Accel, None, 0, 0, Rs2Format::Any, 0)
+                {
+                    eprintln!("Failed to enable imu stream: {}", e);
+                    continue;
+                }
+
                 let pipeline = match InactivePipeline::try_from(&context) {
                     Ok(x) => x,
                     Err(e) => {
