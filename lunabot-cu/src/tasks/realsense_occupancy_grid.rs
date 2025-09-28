@@ -162,7 +162,7 @@ impl CuTask for OccupancyGridTask {
             return Ok(());
         };
 
-        // TODO: utilize imu messages from the realsense here
+        // TODO: utilize imu messages from the realsense here for more accurate pitch information
 
         let depth_camera_transform: AlignedMatrix4<f32> = self
             .camera_node
