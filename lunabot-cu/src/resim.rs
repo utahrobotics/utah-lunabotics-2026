@@ -42,7 +42,6 @@ fn default_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::DetectorCamLaptopFront(_) => SimOverride::ExecutedBySim,
         default::SimStep::RealsenseSubscriber(_) => SimOverride::ExecutedBySim,
         default::SimStep::Lunabase(_) => SimOverride::ExecutedBySim,
-        // May want to temporarily add override for obstacle map recv until lidar simulation works
         _ => SimOverride::ExecuteByRuntime,
     }
 }

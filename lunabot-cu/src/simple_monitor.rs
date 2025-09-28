@@ -58,7 +58,7 @@ impl CuMonitor for SimpleMonitor {
                         }
                         println!("=====================\n");
                     } else {
-                        println!("No errored tasks currently.");
+                        // println!("No errored tasks currently.");
                     }
                 }
             }

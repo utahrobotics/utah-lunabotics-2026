@@ -68,8 +68,9 @@ iceoryx2.workspace = true
 # nix = { version = "0.30.1", features = ["time"] }
 bytemuck.workspace = true
 nalgebra.workspace = true
-kiss-icp-core = { path = "../kiss-icp-rs/core" }
-kiss-icp-ops = { path = "../kiss-icp-rs/ops" }
+# kiss-icp-core = { path = "../kiss-icp-rs/core" }
+# kiss-icp-ops = { path = "../kiss-icp-rs/ops" }
+simple-icp = { git = "https://github.com/utahrobotics/simple-icp.git" }
 rayon = "1.10"
 
 crossbeam.workspace = true
@@ -113,6 +114,7 @@ gstreamer = { version = "0.24.0", optional = true }
 circular-buffer = { version = "1.1.0", optional = true }
 gstreamer-app = { version = "0.24.0", optional = true }
 cu-gstreamer = { workspace = true, optional = true }
+colorous = "1.0.16"
 
 
 [build-dependencies]
