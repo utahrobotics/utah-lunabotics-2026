@@ -16,17 +16,21 @@ use nalgebra::{Vector2, Vector3};
 
 mod adjust_for_camera_position;
 mod clear_cells;
+mod clear_heights;
 mod depth2pcl;
 mod expand_free_cells;
 mod expand_occupancy;
+mod height_map_pipeline;
 mod obstaclefilter;
 mod occupancy_grid_pipeline;
 mod occupancy_normalize;
+mod pcl2height;
 mod pcl2obstacle;
 mod pcl2occupancy;
 
 mod expand_obstacles;
 use expand_obstacles::ExpandObstacles;
+pub use height_map_pipeline::*;
 use obstaclefilter::ObstacleFilter;
 pub use occupancy_grid_pipeline::*;
 use parking_lot::Mutex;

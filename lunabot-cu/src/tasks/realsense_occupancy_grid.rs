@@ -11,8 +11,8 @@ use nalgebra::{Vector2, Vector4};
 use rerun::{Color, Points3D};
 use simple_motion::StaticNode;
 use thalassic::{
-    DepthProjector, DepthProjectorBuilder, Occupancy, OccupancyGridPipeline,
-    OccupancyGridPipelineBuilder, PipelineSharedItems,
+    DepthProjector, DepthProjectorBuilder, HeightMapPipeline, HeightMapPipelineBuilder,
+    PipelineSharedItems,
 };
 
 use crate::ROOT_NODE;
@@ -22,8 +22,7 @@ use crate::tasks::{DEPTH_FRAME_HEIGHT, DEPTH_FRAME_SIZE, DEPTH_FRAME_WIDTH};
 pub struct OccupancyGridTask {
     camera_node: StaticNode,
     depth_projector_pipeline: DepthProjector,
-    occupancy_grid_pipeline: OccupancyGridPipeline,
-    robot_radius: f64,
+    height_map_pipeline: HeightMapPipeline,
 }
 
 #[derive(Serialize, Encode, bincode::Decode, Clone, Copy, Debug)]
@@ -31,7 +30,7 @@ pub struct OccupancyGrid {
     pub width: u32,
     pub height: u32,
     #[serde(serialize_with = "<[_]>::serialize")]
-    pub occupancy: [Occupancy; THALASSIC_CELL_COUNT as usize],
+    pub height_map: [i32; THALASSIC_CELL_COUNT as usize],
 }
 
 impl Default for OccupancyGrid {
@@ -39,7 +38,7 @@ impl Default for OccupancyGrid {
         OccupancyGrid {
             width: 0,
             height: 0,
-            occupancy: [Occupancy::UNKNOWN; THALASSIC_CELL_COUNT as usize],
+            height_map: [0; THALASSIC_CELL_COUNT as usize],
         }
     }
 }
@@ -84,20 +83,6 @@ impl CuTask for OccupancyGridTask {
         let camera_name = config
             .and_then(|c| c.get::<String>("camera_node"))
             .unwrap_or_else(|| "upper_depth_camera".to_string());
-
-        let robot_radius = config
-            .and_then(|c| c.get::<f64>("robot_radius"))
-            .unwrap_or_else(|| 0.5);
-
-        let min_known_neighbors_ratio = config
-            .and_then(|c| c.get::<u32>("min_known_neighbors_ratio"))
-            .unwrap_or_else(|| 60);
-        let neighborhood_radius = config
-            .and_then(|c| c.get::<u32>("neighborhood_radius"))
-            .unwrap_or_else(|| 20);
-        let obstacle_threshold = config
-            .and_then(|c| c.get::<u32>("obstacle_threshold"))
-            .unwrap_or_else(|| 60);
 
         let focal_length_px = config
             .and_then(|c| c.get::<f64>("focal_length"))
@@ -147,23 +132,17 @@ impl CuTask for OccupancyGridTask {
             NonZeroU32::new(THALASSIC_HEIGHT).unwrap(),
         );
 
-        let mut occupancy_grid_pipeline = OccupancyGridPipelineBuilder {
-            occupancy_grid_dimensions: grid_dimensions,
+        let height_map_pipeline = HeightMapPipelineBuilder {
+            grid_dimentions: grid_dimensions,
             cell_size: THALASSIC_CELL_SIZE,
-            min_points_for_occupied: 10,
-            neighborhood_radius,
-            min_known_neighbors_ratio,
-            obstacle_threshold: NonZeroU32::new(obstacle_threshold).unwrap(),
+            max_point_count: depth_projector_pipeline.get_pixel_count(),
         }
-        .build();
-
-        occupancy_grid_pipeline.occupancy_grid_ref = pipeline_shared.clone();
+        .build(pipeline_shared.clone());
 
         Ok(Self {
             camera_node,
             depth_projector_pipeline,
-            occupancy_grid_pipeline,
-            robot_radius,
+            height_map_pipeline,
         })
     }
 
@@ -206,65 +185,54 @@ impl CuTask for OccupancyGridTask {
             Some(&mut point_cloud),
         );
 
-        let mut occupancy_grid_out =
-            std::iter::repeat_n(Occupancy::UNKNOWN, THALASSIC_CELL_COUNT as usize)
-                .collect::<Vec<_>>();
+        let mut height_map_out = vec![0u32; THALASSIC_CELL_COUNT as usize];
+        let point_count = self.depth_projector_pipeline.get_pixel_count().get();
 
-        // since our pipeline is all synchronous, we likely do not need the will_process signal anymore
-        if self.occupancy_grid_pipeline.will_process() {
-            self.occupancy_grid_pipeline.process(
-                self.robot_radius as f32,
-                THALASSIC_CELL_SIZE,
-                &mut occupancy_grid_out,
-                &depth_camera_transform,
-            );
+        if self.height_map_pipeline.will_process() {
+            self.height_map_pipeline
+                .process(point_count, &mut height_map_out);
+
             let mut positions = Vec::new();
             let mut colors = Vec::new();
             let mut labels = Vec::new();
-            for (point, score) in occupancy_grid_out.iter().enumerate().map(|(i, score)| {
-                let (x, y) = index_to_xy(i);
-                (
-                    rerun::Position3D::new(
-                        x as f32 * THALASSIC_CELL_SIZE,
-                        y as f32 * THALASSIC_CELL_SIZE,
-                        0.0,
-                    ),
-                    *score,
-                )
-            }) {
-                positions.push(point);
-                labels.push(score.0.to_string());
-                let color = match score.0 {
-                    0 => Color::from_rgb(128, 128, 128), // Grey for unknown
-                    1..=100 => {
-                        // Gradient from green (1) to red (100)
-                        let t = (score.0 - 1) as f32 / 99.0; // Normalize to 0-1
-                        let r = (255.0 * t) as u8;
-                        let g = (255.0 * (1.0 - t)) as u8;
-                        let b = 0u8;
-                        Color::from_rgb(r, g, b)
-                    }
-                    _ => Color::from_rgb(255, 0, 0), // Fallback to red for any value > 100
-                };
 
-                colors.push(color);
+            for (i, &height_fixed) in height_map_out.iter().enumerate() {
+                let (x, y) = index_to_xy(i);
+                let height_meters = f32::from_bits(height_fixed);
+
+                positions.push(rerun::Position3D::new(
+                    x as f32 * THALASSIC_CELL_SIZE,
+                    y as f32 * THALASSIC_CELL_SIZE,
+                    height_meters,
+                ));
+
+                labels.push(format!("{:.2}m", height_meters));
+
+                let normalized_height = (height_meters + 1.0) / 2.0; // Assuming height range -1m to 1m
+                let normalized_height = normalized_height.clamp(0.0, 1.0);
+                let r = (255.0 * normalized_height) as u8;
+                let b = (255.0 * (1.0 - normalized_height)) as u8;
+                colors.push(Color::from_rgb(r, 0, b));
             }
+
             let _ = RECORDER.get().unwrap().recorder.log(
-                "occupancy",
+                "height_map",
                 &Points3D::new(positions)
                     .with_colors(colors)
                     .with_labels(labels),
             );
-            output.set_payload(OccupancyGrid {
-                width: THALASSIC_WIDTH,
-                height: THALASSIC_HEIGHT,
-                occupancy: occupancy_grid_out.try_into().map_err(|_| {
-                    CuError::new_with_cause(
-                        "occupancy grid out was the wrong size",
-                        std::io::Error::other("size mismatch"),
-                    )
-                })?,
-            });
+
+            // currently we don't have a height map -> occupancy grid implementation yet
+            // output.set_payload(OccupancyGrid {
+            //     width: THALASSIC_WIDTH,
+            //     height: THALASSIC_HEIGHT,
+            //     height_map: height_map_out.try_into().map_err(|_| {
+            //         CuError::new_with_cause(
+            //             "height map out was the wrong size",
+            //             std::io::Error::other("size mismatch"),
+            //         )
+            //     })?,
+            // });
         }
         Ok(())
     }
