@@ -185,6 +185,18 @@ impl CuTask for OccupancyGridTask {
             Some(&mut point_cloud),
         );
 
+        // only log every nth point so my laptop doesnt catch on fire
+        let _ = RECORDER.get().unwrap().recorder.log(
+            format!("realsense/pcl"),
+            &Points3D::new(point_cloud.iter().enumerate().filter_map(|(i, p)| {
+                if p.w != 0.0 && i % 10 == 0 {
+                    Some([p.x, p.y, p.z])
+                } else {
+                    None
+                }
+            })),
+        );
+
         let mut height_map_out = vec![0u32; THALASSIC_CELL_COUNT as usize];
         let point_count = self.depth_projector_pipeline.get_pixel_count().get();
 
