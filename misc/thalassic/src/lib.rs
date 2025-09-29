@@ -20,6 +20,7 @@ mod clear_heights;
 mod depth2pcl;
 mod expand_free_cells;
 mod expand_occupancy;
+mod gaussian_blur;
 mod height_map_pipeline;
 mod obstaclefilter;
 mod occupancy_grid_pipeline;

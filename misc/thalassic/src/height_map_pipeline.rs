@@ -12,27 +12,35 @@ use gputter::{
 };
 use nalgebra::{Vector2, Vector3};
 
-use crate::{clear_heights::ClearHeights, pcl2height::Pcl2HeightV3, PipelineSharedItems};
+use crate::{
+    clear_heights::ClearHeights, gaussian_blur::GaussianBlur, pcl2height::Pcl2HeightV3,
+    PipelineSharedItems,
+};
 
 type HeightMapPipelineBindGroups = (
     GpuBufferSet<(StorageBuffer<[AlignedVec4<f32>], HostReadOnly, ShaderReadWrite>,)>, // Index 0 - pointcloud input grp
     GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>, // Index 1 - output height map
     GpuBufferSet<(UniformBuffer<u32>,)>, // Index 2 - number of points in the point cloud
     GpuBufferSet<(UniformBuffer<AlignedVec2<u32>>,)>, // Index 3 - depth image dimensions
+    GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>, // Index 4 - gaussian blurred output height map
 );
 
 pub struct HeightMapPipelineBuilder {
     pub grid_dimentions: Vector2<NonZeroU32>,
     pub cell_size: f32,
     pub max_point_count: NonZeroU32,
+
+    /// kernel size for the gaussian blur
+    pub kernel_size: NonZeroU32,
 }
 
 pub struct HeightMapPipeline {
     pub bind_grps: Option<(
-        GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>, // height map
+        GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>, // unblurred height map
         GpuBufferSet<(UniformBuffer<u32>,)>,                                  // point count
+        GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>, // blurred height map
     )>,
-    pub pipeline: ComputePipeline<HeightMapPipelineBindGroups, 2>,
+    pub pipeline: ComputePipeline<HeightMapPipelineBindGroups, 3>,
     pub grid_dimensions: Vector2<NonZeroU32>,
     /// Items shared between the depth projector and this pipeline
     pub pipeline_shared_ref: PipelineSharedItems,
@@ -64,10 +72,23 @@ impl HeightMapPipelineBuilder {
             image_dimensions: BufferGroupBinding::<_, HeightMapPipelineBindGroups>::get::<3, 0>(),
         }
         .compile();
-        let pipeline = ComputePipeline::new([&clear_heightmap, &pcl2_height_shader]);
+
+        let [gaussian_blur] = GaussianBlur {
+            heightmap: BufferGroupBinding::<_, HeightMapPipelineBindGroups>::get::<1, 0>(),
+            blurred_heightmap: BufferGroupBinding::<_, HeightMapPipelineBindGroups>::get::<4, 0>(),
+            heightmap_width: self.grid_dimentions.x,
+            heightmap_height: self.grid_dimentions.y,
+            cell_size: self.cell_size,
+            cell_count,
+            kernel_size: self.kernel_size.get(),
+        }
+        .compile();
+        let pipeline =
+            ComputePipeline::new([&clear_heightmap, &pcl2_height_shader, &gaussian_blur]);
         let bind_grps = Some((
             GpuBufferSet::from((StorageBuffer::new_dyn(cell_count.get() as usize).unwrap(),)),
             GpuBufferSet::from((UniformBuffer::new(),)),
+            GpuBufferSet::from((StorageBuffer::new_dyn(cell_count.get() as usize).unwrap(),)),
         ));
         HeightMapPipeline {
             bind_grps,
@@ -99,13 +120,14 @@ impl HeightMapPipeline {
         }
 
         let mut shared = shared_lock.0.take().unwrap();
-        let (height_map_grp, point_count_grp) = self.bind_grps.take().unwrap();
+        let (height_map_grp, point_count_grp, blurred_grid) = self.bind_grps.take().unwrap();
 
         let mut bind_grps: HeightMapPipelineBindGroups = (
             shared.points,
             height_map_grp,
             point_count_grp,
             GpuBufferSet::from((UniformBuffer::new(),)),
+            blurred_grid,
         );
 
         self.pipeline.workgroups[0] = Vector3::new(
@@ -116,6 +138,11 @@ impl HeightMapPipeline {
         self.pipeline.workgroups[1] = Vector3::new(
             shared.image_dimensions.x.div_ceil(8),
             shared.image_dimensions.y.div_ceil(8),
+            1,
+        );
+        self.pipeline.workgroups[2] = Vector3::new(
+            self.grid_dimensions.x.get().div_ceil(8),
+            self.grid_dimensions.y.get().div_ceil(8),
             1,
         );
 
@@ -130,15 +157,15 @@ impl HeightMapPipeline {
             })
             .finish();
 
-        let (points_grp, height_map_grp, point_count_grp, _) = bind_grps;
+        let (points_grp, height_map_grp, point_count_grp, _, blurred_grid) = bind_grps;
 
         // reads out the resulting height map
-        height_map_grp
+        blurred_grid
             .buffers
             .0
             .read(bytemuck::cast_slice_mut(height_map_out));
 
-        self.bind_grps = Some((height_map_grp, point_count_grp));
+        self.bind_grps = Some((height_map_grp, point_count_grp, blurred_grid));
         shared.points = points_grp;
         shared_lock.0.replace(shared);
         shared_lock.1 = false;
