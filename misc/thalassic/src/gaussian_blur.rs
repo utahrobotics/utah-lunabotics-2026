@@ -41,7 +41,7 @@ fn gaussian_blur(
             let sample_index = u32(sample_y) * u32(HEIGHTMAP_WIDTH) + u32(sample_x);
             // Check bounds, and also check if cell is known.
             if (sample_x >= 0i && sample_x < i32(HEIGHTMAP_WIDTH) && 
-                sample_y >= 0i && sample_y < i32(HEIGHTMAP_HEIGHT)) && known_cells[cell_index] == 1 {
+                sample_y >= 0i && sample_y < i32(HEIGHTMAP_HEIGHT)) && known_cells[sample_index] == 1 && known_cells[cell_index] == 1 {
                 
                 
                 let sample_height = bitcast<f32>(atomicLoad(&heightmap[sample_index]));
