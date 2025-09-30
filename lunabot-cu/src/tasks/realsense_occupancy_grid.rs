@@ -206,6 +206,7 @@ impl CuTask for OccupancyGridTask {
         let point_count = self.depth_projector_pipeline.get_pixel_count().get();
 
         if self.height_map_pipeline.will_process() {
+            self.height_map_pipeline.request_clear_cells();
             self.height_map_pipeline
                 .process(point_count, &mut height_map_out);
 

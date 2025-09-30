@@ -1,10 +1,12 @@
 use gputter::build_shader;
-
+// only applies blur to known cells
 build_shader!(
     pub(crate) GaussianBlur,
     r#"
 #[buffer] var<storage, read_write> heightmap: array<atomic<u32>, CELL_COUNT>;
 #[buffer] var<storage, read_write> blurred_heightmap: array<atomic<u32>, CELL_COUNT>;
+#[buffer] var<storage, read_write> known_cells: array<atomic<u32>, CELL_COUNT>;
+
 
 const HEIGHTMAP_WIDTH: NonZeroU32 = {{heightmap_width}};
 const HEIGHTMAP_HEIGHT: NonZeroU32 = {{heightmap_height}};
@@ -36,12 +38,12 @@ fn gaussian_blur(
         for (var kx: i32 = -half_kernel; kx <= half_kernel; kx++) {
             let sample_x = x + kx;
             let sample_y = y + ky;
-            
-            // Check bounds
+            let sample_index = u32(sample_y) * u32(HEIGHTMAP_WIDTH) + u32(sample_x);
+            // Check bounds, and also check if cell is known.
             if (sample_x >= 0i && sample_x < i32(HEIGHTMAP_WIDTH) && 
-                sample_y >= 0i && sample_y < i32(HEIGHTMAP_HEIGHT)) {
+                sample_y >= 0i && sample_y < i32(HEIGHTMAP_HEIGHT)) && known_cells[cell_index] == 1 {
                 
-                let sample_index = u32(sample_y) * u32(HEIGHTMAP_WIDTH) + u32(sample_x);
+                
                 let sample_height = bitcast<f32>(atomicLoad(&heightmap[sample_index]));
                 
                 // Gaussian weight calculation

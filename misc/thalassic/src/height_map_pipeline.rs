@@ -24,6 +24,8 @@ type HeightMapPipelineBindGroups = (
     GpuBufferSet<(UniformBuffer<u32>,)>, // Index 2 - number of points in the point cloud
     GpuBufferSet<(UniformBuffer<AlignedVec2<u32>>,)>, // Index 3 - depth image dimensions
     GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>, // Index 4 - gaussian blurred output height map
+    GpuBufferSet<(UniformBuffer<u32>,)>, // Index 5 - request to clear cells
+    GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>, // Index 6 - Keeps track of known cells (1 = known, 0 = unknown)
 );
 
 pub struct HeightMapPipelineBuilder {
@@ -35,17 +37,23 @@ pub struct HeightMapPipelineBuilder {
     pub kernel_size: NonZeroU32,
 }
 
+/// Takes in point clouds and sets cell's values to the height of the highest point with an x,y that are within that cells boundaries.
+/// Each cell remembers the highest point across multiple point clouds (meaning the height value of a cell can only increase) unless
+/// request_clear_cells() is called true in which case when the next point cloud comes in, affected cells are completely re calculated, forgetting
+/// previous max height values.
 pub struct HeightMapPipeline {
     pub bind_grps: Option<(
         GpuBufferSet<(StorageBuffer<[u32], HostReadWrite, ShaderReadWrite>,)>, // unblurred height map
         GpuBufferSet<(UniformBuffer<u32>,)>,                                   // point count
         GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>,  // blurred height map
+        GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>, // known cells (1 = known 0 = unknown)
     )>,
     pub pipeline: ComputePipeline<HeightMapPipelineBindGroups, 3>,
     pub grid_dimensions: Vector2<NonZeroU32>,
     /// Items shared between the depth projector and this pipeline
     pub pipeline_shared_ref: PipelineSharedItems,
     pub cell_size: f32,
+    request_clear_cells: bool,
 }
 
 impl HeightMapPipelineBuilder {
@@ -60,6 +68,9 @@ impl HeightMapPipelineBuilder {
             heightmap_width: self.grid_dimentions.x,
             cell_count,
             cell_size: self.cell_size,
+            request_clear_cells: BufferGroupBinding::<_, HeightMapPipelineBindGroups>::get::<5, 0>(
+            ),
+            known_cells: BufferGroupBinding::<_, HeightMapPipelineBindGroups>::get::<6, 0>(),
         }
         .compile();
 
@@ -82,10 +93,11 @@ impl HeightMapPipelineBuilder {
             cell_size: self.cell_size,
             cell_count,
             kernel_size: self.kernel_size.get(),
+            known_cells: BufferGroupBinding::<_, HeightMapPipelineBindGroups>::get::<6, 0>(),
         }
         .compile();
         let initial_height_map = StorageBuffer::new_dyn(cell_count.get() as usize).unwrap();
-        let negative_values = vec![-0.2f32; cell_count.get() as usize];
+        let negative_values = vec![0.0f32; cell_count.get() as usize];
         get_device().queue.write_buffer(
             initial_height_map.get_buffer(),
             0,
@@ -98,6 +110,7 @@ impl HeightMapPipelineBuilder {
             GpuBufferSet::from((initial_height_map,)),
             GpuBufferSet::from((UniformBuffer::new(),)),
             GpuBufferSet::from((StorageBuffer::new_dyn(cell_count.get() as usize).unwrap(),)),
+            GpuBufferSet::from((StorageBuffer::new_dyn(cell_count.get() as usize).unwrap(),)),
         ));
 
         HeightMapPipeline {
@@ -106,6 +119,7 @@ impl HeightMapPipelineBuilder {
             grid_dimensions: self.grid_dimentions,
             pipeline_shared_ref,
             cell_size: self.cell_size,
+            request_clear_cells: false,
         }
     }
 }
@@ -114,6 +128,12 @@ impl HeightMapPipeline {
     /// Check if the pipeline is ready to process (i.e., DepthProjector has finished)
     pub fn will_process(&self) -> bool {
         self.pipeline_shared_ref.shared.lock().1
+    }
+
+    /// Cells affected by the next point cloud will be re calculated, forgetting their previous maximum height
+    pub fn request_clear_cells(&mut self) {
+        // this gets set back to false in the process function
+        self.request_clear_cells = true;
     }
 
     /// Process the height map using shared point cloud data from DepthProjector
@@ -130,7 +150,8 @@ impl HeightMapPipeline {
         }
 
         let mut shared = shared_lock.0.take().unwrap();
-        let (height_map_grp, point_count_grp, blurred_grid) = self.bind_grps.take().unwrap();
+        let (height_map_grp, point_count_grp, blurred_grid, known_cells) =
+            self.bind_grps.take().unwrap();
 
         let mut bind_grps: HeightMapPipelineBindGroups = (
             shared.points,
@@ -138,6 +159,8 @@ impl HeightMapPipeline {
             point_count_grp,
             GpuBufferSet::from((UniformBuffer::new(),)),
             blurred_grid,
+            GpuBufferSet::from((UniformBuffer::new(),)), // write the request_clear_cells buffer on new pass
+            known_cells,
         );
 
         self.pipeline.workgroups[0] = Vector3::new(
@@ -163,11 +186,15 @@ impl HeightMapPipeline {
                 bind_grps
                     .3
                     .write::<0, _>(&shared.image_dimensions, &mut lock);
+                bind_grps
+                    .5
+                    .write::<0, _>(&self.request_clear_cells.into(), &mut lock);
                 &mut bind_grps
             })
             .finish();
 
-        let (points_grp, height_map_grp, point_count_grp, _, blurred_grid) = bind_grps;
+        let (points_grp, height_map_grp, point_count_grp, _, blurred_grid, _, known_cells) =
+            bind_grps;
 
         // reads out the resulting height map
         blurred_grid
@@ -175,9 +202,10 @@ impl HeightMapPipeline {
             .0
             .read(bytemuck::cast_slice_mut(height_map_out));
 
-        self.bind_grps = Some((height_map_grp, point_count_grp, blurred_grid));
+        self.bind_grps = Some((height_map_grp, point_count_grp, blurred_grid, known_cells));
         shared.points = points_grp;
         shared_lock.0.replace(shared);
         shared_lock.1 = false;
+        self.request_clear_cells = false;
     }
 }

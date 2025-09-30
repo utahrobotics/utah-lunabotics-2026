@@ -1,7 +1,8 @@
 use gputter::build_shader;
-// Clear Heights sets cells in the heightmap that will be recalculated with the new point cloud
+// Clear Heights sets cells in the heightmap that will be recalculated with the new point cloud (but only if request_clear_cells is true)
 // to a very small number. This prevents the height map from just forever increasing as more point clouds come in
 // it might be more efficient to just do this step on the CPU, I'm not sure.
+// This shader also marks cells as known if a point falls into them
 build_shader!(
     pub(crate) ClearHeights,
     r#"
@@ -10,8 +11,13 @@ build_shader!(
     const CELL_SIZE: f32 = {{cell_size}};
 
     #[buffer] var<storage, read_write> height_map: array<atomic<u32>, CELL_COUNT>;
+    #[buffer] var<storage, read_write> known_cells: array<atomic<u32>, CELL_COUNT>;
+
     #[buffer] var<storage, read_write> points: array<vec4f>;
     #[buffer] var<uniform> image_dimensions: vec2u;
+    // 1 if true, 0 if false
+    #[buffer] var<uniform> request_clear_cells: u32;
+
 
     @compute
     @workgroup_size(8, 8, 1)
@@ -39,7 +45,10 @@ build_shader!(
         }
         let cell_index = y_index * HEIGHTMAP_WIDTH + x_index;
 
-        atomicStore(&height_map[cell_index], bitcast<u32>(-9999.0));
+        atomicStore(&known_cells[cell_index], 1u);
+        if request_clear_cells == 1 {
+            atomicStore(&height_map[cell_index], bitcast<u32>(-9999.0));
+        }
     }
     "#
 );
