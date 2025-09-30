@@ -111,24 +111,31 @@ Brew - This is a useful package manager for macOS. It will be helpful. Install f
 #### Dependencies for Log Replay
 
    1. Git
+      
       You will need to install this if you don't already have it. Download the standalone installer [here](https://git-scm.com/downloads/win). Set up git using either a personal access token or SSH keys.
    
    2. Rust
+      
       Install from [rustup.rs.](rustup.rs).  Open a new PowerShell and run `rustc --version` to ensure it is recognized. After installation, switch to the nightly release using `rustup default nightly`.
    
    3. `make`
+     
       The recommended method of installing this is using `choco`, see below for details. Open an admin PowerShell and run `choco install make`. After install, open a new PowerShell and run `make --version` to ensure it is recognized.
 
-   4. LLVM/Clang
+   5. LLVM/Clang
+      
       Install using `choco install llvm` in an admin PowerShell. After install, open a new PowerShell and run `clang --version` to ensure it is recognized.
    
-   5. C++ Build Tools
+   6. C++ Build Tools
+      
       You will need to install the C++ Build Tools from Microsoft. Download the installer from [Microsoft](https://visualstudio.microsoft.com/downloads/?q=build+tools). Scroll to the bottom of the page, expand "Tools for Visual Studio" and download "Build Tools for Visual Studio". This will download a Visual Studio installer. **Note that you do not need Visual Studio itself, only these build tools**. Run the installer, and in the installer window, select "Desktop development with C++" and "MacOS/Linux Development with C++" and click "Install". This will take a while to install.  
    
-   6. Rerun
+   7. Rerun
+
       Download the latest stable Windows binary, from [rerun's GitHub page](https://github.com/rerun-io/rerun/releases). The latest is 0.25.1 at this time. Download `rerun-cli-0.25.1-x86_64-pc-windows-msvc.exe` and rename it to `rerun.exe`. Move it to `C:\Windows\Program Files\Rerun` or any other directory you want. To add this to your PATH, press Windows+X, choose "System", then "Advanced system settings", then "Environment Variables". Under "System variables", select "Path" and click "Edit". Click "New" and add the path to the directory where you placed `rerun.exe`. Click OK on all the windows to close them. Open a new PowerShell window and run `rerun --version` to ensure it is recognized.
 
-   7. 7zip ZS
+   8. 7zip ZS
+      
       This is needed in order to decompress the log files which are in `.tar.lz4` format. The standard version of 7zip will not work. Download the installer from their [GitHub page](https://github.com/mcmilk/7-Zip-zstd/releases).
 
 
