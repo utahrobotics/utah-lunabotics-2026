@@ -95,6 +95,10 @@ impl CuTask for OccupancyGridTask {
             .and_then(|c| c.get::<f64>("ppy"))
             .expect("specify depth format ppy") as f32;
 
+        let gaussian_kernel_size = config
+            .and_then(|c| c.get::<u32>("gaussian_kernel_size"))
+            .expect("specify kernel size for gaussian blur");
+
         let camera_node = ROOT_NODE
             .get()
             .ok_or_else(|| CuError::from("RealSensePointCloudReceiver: ROOT_NODE not initialized"))?
@@ -136,7 +140,7 @@ impl CuTask for OccupancyGridTask {
             grid_dimentions: grid_dimensions,
             cell_size: THALASSIC_CELL_SIZE,
             max_point_count: depth_projector_pipeline.get_pixel_count(),
-            kernel_size: NonZeroU32::new(10).unwrap(),
+            kernel_size: NonZeroU32::new(gaussian_kernel_size).unwrap(),
         }
         .build(pipeline_shared.clone());
 

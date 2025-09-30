@@ -58,10 +58,7 @@
             type: "crate::tasks::OccupancyGridTask",
             config: {
                 "camera_node": "upper_depth_camera",
-                // "robot_radius": 0.2,
-                // "min_known_neighbors_ratio": 0,
-                // "neighborhood_radius": 20,
-                // "obstacle_threshold": 65,
+                "gaussian_kernel_size": 10,
                 "focal_length": 383,
                 "ppx": 317.44882,
                 "ppy": 245.91605,

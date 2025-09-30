@@ -2,11 +2,12 @@ use std::num::NonZeroU32;
 
 use gputter::{
     buffers::{
-        storage::{HostReadOnly, ShaderReadWrite, StorageBuffer},
+        storage::{HostReadOnly, HostReadWrite, ShaderReadWrite, StorageBuffer},
         uniform::UniformBuffer,
-        GpuBufferSet,
+        GpuBuffer, GpuBufferSet,
     },
     compute::ComputePipeline,
+    get_device,
     shader::BufferGroupBinding,
     types::{AlignedVec2, AlignedVec4},
 };
@@ -19,7 +20,7 @@ use crate::{
 
 type HeightMapPipelineBindGroups = (
     GpuBufferSet<(StorageBuffer<[AlignedVec4<f32>], HostReadOnly, ShaderReadWrite>,)>, // Index 0 - pointcloud input grp
-    GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>, // Index 1 - output height map
+    GpuBufferSet<(StorageBuffer<[u32], HostReadWrite, ShaderReadWrite>,)>, // Index 1 - output height map
     GpuBufferSet<(UniformBuffer<u32>,)>, // Index 2 - number of points in the point cloud
     GpuBufferSet<(UniformBuffer<AlignedVec2<u32>>,)>, // Index 3 - depth image dimensions
     GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>, // Index 4 - gaussian blurred output height map
@@ -36,9 +37,9 @@ pub struct HeightMapPipelineBuilder {
 
 pub struct HeightMapPipeline {
     pub bind_grps: Option<(
-        GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>, // unblurred height map
-        GpuBufferSet<(UniformBuffer<u32>,)>,                                  // point count
-        GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>, // blurred height map
+        GpuBufferSet<(StorageBuffer<[u32], HostReadWrite, ShaderReadWrite>,)>, // unblurred height map
+        GpuBufferSet<(UniformBuffer<u32>,)>,                                   // point count
+        GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>,  // blurred height map
     )>,
     pub pipeline: ComputePipeline<HeightMapPipelineBindGroups, 3>,
     pub grid_dimensions: Vector2<NonZeroU32>,
@@ -83,13 +84,22 @@ impl HeightMapPipelineBuilder {
             kernel_size: self.kernel_size.get(),
         }
         .compile();
+        let initial_height_map = StorageBuffer::new_dyn(cell_count.get() as usize).unwrap();
+        let negative_values = vec![-0.2f32; cell_count.get() as usize];
+        get_device().queue.write_buffer(
+            initial_height_map.get_buffer(),
+            0,
+            bytemuck::cast_slice(&negative_values),
+        );
+
         let pipeline =
             ComputePipeline::new([&clear_heightmap, &pcl2_height_shader, &gaussian_blur]);
         let bind_grps = Some((
-            GpuBufferSet::from((StorageBuffer::new_dyn(cell_count.get() as usize).unwrap(),)),
+            GpuBufferSet::from((initial_height_map,)),
             GpuBufferSet::from((UniformBuffer::new(),)),
             GpuBufferSet::from((StorageBuffer::new_dyn(cell_count.get() as usize).unwrap(),)),
         ));
+
         HeightMapPipeline {
             bind_grps,
             pipeline,
