@@ -97,7 +97,7 @@ impl HeightMapPipelineBuilder {
         }
         .compile();
         let initial_height_map = StorageBuffer::new_dyn(cell_count.get() as usize).unwrap();
-        let negative_values = vec![0.0f32; cell_count.get() as usize];
+        let negative_values = vec![-9999.0f32; cell_count.get() as usize];
         get_device().queue.write_buffer(
             initial_height_map.get_buffer(),
             0,
