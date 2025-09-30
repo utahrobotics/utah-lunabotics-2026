@@ -15,7 +15,7 @@ use nalgebra::{Vector2, Vector3};
 
 use crate::{
     clear_heights::ClearHeights, gaussian_blur::GaussianBlur, pcl2height::Pcl2HeightV3,
-    PipelineSharedItems,
+    statistical_outlier_removal::StatisticalOutlierRemoval, PipelineSharedItems,
 };
 
 type HeightMapPipelineBindGroups = (
@@ -26,6 +26,7 @@ type HeightMapPipelineBindGroups = (
     GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>, // Index 4 - gaussian blurred output height map
     GpuBufferSet<(UniformBuffer<u32>,)>, // Index 5 - request to clear cells
     GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>, // Index 6 - Keeps track of known cells (1 = known, 0 = unknown)
+    GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>, // Index 7 - Output of the  Statistical Outlier Removal
 );
 
 pub struct HeightMapPipelineBuilder {
@@ -35,6 +36,12 @@ pub struct HeightMapPipelineBuilder {
 
     /// kernel size for the gaussian blur
     pub kernel_size: NonZeroU32,
+
+    /// the number of neighbors to take into consideration for statistical outlier removal
+    pub k_neighbors: u32,
+
+    /// all height cells with a distance of more than std_dev_thresh away from the mean are considered outliers
+    pub std_dev_thresh: f32,
 }
 
 /// Takes in point clouds and sets cell's values to the height of the highest point with an x,y that are within that cells boundaries.
@@ -47,8 +54,9 @@ pub struct HeightMapPipeline {
         GpuBufferSet<(UniformBuffer<u32>,)>,                                   // point count
         GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>,  // blurred height map
         GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>, // known cells (1 = known 0 = unknown)
+        GpuBufferSet<(StorageBuffer<[u32], HostReadOnly, ShaderReadWrite>,)>, // output of the statistical outlier removal
     )>,
-    pub pipeline: ComputePipeline<HeightMapPipelineBindGroups, 3>,
+    pub pipeline: ComputePipeline<HeightMapPipelineBindGroups, 4>,
     pub grid_dimensions: Vector2<NonZeroU32>,
     /// Items shared between the depth projector and this pipeline
     pub pipeline_shared_ref: PipelineSharedItems,
@@ -85,8 +93,20 @@ impl HeightMapPipelineBuilder {
         }
         .compile();
 
+        let [statistical_outlier_removal] = StatisticalOutlierRemoval {
+            height_map_in: BufferGroupBinding::<_, HeightMapPipelineBindGroups>::get::<1, 0>(),
+            filtered: BufferGroupBinding::<_, HeightMapPipelineBindGroups>::get::<7, 0>(),
+            known_cells: BufferGroupBinding::<_, HeightMapPipelineBindGroups>::get::<6, 0>(),
+            k_neighbors: self.k_neighbors,
+            std_dev_thresh: self.std_dev_thresh,
+            grid_width: self.grid_dimentions.x,
+            grid_height: self.grid_dimentions.y,
+            cell_count,
+        }
+        .compile();
+
         let [gaussian_blur] = GaussianBlur {
-            heightmap: BufferGroupBinding::<_, HeightMapPipelineBindGroups>::get::<1, 0>(),
+            heightmap: BufferGroupBinding::<_, HeightMapPipelineBindGroups>::get::<7, 0>(),
             blurred_heightmap: BufferGroupBinding::<_, HeightMapPipelineBindGroups>::get::<4, 0>(),
             heightmap_width: self.grid_dimentions.x,
             heightmap_height: self.grid_dimentions.y,
@@ -104,13 +124,18 @@ impl HeightMapPipelineBuilder {
             bytemuck::cast_slice(&negative_values),
         );
 
-        let pipeline =
-            ComputePipeline::new([&clear_heightmap, &pcl2_height_shader, &gaussian_blur]);
+        let pipeline = ComputePipeline::new([
+            &clear_heightmap,
+            &pcl2_height_shader,
+            &statistical_outlier_removal,
+            &gaussian_blur,
+        ]);
         let bind_grps = Some((
             GpuBufferSet::from((initial_height_map,)),
             GpuBufferSet::from((UniformBuffer::new(),)),
             GpuBufferSet::from((StorageBuffer::new_dyn(cell_count.get() as usize).unwrap(),)),
             GpuBufferSet::from((StorageBuffer::new_dyn(cell_count.get() as usize).unwrap(),)),
+            GpuBufferSet::from((StorageBuffer::new_dyn(cell_count.get() as usize).unwrap(),)), // statistical outlier removal output
         ));
 
         HeightMapPipeline {
@@ -150,8 +175,13 @@ impl HeightMapPipeline {
         }
 
         let mut shared = shared_lock.0.take().unwrap();
-        let (height_map_grp, point_count_grp, blurred_grid, known_cells) =
-            self.bind_grps.take().unwrap();
+        let (
+            height_map_grp,
+            point_count_grp,
+            blurred_grid,
+            known_cells,
+            statistical_outlier_removal,
+        ) = self.bind_grps.take().unwrap();
 
         let mut bind_grps: HeightMapPipelineBindGroups = (
             shared.points,
@@ -161,19 +191,32 @@ impl HeightMapPipeline {
             blurred_grid,
             GpuBufferSet::from((UniformBuffer::new(),)), // write the request_clear_cells buffer on new pass
             known_cells,
+            statistical_outlier_removal,
         );
 
+        // clear_heightmap shader
         self.pipeline.workgroups[0] = Vector3::new(
             shared.image_dimensions.x.div_ceil(8),
             shared.image_dimensions.y.div_ceil(8),
             1,
         );
+
+        // pcl2heightmap shader
         self.pipeline.workgroups[1] = Vector3::new(
             shared.image_dimensions.x.div_ceil(8),
             shared.image_dimensions.y.div_ceil(8),
             1,
         );
+
+        // heightmap statistical outlier removal
         self.pipeline.workgroups[2] = Vector3::new(
+            self.grid_dimensions.x.get().div_ceil(8),
+            self.grid_dimensions.y.get().div_ceil(8),
+            1,
+        );
+
+        // heightmap gaussian
+        self.pipeline.workgroups[3] = Vector3::new(
             self.grid_dimensions.x.get().div_ceil(8),
             self.grid_dimensions.y.get().div_ceil(8),
             1,
@@ -193,8 +236,16 @@ impl HeightMapPipeline {
             })
             .finish();
 
-        let (points_grp, height_map_grp, point_count_grp, _, blurred_grid, _, known_cells) =
-            bind_grps;
+        let (
+            points_grp,
+            height_map_grp,
+            point_count_grp,
+            _,
+            blurred_grid,
+            _,
+            known_cells,
+            statistical_outlier_removal,
+        ) = bind_grps;
 
         // reads out the resulting height map
         blurred_grid
@@ -202,7 +253,13 @@ impl HeightMapPipeline {
             .0
             .read(bytemuck::cast_slice_mut(height_map_out));
 
-        self.bind_grps = Some((height_map_grp, point_count_grp, blurred_grid, known_cells));
+        self.bind_grps = Some((
+            height_map_grp,
+            point_count_grp,
+            blurred_grid,
+            known_cells,
+            statistical_outlier_removal,
+        ));
         shared.points = points_grp;
         shared_lock.0.replace(shared);
         shared_lock.1 = false;

@@ -28,6 +28,7 @@ mod occupancy_normalize;
 mod pcl2height;
 mod pcl2obstacle;
 mod pcl2occupancy;
+mod statistical_outlier_removal;
 
 mod expand_obstacles;
 use expand_obstacles::ExpandObstacles;
