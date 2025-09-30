@@ -11,30 +11,14 @@
 ## Dependencies
 
 ### Production env (Linux only)
+
 1. See dockerfile, anything installed there is a dependency for running the robot in production.
 2. Apriltag C library and librealsense
-
-### Log Replay (Native)
-
-1. ```make``` command 
-2. git
-3. rerun - download binary from their github releases page and add "rerun" command to Path.
-4. clang - for windows install with ```choco install llvm```, linux use ```apt install libclang-dev``` 
-5. rust - install from rustup.rs (select nightly version)
-
-NOTE: If you are on macos you can install git, libclang, and make by running ```xcode-select --install```
-
-### Log Replay (Docker)
-1. git
-2. rerun 
-3. docker
 
 ### Optional Dependencies
 
 1. **cubuild** - Enhanced error messages for Copper macros
-   ```bash
-   https://github.com/copper-project/copper-rs/tree/master/support/cargo_cubuild
-   ```
+   <https://github.com/copper-project/copper-rs/tree/master/support/cargo_cubuild>
 2. iox2 cli tool for seeing active iceoryx2 nodes and services.
 3. cargo flamegraph + perf for profiling
 4. gdb
@@ -42,20 +26,51 @@ NOTE: If you are on macos you can install git, libclang, and make by running ```
 
 
 ## Building and Running
-First install the dependencies listed in the dependencies section. 
-
 
 *NOTE: On some machines you have to increase the stack size for it to compile ```export RUST_MIN_STACK=107108864```.*
 
-### Production env
+### Production env (Linux only)
+
 1. run ```make sync``` to build/sync deps for the Unitree L2 publisher.
 2. run ```make prod``` to build and run the project.
 
-### Log replay (Native)
-1. Ensure there are valid log files in lunabot-cu/logs
-2. run ```make resim```
+### Log replay and development tools (Linux)
 
-### Log replay and development tools (MacOS)
+#### Dependencies for log replay
+
+   1. Git 
+
+      This is pre installed on most Linux distros. Just set it up with either a personal access token or SSH keys.
+   
+   2. `make`
+
+      Install it using your package manager. For Ubuntu/Debian, `sudo apt install build-essential`.
+
+   3. Rerun
+
+      Download the latest Linux binary from releases section on <https://github.com/rerun-io/rerun>. Make it executable and add it to your PATH. 
+
+   4. clang
+
+      Install it using your package manager. For Ubuntu/Debian, `sudo apt install libclang-dev`.
+
+   5. Rust
+
+      Install from [rustup.rs.](rustup.rs). After installation, switch to the nightly release using `rustup default nightly`.
+   
+#### Dev Tools for Linux
+
+Recommended IDE : [VS Code](https://code.visualstudio.com)
+
+Package Manager: `apt`, `dnf`, `pacman` etc depending on your distro.
+
+#### Running Log Replay on Linux
+
+   1. Clone the repository.
+   2. Download a log file (linked in Discord), unzip it using `lz4 -d (filename)` and then `tar xvf (filename)` and place it in `lunabot-cu/logs`. Make sure there are no other nested directories in `lunabot-cu/logs`.
+   3. In a new terminal window, in the repo directory, run `make resim`. It will take a few minutes to build and then launch the simulation in Rerun's GUI.
+
+### Log Replay and Development tools (MacOS)
 
 #### Dependencies for log replay
 
@@ -65,7 +80,7 @@ First install the dependencies listed in the dependencies section.
 
 2. `make`
 
-   Run `xcode-select --install` if you haven't before. This will install `make` along with many other useful development tools.
+   Run `xcode-select --install` if you haven't done it before. This will install `make` along with many other useful development tools.
 
 3. Rerun
 
@@ -79,7 +94,7 @@ First install the dependencies listed in the dependencies section.
 
    Install from [rustup.rs.](rustup.rs). After installation, switch to the nightly release using `rustup default nightly`.
 
-#### Other development tools
+#### Dev Tools for MacOS
 
 Recommended IDE : [VS Code](https://code.visualstudio.com)
 
@@ -88,21 +103,62 @@ Brew - This is a useful package manager for macOS. It will be helpful. Install f
 #### Running
 
    1. Clone the repository.
-   2. Run `rerun` in your terminal to launch the GUI. If it is the first time running, you may need to go into privacy settings and approve it, since it is an unsigned app.
+   2. Download a log file (linked in Discord), unzip it using `lz4 -d (filename)` and then `tar xvf (filename)` and place it in `lunabot-cu/logs`. Make sure there are no other nested directories in `lunabot-cu/logs`.
    3. In a new terminal window, in the repo directory, run `make resim`. It will take a few minutes to build and then launch the simulation in Rerun's GUI.
 
+### Log Replay and Development tools (Windows native)
 
-### Log replay (Docker)
+#### Dependencies for Log Replay
+
+   1. Git
+      
+      You will need to install this if you don't already have it. Download the standalone installer [here](https://git-scm.com/downloads/win). Set up git using either a personal access token or SSH keys.
+   
+   2. Rust
+      
+      Install from [rustup.rs.](rustup.rs).  Open a new PowerShell and run `rustc --version` to ensure it is recognized. After installation, switch to the nightly release using `rustup default nightly`.
+   
+   3. `make`
+     
+      The recommended method of installing this is using `choco`, see below for details. Open an admin PowerShell and run `choco install make`. After install, open a new PowerShell and run `make --version` to ensure it is recognized.
+
+   5. LLVM/Clang
+      
+      Install using `choco install llvm` in an admin PowerShell. After install, open a new PowerShell and run `clang --version` to ensure it is recognized.
+   
+   6. C++ Build Tools
+      
+      You will need to install the C++ Build Tools from Microsoft. Download the installer from [Microsoft](https://visualstudio.microsoft.com/downloads/?q=build+tools). Scroll to the bottom of the page, expand "Tools for Visual Studio" and download "Build Tools for Visual Studio". This will download a Visual Studio installer. **Note that you do not need Visual Studio itself, only these build tools**. Run the installer, and in the installer window, select "Desktop development with C++" and "MacOS/Linux Development with C++" and click "Install". This will take a while to install.  
+   
+   7. Rerun
+
+      Download the latest stable Windows binary, from [rerun's GitHub page](https://github.com/rerun-io/rerun/releases). The latest is 0.25.1 at this time. Download `rerun-cli-0.25.1-x86_64-pc-windows-msvc.exe` and rename it to `rerun.exe`. Move it to `C:\Windows\Program Files\Rerun` or any other directory you want. To add this to your PATH, press Windows+X, choose "System", then "Advanced system settings", then "Environment Variables". Under "System variables", select "Path" and click "Edit". Click "New" and add the path to the directory where you placed `rerun.exe`. Click OK on all the windows to close them. Open a new PowerShell window and run `rerun --version` to ensure it is recognized.
+
+   8. 7zip ZS
+      
+      This is needed in order to decompress the log files which are in `.tar.lz4` format. The standard version of 7zip will not work. Download the installer from their [GitHub page](https://github.com/mcmilk/7-Zip-zstd/releases).
+
+
+#### Dev Tools for Windows
+
+Recommended IDE : [VS Code](https://code.visualstudio.com)
+
+Package Manager: [Chocolatey](https://chocolatey.org/install). Follow the instructions for individual installation; It is one command in PowerShell. 
+
+#### Running replay on Windows
+
+   1. Clone the repository.
+   2. Download a log file (linked in Discord), unzip it using 7zip ZS (you will need to do this twice) and place it in `lunabot-cu/logs`. Make sure there are no other nested directories in `lunabot-cu/logs`.
+   3. Open a new PowerShell window, navigate to the repo directory, and run `make resim`. It will take a few minutes to build and then launch the simulation in Rerun's GUI. 
+
+
+### Log replay (Docker) (Not recommended, only if you can't get native working)
+
 1. Ensure there are valid log files in lunabot-cu/logs
 2. From the repository root first build the docker container with ```docker build -t lunabot .``` then if using bash/gitbash run with ```docker run --network=host -it -v $(pwd):/workspace -v cargo-cache:/workspace/target -v cargo-registry:/usr/local/cargo/registry --name lunabot lunabot``` otherwise run with ```docker run --network=host -it -v "${PWD}:/workspace" -v cargo-cache:/workspace/target -v cargo-registry:/usr/local/cargo/registry --name lunabot lunabot```
 3. Comment out the rerun init function call in lunabot-cu/src/resim.rs, and uncomment the line above with the Grpc config.
 4. Start rerun on host.
 5. Run replay with ```container$ make resim```
-
-### Help
-```bash
-make help # see commands for building and running
-```
 
 ## Camera discovery
 
