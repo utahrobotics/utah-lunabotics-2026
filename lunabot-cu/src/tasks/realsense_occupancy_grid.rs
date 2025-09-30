@@ -141,6 +141,8 @@ impl CuTask for OccupancyGridTask {
             cell_size: THALASSIC_CELL_SIZE,
             max_point_count: depth_projector_pipeline.get_pixel_count(),
             kernel_size: NonZeroU32::new(gaussian_kernel_size).unwrap(),
+            k_neighbors: 8,
+            std_dev_thresh: 1.0,
         }
         .build(pipeline_shared.clone());
 
