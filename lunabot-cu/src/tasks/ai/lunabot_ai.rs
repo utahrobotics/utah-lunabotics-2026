@@ -56,24 +56,6 @@ impl CuTask for LunabotAi {
         input: &Self::Input<'i>,
         output: &mut Self::Output<'o>,
     ) -> cu29::CuResult<()> {
-        let mut payload = (None, None);
-        if let Some(actuator_cmd) = self
-            .bt
-            .blackboard_mut()
-            .outgoing_actuator_msg_queue
-            .pop_front()
-        {
-            payload.1 = Some(actuator_cmd);
-        }
-        if let Some(steering_cmd) = self.bt.blackboard_mut().outgoing_steering_msg.take() {
-            payload.0 = Some(steering_cmd);
-        }
-        if payload.0.is_some() || payload.1.is_some() {
-            output.set_payload(payload);
-            return Ok(());
-        } else {
-            output.clear_payload();
-        }
         let dt = nanos_to_secs(clock.now().as_nanos() - self.last_tick_nanos);
 
         let e: Event = UpdateArgs { dt }.into();
@@ -93,7 +75,7 @@ impl CuTask for LunabotAi {
                     Success
                 }
                 LunabotAction::SetLastSteering => {
-                    if let Some(steering) = blackboard.last_steering.take() {
+                    if let Some(steering) = blackboard.last_steering {
                         blackboard.outgoing_steering_msg = Some(steering);
                     }
                     Success
@@ -180,6 +162,25 @@ impl CuTask for LunabotAi {
             (status, remaining_dt) //passing 0.0 consumes all the remaining time for a tick
         });
         self.last_tick_nanos = clock.now().into();
+        let mut payload = (None, None);
+        if let Some(actuator_cmd) = self
+            .bt
+            .blackboard_mut()
+            .outgoing_actuator_msg_queue
+            .pop_front()
+        {
+            payload.1 = Some(actuator_cmd);
+        }
+        if let Some(steering_cmd) = self.bt.blackboard_mut().outgoing_steering_msg.take() {
+            payload.0 = Some(steering_cmd);
+        }
+        if payload.0.is_some() || payload.1.is_some() {
+            output.set_payload(payload);
+            return Ok(());
+        } else {
+            output.clear_payload();
+        }
+
         Ok(())
     }
 }

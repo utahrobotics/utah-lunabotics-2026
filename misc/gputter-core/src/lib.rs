@@ -33,6 +33,8 @@ pub async fn init_gputter() -> anyhow::Result<()> {
         .await
         .or_else(|e| Err(anyhow::anyhow!("Failed to request adapter: {e}")))?;
 
+    let mut limits = wgpu::Limits::default();
+    limits.max_bind_groups = 8;
     let (device, queue) = adapter
         .request_device(&wgpu::DeviceDescriptor {
             trace: wgpu::Trace::Off,
@@ -42,7 +44,7 @@ pub async fn init_gputter() -> anyhow::Result<()> {
             required_limits: if cfg!(target_arch = "wasm32") {
                 wgpu::Limits::downlevel_webgl2_defaults()
             } else {
-                wgpu::Limits::default()
+                limits
             },
             memory_hints: wgpu::MemoryHints::Performance,
             label: None,
