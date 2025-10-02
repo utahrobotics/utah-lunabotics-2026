@@ -1,0 +1,4 @@
+[submodule "misc/kalman-filter"]
+	path = misc/kalman-filter
+	url = https://github.com/utahrobotics/kalman-filter.git
+	branch = master
