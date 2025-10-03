@@ -21,6 +21,10 @@ sync:
 resim:
 	cd lunabot-cu && cargo run --release --bin lunabot-resim --features resim
 
+# Run the MuJoCo Simulation
+sim:
+	cd lunabot-cu && cargo run --release --bin lunabot-sim --features sim
+
 # Clean build and sync, then build everything
 clean-build: clean sync
 	cd $(UNILIDAR_DIR) && RULES_RUST_TOOLCHAIN_VERSION=$(RUST_TOOLCHAIN_VERSION) bazel build //:unilidar_publisher $(BAZEL_BUILD_FLAGS)
@@ -69,5 +73,7 @@ help:
 	@echo "  kill              - Kill any lunabot sub processes that may still be running"
 	@echo "  help              - Show this help message"
 	@echo "  resim			   - Run re-simulation from logs/lunabot.copper"
+	@echo "  clear-logs        - Removes all unified logs from the simulation"
+	@echo "  clear-logs        - Removes all copper unified logs"
 
 .PHONY: prod debug sync clean-build build-publisher discover-cameras check clean help

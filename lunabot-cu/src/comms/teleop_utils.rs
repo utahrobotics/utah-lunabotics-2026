@@ -1,4 +1,4 @@
-#![cfg(feature = "production")]
+#![cfg(not(feature = "resim"))]
 use std::{
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
     ops::Deref,

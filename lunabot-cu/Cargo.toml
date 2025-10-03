@@ -39,12 +39,17 @@ production = [
 ]
 logreader = ["dep:cu29-export"]
 resim = ["dep:cu29-export", "cu-apriltag/resim"]
-sim = []
+sim = ["cu-apriltag/sim", "cakap2"]
 
 [[bin]]
 name = "lunabot-resim"
 path = "src/resim.rs"
 required-features = ["resim"]
+
+[[bin]]
+name = "lunabot-sim"
+path = "src/sim.rs"
+required-features = ["sim"]
 
 [dependencies]
 

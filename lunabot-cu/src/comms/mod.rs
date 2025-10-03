@@ -1,4 +1,4 @@
-#[cfg(feature = "production")]
+#[cfg(not(feature = "resim"))]
 pub mod teleop_utils;
-#[cfg(feature = "production")]
+#[cfg(not(feature = "resim"))]
 pub use teleop_utils::*;

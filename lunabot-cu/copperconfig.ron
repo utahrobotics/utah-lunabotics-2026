@@ -103,7 +103,7 @@
             id:"lunabase", type:"crate::tasks::sources::Lunabase", config:{
                 "max_pong_delay_ms": 500,
             },
-            run_in_sim: false,
+            run_in_sim: true,
         ),
         // receives messages from the ai_source and tells the motors to move accordingly
         (
