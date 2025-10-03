@@ -109,8 +109,17 @@ fn main() {
             application
                 .start_all_tasks(&mut default_callback)
                 .expect("Failed to start all tasks.");
+            let target_duration = std::time::Duration::from_nanos(1_000_000_000 / TARGET_HZ as u64);
+            let mut last_time = std::time::Instant::now();
+
             loop {
                 application.run_one_iteration(&mut sim_callback);
+
+                let elapsed = last_time.elapsed();
+                if elapsed < target_duration {
+                    std::thread::sleep(target_duration - elapsed);
+                }
+                last_time = std::time::Instant::now();
             }
         })
         .expect("failed to spawn main thread")
