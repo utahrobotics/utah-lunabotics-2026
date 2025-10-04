@@ -1,7 +1,5 @@
 # Lunabot
 
-*This repo is in the earlyish stages of a rewrite migrating to the copper framework from last years code base: github.com/utahrobotics/lunadev-2025*
-
 ## Architecture Overview
 <img width="4150" height="818" alt="graphviz(8)" src="https://github.com/user-attachments/assets/a53d91de-1872-44cc-9cf0-02a6a0bba5c2" />
 
