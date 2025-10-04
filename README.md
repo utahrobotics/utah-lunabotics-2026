@@ -12,8 +12,27 @@
 
 ### Production env (Linux only)
 
-1. See dockerfile, anything installed there is a dependency for running the robot in production.
-2. Apriltag C library and librealsense
+1. ```
+   apt/dnf/yum/etc install \
+    pkg-config \
+    libssl-dev \
+    libgstreamer1.0-dev \
+    libgstreamer-plugins-base1.0-dev \
+    gstreamer1.0-plugins-base \
+    gstreamer1.0-plugins-good \
+    gstreamer1.0-plugins-bad \
+    gstreamer1.0-plugins-ugly \
+    gstreamer1.0-libav \
+    libacl1-dev \
+    libgstrtspserver-1.0-dev \
+    libges-1.0-dev \
+    libv4l-dev \
+    libunwind-dev \
+    libudev-dev \
+   ```
+2. [Bazelisk](http://github.com/bazelbuild/bazelisk/releases/)
+3. [Realsense SDK](https://github.com/IntelRealSense/librealsense)
+4. [Apriltag Library](https://github.com/AprilRobotics/apriltag)
 
 ### Optional Dependencies
 
