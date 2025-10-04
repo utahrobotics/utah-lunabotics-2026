@@ -232,7 +232,7 @@ Contains source tasks for:
 * Keeps track of state (the blackboard) associated with the lunabot: robot chain, last messages seen from lunabase, latest obstacle map, (and more to come)
 * Decides how to control the motors and actuators based on all that information.
 
-## lunabot-cu/src/tasks (not the source or sinks ones)
+## lunabot-cu/src/tasks (not the ones in sources/ or sinks/)
 Tasks that lie between the sources and sinks for:
 * Image processing for apriltag detection.
 * Automatically opening camera devices as they become available.
