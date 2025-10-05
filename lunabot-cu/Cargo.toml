@@ -122,7 +122,9 @@ cu-gstreamer = { workspace = true, optional = true }
 colorous = "1.0.16"
 
 # sim deps
-mujoco-rs = { git = "https://github.com/davidhozic/mujoco-rs.git", commit = "455da6fc2235354a4d3f121cdc68fda5c1fe8c25", optional = true }
+mujoco-rs = { git = "https://github.com/davidhozic/mujoco-rs.git", commit = "455da6fc2235354a4d3f121cdc68fda5c1fe8c25", features = [
+    "cpp-viewer",
+], optional = true }
 
 [build-dependencies]
 ron.workspace = true

@@ -10,9 +10,13 @@ use crossbeam_channel::{Receiver, Sender};
 use cu29::prelude::*;
 use cu29_helpers::basic_copper_setup;
 use embedded_common::{ActuatorCommand, FromPicoV3};
+use gputter::{init_gputter_blocking, is_gputter_initialized};
+use mujoco_rs::prelude::*;
+use mujoco_rs::viewer::MjViewerCpp;
 use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
+use std::time::Duration;
 
 const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 
@@ -66,9 +70,16 @@ fn sim_callback(step: default::SimStep) -> SimOverride {
 }
 
 fn main() {
+    // usually we init gputter in the realsense occupancy task but
+    // mujoco will steal exclusive access to the egl context so we can just take it first
+    if !is_gputter_initialized() {
+        init_gputter_blocking().expect("failed to init gputter");
+    }
     std::thread::Builder::new()
         .stack_size(20 * 1000000) // this size will depend on how big the copper list is
         .spawn(move || {
+            let (model, mut viewer, mut data) = set_up_mujoco();
+            let step = model.opt().timestep;
             // Setup logging path for resimulation
             let logger_path = "logs/lunabotsim.copper";
             if let Some(parent) = Path::new(logger_path).parent() {
@@ -112,8 +123,13 @@ fn main() {
             let target_duration = std::time::Duration::from_nanos(1_000_000_000 / TARGET_HZ as u64);
             let mut last_time = std::time::Instant::now();
 
-            loop {
-                application.run_one_iteration(&mut sim_callback);
+            while viewer.running() {
+                application
+                    .run_one_iteration(&mut sim_callback)
+                    .expect("failed to run copper list iteration");
+                viewer.sync();
+                viewer.render(true);
+                data.step();
 
                 let elapsed = last_time.elapsed();
                 if elapsed < target_duration {
@@ -135,4 +151,18 @@ fn main() {
         });
 
     debug!("End of log replay.");
+}
+
+fn set_up_mujoco() -> (&'static MjModel, MjViewerCpp<'static>, MjData<'static>) {
+    println!("Creating model...");
+    let model = Box::leak(Box::new(
+        MjModel::from_xml("../mujoco_sim/artemis_arena.xml")
+            .expect("failed to create MjModel from artemis_arena.xml"),
+    ));
+    println!("Making Data...");
+    let data = model.make_data();
+    println!("Launching Viewer...");
+
+    let viewer = MjViewerCpp::launch_passive(model, &data, 100);
+    (model, viewer, data)
 }

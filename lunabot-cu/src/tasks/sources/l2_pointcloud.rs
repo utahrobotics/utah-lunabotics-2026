@@ -107,7 +107,7 @@ impl CuSrcTask for PointCloudIceoryxReceiver {
                 *point =
                     PointXYZIR::from_nalgebra(transformed, point.intensity, point.time, point.ring);
             }
-            if RECORDER.get().unwrap().level == Level::All {
+            if RECORDER.get().is_some() && RECORDER.get().unwrap().level == Level::All {
                 if let Err(e) = RECORDER.get().unwrap().recorder.log(
                     "l2_pcl",
                     &rerun::Points3D::new(positions)
