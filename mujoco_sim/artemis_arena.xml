@@ -38,13 +38,4 @@
 
   </worldbody>
 
-  <!-- Actuators (if needed for control) -->
-  <actuator>
-    <!-- Add actuators here if you need to control any bodies -->
-  </actuator>
-
-  <!-- Sensors (if needed) -->
-  <sensor>
-    <!-- Add sensors here if needed -->
-  </sensor>
 </mujoco>
