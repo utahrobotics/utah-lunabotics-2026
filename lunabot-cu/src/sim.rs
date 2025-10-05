@@ -6,17 +6,14 @@ pub mod simple_monitor;
 pub mod tasks;
 pub mod utils;
 
-use crossbeam_channel::{Receiver, Sender};
 use cu29::prelude::*;
 use cu29_helpers::basic_copper_setup;
-use embedded_common::{ActuatorCommand, FromPicoV3};
 use gputter::{init_gputter_blocking, is_gputter_initialized};
 use mujoco_rs::prelude::*;
 use mujoco_rs::viewer::MjViewerCpp;
 use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
-use std::time::Duration;
 
 const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 
@@ -79,7 +76,6 @@ fn main() {
         .stack_size(20 * 1000000) // this size will depend on how big the copper list is
         .spawn(move || {
             let (model, mut viewer, mut data) = set_up_mujoco();
-            let step = model.opt().timestep;
             // Setup logging path for resimulation
             let logger_path = "logs/lunabotsim.copper";
             if let Some(parent) = Path::new(logger_path).parent() {
@@ -88,7 +84,7 @@ fn main() {
                 }
             }
             // Create mock robot clock for simulation
-            let (robot_clock, mut robot_clock_mock) = RobotClock::mock();
+            let (robot_clock, _robot_clock_mock) = RobotClock::mock();
 
             let copper_ctx = basic_copper_setup(
                 &PathBuf::from(&logger_path),
@@ -98,9 +94,9 @@ fn main() {
             )
             .expect("Failed to setup logger.");
 
-            rerun_viz::init_rerun(rerun_viz::RerunViz::Viz(rerun_viz::Level::All)).expect(
-                "Failed to initialize Rerun. Please check that the rerun binary is in your path.",
-            );
+            // rerun_viz::init_rerun(rerun_viz::RerunViz::Viz(rerun_viz::Level::All)).expect(
+            //     "Failed to initialize Rerun. Please check that the rerun binary is in your path.",
+            // );
 
             let robot_chain = NodeSerde::from_reader(
                 std::fs::File::open("../robot-layout/lunabot.ron")
@@ -122,18 +118,23 @@ fn main() {
                 .expect("Failed to start all tasks.");
             let target_duration = std::time::Duration::from_nanos(1_000_000_000 / TARGET_HZ as u64);
             let mut last_time = std::time::Instant::now();
-
+            let mut counter = 0;
             while viewer.running() {
+                counter += 1;
                 application
                     .run_one_iteration(&mut sim_callback)
                     .expect("failed to run copper list iteration");
-                viewer.sync();
-                viewer.render(true);
                 data.step();
 
                 let elapsed = last_time.elapsed();
                 if elapsed < target_duration {
                     std::thread::sleep(target_duration - elapsed);
+                }
+                // we don't need to sync and render at TARGET_HZ, only step the simulation
+                if counter == 10 {
+                    viewer.sync();
+                    viewer.render(true);
+                    counter = 0;
                 }
                 last_time = std::time::Instant::now();
             }
@@ -159,6 +160,7 @@ fn set_up_mujoco() -> (&'static MjModel, MjViewerCpp<'static>, MjData<'static>) 
         MjModel::from_xml("../mujoco_sim/artemis_arena.xml")
             .expect("failed to create MjModel from artemis_arena.xml"),
     ));
+    model.opt_mut().timestep = 1.0 / (TARGET_HZ as f64);
     println!("Making Data...");
     let data = model.make_data();
     println!("Launching Viewer...");
