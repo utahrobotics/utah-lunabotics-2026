@@ -30,7 +30,7 @@
     <mesh file="rock_rough_collision_24.obj" />
   </asset>
   <worldbody>
-    <body name="rock_rough" pos="1 1 10">
+    <body name="rock_rough" pos="1 1 1.5">
       <joint type="free" />
       <geom material="DefaultMaterialRock" mesh="rock_rough" class="visual" />
       <geom mesh="rock_rough_collision_0"

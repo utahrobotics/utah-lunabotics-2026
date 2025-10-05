@@ -23,7 +23,7 @@ resim:
 
 # Run the MuJoCo Simulation
 sim:
-	cd lunabot-cu && cargo run --release --bin lunabot-sim --features sim
+	cd lunabot-cu && RUSTFLAGS="-C linker-features=-lld" cargo run --release --bin lunabot-sim --features sim
 
 # Clean build and sync, then build everything
 clean-build: clean sync
