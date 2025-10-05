@@ -12,10 +12,10 @@ Some things to keep in mind to help avoid headaches and keep all our code nice a
   - Your component has dependencies.
   - It needs explanation for usage or integration.
 
-
-Example: If you are working on a complex GUI component, this should be done in its own folder with all its scenes, assets, and scripts within it. Naturally you can have subfolder to keep organization neat. Adding a readme is greatly appreciated especially if you depend on other components.
-
-> Similar components like GUI could all be in a parent folder (GUI)
+Example: If you're working on a GUI component, it should live in its own folder named after the component. This folder should contain all related scenes, assets, and scripts. You can use subfolders to keep things tidy and organized.
+- Try to keep components modular and scoped to their purpose.
+- No need to be overly granular, but clarity and separation help avoid future headaches.
+- Similar components (like GUI elements) can be grouped under a parent folder such as GUI/.
 
 # Other considerations
 
