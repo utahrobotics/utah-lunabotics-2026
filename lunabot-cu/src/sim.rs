@@ -9,6 +9,7 @@ pub mod utils;
 use cu29::prelude::*;
 use cu29_helpers::basic_copper_setup;
 use gputter::{init_gputter_blocking, is_gputter_initialized};
+use mujoco_rs::mujoco_c::mjtEnableBit;
 use mujoco_rs::prelude::*;
 use mujoco_rs::viewer::MjViewerCpp;
 use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
@@ -160,7 +161,13 @@ fn set_up_mujoco() -> (&'static MjModel, MjViewerCpp<'static>, MjData<'static>) 
         MjModel::from_xml("../mujoco_sim/artemis_arena.xml")
             .expect("failed to create MjModel from artemis_arena.xml"),
     ));
-    model.opt_mut().timestep = 1.0 / (TARGET_HZ as f64);
+    let mut timestep = 1.0 / (TARGET_HZ as f64);
+    // speed up the simulation by a little
+    timestep *= 1.3;
+    model.opt_mut().timestep = timestep;
+
+    model.opt_mut().disableflags |= MjtDisableBit::mjDSBL_NATIVECCD as i32;
+    model.opt_mut().enableflags |= MjtEnableBit::mjENBL_MULTICCD as i32;
     println!("Making Data...");
     let data = model.make_data();
     println!("Launching Viewer...");
