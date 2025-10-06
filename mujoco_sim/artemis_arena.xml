@@ -13,6 +13,10 @@
     <global offwidth="1920" offheight="1080" />
   </visual>
 
+  <asset>
+    <material name="RobotMaterial" specular="0.5" shininess="0.5" rgba="1 1 1 1.0" />
+    <mesh name="teri_mesh" file="../lunabot-cu/3d-models/simplify_lunabot.stl" />
+  </asset>
 
   <include file="meshes/lunar_surface/lunar_surface.xml" />
   <include file="meshes/arena_columns/arena_columns.xml" />
@@ -30,6 +34,12 @@
 
     <camera name="user_camera" pos="0.550397 7.43232 16.7573"
       xyaxes="-0.997 -0.078 0 0.024 -0.309 0.951" />
+
+    <body name="teri" pos="1 1 -0.5">
+      <joint type="free" />
+      <geom material="RobotMaterial" mesh="teri_mesh" class="visual"></geom>
+      <geom mesh="teri_mesh" class="collision"></geom>
+    </body>
 
   </worldbody>
 
