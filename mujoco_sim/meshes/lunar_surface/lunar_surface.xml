@@ -1,33 +1,24 @@
 <mujoco model="lunar_surface">
-
   <asset>
     <material name="DefaultMaterialLunarSurface1" specular="0.5" shininess="0.5" rgba="1 1 1 1.0" />
     <mesh file="lunar_surface.obj" />
-    <mesh file="lunar_surface_collision_0.obj" />
-    <mesh file="lunar_surface_collision_1.obj" />
-    <mesh file="lunar_surface_collision_2.obj" />
-    <mesh file="lunar_surface_collision_3.obj" />
-    <mesh file="lunar_surface_collision_4.obj" />
-    <mesh file="lunar_surface_collision_5.obj" />
-    <mesh file="lunar_surface_collision_6.obj" />
+
+    <hfield name="lunar_terrain"
+      file="lunar_heightfield.png"
+      size="3.61 2.67 0.44 0.01" />
   </asset>
+
   <worldbody>
     <body name="lunar_surface" pos="0 0 -1.2">
-      <geom material="DefaultMaterialLunarSurface1" mesh="lunar_surface" class="visual" />
-      <geom mesh="lunar_surface_collision_0"
-        rgba="0.7182451623277757 0.2618734910739219 0.598995783021173 1" class="collision" />
-      <geom mesh="lunar_surface_collision_1"
-        rgba="0.42484694433105763 0.5070554730413183 0.36872764498891175 1" class="collision" />
-      <geom mesh="lunar_surface_collision_2"
-        rgba="0.08066017197410291 0.5415846756263241 0.8919750354630022 1" class="collision" />
-      <geom mesh="lunar_surface_collision_3"
-        rgba="0.6197101776758541 0.20757104679495653 0.032094726917106686 1" class="collision" />
-      <geom mesh="lunar_surface_collision_4"
-        rgba="0.991692569849512 0.9504012083729972 0.7642622794051945 1" class="collision" />
-      <geom mesh="lunar_surface_collision_5"
-        rgba="0.42237424017353975 0.9832352282353294 0.8569539117836149 1" class="collision" />
-      <geom mesh="lunar_surface_collision_6"
-        rgba="0.9375296502525153 0.913890306811168 0.37102689567028757 1" class="collision" />
+      <geom material="DefaultMaterialLunarSurface1"
+        mesh="lunar_surface"
+        class="visual" />
+
+      <geom name="lunar_collision"
+        type="hfield"
+        hfield="lunar_terrain"
+        pos="0 0 -0.32"
+        class="collision" />
     </body>
   </worldbody>
 </mujoco>
