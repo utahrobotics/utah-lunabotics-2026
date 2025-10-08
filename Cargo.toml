@@ -9,6 +9,7 @@ members = [
     "misc/iceoryx-types",
     "misc/launcher",
     "misc/vesc-translator",
+    "misc/kalman-filter",
     "common",
     "lunabot-cu",
     "embedded_common",

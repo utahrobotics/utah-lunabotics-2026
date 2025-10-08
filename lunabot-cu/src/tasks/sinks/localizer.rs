@@ -1,11 +1,8 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, f32::consts::E, intrinsics::powf64};
 
 use cu_spatial_payloads::EncodableIsometry;
 use cu29::{
-    CuError,
-    clock::Instant,
-    cutask::{CuMsg, CuSinkTask, Freezable},
-    input_msg,
+    clock::{CuTime, Instant}, cutask::{CuMsg, CuSinkTask, Freezable}, input_msg, CuError
 };
 use embedded_common::FromPicoV3;
 use iceoryx_types::ImuMsg;
@@ -24,6 +21,8 @@ use crate::{
     utils::{lerp, lerp_value, swing_twist_decomposition},
 };
 
+use kalman_filter::*;
+
 const ACCELEROMETER_LERP_SPEED: f64 = 150.0;
 const ICP_FILTER_SPEED: f64 = 100.0;
 const LOCALIZATION_DELTA: f64 = 1.0 / 60.0;
@@ -37,6 +36,9 @@ pub struct Localizer {
     // publishes EncodableIsometry at 60hz
     root_node_publisher: Publisher<ipc::Service, [f64; 16], ()>,
     realsense_node_publisher: Publisher<ipc::Service, [f64; 16], ()>,
+    /// Stores all information of kalman filter, including past values, and update logic.
+    kalman_filter: KalmanFilter<6>,
+    most_recent_update: CuTime,
 }
 
 impl Freezable for Localizer {}
@@ -89,6 +91,16 @@ impl CuSinkTask for Localizer {
             .create()
             .map_err(|e| CuError::new_with_cause("Localizer: publisher", e))?;
 
+        let kalman_filter = KalmanFilter::new(
+            SimpleVector::from_element(0.0),
+            SimpleSquareMatrix::from_diagonal_element(100.0),
+            |vec, mat, dt| (
+                vec,
+                // e^a * e^b = e^(a+b), so the operation is consistent regardless of time division
+                mat * SimpleSquareMatrix::from_diagonal_element(f64::powf(E.into(), dt))
+            )
+        );
+
         if let Some(root_node) = ROOT_NODE.get() {
             return Ok(Self {
                 root_node: root_node.clone(),
@@ -98,6 +110,8 @@ impl CuSinkTask for Localizer {
                 last_imu_orientation: None,
                 root_node_publisher: publisher,
                 realsense_node_publisher: publisher_realsense,
+                kalman_filter,
+                most_recent_update: CuTime::default(),
             });
         } else {
             return Err(CuError::new_with_cause(
@@ -187,8 +201,21 @@ impl CuSinkTask for Localizer {
             fused_isometry
         };
 
+        let dt: f64 = (clock.now() - self.most_recent_update).as_nanos() as f64 / 1e9;
+        self.most_recent_update = clock.now();
+
+        self.kalman_filter.step_time(dt);
+
         if let Some(iso) = final_isometry {
-            self.root_node.set_isometry(iso);
+            // Convert proper isometry into vector representation used by kalman filter for interpolation.
+            let measurement_vector = iso_to_vec(iso);
+            let variance_matrix = SimpleSquareMatrix::from_diagonal_element(0.1);
+
+            // Enter measurement into filter
+            self.kalman_filter.apply_measurement(&measurement_vector, &variance_matrix);
+
+            // Report kalman filter state (converted to isometry) as robot position
+            self.root_node.set_isometry(vec_to_iso(self.kalman_filter.get_current_state()));
         }
 
         if self.last_rerun_log.elapsed().as_nanos() > 16_666_667 {
@@ -263,6 +290,37 @@ impl CuSinkTask for Localizer {
         Ok(())
     }
 }
+
+
+fn vec_to_iso(vec: SimpleVector<6>) -> Isometry3<f64> {
+    let translation: Vector3<f64> = Vector3::<f64>::new(
+        vec.x,
+        vec.y,
+        vec.z,
+    );
+
+    let rotation: Vector3<f64> = Vector3::<f64>::new(
+        vec.w,
+        vec.a,
+        vec.b,
+    );
+
+    Isometry3::<f64>::new(translation, rotation)
+}
+
+fn iso_to_vec(iso: Isometry3<f64>) -> SimpleVector<6> {
+    let rotation_vector = iso.rotation.scaled_axis();
+
+    SimpleVector::<6>::new(
+        iso.translation.x,
+        iso.translation.y,
+        iso.translation.z,
+        rotation_vector.x,
+        rotation_vector.y,
+        rotation_vector.z,
+    )
+}
+
 
 #[derive(Debug, Clone)]
 struct OrientationComponents {

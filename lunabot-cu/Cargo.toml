@@ -91,6 +91,7 @@ tasker = { path = "../misc/tasker" }
 iceoryx-types = { path = "../misc/iceoryx-types" }
 launcher = { path = "../misc/launcher", optional = true }
 vesc-translator = { path = "../misc/vesc-translator", optional = true }
+kalman_filter = { path = "../misc/kalman-filter" }
 thalassic = { path = "../misc/thalassic" }
 gputter = { path = "../misc/gputter" }
 
