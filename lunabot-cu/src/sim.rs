@@ -158,7 +158,7 @@ fn main() {
 fn set_up_mujoco() -> (&'static MjModel, MjViewerCpp<'static>, MjData<'static>) {
     println!("Creating model...");
     let model = Box::leak(Box::new(
-        MjModel::from_xml("../mujoco_sim/artemis_arena.xml")
+        MjModel::from_xml("../mujoco-sim/artemis_arena.xml")
             .expect("failed to create MjModel from artemis_arena.xml"),
     ));
     let mut timestep = 1.0 / (TARGET_HZ as f64);

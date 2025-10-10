@@ -75,5 +75,6 @@ help:
 	@echo "  resim			   - Run re-simulation from logs/lunabot.copper"
 	@echo "  clear-logs        - Removes all unified logs from the simulation"
 	@echo "  clear-logs        - Removes all copper unified logs"
+	@echo "  sim               - Runs the Mujoco simulation"
 
 .PHONY: prod debug sync clean-build build-publisher discover-cameras check clean help
