@@ -31,3 +31,43 @@ This option simply loads the artemis_arena.xml scene into the mujoco simulator w
 3. run ```./simulate ./simulate /path/to/utah-lunabotics-2026/mujoco-sim/artemis_arena.xml```
 
 **What to use this option for:** Viewing changes to any of the xml files for the scene + model.
+
+
+## Tooling
+
+1. [obj2mjcf](https://github.com/kevinzakka/obj2mjcf)
+
+## Development 
+
+### Adding a Mesh to the scene
+1. Use the obj2mjcf to segment the model into a collection of convex meshs, and generate the files needed for importing it into the scene: ```obj2mjcf --compile-model --save-mjcf --decompose --overwrite --obj-dir .   --coacd-args.threshold 0.01```
+2. Rename DefaultMaterial in the generated xml file to something else.
+3. Delete the ```<default>...<\default>``` element.
+4. Move all the generated files in the directory to mujoco-sim/meshes
+5. Import the item into the scene by adding ```xml
+ <include file="meshes/model_name/model_name.xml" />
+ ```
+To artemis_arena.xml, or use [attach](https://mujoco.readthedocs.io/en/3.3.5/XMLreference.html#body-attach).
+
+6. Set the [joint type](https://mujoco.readthedocs.io/en/stable/XMLreference.html#body-joint)
+7. Make sure the generated meshes look fine by changing the group of the visual class to 3 and the group of the collision class to 2 in artemis_arena.xml, because that will make the collision meshes visible in the simulator UI:
+```  <default>
+    <default class="visual">
+      <geom group="2" type="mesh" contype="0" conaffinity="0" />
+    </default>
+    <default class="collision">
+      <geom group="3" type="mesh" />
+    </default>
+  </default>
+  ```
+
+
+### Learning Resources
+
+1. Mujoco-rs docs
+* Guide: https://mujoco-rs.readthedocs.io/en/v1.5.x/
+* API docs: https://docs.rs/mujoco-rs/latest/mujoco_rs/
+* Mujoco-rs examples: https://github.com/davidhozic/mujoco-rs/tree/main/examples 
+2. [Mujoco Docs](https://mujoco.readthedocs.io/en/3.3.5/overview.html)
+3. [Mujoco XML reference](https://mujoco.readthedocs.io/en/3.3.5/XMLreference.html)
+4. [Mujoco model examples](https://github.com/google-deepmind/mujoco_menagerie/tree/main)
