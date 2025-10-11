@@ -11,9 +11,8 @@ config_version=5
 [application]
 
 config/name="new-lunabase"
-run/main_scene="uid://dpgkr1kstjgty"
 config/features=PackedStringArray("4.5", "GL Compatibility")
-config/icon="res://sources/icon.svg"
+config/icon="res://icon.svg"
 
 [rendering]
 
