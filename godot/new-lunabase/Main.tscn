@@ -1,0 +1,39 @@
+[gd_scene load_steps=4 format=3 uid="uid://dpgkr1kstjgty"]
+
+[ext_resource type="Script" uid="uid://goysb02gh2b" path="res://placeHolderGdScripts/autonomous.gd" id="1_glv2v"]
+[ext_resource type="Texture2D" uid="uid://dw7rfkv8mvfy6" path="res://sources/30876786.png" id="2_uu6xs"]
+[ext_resource type="Script" uid="uid://cclokh0erntvm" path="res://placeHolderGdScripts/StageReader.gd" id="3_r0du0"]
+
+[node name="Node2D" type="CheckButton"]
+offset_left = 949.0
+offset_top = 200.0
+offset_right = 1148.0
+offset_bottom = 252.0
+text = "Autonomous Mode
+"
+script = ExtResource("1_glv2v")
+
+[node name="RichTextLabel" type="RichTextLabel" parent="."]
+layout_mode = 0
+offset_left = -918.0
+offset_top = -176.0
+offset_right = -764.0
+offset_bottom = -117.0
+text = "Current Stage
+"
+tab_size = 5
+
+[node name="RichTextLabel" type="RichTextLabel" parent="RichTextLabel"]
+layout_mode = 0
+offset_left = -22.0
+offset_top = 33.0
+offset_right = 134.0
+offset_bottom = 101.0
+script = ExtResource("3_r0du0")
+
+[node name="Player" type="Player" parent="."]
+position = Vector2(-351, 100)
+scale = Vector2(1.525, 1.525)
+texture = ExtResource("2_uu6xs")
+
+[connection signal="toggled" from="." to="." method="_on_toggled"]
