@@ -1,4 +1,4 @@
-class_name TestHumanController extends Node
+class_name PitchRollcontroller extends Node
 
 ## This is the human controller for the test scene
 ##
