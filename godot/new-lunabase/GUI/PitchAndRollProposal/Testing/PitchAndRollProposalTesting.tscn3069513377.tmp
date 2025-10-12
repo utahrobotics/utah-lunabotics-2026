@@ -1,21 +1,9 @@
-[gd_scene load_steps=10 format=3 uid="uid://bktkc6ibjikek"]
+[gd_scene load_steps=7 format=3 uid="uid://bktkc6ibjikek"]
 
-[ext_resource type="PackedScene" uid="uid://dhg4sb4ifrvh8" path="res://GUI/PitchAndRollProposal/Testing/FlightSim/UIAttitude/UIAttitude.tscn" id="1_qx84t"]
+[ext_resource type="PackedScene" uid="uid://dhg4sb4ifrvh8" path="res://GUI/PitchAndRollProposal/FlightSim/UIAttitude/UIAttitude.tscn" id="1_qx84t"]
 [ext_resource type="Script" uid="uid://duscmfvqjbvso" path="res://GUI/PitchAndRollProposal/Testing/pitch_and_roll_tester.gd" id="1_y38og"]
 [ext_resource type="Script" uid="uid://s3dmmm01g2sc" path="res://GUI/PitchAndRollProposal/Testing/pitch_and_roll_controller.gd" id="2_pew64"]
 [ext_resource type="Script" uid="uid://dq0r8quxwfhj1" path="res://GUI/PitchAndRollProposal/Testing/PitchAndRollTest_object_to_rotate.gd" id="2_rgoof"]
-
-[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_pew64"]
-sky_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
-ground_horizon_color = Color(0.66224277, 0.6717428, 0.6867428, 1)
-
-[sub_resource type="Sky" id="Sky_cflme"]
-sky_material = SubResource("ProceduralSkyMaterial_pew64")
-
-[sub_resource type="Environment" id="Environment_d64ly"]
-background_mode = 2
-sky = SubResource("Sky_cflme")
-tonemap_mode = 2
 
 [sub_resource type="BoxMesh" id="BoxMesh_qx84t"]
 
@@ -23,13 +11,6 @@ tonemap_mode = 2
 albedo_color = Color(0, 1, 1, 1)
 
 [node name="PitchAndRollProposalTesting" type="Node3D"]
-
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
-transform = Transform3D(-0.8660254, -0.43301278, 0.25, 0, 0.49999997, 0.86602545, -0.50000006, 0.75, -0.43301266, 0, 0, 0)
-shadow_enabled = true
-
-[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
-environment = SubResource("Environment_d64ly")
 
 [node name="PitchAndRollTester" type="Node" parent="."]
 script = ExtResource("1_y38og")
@@ -43,7 +24,7 @@ mesh = SubResource("BoxMesh_qx84t")
 script = ExtResource("2_rgoof")
 
 [node name="MeshInstance3D2" type="MeshInstance3D" parent="ObjectToRotate"]
-transform = Transform3D(0.47812104, 0, 0, 0, 0.3393647, 0, 0, 0, 0.6488075, 0, 0, -0.525187)
+transform = Transform3D(0.47812104, 0, 0, 0, 0.3393647, 0, 0, 0, 0.6488075, 0, 0, 0.614439)
 mesh = SubResource("BoxMesh_qx84t")
 skeleton = NodePath("../..")
 surface_material_override/0 = SubResource("StandardMaterial3D_qx84t")
