@@ -1,0 +1,15 @@
+[gd_scene format=3 uid="uid://bktkc6ibjikek"]
+
+[node name="PitchAndRollProposalTesting" type="Node2D"]
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+
+[node name="Control" type="Control" parent="CanvasLayer"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PitchAndRollTester" type="Node" parent="."]
