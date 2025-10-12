@@ -1,5 +1,6 @@
-extends Command
 class_name TestMoveCommand
+extends Command
+
 
 ## This is a test class meant to show off how action commands are created
 ##
