@@ -12,6 +12,7 @@ config_version=5
 
 config/name="new-lunabase"
 config/features=PackedStringArray("4.5", "GL Compatibility")
+boot_splash/image="uid://c3b2y3ky1m03k"
 config/icon="uid://c3b2y3ky1m03k"
 
 [file_customization]
