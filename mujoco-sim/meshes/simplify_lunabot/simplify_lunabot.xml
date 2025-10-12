@@ -102,7 +102,7 @@
       <!-- Front Left Wheel -->
       <body name="wheel_fl" pos="0 0 0">
 
-        <joint name="motor_fl" type="hinge" axis="0 1 0" pos="0.816 0.065 -0.061" />
+        <joint name="motor_fl" type="hinge" axis="0 1 0" pos="0.816 0.065 -0.061" damping="1.0" />
         <geom mesh="simplify_lunabot_collision_9"
           rgba="0.33586594497754674 0.15326019554498593 0.10107899229814699 1" class="collision" />
         <geom mesh="simplify_lunabot_collision_49"
@@ -122,7 +122,7 @@
       <!-- Front Right Wheel -->
       <body name="wheel_fr" pos="0 0 0">
 
-        <joint name="motor_fr" type="hinge" axis="0 1 0" pos="0.824 -0.472 -0.055" />
+        <joint name="motor_fr" type="hinge" axis="0 1 0" pos="0.824 -0.472 -0.055" damping="1.0" />
         <geom mesh="simplify_lunabot_collision_10"
           rgba="0.938059979477167 0.13908969296886464 0.8597639578100418 1" class="collision" />
         <geom mesh="simplify_lunabot_collision_20"
@@ -140,7 +140,7 @@
       <!-- Back Left Wheel -->
       <body name="wheel_bl" pos="0 0 0">
 
-        <joint name="motor_bl" type="hinge" axis="0 1 0" pos="0.153 0.080 -0.062" />
+        <joint name="motor_bl" type="hinge" axis="0 1 0" pos="0.153 0.080 -0.062" damping="1.0" />
         <geom mesh="simplify_lunabot_collision_25"
           rgba="0.19557086776229193 0.7017468753312268 0.8436626548822119 1" class="collision" />
         <geom mesh="simplify_lunabot_collision_32"
@@ -158,7 +158,7 @@
       <!-- Back Right Wheel -->
       <body name="wheel_br" pos="0 0 0">
 
-        <joint name="motor_br" type="hinge" axis="0 1 0" pos="0.157 -0.466 -0.065" />
+        <joint name="motor_br" type="hinge" axis="0 1 0" pos="0.157 -0.466 -0.065" damping="1.0" />
         <geom mesh="simplify_lunabot_collision_17"
           rgba="0.4200993000806815 0.8554658379707712 0.46925964752129634 1" class="collision" />
         <geom mesh="simplify_lunabot_collision_36"
@@ -265,10 +265,10 @@
   </contact>
 
   <actuator>
-    <motor name="motor_fl" joint="motor_fl" gear="10" />
-    <motor name="motor_fr" joint="motor_fr" gear="10" />
-    <motor name="motor_bl" joint="motor_bl" gear="10" />
-    <motor name="motor_br" joint="motor_br" gear="10" />
+    <motor name="motor_fl" joint="motor_fl" gear="20" />
+    <motor name="motor_fr" joint="motor_fr" gear="20" />
+    <motor name="motor_bl" joint="motor_bl" gear="20" />
+    <motor name="motor_br" joint="motor_br" gear="20" />
   </actuator>
 
 </mujoco>
