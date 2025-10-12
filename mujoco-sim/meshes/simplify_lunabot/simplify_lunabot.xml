@@ -99,7 +99,7 @@
       <geom mesh="simplify_lunabot_collision_8"
         rgba="0.6344520669514044 0.6568292713681868 0.13106244560321956 1" class="collision" />
 
-      <!-- Front Left Motor -->
+      <!-- Front Left Wheel -->
       <body name="wheel_fl" pos="0 0 0">
 
         <joint name="motor_fl" type="hinge" axis="0 1 0" pos="0.816 0.065 -0.061" />
@@ -155,7 +155,7 @@
           rgba="0.20250081557099708 0.1662726910990251 0.7764609287363726 1" class="collision" />
       </body>
 
-      <!-- Back Right Wheel Motor -->
+      <!-- Back Right Wheel -->
       <body name="wheel_br" pos="0 0 0">
 
         <joint name="motor_br" type="hinge" axis="0 1 0" pos="0.157 -0.466 -0.065" />
