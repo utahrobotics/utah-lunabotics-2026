@@ -9,18 +9,20 @@ pub mod utils;
 use cu29::prelude::*;
 use cu29_helpers::basic_copper_setup;
 use gputter::{init_gputter_blocking, is_gputter_initialized};
-use mujoco_rs::mujoco_c::mjtEnableBit;
 use mujoco_rs::prelude::*;
 use mujoco_rs::viewer::MjViewerCpp;
 use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
+use std::sync::{Mutex, OnceLock};
 
 const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 
 pub static ROOT_NODE: OnceLock<StaticNode> = OnceLock::new();
 
 pub static TARGET_HZ: usize = 1000; // MUST BE THE SAME AS THE TARGET HZ IN COPPERCONFIG.RON
+
+pub static MJ_MODEL: OnceLock<&'static MjModel> = OnceLock::new();
+pub static MJ_DATA: OnceLock<Mutex<&'static mut MjData<'static>>> = OnceLock::new();
 
 #[copper_runtime(config = "copperconfig.ron", sim_mode = true)]
 struct LunabotApplication {}
@@ -47,6 +49,9 @@ fn default_callback(step: default::SimStep) -> SimOverride {
 }
 
 fn sim_callback(step: default::SimStep) -> SimOverride {
+    // mj model and data should always be set before this function is called
+    let model = MJ_MODEL.get().unwrap();
+    let mut data = MJ_DATA.get().unwrap().lock().unwrap();
     match step {
         default::SimStep::UdevMonitor(_) => SimOverride::ExecutedBySim,
         default::SimStep::CamSide(_) => SimOverride::ExecutedBySim,
@@ -58,7 +63,10 @@ fn sim_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::L2Pointcloud(_) => SimOverride::ExecutedBySim,
         default::SimStep::L2Imu(_) => SimOverride::ExecutedBySim,
         default::SimStep::V3Pico(_) => SimOverride::ExecutedBySim,
-        default::SimStep::MotorCtrl(_) => SimOverride::ExecutedBySim,
+        default::SimStep::MotorCtrl(CuTaskCallbackState::Process(input, output)) => {
+            SimOverride::ExecutedBySim
+        }
+        default::SimStep::MotorCtrl(..) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamBack(_) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamSide(_) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamLaptopFront(_) => SimOverride::ExecutedBySim,
@@ -76,7 +84,12 @@ fn main() {
     std::thread::Builder::new()
         .stack_size(20 * 1000000) // this size will depend on how big the copper list is
         .spawn(move || {
-            let (model, mut viewer, mut data) = set_up_mujoco();
+            let (model, mut viewer, data) = set_up_mujoco();
+            MJ_MODEL.set(model).expect("Failed to set mj model");
+
+            if MJ_DATA.set(Mutex::new(data)).is_err() {
+                panic!("Failed to set mj data");
+            }
             // Setup logging path for resimulation
             let logger_path = "logs/lunabotsim.copper";
             if let Some(parent) = Path::new(logger_path).parent() {
@@ -125,7 +138,7 @@ fn main() {
                 application
                     .run_one_iteration(&mut sim_callback)
                     .expect("failed to run copper list iteration");
-                data.step();
+                MJ_DATA.get().unwrap().lock().unwrap().step();
 
                 let elapsed = last_time.elapsed();
                 if elapsed < target_duration {
@@ -155,7 +168,11 @@ fn main() {
     debug!("End of log replay.");
 }
 
-fn set_up_mujoco() -> (&'static MjModel, MjViewerCpp<'static>, MjData<'static>) {
+fn set_up_mujoco() -> (
+    &'static MjModel,
+    MjViewerCpp<'static>,
+    &'static mut MjData<'static>,
+) {
     println!("Creating model...");
     let model = Box::leak(Box::new(
         MjModel::from_xml("../mujoco-sim/artemis_arena.xml")
@@ -173,5 +190,5 @@ fn set_up_mujoco() -> (&'static MjModel, MjViewerCpp<'static>, MjData<'static>) 
     println!("Launching Viewer...");
 
     let viewer = MjViewerCpp::launch_passive(model, &data, 100);
-    (model, viewer, data)
+    (model, viewer, Box::leak(Box::new(data)))
 }
