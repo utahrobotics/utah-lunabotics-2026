@@ -107,7 +107,7 @@ fn main() {
                 }
             }
             // Create mock robot clock for simulation
-            let (robot_clock, _robot_clock_mock) = RobotClock::mock();
+            let (robot_clock, robot_clock_mock) = RobotClock::mock();
 
             let copper_ctx = basic_copper_setup(
                 &PathBuf::from(&logger_path),
@@ -141,9 +141,11 @@ fn main() {
                 .expect("Failed to start all tasks.");
             let target_duration = std::time::Duration::from_nanos(1_000_000_000 / TARGET_HZ as u64);
             let mut last_time = std::time::Instant::now();
+            let start = std::time::Instant::now();
             let mut counter = 0;
             while viewer.running() {
                 counter += 1;
+                robot_clock_mock.set_value(start.elapsed().as_nanos() as u64);
                 application
                     .run_one_iteration(&mut sim_callback)
                     .expect("failed to run copper list iteration");

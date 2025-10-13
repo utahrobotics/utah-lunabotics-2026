@@ -77,7 +77,7 @@
 
   <worldbody>
     <body name="simplify_lunabot" pos="1 1 0.4">
-      <inertial mass="3" pos="0.5 -0.20 0" diaginertia="1 1 1" />
+      <inertial mass="80" pos="0.5 -0.20 0" diaginertia="1 1 1" />
       <joint type="free" />
       <geom material="DefaultMaterialLunabot" mesh="simplify_lunabot" class="visual" />
       <geom mesh="simplify_lunabot_collision_0"
@@ -100,8 +100,7 @@
         rgba="0.6344520669514044 0.6568292713681868 0.13106244560321956 1" class="collision" />
 
       <!-- Front Left Wheel -->
-      <body name="wheel_fl" pos="0 0 0">
-
+      <body name="wheel_fl" pos="0 0 0" childclass="wheel">
         <joint name="motor_fl" type="hinge" axis="0 1 0" pos="0.816 0.065 -0.061" damping="1.0" />
         <geom mesh="simplify_lunabot_collision_9"
           rgba="0.33586594497754674 0.15326019554498593 0.10107899229814699 1" class="collision" />
@@ -120,7 +119,7 @@
       </body>
 
       <!-- Front Right Wheel -->
-      <body name="wheel_fr" pos="0 0 0">
+      <body name="wheel_fr" pos="0 0 0" childclass="wheel">
 
         <joint name="motor_fr" type="hinge" axis="0 1 0" pos="0.824 -0.472 -0.055" damping="1.0" />
         <geom mesh="simplify_lunabot_collision_10"
@@ -138,7 +137,7 @@
       </body>
 
       <!-- Back Left Wheel -->
-      <body name="wheel_bl" pos="0 0 0">
+      <body name="wheel_bl" pos="0 0 0" childclass="wheel">
 
         <joint name="motor_bl" type="hinge" axis="0 1 0" pos="0.153 0.080 -0.062" damping="1.0" />
         <geom mesh="simplify_lunabot_collision_25"
@@ -156,7 +155,7 @@
       </body>
 
       <!-- Back Right Wheel -->
-      <body name="wheel_br" pos="0 0 0">
+      <body name="wheel_br" pos="0 0 0"  childclass="wheel">
 
         <joint name="motor_br" type="hinge" axis="0 1 0" pos="0.157 -0.466 -0.065" damping="1.0" />
         <geom mesh="simplify_lunabot_collision_17"
