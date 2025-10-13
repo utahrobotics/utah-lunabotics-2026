@@ -17,7 +17,10 @@ cmake --build build --parallel --target simulate libsimulate --config=Release
 This option synchronizes the time step of the physics simulation to the HZ at which the copper pipeline runs, specified as ```rate_target_hz: 1000``` in the copperconfig, and ```pub static TARGET_HZ: usize = 1000;``` in sim.rs.
 
 
-Additionally, starting the simulation this way launches the code for the lunabot, and will eventually be connected to the simulation environment so that the wheels will move when commanded to by the ```motor_ctrl``` task, actuators will move when commanded to by the v3_pico task, and sensor inputs for lidars and imus will be simulated by using Mujoco's rangefinder and accelerometer sensors respectively.
+Additionally, starting the simulation this way launches the code for the lunabot, which is connected to the simulation environment so that the wheels will move when commanded to by the ```motor_ctrl``` task, actuators will move when commanded to by the v3_pico task, and sensor inputs for lidars and imus will be simulated by using Mujoco's rangefinder and accelerometer sensors respectively.
+
+
+*Currently only the motor_ctrl task is connected, no sensor inputs or actuators yet*
 
 * Run the simulation by calling ```make sim```, this command may re build the entire project because mujoco requires using a different linker.
 
@@ -28,7 +31,7 @@ This option simply loads the artemis_arena.xml scene into the mujoco simulator w
 
 1. cd into the directory where you cloned mujoco-rs
 2. cd into ```mujoco/build/bin```
-3. run ```./simulate ./simulate /path/to/utah-lunabotics-2026/mujoco-sim/artemis_arena.xml```
+3. run ```./simulate /path/to/utah-lunabotics-2026/mujoco-sim/artemis_arena.xml```
 
 **What to use this option for:** Viewing changes to any of the xml files for the scene + model.
 
@@ -44,22 +47,25 @@ This option simply loads the artemis_arena.xml scene into the mujoco simulator w
 2. Rename DefaultMaterial in the generated xml file to something else.
 3. Delete the ```<default>...<\default>``` element.
 4. Move all the generated files in the directory to mujoco-sim/meshes
-5. Import the item into the scene by adding ```xml
+5. Import the item into the scene by adding
+
+ ```xml
  <include file="meshes/model_name/model_name.xml" />
  ```
 To artemis_arena.xml, or use [attach](https://mujoco.readthedocs.io/en/3.3.5/XMLreference.html#body-attach).
 
 6. Set the [joint type](https://mujoco.readthedocs.io/en/stable/XMLreference.html#body-joint)
 7. Make sure the generated meshes look fine by changing the group of the visual class to 3 and the group of the collision class to 2 in artemis_arena.xml, because that will make the collision meshes visible in the simulator UI:
-```  <default>
+```xml
+<default>
     <default class="visual">
       <geom group="2" type="mesh" contype="0" conaffinity="0" />
     </default>
     <default class="collision">
       <geom group="3" type="mesh" />
     </default>
-  </default>
-  ```
+</default>
+ ```
 
 
 ### Learning Resources
