@@ -63,7 +63,16 @@ fn sim_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::L2Pointcloud(_) => SimOverride::ExecutedBySim,
         default::SimStep::L2Imu(_) => SimOverride::ExecutedBySim,
         default::SimStep::V3Pico(_) => SimOverride::ExecutedBySim,
-        default::SimStep::MotorCtrl(CuTaskCallbackState::Process(input, output)) => {
+        default::SimStep::MotorCtrl(CuTaskCallbackState::Process(input, _)) => {
+            if let Some((Some(steering), _)) = input.payload() {
+                let (left, right) = steering.get_left_and_right();
+                // left vesc
+                data.actuator("motor_fl").unwrap().view_mut(&mut data).ctrl[0] = left;
+                data.actuator("motor_bl").unwrap().view_mut(&mut data).ctrl[0] = left;
+                // right vesc
+                data.actuator("motor_fr").unwrap().view_mut(&mut data).ctrl[0] = right;
+                data.actuator("motor_br").unwrap().view_mut(&mut data).ctrl[0] = right;
+            }
             SimOverride::ExecutedBySim
         }
         default::SimStep::MotorCtrl(..) => SimOverride::ExecutedBySim,
