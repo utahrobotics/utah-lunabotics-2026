@@ -47,22 +47,25 @@ This option simply loads the artemis_arena.xml scene into the mujoco simulator w
 2. Rename DefaultMaterial in the generated xml file to something else.
 3. Delete the ```<default>...<\default>``` element.
 4. Move all the generated files in the directory to mujoco-sim/meshes
-5. Import the item into the scene by adding ```xml
+5. Import the item into the scene by adding
+
+ ```xml
  <include file="meshes/model_name/model_name.xml" />
  ```
 To artemis_arena.xml, or use [attach](https://mujoco.readthedocs.io/en/3.3.5/XMLreference.html#body-attach).
 
 6. Set the [joint type](https://mujoco.readthedocs.io/en/stable/XMLreference.html#body-joint)
 7. Make sure the generated meshes look fine by changing the group of the visual class to 3 and the group of the collision class to 2 in artemis_arena.xml, because that will make the collision meshes visible in the simulator UI:
-```  <default>
+```xml
+<default>
     <default class="visual">
       <geom group="2" type="mesh" contype="0" conaffinity="0" />
     </default>
     <default class="collision">
       <geom group="3" type="mesh" />
     </default>
-  </default>
-  ```
+</default>
+ ```
 
 
 ### Learning Resources
