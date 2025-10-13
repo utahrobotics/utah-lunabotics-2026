@@ -151,7 +151,7 @@ fn main() {
         .stack_size(20 * 1000000) // this size will depend on how big the copper list is
         .spawn(move || {
             // Setup logging path for resimulation
-            let logger_path = "logs/lunabotsim.copper";
+            let logger_path = "logs/lunabotresim.copper";
             if let Some(parent) = Path::new(logger_path).parent() {
                 if !parent.exists() {
                     std::fs::create_dir_all(parent).expect("Failed to create logs directory");

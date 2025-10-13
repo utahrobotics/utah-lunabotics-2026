@@ -17,7 +17,7 @@ use std::{
 use tasker::tokio::sync::mpsc::error::TryRecvError;
 use tasker::tokio::sync::{mpsc, watch};
 
-#[cfg(feature = "production")]
+#[cfg(not(feature = "resim"))]
 use crate::comms::{
     LunabaseConn, LunabotConnected, PacketBuilder, create_packet_builder, default_max_pong_delay_ms,
 };
@@ -25,7 +25,7 @@ use common::{FromLunabase, LUNABOT_STAGE, LunabotStage, ports::TELEOP};
 
 pub struct Lunabase {
     from_lunabase_rx: mpsc::UnboundedReceiver<FromLunabase>,
-    #[cfg(feature = "production")]
+    #[cfg(not(feature = "resim"))]
     connected: LunabotConnected,
     message_buffer: VecDeque<FromLunabase>,
 }
@@ -35,7 +35,7 @@ impl Freezable for Lunabase {}
 impl CuSrcTask for Lunabase {
     type Output<'m> = output_msg!(Option<FromLunabase>);
 
-    #[cfg(any(feature = "sim", feature = "resim"))]
+    #[cfg(feature = "resim")]
     fn new(_config: Option<&ComponentConfig>) -> CuResult<Self>
     where
         Self: Sized,
@@ -47,7 +47,7 @@ impl CuSrcTask for Lunabase {
         })
     }
 
-    #[cfg(feature = "production")]
+    #[cfg(not(feature = "resim"))]
     fn new(config: Option<&ComponentConfig>) -> CuResult<Self>
     where
         Self: Sized,
@@ -94,7 +94,7 @@ impl CuSrcTask for Lunabase {
             }
         }
         let status;
-        #[cfg(feature = "production")]
+        #[cfg(not(feature = "resim"))]
         if !self.connected.is_connected() {
             self.message_buffer.clear();
             self.message_buffer.push_back(FromLunabase::Disconnect);
@@ -106,7 +106,7 @@ impl CuSrcTask for Lunabase {
             status = Ok(())
         }
 
-        #[cfg(any(feature = "sim", feature = "resim"))]
+        #[cfg(feature = "resim")]
         {
             status = Ok(());
         }

@@ -32,6 +32,12 @@
 3. [Realsense SDK](https://github.com/IntelRealSense/librealsense)
 4. [Apriltag Library](https://github.com/AprilRobotics/apriltag)
 
+### Log Replay env (Windows, Macos, Linux)
+See ```Building and Running``` section for detailed instructions for your platform.
+
+### Simulation Environment 
+See [mujoco-sim/README.md](mujoco-sim/README.md) for dependencies and instructions.
+
 ### Optional Dependencies
 
 1. **cubuild** - Enhanced error messages for Copper macros
@@ -46,10 +52,14 @@
 
 *NOTE: On some machines you have to increase the stack size for it to compile ```export RUST_MIN_STACK=107108864```.*
 
-### Production env (Linux only)
 
-1. run ```make sync``` to build/sync deps for the Unitree L2 publisher.
-2. run ```make prod``` to build and run the project.
+### Simulation Environment (Linux, Macos, Windows)
+See [mujoco-sim/README.md](mujoco-sim/README.md) for instructions.
+
+### Production env (Linux only)
+1. Install dependencies listed in the above ```Dependencies``` section for the production environment.
+2. run ```make sync``` to build/sync deps for the Unitree L2 publisher.
+3. run ```make prod``` to build and run the project.
 
 ### Log replay and development tools (Linux)
 

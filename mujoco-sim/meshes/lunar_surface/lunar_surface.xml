@@ -1,0 +1,24 @@
+<mujoco model="lunar_surface">
+  <asset>
+    <material name="DefaultMaterialLunarSurface1" specular="0.5" shininess="0.5" rgba="1 1 1 1.0" />
+    <mesh file="lunar_surface.obj" />
+
+    <hfield name="lunar_terrain"
+      file="lunar_heightfield.png"
+      size="3.61 2.67 0.44 0.01" />
+  </asset>
+
+  <worldbody>
+    <body name="lunar_surface" pos="0 0 -1.2">
+      <geom material="DefaultMaterialLunarSurface1"
+        mesh="lunar_surface"
+        class="visual" />
+
+      <geom name="lunar_collision"
+        type="hfield"
+        hfield="lunar_terrain"
+        pos="0 0 -0.32"
+        class="collision" />
+    </body>
+  </worldbody>
+</mujoco>

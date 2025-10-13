@@ -63,16 +63,16 @@ impl CuTask for OccupancyGridTask {
             (height as f32 * THALASSIC_CELL_SIZE) / 2.0,
             0.01,
         );
+        if let Some(logger) = RECORDER.get() {
+            logger
+                .recorder
+                .log_static(
+                    "arena",
+                    &rerun::Boxes3D::from_centers_and_half_sizes(vec![center], vec![half_size]),
+                )
+                .unwrap();
+        }
 
-        RECORDER
-            .get()
-            .unwrap()
-            .recorder
-            .log_static(
-                "arena",
-                &rerun::Boxes3D::from_centers_and_half_sizes(vec![center], vec![half_size]),
-            )
-            .unwrap();
         Ok(())
     }
 
@@ -193,16 +193,18 @@ impl CuTask for OccupancyGridTask {
         );
 
         // only log every nth point so my laptop doesnt catch on fire
-        let _ = RECORDER.get().unwrap().recorder.log(
-            format!("realsense/pcl"),
-            &Points3D::new(point_cloud.iter().enumerate().filter_map(|(i, p)| {
-                if p.w != 0.0 && i % 10 == 0 {
-                    Some([p.x, p.y, p.z])
-                } else {
-                    None
-                }
-            })),
-        );
+        if let Some(logger) = RECORDER.get() {
+            let _ = logger.recorder.log(
+                format!("realsense/pcl"),
+                &Points3D::new(point_cloud.iter().enumerate().filter_map(|(i, p)| {
+                    if p.w != 0.0 && i % 10 == 0 {
+                        Some([p.x, p.y, p.z])
+                    } else {
+                        None
+                    }
+                })),
+            );
+        }
 
         let mut height_map_out = vec![0u32; THALASSIC_CELL_COUNT as usize];
         let point_count = self.depth_projector_pipeline.get_pixel_count().get();
