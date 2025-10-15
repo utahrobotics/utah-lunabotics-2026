@@ -18,7 +18,7 @@
         type="hfield"
         hfield="lunar_terrain"
         pos="0 0 -0.32"
-        class="collision" />
+        class="collision"  solimp="0.8"/>
     </body>
   </worldbody>
 </mujoco>

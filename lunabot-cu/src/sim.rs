@@ -66,6 +66,8 @@ fn sim_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::MotorCtrl(CuTaskCallbackState::Process(input, _)) => {
             if let Some((Some(steering), _)) = input.payload() {
                 let (left, right) = steering.get_left_and_right();
+                let left = left * 50.0;
+                let right = right * 50.0;
                 // left vesc
                 data.actuator("motor_fl").unwrap().view_mut(&mut data).ctrl[0] = left;
                 data.actuator("motor_bl").unwrap().view_mut(&mut data).ctrl[0] = left;
@@ -191,7 +193,7 @@ fn set_up_mujoco() -> (
     ));
     let mut timestep = 1.0 / (TARGET_HZ as f64);
     // speed up the simulation by a little
-    timestep *= 1.3;
+    timestep *= 1.6;
     model.opt_mut().timestep = timestep;
 
     model.opt_mut().disableflags |= MjtDisableBit::mjDSBL_NATIVECCD as i32;

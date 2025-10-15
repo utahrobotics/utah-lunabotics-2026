@@ -7,7 +7,7 @@
       <geom group="2" type="mesh" />
     </default>
     <default class="wheel">
-        <geom group="2" type="mesh" friction="10.0 0.0001 0.0001"  />
+        <geom group="2" type="mesh" solimp="0.8" />
     </default>
   </default>
   <visual>
@@ -24,7 +24,7 @@
   <include file="meshes/arena_window_frames/arena_window_frames.xml" />
   <include file="meshes/arena_windows/arena_windows.xml" />
 
-  <include file="meshes/rock_rough/rock_rough.xml" />
+  <!-- <include file="meshes/rock_rough/rock_rough.xml" /> -->
   <include file="meshes/simplify_lunabot/simplify_lunabot.xml" />
 
 

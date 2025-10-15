@@ -76,7 +76,7 @@
   </asset>
 
   <worldbody>
-    <body name="simplify_lunabot" pos="1 1 0.4">
+    <body name="simplify_lunabot" pos="1 1 0.4" euler = "0 0 0 ">
       <inertial mass="80" pos="0.5 -0.20 0" diaginertia="1 1 1" />
       <joint type="free" />
       <geom material="DefaultMaterialLunabot" mesh="simplify_lunabot" class="visual" />
@@ -244,7 +244,7 @@
         rgba="0.23498010517229106 0.4707940170404168 0.42072024685700504 1" class="collision" />
       <geom mesh="simplify_lunabot_collision_69"
         rgba="0.9013961705691316 0.6758704046652588 0.9204316164110201 1" class="collision" />
-    </body>
+     </body>
   </worldbody>
 
   <contact>
@@ -264,10 +264,10 @@
   </contact>
 
   <actuator>
-    <motor name="motor_fl" joint="motor_fl" gear="20" />
-    <motor name="motor_fr" joint="motor_fr" gear="20" />
-    <motor name="motor_bl" joint="motor_bl" gear="20" />
-    <motor name="motor_br" joint="motor_br" gear="20" />
+    <velocity ctrllimited="true" ctrlrange="-100 1000" name="motor_fl" joint="motor_fl" gear="5" kv="1" />
+    <velocity ctrllimited="true" ctrlrange="-100 1000" name="motor_fr" joint="motor_fr" gear="5" kv="1" />
+    <velocity ctrllimited="true" ctrlrange="-100 1000" name="motor_bl" joint="motor_bl" gear="5" kv="1" />
+    <velocity ctrllimited="true" ctrlrange="-100 1000" name="motor_br" joint="motor_br" gear="5" kv="1" />
   </actuator>
 
 </mujoco>
