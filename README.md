@@ -1,10 +1,8 @@
 # Lunabot
 
-*This repo is in the earlyish stages of a rewrite migrating to the copper framework from last years code base: github.com/utahrobotics/lunadev-2025*
-
 ## Architecture Overview
-<img width="4150" height="818" alt="graphviz(8)" src="https://github.com/user-attachments/assets/a53d91de-1872-44cc-9cf0-02a6a0bba5c2" />
 
+<img width="4378" height="726" alt="graphviz" src="https://github.com/user-attachments/assets/399a1f5c-2bb3-446b-83d5-b68da5d1582f" />
 
 ##### Check copperconfig.ron to see the definitions of all the tasks running and the datatypes passed between tasks.
 
@@ -12,8 +10,27 @@
 
 ### Production env (Linux only)
 
-1. See dockerfile, anything installed there is a dependency for running the robot in production.
-2. Apriltag C library and librealsense
+1. ```
+   apt/dnf/yum/etc install \
+    pkg-config \
+    libssl-dev \
+    libgstreamer1.0-dev \
+    libgstreamer-plugins-base1.0-dev \
+    gstreamer1.0-plugins-base \
+    gstreamer1.0-plugins-good \
+    gstreamer1.0-plugins-bad \
+    gstreamer1.0-plugins-ugly \
+    gstreamer1.0-libav \
+    libacl1-dev \
+    libgstrtspserver-1.0-dev \
+    libges-1.0-dev \
+    libv4l-dev \
+    libunwind-dev \
+    libudev-dev \
+   ```
+2. [Bazelisk](http://github.com/bazelbuild/bazelisk/releases/)
+3. [Realsense SDK](https://github.com/IntelRealSense/librealsense)
+4. [Apriltag Library](https://github.com/AprilRobotics/apriltag)
 
 ### Optional Dependencies
 
@@ -213,7 +230,7 @@ Contains source tasks for:
 * Keeps track of state (the blackboard) associated with the lunabot: robot chain, last messages seen from lunabase, latest obstacle map, (and more to come)
 * Decides how to control the motors and actuators based on all that information.
 
-## lunabot-cu/src/tasks (not the source or sinks ones)
+## lunabot-cu/src/tasks (not the ones in sources/ or sinks/)
 Tasks that lie between the sources and sinks for:
 * Image processing for apriltag detection.
 * Automatically opening camera devices as they become available.

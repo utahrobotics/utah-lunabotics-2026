@@ -3,14 +3,15 @@
         rate_target_hz: 1000
     ),
     tasks:[
-        // waits for v4l udev add events, and reports them to the camera tasks
-        // camera tasks can open the device if the port from the reported event
-        // matches the port from the camera task config
+        // Uses a behavior tree to make decisions for the robot. 
         (
             id: "new_ai",
             type: "crate::tasks::ai::lunabot_ai::LunabotAi",
             config: {},
         ),
+        // waits for v4l udev add events, and reports them to the camera tasks
+        // camera tasks can open the device if the port from the reported event
+        // matches the port from the camera task config
         (
             id:"udev_monitor",
             type:"crate::tasks::UdevMonitor",
