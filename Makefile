@@ -53,7 +53,7 @@ kill:
 	killall realsense unilidar_publisher lunabot-ai2
 
 clear-simlogs:
-	cd lunabot-cu/logs && rm lunabotsim*
+	cd lunabot-cu/logs && rm lunabotsim*; rm lunabotresim*;
 
 clear-logs:
 	rm lunabot-cu/logs/*
