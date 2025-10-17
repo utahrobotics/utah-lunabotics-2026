@@ -34,3 +34,18 @@ Sometimes there are artifacts from iceoryx that get left behind if a program cra
 #### Other log replay (resim.rs) errors
 
 1. Ensure that the logs you downloaded are compatible with the commit hash you are currently on, trying to replay logs recorded with different datatypes passed between tasks will result in weird obscure error messages. Logs downloaded from the lunabot-logs channel will always specify the commit hash that those logs are known to replay correctly with.
+
+
+#### Invalid copperconfig.ron
+
+The copper runtime has pretty useless error messages for invalid copper configs which can be frustrating, so if you see something like this ensure that all tasks have an input and output, and the connections between tasks are all defined.
+You cannot have a task with an output that isn't connected to the input of some other task.
+```rust
+error: custom attribute panicked
+  --> lunabot-cu/src/resim.rs:24:1
+   |
+24 | #[copper_runtime(config = "copperconfig.ron", sim_mode = true)]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: message: index out of bounds: the len is 0 but the index is 0
+```
