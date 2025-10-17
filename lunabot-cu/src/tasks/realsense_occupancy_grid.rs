@@ -169,6 +169,10 @@ impl CuTask for OccupancyGridTask {
             return Ok(());
         };
 
+        // Apply bilateral filtering to clean up the depth data
+        let mut filtered_depth_frame = depth_frame.clone();
+        bilateral_filter(&mut filtered_depth_frame, 3, 1.5, 0.05); // radius=3, spatial_sigma=1.5, range_sigma=0.05m
+
         // TODO: utilize imu messages from the realsense here for more accurate pitch information
 
         let depth_camera_transform: AlignedMatrix4<f32> = self
@@ -186,11 +190,18 @@ impl CuTask for OccupancyGridTask {
         .into_boxed_slice();
 
         self.depth_projector_pipeline.project(
-            &depth_frame.depths,
+            &filtered_depth_frame.depths,
             &depth_camera_transform,
-            depth_frame.depth_scale,
+            filtered_depth_frame.depth_scale,
             Some(&mut point_cloud),
         );
+
+        // self.depth_projector_pipeline.project(
+        //     &depth_frame.depths,
+        //     &depth_camera_transform,
+        //     depth_frame.depth_scale,
+        //     Some(&mut point_cloud),
+        // );
 
         // only log every nth point so my laptop doesnt catch on fire
         if let Some(logger) = RECORDER.get() {
@@ -265,4 +276,105 @@ fn index_to_xy(index: usize) -> (usize, usize) {
         index % THALASSIC_WIDTH as usize,
         index / THALASSIC_WIDTH as usize,
     )
+}
+
+// Bilateral filter for depth images
+// For each pixel: examine neighbors within radius
+// Compute weight using pixel distance - Gaussian spatial weight
+// Compute weight using depth difference - Gaussian range weight
+// Combine weights to get final weight for each neighbor
+// Find a weighted average of neighbor depths
+fn bilateral_filter(frame: &mut IceoryxDepthFrame<DEPTH_FRAME_SIZE>, radius: i32, sigma_spatial: f32, sigma_range: f32) {
+    let width = DEPTH_FRAME_WIDTH as i32;
+    let height = DEPTH_FRAME_HEIGHT as i32;
+    
+    // temporary copy for reading 
+    let mut temp_frame = frame.clone();
+    
+    // Precompute spatial weights for efficiency
+    let mut spatial_weights = vec![0.0f32; (2 * radius + 1) as usize];
+    for i in 0..spatial_weights.len() {
+        let distance = (i as i32 - radius) as f32;
+        spatial_weights[i] = (-distance * distance / (2.0 * sigma_spatial * sigma_spatial)).exp();
+    }
+    
+    // get depth value at position, handling invalid depths (0)
+    let get_depth = |depths: &[u16], x: i32, y: i32| -> Option<u16> {
+        if x < 0 || x >= width || y < 0 || y >= height {
+            return None;
+        }
+        let idx = (y * width + x) as usize;
+        let depth = depths[idx];
+        if depth == 0 { None } else { Some(depth) }
+    };
+    
+    // compute range weight
+    let range_weight = |center_depth: u16, neighbor_depth: u16| -> f32 {
+        let diff = (center_depth as f32 - neighbor_depth as f32) * frame.depth_scale;
+        (-diff * diff / (2.0 * sigma_range * sigma_range)).exp()
+    };
+    
+    // Pass 1: Horizontal filtering
+    for y in 0..height {
+        for x in 0..width {
+            let idx = (y * width + x) as usize;
+            
+            if let Some(center_depth) = get_depth(&temp_frame.depths, x, y) {
+                let mut sum_weights = 0.0f32;
+                let mut sum_depth = 0.0f32;
+                
+                for dx in -radius..=radius {
+                    if let Some(neighbor_depth) = get_depth(&temp_frame.depths, x + dx, y) {
+                        let spatial_w = spatial_weights[(dx + radius) as usize];
+                        let range_w = range_weight(center_depth, neighbor_depth);
+                        let weight = spatial_w * range_w;
+                        
+                        sum_weights += weight;
+                        sum_depth += neighbor_depth as f32 * weight;
+                    }
+                }
+                
+                if sum_weights > 0.0 {
+                    frame.depths[idx] = (sum_depth / sum_weights).round() as u16;
+                } else {
+                    frame.depths[idx] = center_depth;
+                }
+            }
+            // If center depth is invalid (0), leave it as is
+        }
+    }
+    
+    // Update temp with horizontal filtered results for vertical pass
+    temp_frame = frame.clone();
+    
+    // Pass 2: Vertical filtering
+    for y in 0..height {
+        for x in 0..width {
+            let idx = (y * width + x) as usize;
+            
+            if let Some(center_depth) = get_depth(&temp_frame.depths, x, y) {
+                let mut sum_weights = 0.0f32;
+                let mut sum_depth = 0.0f32;
+                
+                for dy in -radius..=radius {
+                    if let Some(neighbor_depth) = get_depth(&temp_frame.depths, x, y + dy) {
+
+                        let spatial_w = spatial_weights[(dy + radius) as usize];
+                        let range_w = range_weight(center_depth, neighbor_depth);
+                        let weight = spatial_w * range_w;
+                        
+                        sum_weights += weight;
+                        sum_depth += neighbor_depth as f32 * weight;
+                    }
+                }
+                
+                if sum_weights > 0.0 {
+                    frame.depths[idx] = (sum_depth / sum_weights).round() as u16;
+                } else {
+                    frame.depths[idx] = center_depth;
+                }
+            }
+            // If center depth is invalid (0), leave it as is
+        }
+    }
 }
