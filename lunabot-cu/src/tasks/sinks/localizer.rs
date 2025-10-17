@@ -1,8 +1,11 @@
-use std::{collections::HashMap, f32::consts::E, intrinsics::powf64};
+use std::{collections::HashMap, f32::consts::E};
 
 use cu_spatial_payloads::EncodableIsometry;
 use cu29::{
-    clock::{CuTime, Instant}, cutask::{CuMsg, CuSinkTask, Freezable}, input_msg, CuError
+    CuError,
+    clock::{CuTime, Instant},
+    cutask::{CuMsg, CuSinkTask, Freezable},
+    input_msg,
 };
 use embedded_common::FromPicoV3;
 use iceoryx_types::ImuMsg;
@@ -94,11 +97,13 @@ impl CuSinkTask for Localizer {
         let kalman_filter = KalmanFilter::new(
             SimpleVector::from_element(0.0),
             SimpleSquareMatrix::from_diagonal_element(100.0),
-            |vec, mat, dt| (
-                vec,
-                // e^a * e^b = e^(a+b), so the operation is consistent regardless of time division
-                mat * SimpleSquareMatrix::from_diagonal_element(f64::powf(E.into(), dt))
-            )
+            |vec, mat, dt| {
+                (
+                    vec,
+                    // e^a * e^b = e^(a+b), so the operation is consistent regardless of time division
+                    mat * SimpleSquareMatrix::from_diagonal_element(f64::powf(E.into(), dt)),
+                )
+            },
         );
 
         if let Some(root_node) = ROOT_NODE.get() {
@@ -212,10 +217,12 @@ impl CuSinkTask for Localizer {
             let variance_matrix = SimpleSquareMatrix::from_diagonal_element(0.1);
 
             // Enter measurement into filter
-            self.kalman_filter.apply_measurement(&measurement_vector, &variance_matrix);
+            self.kalman_filter
+                .apply_measurement(&measurement_vector, &variance_matrix);
 
             // Report kalman filter state (converted to isometry) as robot position
-            self.root_node.set_isometry(vec_to_iso(self.kalman_filter.get_current_state()));
+            self.root_node
+                .set_isometry(vec_to_iso(self.kalman_filter.get_current_state()));
         }
 
         if self.last_rerun_log.elapsed().as_nanos() > 16_666_667 {
@@ -291,19 +298,10 @@ impl CuSinkTask for Localizer {
     }
 }
 
-
 fn vec_to_iso(vec: SimpleVector<6>) -> Isometry3<f64> {
-    let translation: Vector3<f64> = Vector3::<f64>::new(
-        vec.x,
-        vec.y,
-        vec.z,
-    );
+    let translation: Vector3<f64> = Vector3::<f64>::new(vec.x, vec.y, vec.z);
 
-    let rotation: Vector3<f64> = Vector3::<f64>::new(
-        vec.w,
-        vec.a,
-        vec.b,
-    );
+    let rotation: Vector3<f64> = Vector3::<f64>::new(vec.w, vec.a, vec.b);
 
     Isometry3::<f64>::new(translation, rotation)
 }
@@ -320,7 +318,6 @@ fn iso_to_vec(iso: Isometry3<f64>) -> SimpleVector<6> {
         rotation_vector.z,
     )
 }
-
 
 #[derive(Debug, Clone)]
 struct OrientationComponents {
