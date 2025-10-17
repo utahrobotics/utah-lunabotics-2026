@@ -1,0 +1,11 @@
+[gd_scene format=3 uid="uid://d4h66rocrsek2"]
+
+[node name="Node2D" type="safestop"]
+offset_left = 494.0
+offset_top = 144.0
+offset_right = 662.0
+offset_bottom = 229.0
+text = "SafeStop
+"
+
+[node name="StateViewer" type="StateViewer" parent="."]
