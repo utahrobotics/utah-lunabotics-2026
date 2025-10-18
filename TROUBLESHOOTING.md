@@ -11,7 +11,10 @@ Before spending a million years debugging, first check which git branch you are 
 
 #### Weird error related to Iceoryx node or service creation
 
-Sometimes there are artifacts from iceoryx that get left behind if a program crashes during data transfer, to fix it run ```rm /tmp/iceoryx2```.
+Sometimes there are artifacts from iceoryx that get left behind if a program crashes during data transfer, to fix it run:
+1. ```rm -r /tmp/iceoryx2```
+2. ```rm -r /dev/shm/iox2_*```
+3. ```rm -rf /dev/shm/*iceoryx*```
 
 
 #### Rerun window not opening
