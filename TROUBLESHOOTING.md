@@ -36,6 +36,11 @@ Sometimes there are artifacts from iceoryx that get left behind if a program cra
 1. Ensure that the logs you downloaded are compatible with the commit hash you are currently on, trying to replay logs recorded with different datatypes passed between tasks will result in weird obscure error messages. Logs downloaded from the lunabot-logs channel will always specify the commit hash that those logs are known to replay correctly with.
 
 
+#### Error InvalidIntegerType { expected: I32, found: I64 }
+
+This is an incredibly useful error message saying that the logs you are trying to replay are incompatible with the copperconfig you are using. This error bubbles up from bincode when it tries to decode a type passed between tasks that is different between the saved logs and the current defined type.
+
+
 #### Invalid copperconfig.ron
 
 The copper runtime has pretty useless error messages for invalid copper configs which can be frustrating, so if you see something like this ensure that all tasks have an input and output, and the connections between tasks are all defined.
