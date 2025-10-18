@@ -23,6 +23,8 @@ Sometimes there are artifacts from iceoryx that get left behind if a program cra
 
 #### Other Rerun error messages and unexpected behavior
 
+Common error message when the versions are incompatible: ```ERROR re_grpc_server] dropping LogMsg due to failed decode: Could not convert type from protobuf: missing required field: rerun.log_msg.v1alpha1.StoreInfo.application_id```
+
 1. Ensure that the rerun sdk version in Cargo.toml matches the version that is reported by running ```rerun --version```
 
 
