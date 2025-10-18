@@ -195,6 +195,8 @@ Package Manager: [Chocolatey](https://chocolatey.org/install). Follow the instru
 make discover-cameras
 ```
 
+# Trouble Shooting
+List of common problems and how to fix them can be found [here](https://github.com/utahrobotics/utah-lunabotics-2026/blob/main/TROUBLESHOOTING.md)
 
 # Crate Layout
 
