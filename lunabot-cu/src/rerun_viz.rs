@@ -20,8 +20,11 @@ pub struct RecorderData {
 
 #[derive(Deserialize, Default, Debug)]
 pub enum RerunViz {
+    /// Send rerun logs over grpc
     Grpc(Level, String),
+    /// Save logs to recording.rrd
     Log(Level),
+    /// Spawn rerun as a process
     Viz(Level),
     #[default]
     Disabled,
