@@ -29,7 +29,7 @@
     libudev-dev \
    ```
 2. [Bazelisk](http://github.com/bazelbuild/bazelisk/releases/)
-3. [Realsense SDK](https://github.com/IntelRealSense/librealsense)
+3. [Realsense SDK](https://github.com/IntelRealSense/librealsense/blob/master/doc/installation.md#building-librealsense2-sdk)
 4. [Apriltag Library](https://github.com/AprilRobotics/apriltag)
 
 ### Log Replay env (Windows, Macos, Linux)
