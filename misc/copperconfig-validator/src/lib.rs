@@ -18,6 +18,9 @@
 //! Invalid digraph error message using this validator:
 //! Validation failed: Node 'l2_imu' is isolated (check that its inputs are supplied and outputs are utilized)
 //!
+//! Another example output:
+//! Validation failed: Cycle detected in graph: localizer -> new_ai -> v3_pico -> localizer
+//!
 //! Todo:
 //! I have not tested this tool on copper configs with missions
 
