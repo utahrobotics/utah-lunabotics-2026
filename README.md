@@ -4,6 +4,11 @@
 
 <img width="4378" height="726" alt="graphviz" src="https://github.com/user-attachments/assets/399a1f5c-2bb3-446b-83d5-b68da5d1582f" />
 
+
+## Detailed Copper Task Overview
+
+![img task overview](graph.svg)
+
 ##### Check copperconfig.ron to see the definitions of all the tasks running and the datatypes passed between tasks.
 
 ## Dependencies
