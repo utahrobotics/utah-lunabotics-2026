@@ -3,7 +3,6 @@
 
 use godot::prelude::*;
 use godot::classes::*;
-use common::lunabase_sync::ThalassicData;
 use common::{
     FromLunabase, FromLunabot, LunabotStage, Steering, THALASSIC_CELL_SIZE, THALASSIC_HEIGHT,
     THALASSIC_WIDTH,
