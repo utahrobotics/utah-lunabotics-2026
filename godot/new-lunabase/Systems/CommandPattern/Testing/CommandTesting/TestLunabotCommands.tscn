@@ -1,0 +1,25 @@
+[gd_scene load_steps=2 format=3 uid="uid://drqei17g74dma"]
+
+[ext_resource type="Script" uid="uid://f3va7r57ou5g" path="res://Systems/CommandPattern/Controllers/HumanController.gd" id="1_hrfi8"]
+
+[node name="CommandPatternTestScene" type="Node2D"]
+
+[node name="CommandController" type="Node2D" parent="." node_paths=PackedStringArray("actor")]
+script = ExtResource("1_hrfi8")
+actor = NodePath("../ActorNode(Does not execute code)")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+
+[node name="ActorNode(Does not execute code)" type="Node" parent="."]
+
+[node name="SceneLabel" type="Label" parent="."]
+offset_right = 40.0
+offset_bottom = 23.0
+text = "By running this scene you will be able to use the following commands:
+
+- Softstop: Activate it using Backspace or the select button on a controller
+- Continue Mission: Activate it using Enter or the start button on a controller
+
+
+Implementing the commands (Calling the rust functions. Can be done through their respective
+command file in the Commands folder"
