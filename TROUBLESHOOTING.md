@@ -47,7 +47,7 @@ This is an incredibly useful error message saying that the logs you are trying t
 
 
 #### Invalid copperconfig.ron
-
+**Use make validate-config for better error messages in some cases.** <br>
 The copper runtime has pretty useless error messages for invalid copper configs which can be frustrating, so if you see something like this ensure that all tasks have an input and output, and the connections between tasks are all defined.
 You cannot have a task with an output that isn't connected to the input of some other task.
 ```rust
