@@ -7,7 +7,8 @@
 
 ## Detailed Copper Task Overview
 
-![img task overview](graph.svg)
+<img width="7098" height="4698" alt="graphviz(3)" src="https://github.com/user-attachments/assets/969af1fc-0d6c-4ccd-8cac-c86362b93b32" />
+
 
 ##### Check copperconfig.ron to see the definitions of all the tasks running and the datatypes passed between tasks.
 
