@@ -13,6 +13,7 @@ use cakap2::{
 };
 use bitcode::encode;
 
+use std::time::Instant;
 use std::{
     net::{UdpSocket, SocketAddr, SocketAddrV4, IpAddr, Ipv4Addr},
     time::Duration, 
@@ -101,9 +102,12 @@ impl INode for lunabotConn{
   }
  fn process(&mut self,delta:f64){
     let mut received = false;
+    let mut buf = [0u8; 1500];
+    let data = &buf;
+
  if let Some(inner) = self.inner.as_mut(){
     while let Some(msg) = inner.cakap_sm.poll(){
-     self.handle_messages(msg, &mut received);
+      self.handle_messages(msg, &mut received);
   }
 
  }
@@ -144,6 +148,6 @@ impl lunabotConn {
      }  
 
     }
-    
+  
 }
    
