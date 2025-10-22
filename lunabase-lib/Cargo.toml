@@ -1,0 +1,12 @@
+[package]
+name = "lunabase-lib"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+godot = "0.4.0"
+
+
+[lib]
+crate-type = ["cdylib"]      # Compile this crate to a dynamic C library.
+common = { path = "common" }
