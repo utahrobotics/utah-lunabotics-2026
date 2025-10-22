@@ -14,6 +14,10 @@ config/name="new-lunabase"
 config/features=PackedStringArray("4.5", "GL Compatibility")
 config/icon="uid://c3b2y3ky1m03k"
 
+[autoload]
+
+NotificationCanvasGlobal="*res://GUI/NotificationSystem/Assets/NotificationCanvas.tscn"
+
 [file_customization]
 
 folder_colors={

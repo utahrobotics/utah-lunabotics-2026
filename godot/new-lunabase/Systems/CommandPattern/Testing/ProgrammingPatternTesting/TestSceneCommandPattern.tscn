@@ -1,9 +1,9 @@
 [gd_scene load_steps=6 format=3 uid="uid://81kfbgjtlieb"]
 
-[ext_resource type="Script" uid="uid://bdprp7hdo4seh" path="res://Systems/CommandPattern/Testing/TestController/TestHumanController.gd" id="1_shq14"]
-[ext_resource type="Script" uid="uid://seb6w50qyguj" path="res://Systems/CommandPattern/Testing/test_move_command_pattern.gd" id="2_x1swg"]
+[ext_resource type="Script" uid="uid://bdprp7hdo4seh" path="res://Systems/CommandPattern/Testing/ProgrammingPatternTesting/TestController/TestHumanController.gd" id="1_shq14"]
+[ext_resource type="Script" uid="uid://seb6w50qyguj" path="res://Systems/CommandPattern/Testing/ProgrammingPatternTesting/test_move_command_pattern.gd" id="2_x1swg"]
 [ext_resource type="Texture2D" uid="uid://bjwlx7ar673ff" path="res://icon.svg" id="3_lwj7g"]
-[ext_resource type="Script" uid="uid://cvtpbf7s3dbvy" path="res://Systems/CommandPattern/Testing/test_replay.gd" id="4_31cek"]
+[ext_resource type="Script" uid="uid://cvtpbf7s3dbvy" path="res://Systems/CommandPattern/Testing/ProgrammingPatternTesting/test_replay.gd" id="4_31cek"]
 
 [sub_resource type="CircleShape2D" id="CircleShape2D_ias37"]
 radius = 89.005615
