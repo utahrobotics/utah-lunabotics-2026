@@ -19,7 +19,7 @@ pub fn make_server_endpoint(
 
 pub fn configure_server()
 -> Result<(ServerConfig, CertificateDer<'static>), Box<dyn Error + Send + Sync + 'static>> {
-    let cert = generate_simple_self_signed(vec!["localhost".into(), "0.0.0.0".into()]).unwrap();
+    let cert = generate_simple_self_signed(vec!["localhost".into(), "0.0.0.0".into(), "lunabot".into()]).unwrap();
     let cert_der = CertificateDer::from(cert.cert);
     let priv_key = PrivatePkcs8KeyDer::from(cert.signing_key.serialize_der());
 

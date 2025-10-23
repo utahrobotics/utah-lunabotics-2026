@@ -287,7 +287,7 @@ async fn attempt_client_reconnect(
     server_addr: SocketAddr,
     shared: Arc<Mutex<InnerShared>>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let mut endpoint = Endpoint::client(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0))?;
+    let mut endpoint = Endpoint::client(SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0))?;
 
     let client_config = quinn::ClientConfig::new(Arc::new(QuicClientConfig::try_from(
         rustls::ClientConfig::builder()
@@ -298,7 +298,7 @@ async fn attempt_client_reconnect(
 
     endpoint.set_default_client_config(client_config);
 
-    let connecting = endpoint.connect(server_addr, "localhost")?;
+    let connecting = endpoint.connect(server_addr, "lunabot")?;
     let connection = connecting.await?;
 
     setup_bidirectional_stream(connection.clone(), Arc::clone(&shared), false, "CLIENT").await?;
@@ -455,7 +455,7 @@ impl<Msg: Encode + Decode<()> + Clone> QuicClient<Msg> {
 
         tasker::get_tokio_handle().spawn(async move {
             let mut endpoint =
-                match Endpoint::client(SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0)) {
+                match Endpoint::client(SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0)) {
                     Ok(ep) => ep,
                     Err(e) => {
                         eprintln!("[CLIENT] Failed to create client endpoint: {e}");
@@ -482,7 +482,7 @@ impl<Msg: Encode + Decode<()> + Clone> QuicClient<Msg> {
 
             endpoint.set_default_client_config(client_config);
 
-            match endpoint.connect(server_addr, "localhost") {
+            match endpoint.connect(server_addr, "lunabot") {
                 Ok(connecting) => match connecting.await {
                     Ok(connection) => {
                         if let Err(e) = setup_bidirectional_stream(
