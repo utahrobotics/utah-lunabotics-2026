@@ -12,7 +12,9 @@ members = [
     "common",
     "lunabot-cu",
     "embedded_common",
-    "external-tasks/realsense", "lunabase-lib", "misc/quic",
+    "external-tasks/realsense",
+    "lunabase-lib",
+    "misc/quic",
 ]
 exclude = ["misc/usb-reset"]
 # Shared dependencies across workspace members
@@ -59,6 +61,7 @@ serde = { version = "1", features = ["derive"] }
 tokio-serial = "5.4.5"
 tokio-util = "0.7.16"
 futures-util = "0.3.31"
+cobs = "0.5.0"
 
 # members
 common = { path = "common" }

@@ -914,10 +914,11 @@ dependencies = [
 
 [[package]]
 name = "cobs"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fea6d1b751c55bd9c0dda7d4ff752074e98f4765ae969664648bd193bb326d15"
+checksum = "b4ef0193218d365c251b5b9297f9911a908a8ddd2ebd3a36cc5d0ef0f63aee9e"
 dependencies = [
+ "heapless 0.9.1",
  "thiserror 2.0.16",
 ]
 
@@ -2558,6 +2559,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "heapless"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b1edcd5a338e64688fbdcb7531a846cfd3476a54784dcb918a0844682bc7ada5"
+dependencies = [
+ "hash32",
+ "stable_deref_trait",
+]
+
+[[package]]
 name = "heck"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3480,7 +3491,7 @@ dependencies = [
  "bytes",
  "cakap2",
  "circular-buffer",
- "cobs 0.4.0",
+ "cobs 0.5.0",
  "colorous",
  "common",
  "crossbeam",
@@ -4567,6 +4578,7 @@ name = "quic"
 version = "0.1.0"
 dependencies = [
  "bincode 2.0.1",
+ "cobs 0.5.0",
  "quinn",
  "rcgen",
  "tasker",
@@ -6958,7 +6970,7 @@ name = "vesc-translator"
 version = "1.0.0"
 dependencies = [
  "crc16",
- "heapless",
+ "heapless 0.8.0",
 ]
 
 [[package]]

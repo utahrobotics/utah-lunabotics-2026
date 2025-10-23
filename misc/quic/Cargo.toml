@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 bincode.workspace = true
+cobs.workspace = true
 quinn = "0.11.9"
 rcgen = "0.14.5"
 tasker = { path = "../tasker" }
