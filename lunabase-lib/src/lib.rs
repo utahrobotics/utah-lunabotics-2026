@@ -1,4 +1,5 @@
 use godot::prelude::*;
+use quic::QuicClient;
 
 struct LunabaseExtension;
 
