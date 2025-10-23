@@ -8,5 +8,6 @@ godot = "0.4.0"
 
 
 [lib]
-crate-type = ["cdylib"]      # Compile this crate to a dynamic C library.
-common = { path = "common" }
+crate-type = ["cdylib"]          # Compile this crate to a dynamic C library.
+common = { path = "../common" }
+quic = { path = "../misc/quic" }
