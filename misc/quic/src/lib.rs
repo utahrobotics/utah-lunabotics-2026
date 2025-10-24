@@ -13,7 +13,7 @@ use quinn::{
     Connection, Endpoint, RecvStream, SendStream, crypto::rustls::QuicClientConfig, rustls,
 };
 use std::time::{Duration, Instant};
-use tasker::{parking_lot::Mutex, tokio::io::AsyncWriteExt};
+use tasker::{parking_lot::Mutex, tokio::{self, io::AsyncWriteExt, sync::watch::{Receiver, Sender}}};
 
 use crate::utils::{SkipServerVerification, make_server_endpoint};
 
@@ -24,14 +24,45 @@ enum KeepAlivePacket {
     Pong(Vec<u8>),
 }
 
-pub struct InnerShared {
-    pub connection: Option<Connection>,
-    pub send_stream: Option<SendStream>,
+/// Anything that recv needs
+pub struct InnerSharedReader {
     pub recv_stream: Option<RecvStream>,
     /// decoder has a box leaked buffer
     pub decoder: CobsDecoderOwned,
     /// Queue of decoded messages waiting to be returned by recv()
     pub message_queue: VecDeque<Vec<u8>>,
+    /// Watch channel receiver to detect new connections
+    /// when a new connection is detected, the decoder is reset, and the message queue is cleared, and any recv operations are cancelled
+    pub new_connection_rx: tasker::tokio::sync::watch::Receiver<u64>,
+}
+
+impl InnerSharedReader {
+    fn new(new_connection_rx: Receiver<u64>) -> Self {
+        let decoder = CobsDecoderOwned::new(1024*1024*2);
+        Self {
+            new_connection_rx,
+            recv_stream: None,
+            decoder,
+            message_queue: VecDeque::new(),
+        }
+    }
+}
+
+/// Anything that send needs
+pub struct InnerSharedWriter {
+    pub send_stream: Option<SendStream>,
+}
+
+impl InnerSharedWriter {
+    fn new() -> Self {
+        Self {
+            send_stream: None
+        }
+    }
+}
+
+pub struct InnerShared {
+    pub connection: Option<Connection>,
     /// heartbeat message to send with ping/pong
     pub keep_alive_msg: Vec<u8>,
     pub last_keep_alive_received: Option<Instant>,
@@ -40,28 +71,19 @@ pub struct InnerShared {
     pub keep_alive_abort_handle: Option<tasker::tokio::task::AbortHandle>,
     /// Watch channel sender to signal new connection (cancels pending recvs)
     pub new_connection_tx: tasker::tokio::sync::watch::Sender<u64>,
-    /// Watch channel receiver to detect new connections
-    /// when a new connection is detected, the decoder is reset, and the message queue is cleared, and any recv operations are cancelled
-    pub new_connection_rx: tasker::tokio::sync::watch::Receiver<u64>,
+
 }
 
 impl InnerShared {
-    fn new() -> Self {
+    fn new(new_connection_tx: Sender<u64>) -> Self {
         // 2MB decoder buffer
-        let decoder = CobsDecoderOwned::new(1024*1024*2);
-        let (new_connection_tx, new_connection_rx) = tasker::tokio::sync::watch::channel(0u64);
         Self {
             connection: None,
-            send_stream: None,
-            recv_stream: None,
-            decoder,
-            message_queue: VecDeque::new(),
             keep_alive_msg: Vec::new(),
             last_keep_alive_received: None,
             last_received_keep_alive_msg: None,
             keep_alive_abort_handle: None,
             new_connection_tx,
-            new_connection_rx,
         }
     }
 }
@@ -69,7 +91,7 @@ impl InnerShared {
 /// Common function to receive and decode messages from a QUIC stream
 async fn recv_messages(
     mut recv_stream: RecvStream,
-    shared: Arc<Mutex<InnerShared>>,
+    shared: Arc<Mutex<InnerSharedReader>>,
     context: &str,
 ) -> Result<RecvStream, Box<dyn std::error::Error + Send + Sync>> {
     let mut buf = vec![0; 4096];
@@ -148,6 +170,8 @@ async fn recv_messages(
 async fn setup_bidirectional_stream(
     connection: Connection,
     shared: Arc<Mutex<InnerShared>>,
+    shared_writer: Arc<Mutex<InnerSharedWriter>>,
+    shared_reader: Arc<Mutex<InnerSharedReader>>,
     is_server: bool,
     context: &str,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
@@ -180,14 +204,16 @@ async fn setup_bidirectional_stream(
     }
 
     let mut shared_lock = shared.lock();
+    let mut shared_reader = shared_reader.lock();
+    let mut shared_writer = shared_writer.lock();
     
     let is_replacement = shared_lock.connection.is_some();
     
-    shared_lock.message_queue.clear();
+    shared_reader.message_queue.clear();
     
     
-    shared_lock.send_stream = Some(send_stream);
-    shared_lock.recv_stream = Some(recv_stream);
+    shared_writer.send_stream = Some(send_stream);
+    shared_reader.recv_stream = Some(recv_stream);
     shared_lock.connection = Some(connection);
     
     // signal if we're replacing an existing connection
@@ -196,7 +222,7 @@ async fn setup_bidirectional_stream(
         let current_gen = *shared_lock.new_connection_tx.borrow();
         let new_gen = current_gen.wrapping_add(1);
         shared_lock.new_connection_tx.send(new_gen).ok();
-        shared_lock.decoder.reset();
+        shared_reader.decoder.reset();
     }
 
     Ok(())
@@ -301,6 +327,8 @@ fn start_client_keep_alive_task(
 #[derive(Clone)]
 pub struct QuicServer<Msg: Encode + Decode<()>> {
     pub shared: Arc<Mutex<InnerShared>>,
+    pub shared_writer: Arc<Mutex<InnerSharedWriter>>,
+    pub shared_reader: Arc<Mutex<InnerSharedReader>>,
     _boo: PhantomData<Msg>,
 }
 
@@ -319,9 +347,13 @@ impl<Msg: Encode + Decode<()>> QuicServer<Msg> {
                 SocketAddrV4::from_str(&format!("0.0.0.0:{port}")).unwrap(),
             ))
         })?;
-
-        let shared = Arc::new(Mutex::new(InnerShared::new()));
-        let shared_c1 = Arc::clone(&shared);
+        let (new_connection_tx, new_connection_rx) = tokio::sync::watch::channel(0u64);
+        let shared = Arc::new(Mutex::new(InnerShared::new(new_connection_tx)));
+        let shared_reader = Arc::new(Mutex::new(InnerSharedReader::new(new_connection_rx)));
+        let shared_writer = Arc::new(Mutex::new(InnerSharedWriter::new()));
+        let shared_c = Arc::clone(&shared);
+        let shared_wc = Arc::clone(&shared_writer);
+        let shared_rc = Arc::clone(&shared_reader);
         let interval_ms = keep_alive_interval.as_millis() as u64;
         println!("Listening on {}",format!("0.0.0.0:{port}"));
         tasker::get_tokio_handle().spawn(async move {
@@ -337,13 +369,15 @@ impl<Msg: Encode + Decode<()>> QuicServer<Msg> {
                         match connection {
                             Ok((connection, _zero_rtt_accepted)) => {
                                 // abort old keep-alive task if it exists
-                                if let Some(old_handle) = shared_c1.lock().keep_alive_abort_handle.take() {
+                                if let Some(old_handle) = shared_c.lock().keep_alive_abort_handle.take() {
                                     old_handle.abort();
                                     eprintln!("[SERVER] Aborted old keep-alive task (new connection accepted)");
                                 }
                                 if let Err(e) = setup_bidirectional_stream(
                                     connection.clone(),
-                                    Arc::clone(&shared_c1),
+                                    shared_c.clone(),
+                                    shared_wc.clone(),
+                                    shared_rc.clone(),
                                     true,
                                     "SERVER",
                                 )
@@ -354,10 +388,10 @@ impl<Msg: Encode + Decode<()>> QuicServer<Msg> {
                                     // start new keep-alive task, store handle
                                     let abort_handle = start_server_keep_alive_task(
                                         connection,
-                                        Arc::clone(&shared_c1),
+                                        Arc::clone(&shared_c),
                                         interval_ms,
                                     );
-                                    shared_c1.lock().keep_alive_abort_handle = Some(abort_handle);
+                                    shared_c.lock().keep_alive_abort_handle = Some(abort_handle);
                                 }
                             }
                             Err(ongoing) => {
@@ -365,14 +399,16 @@ impl<Msg: Encode + Decode<()>> QuicServer<Msg> {
                                 match ongoing.await {
                                     Ok(connection) => {
                                         // abort old keep-alive task if it exists
-                                        if let Some(old_handle) = shared_c1.lock().keep_alive_abort_handle.take() {
+                                        if let Some(old_handle) = shared_c.lock().keep_alive_abort_handle.take() {
                                             old_handle.abort();
                                             eprintln!("[SERVER] Aborted old keep-alive task (new connection accepted)");
                                         }
                                         
                                         if let Err(e) = setup_bidirectional_stream(
                                             connection.clone(),
-                                            Arc::clone(&shared_c1),
+                                            shared_c.clone(),
+                                            shared_wc.clone(),
+                                            shared_rc.clone(),
                                             true,
                                             "SERVER",
                                         )
@@ -383,10 +419,10 @@ impl<Msg: Encode + Decode<()>> QuicServer<Msg> {
                                             // start new keep-alive task, store handle
                                             let abort_handle = start_server_keep_alive_task(
                                                 connection,
-                                                Arc::clone(&shared_c1),
+                                                Arc::clone(&shared_c),
                                                 interval_ms,
                                             );
-                                            shared_c1.lock().keep_alive_abort_handle = Some(abort_handle);
+                                            shared_c.lock().keep_alive_abort_handle = Some(abort_handle);
                                         }
                                     }
                                     Err(e) => {
@@ -405,19 +441,21 @@ impl<Msg: Encode + Decode<()>> QuicServer<Msg> {
 
         Ok(Self {
             shared,
+            shared_reader,
+            shared_writer,
             _boo: PhantomData {},
         })
     }
 
     /// blocking operation
     pub fn recv(&self) -> Result<Msg, Box<dyn std::error::Error + Send + Sync>> {
-        recv_common(&self.shared, "SERVER")
+        recv_common(&self.shared_reader, "SERVER")
     }
 
     /// blocking operation
     /// only send messages of under 1 mb otherwise this will likely fail
     pub fn send(&self, packet: Msg) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        send_common(&self.shared, packet)
+        send_common(&self.shared_writer, packet)
     }
 
     /// checks if the connection has not been reported as closed
@@ -447,7 +485,12 @@ impl<Msg: Encode + Decode<()>> QuicServer<Msg> {
 
 #[derive(Clone)]
 pub struct QuicClient<Msg: Encode + Decode<()> + Clone> {
+    /// resources shared between reader and writer
     pub shared: Arc<Mutex<InnerShared>>,
+    /// resources only for writing
+    pub shared_writer: Arc<Mutex<InnerSharedWriter>>,
+    /// resources only for reading
+    pub shared_reader: Arc<Mutex<InnerSharedReader>>,
     _boo: PhantomData<Msg>,
 }
 
@@ -463,15 +506,18 @@ impl<Msg: Encode + Decode<()> + Clone> QuicClient<Msg> {
         server_addr: SocketAddr,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         Self::ensure_runtime();
-
-        let shared = Arc::new(Mutex::new(InnerShared::new()));
+        let (new_connection_tx, new_connection_rx) = tokio::sync::watch::channel(0u64);
+        let shared = Arc::new(Mutex::new(InnerShared::new(new_connection_tx)));
+        let shared_writer = Arc::new(Mutex::new(InnerSharedWriter::new()));
+        let shared_reader = Arc::new(Mutex::new(InnerSharedReader::new(new_connection_rx)));
         {
             let mut shared_lock = shared.lock();
             shared_lock.keep_alive_msg = [0u8].to_vec();
         }
 
-        let shared_c1 = Arc::clone(&shared);
-
+        let shared_c1 = shared.clone();
+        let shared_wc = shared_writer.clone();
+        let shared_rc = shared_reader.clone();
         tasker::get_tokio_handle().spawn(async move {
             let mut endpoint =
                 match Endpoint::client(SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0)) {
@@ -515,6 +561,8 @@ impl<Msg: Encode + Decode<()> + Clone> QuicClient<Msg> {
                             if let Err(e) = setup_bidirectional_stream(
                                 connection.clone(),
                                 Arc::clone(&shared_c1),
+                                shared_wc.clone(),
+                                shared_rc.clone(),
                                 false,
                                 "CLIENT",
                             )
@@ -544,19 +592,21 @@ impl<Msg: Encode + Decode<()> + Clone> QuicClient<Msg> {
 
         Ok(Self {
             shared,
+            shared_reader,
+            shared_writer,
             _boo: PhantomData {},
         })
     }
 
     /// blocking operation
     pub fn recv(&self) -> Result<Msg, Box<dyn std::error::Error + Send + Sync>> {
-        recv_common(&self.shared, "CLIENT")
+        recv_common(&self.shared_reader, "CLIENT")
     }
 
     /// blocking operation
     /// only send messages of up to 1 mb otherwise this will likely fail
     pub fn send(&self, packet: Msg) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        send_common(&self.shared, packet)
+        send_common(&self.shared_writer, packet)
     }
 
     pub fn is_connected(&self) -> bool {
@@ -578,7 +628,7 @@ impl<Msg: Encode + Decode<()> + Clone> QuicClient<Msg> {
 
 /// Common recv used by client and server
 fn recv_common<Msg: Encode + Decode<()>>(
-    shared: &Arc<Mutex<InnerShared>>,
+    shared: &Arc<Mutex<InnerSharedReader>>,
     // context only used for logs, otherwise I would have used an enum
     context: &str,
 ) -> Result<Msg, Box<dyn std::error::Error + Send + Sync>> {
@@ -591,10 +641,9 @@ fn recv_common<Msg: Encode + Decode<()>>(
     }
 
     // read from stream
-    let (recv_stream_opt, mut watch_rx, start_gen) = {
+    let (recv_stream_opt, mut watch_rx) = {
         let mut guard = shared.lock();
-        let generation = *guard.new_connection_tx.borrow();
-        (guard.recv_stream.take(), guard.new_connection_rx.clone(), generation)
+        (guard.recv_stream.take(), guard.new_connection_rx.clone())
     };
     
     if let Some(recv_stream) = recv_stream_opt {
@@ -602,11 +651,6 @@ fn recv_common<Msg: Encode + Decode<()>>(
         let result = tasker::get_tokio_handle().block_on(async move {
             // Mark the current generation as seen
             let current_gen = *watch_rx.borrow_and_update();
-            
-            // race condition check
-            if current_gen != start_gen {
-                return Err(Box::new(std::io::Error::other("Connection replaced")) as Box<dyn std::error::Error + Send + Sync>);
-            }
             
             // either complete recv or detect new connection
             tasker::tokio::select! {
@@ -647,7 +691,7 @@ fn recv_common<Msg: Encode + Decode<()>>(
 
 /// Common send used by client and server
 fn send_common<Msg: Encode + Decode<()>>(
-    shared: &Arc<Mutex<InnerShared>>,
+    shared: &Arc<Mutex<InnerSharedWriter>>,
     packet: Msg,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let bytes = bincode::encode_to_vec(packet, bincode::config::standard())?;
