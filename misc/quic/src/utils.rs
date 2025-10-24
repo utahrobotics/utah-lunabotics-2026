@@ -8,7 +8,7 @@ use quinn::{
 };
 use rcgen::generate_simple_self_signed;
 
-pub static IDLE_TIMEOUT_MS: u32 = 500;
+pub static IDLE_TIMEOUT_MS: u32 = 200;
 
 pub fn make_server_endpoint(
     bind_addr: SocketAddr,
