@@ -1,7 +1,7 @@
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
 use bincode::{config::Configuration, error::DecodeError};
-use common::{LunabotStage, QuicMessage, Steering};
+use common::{FromLunabase, FromLunabot, LunabotStage, Steering};
 use godot::{classes::Os, prelude::*};
 use quic::QuicClient;
 
@@ -14,7 +14,8 @@ unsafe impl ExtensionLibrary for LunabaseExtension {}
 #[class(base=Node)]
 struct LunabaseConnection {
     base: Base<Node>,
-    client: QuicClient<QuicMessage>,
+    // <outgoing type, incoming type>
+    client: QuicClient<FromLunabase, FromLunabot>,
 }
 
 #[godot_api]
@@ -70,8 +71,8 @@ impl LunabaseConnection {
         // the lunabot.
         match self
             .client
-            .send(QuicMessage::FromClient(common::FromLunabase::Steering(
-                Steering::new(left, right, 1.0),
+            .send(common::FromLunabase::Steering(Steering::new(
+                left, right, 1.0,
             ))) {
             Ok(_) => {}
             Err(e) => {

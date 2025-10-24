@@ -17,6 +17,7 @@ use tasker::{parking_lot::Mutex, tokio::{self, io::AsyncWriteExt, sync::watch::{
 
 use crate::utils::{SkipServerVerification, make_server_endpoint};
 
+
 /// Internal keep-alive packet format
 #[derive(Debug, Clone, Encode, Decode)]
 enum KeepAlivePacket {
@@ -325,14 +326,15 @@ fn start_client_keep_alive_task(
 }
 
 #[derive(Clone)]
-pub struct QuicServer<Msg: Encode + Decode<()>> {
+pub struct QuicServer<Outgoing: Encode + Decode<()>, Incoming: Encode + Decode<()>> {
     pub shared: Arc<Mutex<InnerShared>>,
     pub shared_writer: Arc<Mutex<InnerSharedWriter>>,
     pub shared_reader: Arc<Mutex<InnerSharedReader>>,
-    _boo: PhantomData<Msg>,
+    _boo: PhantomData<Outgoing>,
+    _boo_incoming: PhantomData<Incoming>,
 }
 
-impl<Msg: Encode + Decode<()>> QuicServer<Msg> {
+impl<Outgoing: Encode + Decode<()>, Incoming: Encode + Decode<()>> QuicServer<Outgoing, Incoming> {
     /// Ensures the Tokio runtime is available for QUIC operations.
     fn ensure_runtime() {
         let _ = tasker::get_tokio_handle();
@@ -444,17 +446,19 @@ impl<Msg: Encode + Decode<()>> QuicServer<Msg> {
             shared_reader,
             shared_writer,
             _boo: PhantomData {},
+                        _boo_incoming: PhantomData {},
+
         })
     }
 
     /// blocking operation
-    pub fn recv(&self) -> Result<Msg, Box<dyn std::error::Error + Send + Sync>> {
+    pub fn recv(&self) -> Result<Incoming, Box<dyn std::error::Error + Send + Sync>> {
         recv_common(&self.shared_reader, "SERVER")
     }
 
     /// blocking operation
     /// only send messages of under 1 mb otherwise this will likely fail
-    pub fn send(&self, packet: Msg) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    pub fn send(&self, packet: Outgoing) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         send_common(&self.shared_writer, packet)
     }
 
@@ -484,17 +488,19 @@ impl<Msg: Encode + Decode<()>> QuicServer<Msg> {
 }
 
 #[derive(Clone)]
-pub struct QuicClient<Msg: Encode + Decode<()> + Clone> {
+pub struct QuicClient<Outgoing: Encode + Decode<()>, Incoming: Encode + Decode<()>> {
     /// resources shared between reader and writer
     pub shared: Arc<Mutex<InnerShared>>,
     /// resources only for writing
     pub shared_writer: Arc<Mutex<InnerSharedWriter>>,
     /// resources only for reading
     pub shared_reader: Arc<Mutex<InnerSharedReader>>,
-    _boo: PhantomData<Msg>,
+    _boo: PhantomData<Outgoing>,
+    _boo_incoming: PhantomData<Incoming>,
+
 }
 
-impl<Msg: Encode + Decode<()> + Clone> QuicClient<Msg> {
+impl<Outgoing: Encode + Decode<()>, Incoming: Encode + Decode<()>> QuicClient<Outgoing, Incoming> {
     fn ensure_runtime() {
         let _ = tasker::get_tokio_handle();
     }
@@ -595,17 +601,18 @@ impl<Msg: Encode + Decode<()> + Clone> QuicClient<Msg> {
             shared_reader,
             shared_writer,
             _boo: PhantomData {},
+            _boo_incoming: PhantomData {},
         })
     }
 
     /// blocking operation
-    pub fn recv(&self) -> Result<Msg, Box<dyn std::error::Error + Send + Sync>> {
+    pub fn recv(&self) -> Result<Incoming, Box<dyn std::error::Error + Send + Sync>> {
         recv_common(&self.shared_reader, "CLIENT")
     }
 
     /// blocking operation
     /// only send messages of up to 1 mb otherwise this will likely fail
-    pub fn send(&self, packet: Msg) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    pub fn send(&self, packet: Outgoing) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         send_common(&self.shared_writer, packet)
     }
 

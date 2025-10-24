@@ -5,14 +5,6 @@ mod constants;
 pub mod ports;
 pub use constants::*;
 
-/// The lunabot is the server because it is easy to assign the 
-/// computer a static ip, and then anyone can connect to it as a client
-#[derive(bincode::Encode, bincode::Decode, Clone)]
-pub enum QuicMessage {
-    FromServer(FromLunabot),
-    FromClient(FromLunabase)
-}
-
 #[repr(C)]
 #[derive(
     bincode::Encode,
