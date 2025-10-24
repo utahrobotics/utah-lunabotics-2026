@@ -919,3 +919,22 @@ fn test_keep_alive_during_load() {
 
     println!("\n✅ KEEP-ALIVE DURING LOAD TEST PASSED!");
 }
+
+
+#[test]
+fn test_connect_blocks() {
+    println!("\n=== TEST: connect blocks until it can connect ===");
+    let addr = get_test_addr(18);
+
+
+    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG, Duration::from_millis(10))
+       .expect("Failed to create client");
+
+    thread::sleep(Duration::from_millis(5000));
+
+    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 18)
+        .expect("Failed to create server");
+    thread::sleep(Duration::from_millis(500));
+    assert!(client.is_connected());
+    assert!(server.is_connected());
+}

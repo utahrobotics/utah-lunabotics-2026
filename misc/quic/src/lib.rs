@@ -15,7 +15,7 @@ use quinn::{
 use std::time::{Duration, Instant};
 use tasker::{parking_lot::Mutex, tokio::io::AsyncWriteExt};
 
-use crate::utils::{SkipServerVerification, make_server_endpoint};
+use crate::utils::{IDLE_TIMEOUT_MS, SkipServerVerification, make_server_endpoint};
 
 /// Internal keep-alive packet format
 #[derive(Debug, Clone, Encode, Decode)]
@@ -329,7 +329,7 @@ impl<Msg: Encode + Decode<()>> QuicServer<Msg> {
 
         let shared = Arc::new(Mutex::new(InnerShared::new()));
         let shared_c1 = Arc::clone(&shared);
-
+        println!("listening on {}",format!("0.0.0.0:{port}"));
         tasker::get_tokio_handle().spawn(async move {
             loop {
                 let Some(incoming) = endpoint.accept().await else {
@@ -437,11 +437,16 @@ impl<Msg: Encode + Decode<()> + Clone> QuicClient<Msg> {
 
     /// Connect to a server
     /// the keep alive packet is typically used to communicate the lunabot stage.
+    /// does not block even if the server isn't available
+    /// it will just wait until the server does become available and then connect.
     pub fn connect(
         server_addr: SocketAddr,
         initial_keep_alive_packet: &[u8],
         keep_alive_interval: Duration,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        if keep_alive_interval.as_millis() >= IDLE_TIMEOUT_MS as u128 {
+            eprintln!("[CLIENT] WARN: your keep alive interval should be set above IDLE_TIMEOUT_MS")
+        }
         Self::ensure_runtime();
 
         let shared = Arc::new(Mutex::new(InnerShared::new()));
@@ -479,36 +484,40 @@ impl<Msg: Encode + Decode<()> + Clone> QuicClient<Msg> {
             )) {
                 config => config,
             };
-
             endpoint.set_default_client_config(client_config);
 
-            match endpoint.connect(server_addr, "lunabot") {
-                Ok(connecting) => match connecting.await {
-                    Ok(connection) => {
-                        if let Err(e) = setup_bidirectional_stream(
-                            connection.clone(),
-                            Arc::clone(&shared_c1),
-                            false,
-                            "CLIENT",
-                        )
-                        .await
-                        {
-                            eprintln!("[CLIENT] Failed to setup stream: {e}");
-                        } else {
-                            start_client_keep_alive_task(
-                                connection,
+            'retry_loop: loop {
+                println!("starting retry loop, connecting to {server_addr:?}");
+                match endpoint.connect(server_addr, "lunabot") {
+                    Ok(connecting) => match connecting.await {
+                        Ok(connection) => {
+                            if let Err(e) = setup_bidirectional_stream(
+                                connection.clone(),
                                 Arc::clone(&shared_c1),
-                                server_addr,
-                                keep_alive_interval.as_millis() as u64,
-                            );
+                                false,
+                                "CLIENT",
+                            )
+                            .await
+                            {
+                                eprintln!("[CLIENT] Failed to setup stream: {e}");
+                                continue 'retry_loop;
+                            } else {
+                                start_client_keep_alive_task(
+                                    connection,
+                                    Arc::clone(&shared_c1),
+                                    server_addr,
+                                    keep_alive_interval.as_millis() as u64,
+                                );
+                                break 'retry_loop;
+                            }
                         }
-                    }
+                        Err(e) => {
+                            eprintln!("[CLIENT] Failed to establish connection: {e}");
+                        }
+                    },
                     Err(e) => {
-                        eprintln!("[CLIENT] Failed to establish connection: {e}");
+                        eprintln!("[CLIENT] Failed to connect to server: {e}");
                     }
-                },
-                Err(e) => {
-                    eprintln!("[CLIENT] Failed to connect to server: {e}");
                 }
             }
         });
