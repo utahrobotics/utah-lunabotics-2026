@@ -1,6 +1,6 @@
-use std::net::{IpAddr, Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
-use common::QuicMessage;
+use common::{QuicMessage, Steering};
 use godot::{classes::Os, prelude::*};
 use quic::QuicClient;
 
@@ -46,5 +46,27 @@ impl INode for LunabaseConnection {
             client: client.unwrap()
         }
     }
+}
 
+
+#[godot_api]
+impl LunabaseConnection {
+    #[func]
+    fn execute_steering(&self, left: f64, right: f64) {
+        // lets not use the weight 
+        // send could block depending on the packet size so we might need to just queue up the steering msg
+        // and then spawn a thread in the init function that just continuously checks if there is a new message in the queue and sends it to 
+        // the lunabot.
+        match self.client.send(QuicMessage::FromClient(common::FromLunabase::Steering(Steering::new(left, right, 1.0)))) {
+            Ok(_) => {
+                
+            },
+            Err(e) => {
+                godot_warn!("Failed to send packet: {e}");
+                // use Carlos's notification system here, 
+                //or maybe return an error message from here and notify the user
+                // from godot instead of rust if that is easier
+            },
+        }
+    }
 }
