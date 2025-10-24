@@ -38,7 +38,7 @@ fn test_basic_send_receive() {
     // Give server time to start
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG)
+    let client = QuicClient::<TestMessage>::connect(addr)
         .expect("Failed to create client");
 
     // Give connection time to establish
@@ -75,7 +75,7 @@ fn test_bidirectional_communication() {
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG)
+    let client = QuicClient::<TestMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -117,7 +117,7 @@ fn test_multiple_messages() {
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG)
+    let client = QuicClient::<TestMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -155,7 +155,7 @@ fn test_large_message() {
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<LargeMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG)
+    let client = QuicClient::<LargeMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -197,7 +197,7 @@ fn test_rapid_fire() {
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG)
+    let client = QuicClient::<TestMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -236,7 +236,7 @@ fn test_ping_pong() {
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<PingMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG)
+    let client = QuicClient::<PingMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -273,7 +273,7 @@ fn test_empty_string_message() {
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG)
+    let client = QuicClient::<TestMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -302,7 +302,7 @@ fn test_unicode_message() {
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG)
+    let client = QuicClient::<TestMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -331,7 +331,7 @@ fn test_alternating_communication() {
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG)
+    let client = QuicClient::<TestMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -371,7 +371,7 @@ fn test_stress_test() {
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG)
+    let client = QuicClient::<TestMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -408,7 +408,7 @@ fn test_auto_reconnection_after_connection_close() {
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG)
+    let client = QuicClient::<TestMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -476,7 +476,7 @@ fn test_latency_benchmark() {
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<PingMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG)
+    let client = QuicClient::<PingMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -545,7 +545,7 @@ fn test_multiple_reconnection_cycles() {
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG)
+    let client = QuicClient::<TestMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -605,7 +605,7 @@ fn test_keep_alive_messages() {
 
     // Configure server keep-alive message
     let custom_keep_alive = b"custom_server_v1";
-    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG)
+    let client = QuicClient::<TestMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -679,7 +679,7 @@ fn test_connection_health_monitoring() {
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG)
+    let client = QuicClient::<TestMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -753,7 +753,7 @@ fn test_rapid_close_and_reconnect() {
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG)
+    let client = QuicClient::<TestMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -811,7 +811,7 @@ fn test_bidirectional_after_auto_reconnect() {
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG)
+    let client = QuicClient::<TestMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -888,7 +888,7 @@ fn test_keep_alive_during_load() {
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG)
+    let client = QuicClient::<TestMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -932,7 +932,7 @@ fn test_connect_blocks() {
     let addr = get_test_addr(18);
 
 
-    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG)
+    let client = QuicClient::<TestMessage>::connect(addr)
        .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(1000));

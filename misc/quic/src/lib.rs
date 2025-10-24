@@ -451,14 +451,13 @@ impl<Msg: Encode + Decode<()> + Clone> QuicClient<Msg> {
     /// it will just wait until the server does become available and then connect.
     pub fn connect(
         server_addr: SocketAddr,
-        initial_keep_alive_packet: &[u8],
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         Self::ensure_runtime();
 
         let shared = Arc::new(Mutex::new(InnerShared::new()));
         {
             let mut shared_lock = shared.lock();
-            shared_lock.keep_alive_msg = initial_keep_alive_packet.to_vec();
+            shared_lock.keep_alive_msg = [0u8].to_vec();
         }
 
         let shared_c1 = Arc::clone(&shared);
