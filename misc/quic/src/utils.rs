@@ -1,13 +1,14 @@
-use std::{error::Error, net::SocketAddr, sync::Arc};
+use std::{error::Error, net::SocketAddr, sync::Arc, time::Duration};
 
 use quinn::{
-    ClientConfig, Endpoint, ServerConfig,
-    rustls::{
+    ClientConfig, Endpoint, IdleTimeout, ServerConfig, TransportConfig, VarInt, rustls::{
         self,
         pki_types::{CertificateDer, PrivatePkcs8KeyDer, ServerName, UnixTime},
-    },
+    }
 };
 use rcgen::generate_simple_self_signed;
+
+pub static IDLE_TIMEOUT_MS: u32 = 200;
 
 pub fn make_server_endpoint(
     bind_addr: SocketAddr,
@@ -19,7 +20,7 @@ pub fn make_server_endpoint(
 
 pub fn configure_server()
 -> Result<(ServerConfig, CertificateDer<'static>), Box<dyn Error + Send + Sync + 'static>> {
-    let cert = generate_simple_self_signed(vec!["localhost".into(), "0.0.0.0".into()]).unwrap();
+    let cert = generate_simple_self_signed(vec!["localhost".into(), "0.0.0.0".into(), "lunabot".into()]).unwrap();
     let cert_der = CertificateDer::from(cert.cert);
     let priv_key = PrivatePkcs8KeyDer::from(cert.signing_key.serialize_der());
 
@@ -37,7 +38,6 @@ pub fn make_client_endpoint(
     server_certs: &[&[u8]],
 ) -> Result<Endpoint, Box<dyn Error + Send + Sync + 'static>> {
     let client_cfg = configure_client(server_certs)?;
-
     let mut endpoint = Endpoint::client(bind_addr)?;
     endpoint.set_default_client_config(client_cfg);
     Ok(endpoint)
@@ -50,8 +50,11 @@ fn configure_client(
     for cert in server_certs {
         certs.add(CertificateDer::from(*cert))?;
     }
-
-    Ok(ClientConfig::with_root_certificates(Arc::new(certs))?)
+    let mut config = ClientConfig::with_root_certificates(Arc::new(certs))?;
+    let mut transport_config = TransportConfig::default();
+    transport_config.max_idle_timeout(Some(VarInt::from_u32(IDLE_TIMEOUT_MS).into()));
+    config.transport_config(Arc::new(transport_config));
+    Ok(config)
 }
 
 /// Dummy certificate verifier that treats any certificate as valid.

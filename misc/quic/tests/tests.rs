@@ -21,7 +21,7 @@ struct LargeMessage {
 
 const TEST_PORT_BASE: u32 = 9000;
 const DEFAULT_KEEP_ALIVE_MSG: &[u8] = b"test_client";
-const DEFAULT_KEEP_ALIVE_INTERVAL: Duration = Duration::from_millis(1000);
+const DEFAULT_KEEP_ALIVE_INTERVAL: Duration = Duration::from_millis(250);
 
 fn get_test_addr(port_offset: u32) -> SocketAddr {
     SocketAddr::from_str(&format!("127.0.0.1:{}", TEST_PORT_BASE + port_offset)).unwrap()
@@ -32,13 +32,13 @@ fn test_basic_send_receive() {
     println!("\n=== TEST: Basic Send/Receive ===");
 
     let addr = get_test_addr(0);
-    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE)
+    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE, DEFAULT_KEEP_ALIVE_INTERVAL)
         .expect("Failed to create server");
 
     // Give server time to start
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG, DEFAULT_KEEP_ALIVE_INTERVAL)
+    let client = QuicClient::<TestMessage>::connect(addr)
         .expect("Failed to create client");
 
     // Give connection time to establish
@@ -70,12 +70,12 @@ fn test_bidirectional_communication() {
     println!("\n=== TEST: Bidirectional Communication ===");
 
     let addr = get_test_addr(1);
-    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 1)
+    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 1, DEFAULT_KEEP_ALIVE_INTERVAL)
         .expect("Failed to create server");
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG, DEFAULT_KEEP_ALIVE_INTERVAL)
+    let client = QuicClient::<TestMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -112,12 +112,12 @@ fn test_multiple_messages() {
     println!("\n=== TEST: Multiple Messages ===");
 
     let addr = get_test_addr(2);
-    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 2)
+    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 2, DEFAULT_KEEP_ALIVE_INTERVAL)
         .expect("Failed to create server");
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG, DEFAULT_KEEP_ALIVE_INTERVAL)
+    let client = QuicClient::<TestMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -150,12 +150,12 @@ fn test_large_message() {
     println!("\n=== TEST: Large Message ===");
 
     let addr = get_test_addr(3);
-    let server = QuicServer::<LargeMessage>::listen(TEST_PORT_BASE + 3)
+    let server = QuicServer::<LargeMessage>::listen(TEST_PORT_BASE + 3, DEFAULT_KEEP_ALIVE_INTERVAL)
         .expect("Failed to create server");
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<LargeMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG, DEFAULT_KEEP_ALIVE_INTERVAL)
+    let client = QuicClient::<LargeMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -192,12 +192,12 @@ fn test_rapid_fire() {
     println!("\n=== TEST: Rapid Fire Messages ===");
 
     let addr = get_test_addr(4);
-    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 4)
+    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 4, DEFAULT_KEEP_ALIVE_INTERVAL)
         .expect("Failed to create server");
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG, DEFAULT_KEEP_ALIVE_INTERVAL)
+    let client = QuicClient::<TestMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -231,12 +231,12 @@ fn test_ping_pong() {
     println!("\n=== TEST: Ping Pong ===");
 
     let addr = get_test_addr(5);
-    let server = QuicServer::<PingMessage>::listen(TEST_PORT_BASE + 5)
+    let server = QuicServer::<PingMessage>::listen(TEST_PORT_BASE + 5, DEFAULT_KEEP_ALIVE_INTERVAL)
         .expect("Failed to create server");
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<PingMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG, DEFAULT_KEEP_ALIVE_INTERVAL)
+    let client = QuicClient::<PingMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -268,12 +268,12 @@ fn test_empty_string_message() {
     println!("\n=== TEST: Empty String Message ===");
 
     let addr = get_test_addr(6);
-    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 6)
+    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 6, DEFAULT_KEEP_ALIVE_INTERVAL)
         .expect("Failed to create server");
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG, DEFAULT_KEEP_ALIVE_INTERVAL)
+    let client = QuicClient::<TestMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -297,12 +297,12 @@ fn test_unicode_message() {
     println!("\n=== TEST: Unicode Message ===");
 
     let addr = get_test_addr(7);
-    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 7)
+    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 7, DEFAULT_KEEP_ALIVE_INTERVAL)
         .expect("Failed to create server");
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG, DEFAULT_KEEP_ALIVE_INTERVAL)
+    let client = QuicClient::<TestMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -326,12 +326,12 @@ fn test_alternating_communication() {
     println!("\n=== TEST: Alternating Communication ===");
 
     let addr = get_test_addr(8);
-    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 8)
+    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 8, DEFAULT_KEEP_ALIVE_INTERVAL)
         .expect("Failed to create server");
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG, DEFAULT_KEEP_ALIVE_INTERVAL)
+    let client = QuicClient::<TestMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -366,17 +366,17 @@ fn test_stress_test() {
     println!("\n=== TEST: Stress Test (100,000 messages) ===");
 
     let addr = get_test_addr(9);
-    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 9)
+    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 9, DEFAULT_KEEP_ALIVE_INTERVAL)
         .expect("Failed to create server");
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG, DEFAULT_KEEP_ALIVE_INTERVAL)
+    let client = QuicClient::<TestMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
 
-    const STRESS_COUNT: u32 = 100;
+    const STRESS_COUNT: u32 = 100_000;
     let start = std::time::Instant::now();
 
     for i in 0..STRESS_COUNT {
@@ -403,12 +403,12 @@ fn test_auto_reconnection_after_connection_close() {
     println!("\n=== TEST: Auto-Reconnection After Connection Close ===");
 
     let addr = get_test_addr(11);
-    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 11)
+    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 11, DEFAULT_KEEP_ALIVE_INTERVAL)
         .expect("Failed to create server");
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG, DEFAULT_KEEP_ALIVE_INTERVAL)
+    let client = QuicClient::<TestMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -471,12 +471,12 @@ fn test_latency_benchmark() {
     println!("\n=== TEST: Latency Benchmark ===");
 
     let addr = get_test_addr(10);
-    let server = QuicServer::<PingMessage>::listen(TEST_PORT_BASE + 10)
+    let server = QuicServer::<PingMessage>::listen(TEST_PORT_BASE + 10, DEFAULT_KEEP_ALIVE_INTERVAL)
         .expect("Failed to create server");
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<PingMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG, DEFAULT_KEEP_ALIVE_INTERVAL)
+    let client = QuicClient::<PingMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -540,12 +540,12 @@ fn test_multiple_reconnection_cycles() {
     println!("\n=== TEST: Multiple Reconnection Cycles ===");
 
     let addr = get_test_addr(12);
-    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 12)
+    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 12, DEFAULT_KEEP_ALIVE_INTERVAL)
         .expect("Failed to create server");
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG, DEFAULT_KEEP_ALIVE_INTERVAL)
+    let client = QuicClient::<TestMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -575,7 +575,7 @@ fn test_multiple_reconnection_cycles() {
         println!("✓ Connection closed");
 
         // Wait for auto-reconnection
-        thread::sleep(Duration::from_secs(7));
+        thread::sleep(Duration::from_secs(3));
 
         // Send message after reconnection
         let msg2 = TestMessage {
@@ -597,16 +597,15 @@ fn test_keep_alive_messages() {
     println!("\n=== TEST: Keep-Alive Messages ===");
 
     let addr = get_test_addr(13);
-    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 13)
+    let keep_alive_interval = Duration::from_millis(250);
+    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 13, keep_alive_interval)
         .expect("Failed to create server");
 
     thread::sleep(Duration::from_millis(100));
 
-    // Create client with custom keep-alive message
-    let custom_keep_alive = b"custom_client_v1";
-    let keep_alive_interval = Duration::from_millis(500);
-    
-    let client = QuicClient::<TestMessage>::connect(addr, custom_keep_alive, keep_alive_interval)
+    // Configure server keep-alive message
+    let custom_keep_alive = b"custom_server_v1";
+    let client = QuicClient::<TestMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -622,33 +621,39 @@ fn test_keep_alive_messages() {
     assert_eq!(received, msg);
     println!("✓ Initial message sent successfully");
 
-    // Wait for keep-alive exchange to occur
+    // Set the server keep-alive message and wait for exchange to occur
     println!("\n--- Phase 2: Waiting for Keep-Alive ---");
+    server.set_keep_alive_msg(custom_keep_alive);
     thread::sleep(Duration::from_millis(1500)); // Wait for at least 2 keep-alive cycles
 
-    // Check that server received keep-alive message from client
-    let server_received_ka = server.get_last_keep_alive_msg();
-    assert!(server_received_ka.is_some(), "Server should have received keep-alive from client");
-    assert_eq!(server_received_ka.unwrap(), custom_keep_alive, "Server should receive client's custom keep-alive message");
-    println!("✓ Server received client's keep-alive message");
+    // Check that client received keep-alive message from server
+    let client_received_ka = client.get_last_keep_alive_msg();
+    assert!(client_received_ka.is_some(), "Client should have received keep-alive from server");
+    assert_eq!(client_received_ka.unwrap(), custom_keep_alive, "Client should receive server's custom keep-alive message");
+    println!("✓ Client received server's keep-alive message");
 
     // Check that keep-alive was received recently
-    let time_since = server.time_since_last_keep_alive();
-    assert!(time_since.is_some(), "Server should have keep-alive timestamp");
-    assert!(time_since.unwrap() < Duration::from_secs(2), "Keep-alive should be recent");
-    println!("✓ Keep-alive timestamp is recent: {:?}", time_since.unwrap());
+    let server_time_since = server.time_since_last_keep_alive();
+    assert!(server_time_since.is_some(), "Server should have keep-alive timestamp");
+    assert!(server_time_since.unwrap() < Duration::from_secs(2), "Keep-alive should be recent");
+    println!("✓ Server keep-alive timestamp is recent: {:?}", server_time_since.unwrap());
+
+    let client_time_since = client.time_since_last_keep_alive();
+    assert!(client_time_since.is_some(), "Client should have keep-alive timestamp");
+    assert!(client_time_since.unwrap() < Duration::from_secs(2), "Keep-alive should be recent");
+    println!("✓ Client keep-alive timestamp is recent: {:?}", client_time_since.unwrap());
 
     // Update client's keep-alive message
     println!("\n--- Phase 3: Update Keep-Alive Message ---");
-    let new_keep_alive = b"updated_client_v2";
-    client.set_keep_alive_msg(new_keep_alive);
+    let new_keep_alive = b"updated_server_v2";
+    server.set_keep_alive_msg(new_keep_alive);
     
     // Wait for updated keep-alive to be sent
     thread::sleep(Duration::from_millis(1500));
     
-    let updated_ka = server.get_last_keep_alive_msg();
-    assert_eq!(updated_ka.unwrap(), new_keep_alive, "Server should receive updated keep-alive message");
-    println!("✓ Server received updated keep-alive message");
+    let updated_ka = client.get_last_keep_alive_msg();
+    assert_eq!(updated_ka.unwrap(), new_keep_alive, "Client should receive updated keep-alive message");
+    println!("✓ Client received updated keep-alive message");
 
     // Verify normal communication still works
     println!("\n--- Phase 4: Verify Normal Communication ---");
@@ -669,12 +674,12 @@ fn test_connection_health_monitoring() {
     println!("\n=== TEST: Connection Health Monitoring ===");
 
     let addr = get_test_addr(14);
-    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 14)
+    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 14, DEFAULT_KEEP_ALIVE_INTERVAL)
         .expect("Failed to create server");
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG, DEFAULT_KEEP_ALIVE_INTERVAL)
+    let client = QuicClient::<TestMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -743,12 +748,12 @@ fn test_rapid_close_and_reconnect() {
     println!("\n=== TEST: Rapid Close and Auto-Reconnect ===");
 
     let addr = get_test_addr(15);
-    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 15)
+    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 15, DEFAULT_KEEP_ALIVE_INTERVAL)
         .expect("Failed to create server");
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG, DEFAULT_KEEP_ALIVE_INTERVAL)
+    let client = QuicClient::<TestMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -801,12 +806,12 @@ fn test_bidirectional_after_auto_reconnect() {
     println!("\n=== TEST: Bidirectional Communication After Auto-Reconnect ===");
 
     let addr = get_test_addr(16);
-    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 16)
+    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 16, DEFAULT_KEEP_ALIVE_INTERVAL)
         .expect("Failed to create server");
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG, DEFAULT_KEEP_ALIVE_INTERVAL)
+    let client = QuicClient::<TestMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -878,12 +883,12 @@ fn test_keep_alive_during_load() {
     println!("\n=== TEST: Keep-Alive During High Load ===");
 
     let addr = get_test_addr(17);
-    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 17)
+    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 17, Duration::from_millis(250))
         .expect("Failed to create server");
 
     thread::sleep(Duration::from_millis(100));
 
-    let client = QuicClient::<TestMessage>::connect(addr, DEFAULT_KEEP_ALIVE_MSG, Duration::from_millis(500))
+    let client = QuicClient::<TestMessage>::connect(addr)
         .expect("Failed to create client");
 
     thread::sleep(Duration::from_millis(200));
@@ -918,4 +923,23 @@ fn test_keep_alive_during_load() {
     println!("✓ Keep-alive still active: {:?} ago", server_ka.unwrap());
 
     println!("\n✅ KEEP-ALIVE DURING LOAD TEST PASSED!");
+}
+
+
+#[test]
+fn test_connect_blocks() {
+    println!("\n=== TEST: connect blocks until it can connect ===");
+    let addr = get_test_addr(18);
+
+
+    let client = QuicClient::<TestMessage>::connect(addr)
+       .expect("Failed to create client");
+
+    thread::sleep(Duration::from_millis(1000));
+
+    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 18, DEFAULT_KEEP_ALIVE_INTERVAL)
+        .expect("Failed to create server");
+    thread::sleep(Duration::from_millis(5000));
+    assert!(client.is_connected());
+    assert!(server.is_connected());
 }
