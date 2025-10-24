@@ -1,14 +1,15 @@
-use std::{error::Error, net::SocketAddr, sync::Arc, time::Duration};
+use std::{error::Error, net::SocketAddr, sync::Arc};
 
 use quinn::{
-    ClientConfig, Endpoint, IdleTimeout, ServerConfig, TransportConfig, VarInt, rustls::{
+    ClientConfig, Endpoint, ServerConfig, TransportConfig, VarInt, rustls::{
         self,
         pki_types::{CertificateDer, PrivatePkcs8KeyDer, ServerName, UnixTime},
     }
 };
 use rcgen::generate_simple_self_signed;
 
-pub static IDLE_TIMEOUT_MS: u32 = 200;
+// effectively infinite for most use cases
+pub static IDLE_TIMEOUT_MS: u32 = 86_400_000;
 
 pub fn make_server_endpoint(
     bind_addr: SocketAddr,
@@ -28,6 +29,7 @@ pub fn configure_server()
         ServerConfig::with_single_cert(vec![cert_der.clone()], priv_key.into())?;
     let transport_config = Arc::get_mut(&mut server_config.transport).unwrap();
     transport_config.max_concurrent_uni_streams(0_u8.into());
+    transport_config.max_idle_timeout(Some(VarInt::from_u32(IDLE_TIMEOUT_MS).into()));
 
     Ok((server_config, cert_der))
 }

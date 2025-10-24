@@ -7,5 +7,6 @@ edition = "2024"
 bincode.workspace = true
 cobs.workspace = true
 quinn = "0.11.9"
+rand = "0.9.2"
 rcgen = "0.14.5"
 tasker = { path = "../tasker" }

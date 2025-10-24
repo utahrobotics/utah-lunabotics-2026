@@ -20,7 +20,6 @@ struct LargeMessage {
 }
 
 const TEST_PORT_BASE: u32 = 9000;
-const DEFAULT_KEEP_ALIVE_MSG: &[u8] = b"test_client";
 const DEFAULT_KEEP_ALIVE_INTERVAL: Duration = Duration::from_millis(250);
 
 fn get_test_addr(port_offset: u32) -> SocketAddr {
@@ -398,73 +397,7 @@ fn test_stress_test() {
     println!("✓ Stress test passed!");
 }
 
-#[test]
-fn test_auto_reconnection_after_connection_close() {
-    println!("\n=== TEST: Auto-Reconnection After Connection Close ===");
-
-    let addr = get_test_addr(11);
-    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 11, DEFAULT_KEEP_ALIVE_INTERVAL)
-        .expect("Failed to create server");
-
-    thread::sleep(Duration::from_millis(100));
-
-    let client = QuicClient::<TestMessage>::connect(addr)
-        .expect("Failed to create client");
-
-    thread::sleep(Duration::from_millis(200));
-
-    // Send initial message to verify connection works
-    println!("--- Phase 1: Initial Communication ---");
-    let msg1 = TestMessage {
-        id: 1,
-        data: "Before close".to_string(),
-    };
-    client.send(msg1.clone()).expect("Failed to send first message");
-    let received1 = server.recv().expect("Failed to receive first message");
-    assert_eq!(received1, msg1);
-    println!("✓ Initial message sent successfully");
-
-    // Force close the client's inner connection
-    println!("\n--- Phase 2: Force Close Client Connection ---");
-    {
-        let mut shared = client.shared.lock();
-        if let Some(conn) = shared.connection.take() {
-            conn.close(0u32.into(), b"test forced close");
-            println!("✓ Client connection closed");
-        }
-    }
-
-    // Give the keep-alive task time to detect the closure and attempt reconnect
-    println!("Waiting for auto-reconnection...");
-    thread::sleep(Duration::from_secs(7));
-
-    // Try to send a message - the client should have auto-reconnected
-    println!("\n--- Phase 3: Communication After Auto-Reconnect ---");
-    let msg2 = TestMessage {
-        id: 2,
-        data: "After auto-reconnect".to_string(),
-    };
-    
-    client.send(msg2.clone()).expect("Failed to send after reconnect");
-    let received2 = server.recv().expect("Failed to receive after reconnect");
-    assert_eq!(received2, msg2);
-    println!("✓ Message sent successfully after auto-reconnection!");
-
-    // Verify continued communication works
-    println!("\n--- Phase 4: Continued Communication ---");
-    for i in 3..8 {
-        let msg = TestMessage {
-            id: i,
-            data: format!("Message {}", i),
-        };
-        client.send(msg.clone()).expect(&format!("Failed to send message {}", i));
-        let received = server.recv().expect(&format!("Failed to receive message {}", i));
-        assert_eq!(received, msg);
-    }
-    println!("✓ Sent 5 more messages successfully!");
-
-    println!("\n✅ AUTO-RECONNECTION TEST PASSED!");
-}
+// Removed: Auto-reconnection tests are no longer relevant with high idle timeout
 
 #[test]
 fn test_latency_benchmark() {
@@ -535,62 +468,7 @@ fn test_latency_benchmark() {
 }
 
 
-#[test]
-fn test_multiple_reconnection_cycles() {
-    println!("\n=== TEST: Multiple Reconnection Cycles ===");
-
-    let addr = get_test_addr(12);
-    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 12, DEFAULT_KEEP_ALIVE_INTERVAL)
-        .expect("Failed to create server");
-
-    thread::sleep(Duration::from_millis(100));
-
-    let client = QuicClient::<TestMessage>::connect(addr)
-        .expect("Failed to create client");
-
-    thread::sleep(Duration::from_millis(200));
-
-    const NUM_CYCLES: u32 = 5;
-
-    for cycle in 0..NUM_CYCLES {
-        println!("\n--- Cycle {}/{} ---", cycle + 1, NUM_CYCLES);
-        
-        // Send message
-        let msg = TestMessage {
-            id: cycle,
-            data: format!("Before close cycle {}", cycle),
-        };
-        client.send(msg.clone()).expect("Failed to send");
-        let received = server.recv().expect("Failed to receive");
-        assert_eq!(received, msg);
-        println!("✓ Message sent before close");
-
-        // Force close connection
-        {
-            let mut shared = client.shared.lock();
-            if let Some(conn) = shared.connection.take() {
-                conn.close(0u32.into(), b"test cycle");
-            }
-        }
-        println!("✓ Connection closed");
-
-        // Wait for auto-reconnection
-        thread::sleep(Duration::from_secs(3));
-
-        // Send message after reconnection
-        let msg2 = TestMessage {
-            id: cycle + 100,
-            data: format!("After reconnect cycle {}", cycle),
-        };
-        client.send(msg2.clone()).expect("Failed to send after reconnect");
-        let received2 = server.recv().expect("Failed to receive after reconnect");
-        assert_eq!(received2, msg2);
-        println!("✓ Message sent after reconnect");
-    }
-
-    println!("\n✅ MULTIPLE RECONNECTION CYCLES TEST PASSED!");
-    println!("Successfully completed {} reconnection cycles", NUM_CYCLES);
-}
+// Removed: Multiple reconnection cycles test - no longer relevant with high idle timeout
 
 #[test]
 fn test_keep_alive_messages() {
@@ -717,166 +595,12 @@ fn test_connection_health_monitoring() {
     assert!(server.is_connected(), "Server should still be connected");
     println!("✓ Connection health confirmed");
 
-    // Force close and check status
-    println!("\n--- Phase 3: Check Status After Connection Close ---");
-    {
-        let mut shared = client.shared.lock();
-        if let Some(conn) = shared.connection.take() {
-            conn.close(0u32.into(), b"test");
-        }
-    }
-
-    // Connection status should reflect the closure (after a brief moment)
-    thread::sleep(Duration::from_millis(100));
-    
-    // After closure is detected, is_connected should return false
-    // (though auto-reconnection may already be in progress)
-    println!("Connection closed, waiting for status update...");
-    
-    // Wait for auto-reconnection
-    thread::sleep(Duration::from_secs(7));
-    
-    // After auto-reconnection, should be connected again
-    assert!(client.is_connected(), "Client should be reconnected");
-    println!("✓ Client auto-reconnected and reports connected status");
-
     println!("\n✅ CONNECTION HEALTH MONITORING TEST PASSED!");
 }
 
-#[test]
-fn test_rapid_close_and_reconnect() {
-    println!("\n=== TEST: Rapid Close and Auto-Reconnect ===");
+// Removed: Rapid close and reconnect test - no longer relevant with high idle timeout
 
-    let addr = get_test_addr(15);
-    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 15, DEFAULT_KEEP_ALIVE_INTERVAL)
-        .expect("Failed to create server");
-
-    thread::sleep(Duration::from_millis(100));
-
-    let client = QuicClient::<TestMessage>::connect(addr)
-        .expect("Failed to create client");
-
-    thread::sleep(Duration::from_millis(200));
-
-    const NUM_RAPID_CYCLES: u32 = 3;
-
-    for i in 0..NUM_RAPID_CYCLES {
-        println!("\n--- Rapid Cycle {}/{} ---", i + 1, NUM_RAPID_CYCLES);
-
-        // Send message before close
-        let msg1 = TestMessage {
-            id: i * 2,
-            data: format!("Before rapid close {}", i),
-        };
-        client.send(msg1.clone()).expect("Failed to send before close");
-        let recv1 = server.recv().expect("Failed to receive before close");
-        assert_eq!(recv1, msg1);
-        println!("✓ Message sent before close");
-
-        // Force close
-        {
-            let mut shared = client.shared.lock();
-            if let Some(conn) = shared.connection.take() {
-                conn.close(0u32.into(), b"rapid test");
-            }
-        }
-        println!("✓ Connection force closed");
-
-        // Wait for auto-reconnection (shorter wait)
-        println!("Waiting for auto-reconnection...");
-        thread::sleep(Duration::from_secs(7));
-
-        // Send message after reconnect
-        let msg2 = TestMessage {
-            id: i * 2 + 1,
-            data: format!("After rapid reconnect {}", i),
-        };
-        client.send(msg2.clone()).expect("Failed to send after reconnect");
-        let recv2 = server.recv().expect("Failed to receive after reconnect");
-        assert_eq!(recv2, msg2);
-        println!("✓ Message sent after auto-reconnect");
-    }
-
-    println!("\n✅ RAPID CLOSE AND AUTO-RECONNECT TEST PASSED!");
-    println!("Successfully completed {} rapid reconnection cycles", NUM_RAPID_CYCLES);
-}
-
-#[test]
-fn test_bidirectional_after_auto_reconnect() {
-    println!("\n=== TEST: Bidirectional Communication After Auto-Reconnect ===");
-
-    let addr = get_test_addr(16);
-    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 16, DEFAULT_KEEP_ALIVE_INTERVAL)
-        .expect("Failed to create server");
-
-    thread::sleep(Duration::from_millis(100));
-
-    let client = QuicClient::<TestMessage>::connect(addr)
-        .expect("Failed to create client");
-
-    thread::sleep(Duration::from_millis(200));
-
-    // Initial bidirectional communication
-    println!("--- Phase 1: Initial Bidirectional Communication ---");
-    let c2s = TestMessage { id: 1, data: "Client to server".to_string() };
-    client.send(c2s.clone()).expect("C2S failed");
-    let recv_c2s = server.recv().expect("Server recv failed");
-    assert_eq!(recv_c2s, c2s);
-
-    let s2c = TestMessage { id: 2, data: "Server to client".to_string() };
-    server.send(s2c.clone()).expect("S2C failed");
-    let recv_s2c = client.recv().expect("Client recv failed");
-    assert_eq!(recv_s2c, s2c);
-    println!("✓ Initial bidirectional communication works");
-
-    // Force close client connection
-    println!("\n--- Phase 2: Force Close Connection ---");
-    {
-        let mut shared = client.shared.lock();
-        if let Some(conn) = shared.connection.take() {
-            conn.close(0u32.into(), b"test");
-        }
-    }
-    println!("✓ Client connection closed");
-
-    // Wait for auto-reconnection
-    println!("Waiting for auto-reconnection...");
-    thread::sleep(Duration::from_secs(7));
-
-    // Test bidirectional communication after auto-reconnect
-    println!("\n--- Phase 3: Bidirectional Communication After Auto-Reconnect ---");
-    
-    // Client to Server
-    let c2s2 = TestMessage { id: 3, data: "Client to server after reconnect".to_string() };
-    client.send(c2s2.clone()).expect("C2S after reconnect failed");
-    let recv_c2s2 = server.recv().expect("Server recv after reconnect failed");
-    assert_eq!(recv_c2s2, c2s2);
-    println!("✓ Client to server works after reconnect");
-
-    // Server to Client
-    let s2c2 = TestMessage { id: 4, data: "Server to client after reconnect".to_string() };
-    server.send(s2c2.clone()).expect("S2C after reconnect failed");
-    let recv_s2c2 = client.recv().expect("Client recv after reconnect failed");
-    assert_eq!(recv_s2c2, s2c2);
-    println!("✓ Server to client works after reconnect");
-
-    // Multiple exchanges
-    println!("\n--- Phase 4: Multiple Bidirectional Exchanges ---");
-    for i in 0..5 {
-        let c_msg = TestMessage { id: 10 + i, data: format!("C->S exchange {}", i) };
-        client.send(c_msg.clone()).expect("Exchange C2S failed");
-        let recv = server.recv().expect("Exchange S recv failed");
-        assert_eq!(recv, c_msg);
-
-        let s_msg = TestMessage { id: 20 + i, data: format!("S->C exchange {}", i) };
-        server.send(s_msg.clone()).expect("Exchange S2C failed");
-        let recv = client.recv().expect("Exchange C recv failed");
-        assert_eq!(recv, s_msg);
-    }
-    println!("✓ Multiple bidirectional exchanges successful");
-
-    println!("\n✅ BIDIRECTIONAL AFTER AUTO-RECONNECT TEST PASSED!");
-}
+// Removed: Bidirectional after auto-reconnect test - no longer relevant with high idle timeout
 
 #[test]
 fn test_keep_alive_during_load() {
@@ -942,4 +666,157 @@ fn test_connect_blocks() {
     thread::sleep(Duration::from_millis(5000));
     assert!(client.is_connected());
     assert!(server.is_connected());
+}
+
+#[test]
+fn test_reconnect_and_send_with_close() {
+    println!("\n=== TEST: Client Reconnect and Send (with close()) ===");
+
+    let addr = get_test_addr(19);
+    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 19, DEFAULT_KEEP_ALIVE_INTERVAL)
+        .expect("Failed to create server");
+
+    thread::sleep(Duration::from_millis(100));
+
+    // First connection
+    println!("\n--- Phase 1: First Connection ---");
+    let client1 = QuicClient::<TestMessage>::connect(addr)
+        .expect("Failed to create client");
+
+    thread::sleep(Duration::from_millis(200));
+
+    let msg1 = TestMessage {
+        id: 1,
+        data: "First client message".to_string(),
+    };
+    client1.send(msg1.clone()).expect("Failed to send first message");
+    let received1 = server.recv().expect("Failed to receive first message");
+    assert_eq!(received1, msg1);
+    println!("✓ First message received successfully");
+
+    // Force close the client
+    println!("\n--- Phase 2: Close First Client ---");
+    {
+        let mut shared = client1.shared.lock();
+        if let Some(conn) = shared.connection.take() {
+            conn.close(0u32.into(), b"test close");
+            println!("✓ Client connection closed");
+        }
+    }
+    drop(client1);
+
+    // Wait a moment for server to detect
+    thread::sleep(Duration::from_millis(500));
+
+    // Second connection (reconnect)
+    println!("\n--- Phase 3: Reconnect with New Client ---");
+    let client2 = QuicClient::<TestMessage>::connect(addr)
+        .expect("Failed to create reconnected client");
+
+    thread::sleep(Duration::from_millis(500));
+
+    // Try to send from new client
+    println!("\n--- Phase 4: Send from Reconnected Client ---");
+    let msg2 = TestMessage {
+        id: 2,
+        data: "Second client message after reconnect".to_string(),
+    };
+    
+    println!("Sending message from reconnected client...");
+    client2.send(msg2.clone()).expect("Failed to send second message");
+    
+    println!("Server attempting to receive...");
+    let received2 = server.recv().expect("Failed to receive second message");
+    
+    assert_eq!(received2, msg2);
+    println!("✓ Second message received successfully after reconnect!");
+
+    // Send a few more to make sure it's stable
+    println!("\n--- Phase 5: Multiple Messages After Reconnect ---");
+    for i in 3..6 {
+        let msg = TestMessage {
+            id: i,
+            data: format!("Message {} after reconnect", i),
+        };
+        client2.send(msg.clone()).expect(&format!("Failed to send message {}", i));
+        let received = server.recv().expect(&format!("Failed to receive message {}", i));
+        assert_eq!(received, msg);
+    }
+    println!("✓ Multiple messages work after reconnect");
+
+    println!("\n✅ RECONNECT AND SEND TEST PASSED!");
+}
+
+#[test]
+fn test_reconnect_after_abrupt_disconnect() {
+    println!("\n=== TEST: Client Reconnect After Abrupt Disconnect (simulating Ctrl+C) ===");
+
+    let addr = get_test_addr(20);
+    let server = QuicServer::<TestMessage>::listen(TEST_PORT_BASE + 20, DEFAULT_KEEP_ALIVE_INTERVAL)
+        .expect("Failed to create server");
+
+    thread::sleep(Duration::from_millis(100));
+
+    // First connection
+    println!("\n--- Phase 1: First Connection ---");
+    let client1 = QuicClient::<TestMessage>::connect(addr)
+        .expect("Failed to create client");
+
+    thread::sleep(Duration::from_millis(200));
+
+    let msg1 = TestMessage {
+        id: 1,
+        data: "First client message".to_string(),
+    };
+    client1.send(msg1.clone()).expect("Failed to send first message");
+    let received1 = server.recv().expect("Failed to receive first message");
+    assert_eq!(received1, msg1);
+    println!("✓ First message received successfully");
+
+    // Abruptly drop the client WITHOUT calling close (simulates Ctrl+C)
+    println!("\n--- Phase 2: Abruptly Drop Client (simulating Ctrl+C) ---");
+    drop(client1);
+    println!("✓ Client dropped without close frame");
+
+    // Server doesn't know yet that client is gone
+    // Wait just a tiny bit (not enough for timeout)
+    thread::sleep(Duration::from_millis(100));
+
+    // Second connection (reconnect) happens BEFORE server detects the first is dead
+    println!("\n--- Phase 3: Reconnect with New Client (before server detects disconnect) ---");
+    let client2 = QuicClient::<TestMessage>::connect(addr)
+        .expect("Failed to create reconnected client");
+
+    thread::sleep(Duration::from_millis(500));
+
+    // Try to send from new client
+    println!("\n--- Phase 4: Send from Reconnected Client ---");
+    let msg2 = TestMessage {
+        id: 2,
+        data: "Second client message after abrupt reconnect".to_string(),
+    };
+    
+    println!("Sending message from reconnected client...");
+    client2.send(msg2.clone()).expect("Failed to send second message");
+    
+    println!("Server attempting to receive...");
+    let received2 = server.recv().expect("Failed to receive second message");
+    
+    assert_eq!(received2, msg2);
+    println!("✓ Second message received successfully after abrupt reconnect!");
+
+    // Send a few more to make sure it's stable
+    println!("\n--- Phase 5: Multiple Messages After Abrupt Reconnect ---");
+    for i in 3..6 {
+        let msg = TestMessage {
+            id: i,
+            data: format!("Message {} after abrupt reconnect", i),
+        };
+        client2.send(msg.clone()).expect(&format!("Failed to send message {}", i));
+        let received = server.recv().expect(&format!("Failed to receive message {}", i));
+        assert_eq!(received, msg);
+    }
+    println!("✓ Multiple messages work after abrupt reconnect");
+
+    println!("\n✅ ABRUPT RECONNECT TEST PASSED!");
 }

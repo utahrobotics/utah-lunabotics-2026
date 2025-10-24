@@ -8,14 +8,14 @@ use std::{
 };
 
 use bincode::{Decode, Encode};
-use cobs::CobsDecoder;
+use cobs::{CobsDecoderOwned};
 use quinn::{
     Connection, Endpoint, RecvStream, SendStream, crypto::rustls::QuicClientConfig, rustls,
 };
 use std::time::{Duration, Instant};
 use tasker::{parking_lot::Mutex, tokio::io::AsyncWriteExt};
 
-use crate::utils::{IDLE_TIMEOUT_MS, SkipServerVerification, make_server_endpoint};
+use crate::utils::{SkipServerVerification, make_server_endpoint};
 
 /// Internal keep-alive packet format
 #[derive(Debug, Clone, Encode, Decode)]
@@ -29,19 +29,27 @@ pub struct InnerShared {
     pub send_stream: Option<SendStream>,
     pub recv_stream: Option<RecvStream>,
     /// decoder has a box leaked buffer
-    pub decoder: CobsDecoder<'static>,
+    pub decoder: CobsDecoderOwned,
     /// Queue of decoded messages waiting to be returned by recv()
     pub message_queue: VecDeque<Vec<u8>>,
     /// heartbeat message to send with ping/pong
     pub keep_alive_msg: Vec<u8>,
     pub last_keep_alive_received: Option<Instant>,
     pub last_received_keep_alive_msg: Option<Vec<u8>>,
+    /// Abort handle to kill the current keep-alive task when new connection accepted
+    pub keep_alive_abort_handle: Option<tasker::tokio::task::AbortHandle>,
+    /// Watch channel sender to signal new connection (cancels pending recvs)
+    pub new_connection_tx: tasker::tokio::sync::watch::Sender<u64>,
+    /// Watch channel receiver to detect new connections
+    /// when a new connection is detected, the decoder is reset, and the message queue is cleared, and any recv operations are cancelled
+    pub new_connection_rx: tasker::tokio::sync::watch::Receiver<u64>,
 }
 
 impl InnerShared {
     fn new() -> Self {
-        let decoder_inner = Box::leak(Box::new(vec![0u8; 2 * 1024 * 1024]));
-        let decoder = CobsDecoder::new(decoder_inner);
+        // 2MB decoder buffer
+        let decoder = CobsDecoderOwned::new(1024*1024*2);
+        let (new_connection_tx, new_connection_rx) = tasker::tokio::sync::watch::channel(0u64);
         Self {
             connection: None,
             send_stream: None,
@@ -51,6 +59,9 @@ impl InnerShared {
             keep_alive_msg: Vec::new(),
             last_keep_alive_received: None,
             last_received_keep_alive_msg: None,
+            keep_alive_abort_handle: None,
+            new_connection_tx,
+            new_connection_rx,
         }
     }
 }
@@ -100,6 +111,7 @@ async fn recv_messages(
                         frames_decoded += 1;
                         offset += parsed_size;
                         drop(shared_lock);
+                        
                         if offset >= byte_count {
                             break;
                         }
@@ -167,9 +179,24 @@ async fn setup_bidirectional_stream(
     }
 
     let mut shared_lock = shared.lock();
+    
+    let is_replacement = shared_lock.connection.is_some();
+    
+    shared_lock.message_queue.clear();
+    
+    
     shared_lock.send_stream = Some(send_stream);
     shared_lock.recv_stream = Some(recv_stream);
     shared_lock.connection = Some(connection);
+    
+    // signal if we're replacing an existing connection
+    // This wakes up any blocked recv() calls to use the new connection
+    if is_replacement {
+        let current_gen = *shared_lock.new_connection_tx.borrow();
+        let new_gen = current_gen.wrapping_add(1);
+        shared_lock.new_connection_tx.send(new_gen).ok();
+        shared_lock.decoder.reset();
+    }
 
     Ok(())
 }
@@ -196,8 +223,8 @@ fn start_server_keep_alive_task(
     connection: Connection,
     shared: Arc<Mutex<InnerShared>>,
     interval_ms: u64,
-) {
-    tasker::get_tokio_handle().spawn(async move {
+) -> tasker::tokio::task::AbortHandle {
+    let handle = tasker::get_tokio_handle().spawn(async move {
         loop {
             if connection.close_reason().is_some() {
                 eprintln!("[SERVER] Connection closed, stopping keep-alive task");
@@ -206,10 +233,10 @@ fn start_server_keep_alive_task(
 
             tasker::tokio::time::sleep(Duration::from_millis(interval_ms)).await;
 
+
             let ping_msg = shared.lock().keep_alive_msg.clone();
             if let Err(e) = send_keep_alive(&connection, KeepAlivePacket::Ping(ping_msg)).await {
-                eprintln!("[SERVER] Failed to send ping: {e}");
-                continue;
+                eprintln!("[SERVER] Failed to send ping ({})", e);
             }
 
             let timeout_duration = Duration::from_millis(interval_ms * 3);
@@ -232,30 +259,19 @@ fn start_server_keep_alive_task(
             }
         }
     });
+    
+    handle.abort_handle()
 }
 
 fn start_client_keep_alive_task(
     connection: Connection,
     shared: Arc<Mutex<InnerShared>>,
-    server_addr: SocketAddr,
 ) {
     tasker::get_tokio_handle().spawn(async move {
-
         loop {
             if connection.close_reason().is_some() {
-                eprintln!("[CLIENT] Connection closed, attempting reconnect...");
-
-                if let Err(e) = attempt_client_reconnect(server_addr, Arc::clone(&shared)).await {
-                    eprintln!("[CLIENT] Reconnection failed: {e}");
-                    tasker::tokio::time::sleep(Duration::from_millis(150)).await;
-                } else {
-                    eprintln!("[CLIENT] Reconnected successfully");
-                    if let Some(new_conn) = shared.lock().connection.clone() {
-                        start_client_keep_alive_task(new_conn, Arc::clone(&shared), server_addr);
-                        break;
-                    }
-                }
-                continue;
+                eprintln!("[CLIENT] Connection closed, stopping keep-alive task");
+                break;
             }
 
             match recv_keep_alive(&connection).await {
@@ -267,43 +283,20 @@ fn start_client_keep_alive_task(
                     }
 
                     if let Err(e) = send_keep_alive(&connection, KeepAlivePacket::Pong(msg)).await {
-                        eprintln!("[CLIENT] Failed to send pong: {e}");
+                        eprintln!("[CLIENT] Failed to send pong ({})", e);
                     }
                 }
                 Ok(KeepAlivePacket::Pong(_)) => {
                     eprintln!("[CLIENT] Unexpected pong received, ignoring");
                 }
                 Err(e) => {
-                    eprintln!("[CLIENT] Failed to receive ping: {e}");
+                    eprintln!("[CLIENT] Failed to receive ping ({})", e);
                 }
             }
         }
     });
 }
 
-async fn attempt_client_reconnect(
-    server_addr: SocketAddr,
-    shared: Arc<Mutex<InnerShared>>,
-) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    // this port must be 0
-    let mut endpoint = Endpoint::client(SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0))?;
-
-    let client_config = quinn::ClientConfig::new(Arc::new(QuicClientConfig::try_from(
-        rustls::ClientConfig::builder()
-            .dangerous()
-            .with_custom_certificate_verifier(SkipServerVerification::new())
-            .with_no_client_auth(),
-    )?));
-
-    endpoint.set_default_client_config(client_config);
-
-    let connecting = endpoint.connect(server_addr, "lunabot")?;
-    let connection = connecting.await?;
-
-    setup_bidirectional_stream(connection.clone(), Arc::clone(&shared), false, "CLIENT").await?;
-
-    Ok(())
-}
 
 pub struct QuicServer<Msg: Encode + Decode<()>> {
     pub shared: Arc<Mutex<InnerShared>>,
@@ -319,9 +312,6 @@ impl<Msg: Encode + Decode<()>> QuicServer<Msg> {
     /// Listens on 0.0.0.0:{port}
     /// Accepts incoming connections
     pub fn listen(port: u32, keep_alive_interval: Duration) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        if keep_alive_interval.as_millis() >= IDLE_TIMEOUT_MS as u128 {
-            eprintln!("[SERVER] WARNING: keep alive interval should be less than {IDLE_TIMEOUT_MS}");
-        }
         Self::ensure_runtime();
         let (endpoint, _cert) = tasker::get_tokio_handle().block_on(async {
             make_server_endpoint(std::net::SocketAddr::V4(
@@ -332,7 +322,7 @@ impl<Msg: Encode + Decode<()>> QuicServer<Msg> {
         let shared = Arc::new(Mutex::new(InnerShared::new()));
         let shared_c1 = Arc::clone(&shared);
         let interval_ms = keep_alive_interval.as_millis() as u64;
-        println!("listening on {}",format!("0.0.0.0:{port}"));
+        println!("Listening on {}",format!("0.0.0.0:{port}"));
         tasker::get_tokio_handle().spawn(async move {
             loop {
                 let Some(incoming) = endpoint.accept().await else {
@@ -345,6 +335,11 @@ impl<Msg: Encode + Decode<()>> QuicServer<Msg> {
                         let connection = ongoing.into_0rtt();
                         match connection {
                             Ok((connection, _zero_rtt_accepted)) => {
+                                // abort old keep-alive task if it exists
+                                if let Some(old_handle) = shared_c1.lock().keep_alive_abort_handle.take() {
+                                    old_handle.abort();
+                                    eprintln!("[SERVER] Aborted old keep-alive task (new connection accepted)");
+                                }
                                 if let Err(e) = setup_bidirectional_stream(
                                     connection.clone(),
                                     Arc::clone(&shared_c1),
@@ -355,17 +350,25 @@ impl<Msg: Encode + Decode<()>> QuicServer<Msg> {
                                 {
                                     eprintln!("[SERVER] Failed to setup stream: {e}");
                                 } else {
-                                    start_server_keep_alive_task(
+                                    // start new keep-alive task, store handle
+                                    let abort_handle = start_server_keep_alive_task(
                                         connection,
                                         Arc::clone(&shared_c1),
                                         interval_ms,
                                     );
+                                    shared_c1.lock().keep_alive_abort_handle = Some(abort_handle);
                                 }
                             }
                             Err(ongoing) => {
                                 eprintln!("[SERVER] 0-RTT Connection failed, attempting to establish normal connection");
                                 match ongoing.await {
                                     Ok(connection) => {
+                                        // abort old keep-alive task if it exists
+                                        if let Some(old_handle) = shared_c1.lock().keep_alive_abort_handle.take() {
+                                            old_handle.abort();
+                                            eprintln!("[SERVER] Aborted old keep-alive task (new connection accepted)");
+                                        }
+                                        
                                         if let Err(e) = setup_bidirectional_stream(
                                             connection.clone(),
                                             Arc::clone(&shared_c1),
@@ -376,11 +379,13 @@ impl<Msg: Encode + Decode<()>> QuicServer<Msg> {
                                         {
                                             eprintln!("[SERVER] Failed to setup stream: {e}");
                                         } else {
-                                            start_server_keep_alive_task(
+                                            // start new keep-alive task, store handle
+                                            let abort_handle = start_server_keep_alive_task(
                                                 connection,
                                                 Arc::clone(&shared_c1),
                                                 interval_ms,
                                             );
+                                            shared_c1.lock().keep_alive_abort_handle = Some(abort_handle);
                                         }
                                     }
                                     Err(e) => {
@@ -413,6 +418,9 @@ impl<Msg: Encode + Decode<()>> QuicServer<Msg> {
         send_common(&self.shared, packet)
     }
 
+    /// checks if the connection has not been reported as closed
+    /// you should not use this to check if the connection is alive, use the last seen keep-alive mechanism instead
+    /// this is only useful for detecting if the connection has been closed by the remote end
     pub fn is_connected(&self) -> bool {
         let connection = &self.shared.lock().connection;
         connection.is_some() && connection.as_ref().unwrap().close_reason().is_none()
@@ -447,8 +455,7 @@ impl<Msg: Encode + Decode<()> + Clone> QuicClient<Msg> {
 
     /// Connect to a server
     /// the keep alive packet is typically used to communicate the lunabot stage.
-    /// does not block even if the server isn't available
-    /// it will just wait until the server does become available and then connect.
+    /// does not block if the server isn't available
     pub fn connect(
         server_addr: SocketAddr,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
@@ -472,7 +479,7 @@ impl<Msg: Encode + Decode<()> + Clone> QuicClient<Msg> {
                     }
                 };
 
-            let client_config = match quinn::ClientConfig::new(Arc::new(
+            let mut client_config = match quinn::ClientConfig::new(Arc::new(
                 match QuicClientConfig::try_from(
                     rustls::ClientConfig::builder()
                         .dangerous()
@@ -488,6 +495,13 @@ impl<Msg: Encode + Decode<()> + Clone> QuicClient<Msg> {
             )) {
                 config => config,
             };
+            
+            let mut transport_config = quinn::TransportConfig::default();
+            transport_config.max_idle_timeout(Some(
+                quinn::VarInt::from_u32(crate::utils::IDLE_TIMEOUT_MS).into()
+            ));
+            client_config.transport_config(Arc::new(transport_config));
+            
             endpoint.set_default_client_config(client_config);
 
             'retry_loop: loop {
@@ -510,7 +524,6 @@ impl<Msg: Encode + Decode<()> + Clone> QuicClient<Msg> {
                                 start_client_keep_alive_task(
                                     connection,
                                     Arc::clone(&shared_c1),
-                                    server_addr,
                                 );
                                 break 'retry_loop;
                             }
@@ -574,15 +587,41 @@ fn recv_common<Msg: Encode + Decode<()>>(
     }
 
     // read from stream
-    let recv_stream_opt = shared.lock().recv_stream.take();
+    let (recv_stream_opt, mut watch_rx, start_gen) = {
+        let mut guard = shared.lock();
+        let generation = *guard.new_connection_tx.borrow();
+        (guard.recv_stream.take(), guard.new_connection_rx.clone(), generation)
+    };
+    
     if let Some(recv_stream) = recv_stream_opt {
         let shared_c = Arc::clone(shared);
-        let result = tasker::get_tokio_handle()
-            .block_on(async move { recv_messages(recv_stream, shared_c, context).await });
+        let result = tasker::get_tokio_handle().block_on(async move {
+            // Mark the current generation as seen
+            let current_gen = *watch_rx.borrow_and_update();
+            
+            // race condition check
+            if current_gen != start_gen {
+                return Err(Box::new(std::io::Error::other("Connection replaced")) as Box<dyn std::error::Error + Send + Sync>);
+            }
+            
+            // either complete recv or detect new connection
+            tasker::tokio::select! {
+                recv_result = recv_messages(recv_stream, shared_c.clone(), context) => {
+                    recv_result
+                }
+                _ = watch_rx.changed() => {
+                    Err(Box::new(std::io::Error::other("Connection replaced")) as Box<dyn std::error::Error + Send + Sync>)
+                }
+            }
+        });
 
         match result {
             Ok(stream) => {
-                shared.lock().recv_stream = Some(stream);
+                let mut guard = shared.lock();
+                // avoid overwriting a new connection's stream with an old one
+                if guard.recv_stream.is_none() {
+                    guard.recv_stream = Some(stream);
+                }
             }
             Err(e) => {
                 return Err(e);
@@ -608,17 +647,25 @@ fn send_common<Msg: Encode + Decode<()>>(
     packet: Msg,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let bytes = bincode::encode_to_vec(packet, bincode::config::standard())?;
-    if let Some(ref mut send_stream) = shared.lock().send_stream {
-        tasker::get_tokio_handle().block_on(async {
-            send_stream
-                .write_all(&cobs::encode_vec_including_sentinels(&bytes))
-                .await?;
-            send_stream.flush().await
-        })?;
-    } else {
-        return Err(Box::new(std::io::Error::other(
-            "No established connection.",
-        )));
+    
+    // Take ownership of send_stream to prevent it from being replaced during send
+    let mut send_stream = shared.lock().send_stream.take()
+        .ok_or_else(|| Box::new(std::io::Error::other("No established connection.")) as Box<dyn std::error::Error + Send + Sync>)?;
+    
+    let result: Result<(), Box<dyn std::error::Error + Send + Sync>> = tasker::get_tokio_handle().block_on(async {
+        send_stream
+            .write_all(&cobs::encode_vec_including_sentinels(&bytes))
+            .await
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
+        send_stream.flush().await
+            .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
+    });
+    
+    // Put the stream back if still valid
+    let mut guard = shared.lock();
+    if guard.send_stream.is_none() {
+        guard.send_stream = Some(send_stream);
     }
-    Ok(())
+    
+    result
 }
