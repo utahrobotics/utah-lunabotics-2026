@@ -298,7 +298,7 @@ fn start_client_keep_alive_task(
     });
 }
 
-
+#[derive(Clone)]
 pub struct QuicServer<Msg: Encode + Decode<()>> {
     pub shared: Arc<Mutex<InnerShared>>,
     _boo: PhantomData<Msg>,
@@ -445,6 +445,7 @@ impl<Msg: Encode + Decode<()>> QuicServer<Msg> {
     }
 }
 
+#[derive(Clone)]
 pub struct QuicClient<Msg: Encode + Decode<()> + Clone> {
     pub shared: Arc<Mutex<InnerShared>>,
     _boo: PhantomData<Msg>,
