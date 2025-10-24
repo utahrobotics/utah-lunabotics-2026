@@ -7,6 +7,7 @@ edition = "2024"
 godot = "0.4.0"
 common = { path = "../common" }
 quic = { path = "../misc/quic" }
+bincode.workspace = true
 
 [lib]
 crate-type = ["cdylib"] # Compile this crate to a dynamic C library.

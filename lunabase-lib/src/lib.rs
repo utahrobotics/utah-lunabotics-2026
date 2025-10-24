@@ -1,6 +1,7 @@
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
-use common::{QuicMessage, Steering};
+use bincode::{config::Configuration, error::DecodeError};
+use common::{LunabotStage, QuicMessage, Steering};
 use godot::{classes::Os, prelude::*};
 use quic::QuicClient;
 
@@ -13,7 +14,7 @@ unsafe impl ExtensionLibrary for LunabaseExtension {}
 #[class(base=Node)]
 struct LunabaseConnection {
     base: Base<Node>,
-    client: QuicClient<QuicMessage>
+    client: QuicClient<QuicMessage>,
 }
 
 #[godot_api]
@@ -33,7 +34,10 @@ impl INode for LunabaseConnection {
                 None
             }
         };
-        let socket_addr = SocketAddr::V4(SocketAddrV4::new(lunabot_address.unwrap(), common::ports::TELEOP));
+        let socket_addr = SocketAddr::V4(SocketAddrV4::new(
+            lunabot_address.unwrap(),
+            common::ports::TELEOP,
+        ));
         let client = {
             let c = QuicClient::connect(socket_addr);
             if let Err(ref e) = c {
@@ -41,32 +45,41 @@ impl INode for LunabaseConnection {
             }
             c
         };
-        LunabaseConnection { 
+        LunabaseConnection {
             base,
-            client: client.unwrap()
+            client: client.unwrap(),
+        }
+    }
+
+    fn process(&mut self, delta: f64) {
+        if let Some(encoded_stage) = self.client.get_last_keep_alive_msg() {
+            let reported_lunabot_stage: Result<(LunabotStage, usize), DecodeError> =
+                bincode::borrow_decode_from_slice(&encoded_stage, bincode::config::standard());
+            // TODO: store lunabot stage somewhere, update display based on what stage of operation the lunabot is in
         }
     }
 }
-
 
 #[godot_api]
 impl LunabaseConnection {
     #[func]
     fn execute_steering(&self, left: f64, right: f64) {
-        // lets not use the weight 
+        // lets not use the weight
         // send could block depending on the packet size so we might need to just queue up the steering msg
-        // and then spawn a thread in the init function that just continuously checks if there is a new message in the queue and sends it to 
+        // and then spawn a thread in the init function that just continuously checks if there is a new message in the queue and sends it to
         // the lunabot.
-        match self.client.send(QuicMessage::FromClient(common::FromLunabase::Steering(Steering::new(left, right, 1.0)))) {
-            Ok(_) => {
-                
-            },
+        match self
+            .client
+            .send(QuicMessage::FromClient(common::FromLunabase::Steering(
+                Steering::new(left, right, 1.0),
+            ))) {
+            Ok(_) => {}
             Err(e) => {
                 godot_warn!("Failed to send packet: {e}");
-                // use Carlos's notification system here, 
+                // use Carlos's notification system here,
                 //or maybe return an error message from here and notify the user
                 // from godot instead of rust if that is easier
-            },
+            }
         }
     }
 }

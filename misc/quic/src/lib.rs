@@ -75,6 +75,7 @@ async fn recv_messages(
     let mut buf = vec![0; 4096];
     let mut frames_decoded = 0;
 
+    // this loop is broken out of once a whole frame is seen
     loop {
         match recv_stream.read(&mut buf).await {
             Ok(Some(byte_count)) => {
@@ -414,6 +415,7 @@ impl<Msg: Encode + Decode<()>> QuicServer<Msg> {
     }
 
     /// blocking operation
+    /// only send messages of under 1 mb otherwise this will likely fail
     pub fn send(&self, packet: Msg) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         send_common(&self.shared, packet)
     }
@@ -551,6 +553,7 @@ impl<Msg: Encode + Decode<()> + Clone> QuicClient<Msg> {
     }
 
     /// blocking operation
+    /// only send messages of up to 1 mb otherwise this will likely fail
     pub fn send(&self, packet: Msg) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         send_common(&self.shared, packet)
     }
