@@ -11,6 +11,7 @@ config_version=5
 [application]
 
 config/name="new-lunabase"
+run/main_scene="uid://d4h66rocrsek2"
 config/features=PackedStringArray("4.5", "GL Compatibility")
 config/icon="uid://c3b2y3ky1m03k"
 
