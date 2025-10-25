@@ -171,7 +171,7 @@ impl CuTask for OccupancyGridTask {
 
         // Apply bilateral filtering to clean up the depth data
         let mut filtered_depth_frame = depth_frame.clone();
-        bilateral_filter(&mut filtered_depth_frame, 3, 1.5, 0.05); // radius=3, spatial_sigma=1.5, range_sigma=0.05m
+        bilateral_filter(&mut filtered_depth_frame, 10, 3.0, 0.1); // radius=3, spatial_sigma=1.5, range_sigma=0.05m
 
         // TODO: utilize imu messages from the realsense here for more accurate pitch information
 
@@ -196,6 +196,26 @@ impl CuTask for OccupancyGridTask {
             Some(&mut point_cloud),
         );
 
+
+
+        // Project the unfiltered point cloud - to compare in rerun
+        let mut unfiltered_point_cloud: Box<[AlignedVec4<f32>]> = std::iter::repeat_n(
+            AlignedVec4::from(Vector4::default()),
+            self.depth_projector_pipeline.get_pixel_count().get() as usize,
+        )
+        .collect::<Vec<_>>()
+        .into_boxed_slice();
+
+        self.depth_projector_pipeline.project(
+            &depth_frame.depths,
+            &depth_camera_transform,
+            depth_frame.depth_scale,
+            Some(&mut unfiltered_point_cloud),
+        );
+
+        
+
+
         // self.depth_projector_pipeline.project(
         //     &depth_frame.depths,
         //     &depth_camera_transform,
@@ -208,6 +228,20 @@ impl CuTask for OccupancyGridTask {
             let _ = logger.recorder.log(
                 format!("realsense/pcl"),
                 &Points3D::new(point_cloud.iter().enumerate().filter_map(|(i, p)| {
+                    if p.w != 0.0 && i % 10 == 0 {
+                        Some([p.x, p.y, p.z])
+                    } else {
+                        None
+                    }
+                })),
+            );
+        }
+
+        // log unfiltered point cloud - still every nth point
+        if let Some(logger) = RECORDER.get() {
+            let _ = logger.recorder.log(
+                "realsense/pcl_unfiltered",
+                &Points3D::new(unfiltered_point_cloud.iter().enumerate().filter_map(|(i, p)| {
                     if p.w != 0.0 && i % 10 == 0 {
                         Some([p.x, p.y, p.z])
                     } else {
