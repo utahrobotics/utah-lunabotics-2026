@@ -68,3 +68,5 @@ common = { path = "common" }
 # Workspace-level metadata
 [workspace.metadata]
 # You can add custom metadata here if needed
+[net]
+git-fetch-with-cli = true

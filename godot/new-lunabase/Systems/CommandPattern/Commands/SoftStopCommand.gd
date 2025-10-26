@@ -5,4 +5,6 @@ extends Command
 
 # TODO: EXECUTE
 func execute(actor: Node) -> void:
-	pass
+	var rustExt = actor.get_node("../Main")
+	rustExt.init_softstop()
+	

@@ -1,7 +1,7 @@
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
 use bincode::{config::Configuration, error::DecodeError};
-use common::{FromLunabase, FromLunabot, LunabotStage, Steering};
+use common::{FromLunabase, FromLunabot, LunabotStage, Steering, LUNABOT_STAGE};
 use godot::{classes::Os, prelude::*};
 use quic::QuicClient;
 
@@ -82,5 +82,35 @@ impl LunabaseConnection {
                 // from godot instead of rust if that is easier
             }
         }
+    }
+    #[func]
+    fn retrieve_state(&self) -> String {
+        format!("{:?}", LUNABOT_STAGE.load())
+    }
+
+    #[func]
+    fn init_softstop(&self) {
+        LUNABOT_STAGE.store(LunabotStage::SoftStop);
+
+        match self.client.send(common::FromLunabase::SoftStop) {
+            Ok(_) => {}
+            Err(e) => {
+                godot_warn!("cannot initiate softstop REALBAD")
+            }
+        }
+    }
+    #[func]
+    fn init_manual(&self) {
+        LUNABOT_STAGE.store(LunabotStage::Manual);
+
+        //match self
+        //  .client
+        //.send(common::FromLunabase::Manual)
+        //{
+        //  Ok(_) => {}
+        //Err(e)=>{
+        //  godot_warn!("cannot initiate Manual Control")
+        // }
+        // }
     }
 }
