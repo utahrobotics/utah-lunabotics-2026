@@ -1,0 +1,14 @@
+[package]
+name = "gdext-lib"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+name = "godot"
+crate-type = ["cdylib","staticlib"]
+
+[dependencies]
+godot = "0.4.0"
+common = {path = "../../../common"}
+cakap2 = { path = "../../../misc/cakap2" }
+bitcode = "0.6.7"
