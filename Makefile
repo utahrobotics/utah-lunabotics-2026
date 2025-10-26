@@ -58,6 +58,12 @@ clear-simlogs:
 clear-logs:
 	rm lunabot-cu/logs/*
 
+build-lunabase:
+	cd lunabase-lib && cargo build --release
+
+edit-lunabase: build-lunabase
+	cd godot/new-lunabase && godot project.godot
+
 # Help target to show available commands
 help:
 	@echo "Available targets:"
@@ -76,5 +82,7 @@ help:
 	@echo "  clear-logs        - Removes all unified logs from the simulation"
 	@echo "  clear-logs        - Removes all copper unified logs"
 	@echo "  sim               - Runs the Mujoco simulation"
+	@echo "  build-lunabase    - Builds the lunabase library"
+	@echo "  edit-lunabase     - Opens the lunabase Godot project after building the lunabase library"
 
 .PHONY: prod debug sync clean-build build-publisher discover-cameras check clean help
