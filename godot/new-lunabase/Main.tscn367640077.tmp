@@ -1,0 +1,30 @@
+[gd_scene load_steps=5 format=3 uid="uid://dpgkr1kstjgty"]
+
+[ext_resource type="PackedScene" uid="uid://twqubxyqr60r" path="res://BinaryTree.tscn" id="1_glv2v"]
+[ext_resource type="Script" uid="uid://b8ll18vp4kfgq" path="res://main.gd" id="1_r0du0"]
+[ext_resource type="Script" uid="uid://c56nn3jn5vsr6" path="res://SoftStopTemp.gd" id="2_uu6xs"]
+
+[sub_resource type="GDScript" id="GDScript_cm0pq"]
+script/source = "extends RichTextLabel
+"
+
+[node name="Main" type="LunabaseConnection"]
+script = ExtResource("1_r0du0")
+
+[node name="StateManager" parent="." instance=ExtResource("1_glv2v")]
+
+[node name="Button" type="Button" parent="."]
+offset_left = 955.0
+offset_top = 34.0
+offset_right = 1094.0
+offset_bottom = 95.0
+text = "STOP"
+script = ExtResource("2_uu6xs")
+
+[node name="stateString" type="RichTextLabel" parent="."]
+offset_left = 944.0
+offset_top = 593.0
+offset_right = 1147.0
+offset_bottom = 644.0
+text = "Current State:"
+script = SubResource("GDScript_cm0pq")

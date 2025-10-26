@@ -1,0 +1,37 @@
+[gd_scene load_steps=3 format=3 uid="uid://twqubxyqr60r"]
+
+[ext_resource type="Script" uid="uid://jpqkfl3q8jnr" path="res://StateManager/nodeManager.gd" id="1_qrgj5"]
+[ext_resource type="Script" uid="uid://crg07lahrh7ck" path="res://StateManager/DirectedNode.gd" id="2_6hfbt"]
+
+[node name="StateManager" type="Node2D" node_paths=PackedStringArray("behavior_tree_nodes")]
+script = ExtResource("1_qrgj5")
+behavior_tree_nodes = [NodePath("StateA"), null]
+
+[node name="StateA" type="Node2D" parent="."]
+position = Vector2(169, 73)
+script = ExtResource("2_6hfbt")
+
+[node name="PanelContainer" type="PanelContainer" parent="StateA"]
+offset_right = 133.0
+offset_bottom = 68.0
+
+[node name="RichTextLabel" type="RichTextLabel" parent="StateA/PanelContainer"]
+layout_mode = 2
+text = " StateA"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="StateB" type="Node2D" parent="."]
+script = ExtResource("2_6hfbt")
+
+[node name="PanelContainer" type="PanelContainer" parent="StateB"]
+offset_left = 72.0
+offset_top = 162.0
+offset_right = 185.0
+offset_bottom = 225.0
+
+[node name="RichTextLabel" type="RichTextLabel" parent="StateB/PanelContainer"]
+layout_mode = 2
+text = "StateB"
+horizontal_alignment = 1
+vertical_alignment = 1
