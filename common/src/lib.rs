@@ -19,7 +19,6 @@ pub use constants::*;
     Zeroable,
     Serialize,
 )]
-
 pub struct Steering {
     left: i8,
     right: i8,
