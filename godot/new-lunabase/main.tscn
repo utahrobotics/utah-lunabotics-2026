@@ -1,10 +1,38 @@
-[gd_scene format=3 uid="uid://d4h66rocrsek2"]
+[gd_scene load_steps=6 format=3 uid="uid://dpgkr1kstjgty"]
 
-[node name="Node2D" type="safestop"]
-offset_left = 494.0
-offset_top = 144.0
-offset_right = 662.0
-offset_bottom = 229.0
-text = "SafeStop"
+[ext_resource type="PackedScene" uid="uid://twqubxyqr60r" path="res://BinaryTree.tscn" id="1_glv2v"]
+[ext_resource type="Script" uid="uid://b8ll18vp4kfgq" path="res://GUI/main.gd" id="1_r0du0"]
+[ext_resource type="Script" uid="uid://c56nn3jn5vsr6" path="res://GUI/Buttons/SoftStopTemp.gd" id="2_uu6xs"]
+[ext_resource type="Script" uid="uid://dsluv75r7d43f" path="res://GUI/Buttons/manualButton.gd" id="4_cm0pq"]
 
-[node name="StateViewer" type="StateViewer" parent="."]
+[sub_resource type="GDScript" id="GDScript_cm0pq"]
+script/source = "extends RichTextLabel
+"
+
+[node name="Main" type="LunabaseConnection"]
+script = ExtResource("1_r0du0")
+
+[node name="StateManager" parent="." instance=ExtResource("1_glv2v")]
+
+[node name="SoftStopButton" type="Button" parent="."]
+offset_left = 955.0
+offset_top = 34.0
+offset_right = 1094.0
+offset_bottom = 95.0
+text = "STOP"
+script = ExtResource("2_uu6xs")
+
+[node name="stateString" type="RichTextLabel" parent="."]
+offset_left = 947.0
+offset_top = 605.0
+offset_right = 1150.0
+offset_bottom = 656.0
+script = SubResource("GDScript_cm0pq")
+
+[node name="manualControlButton" type="Button" parent="."]
+offset_left = 948.0
+offset_top = 134.0
+offset_right = 1105.0
+offset_bottom = 197.0
+text = "Manual Control"
+script = ExtResource("4_cm0pq")

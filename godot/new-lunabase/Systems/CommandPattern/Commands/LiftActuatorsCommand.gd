@@ -9,4 +9,6 @@ extends Command
 
 # TODO: EXECUTE
 func execute(actor: Node) -> void:
-	pass
+	var rustext = actor.get_node("../Main")
+	rustext.set_lift_actuators(lift)
+	

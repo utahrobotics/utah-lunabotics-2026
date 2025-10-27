@@ -1,7 +1,7 @@
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
 use bincode::{config::Configuration, error::DecodeError};
-use common::{FromLunabase, FromLunabot, LunabotStage, Steering, LUNABOT_STAGE};
+use common::{FromLunabase, FromLunabot, LUNABOT_STAGE, LunabotStage, Steering};
 use godot::{classes::Os, prelude::*};
 use quic::QuicClient;
 
@@ -16,6 +16,7 @@ struct LunabaseConnection {
     base: Base<Node>,
     // <outgoing type, incoming type>
     client: QuicClient<FromLunabase, FromLunabot>,
+    last_stage: Option<LunabotStage>,
 }
 
 #[godot_api]
@@ -49,6 +50,7 @@ impl INode for LunabaseConnection {
         LunabaseConnection {
             base,
             client: client.unwrap(),
+            last_stage: None,
         }
     }
 
@@ -57,12 +59,20 @@ impl INode for LunabaseConnection {
             let reported_lunabot_stage: Result<(LunabotStage, usize), DecodeError> =
                 bincode::borrow_decode_from_slice(&encoded_stage, bincode::config::standard());
             // TODO: store lunabot stage somewhere, update display based on what stage of operation the lunabot is in
+            match reported_lunabot_stage {
+                Ok((stage, _)) => {
+                    self.last_stage = Some(stage);
+                    godot_print!("Lunabot switched to new stage {:?}", stage);
+                }
+                Err(e) => godot_warn!("Lunabot's stage is unknown {}", { e }),
+            }
         }
     }
 }
 
 #[godot_api]
 impl LunabaseConnection {
+    //mobility functions
     #[func]
     fn execute_steering(&self, left: f64, right: f64) {
         // lets not use the weight
@@ -83,34 +93,80 @@ impl LunabaseConnection {
             }
         }
     }
+
+    #[func]
+    fn set_lift_actuators(&self, lift: i8 ){
+        match self.client.send(common::FromLunabase::LiftActuators((lift))){
+            Ok(_) => {}
+            Err(e) => {
+                godot_warn!("could not set lift actuators packet failed to send :( ")
+            }
+        }
+
+    }
+    #[func]
+    fn set_bucket_actuators(&self, lift: i8){
+        match self.client.send(common::FromLunabase::BucketActuators((lift))){
+            Ok(_) => {}
+            Err(e) =>{
+                godot_warn!("could not set bucket actuators packet failed to send :(")
+            }
+        }
+    }
+
+    //state functions
     #[func]
     fn retrieve_state(&self) -> String {
-        format!("{:?}", LUNABOT_STAGE.load())
+        match &self.last_stage {
+            Some(stage) => format!("{:?}", stage),
+            None => "unknown".to_string(),
+        }
     }
 
     #[func]
     fn init_softstop(&self) {
-        LUNABOT_STAGE.store(LunabotStage::SoftStop);
-
         match self.client.send(common::FromLunabase::SoftStop) {
             Ok(_) => {}
             Err(e) => {
-                godot_warn!("cannot initiate softstop REALBAD")
+                godot_warn!("cannot initiate softstop REALBAD packet failed to send")
             }
         }
     }
     #[func]
     fn init_manual(&self) {
-        LUNABOT_STAGE.store(LunabotStage::Manual);
-
-        //match self
-        //  .client
-        //.send(common::FromLunabase::Manual)
-        //{
-        //  Ok(_) => {}
-        //Err(e)=>{
-        //  godot_warn!("cannot initiate Manual Control")
-        // }
-        // }
+        match self.client.send(common::FromLunabase::ContinueMission) {
+            Ok(_) => {}
+            Err(e) => {
+                godot_warn!("cannot initiate Manual Control packet failed to send")
+            }
+        }
     }
+    #[func]
+    fn init_autonomous_navigate(&self, x: f32, y: f32){
+        match self.client.send(common::FromLunabase::Navigate((x,y))){
+            Ok(_) => {}
+            Err(e) => {
+                godot_warn!("cannot initiate autonomous state packet failed to send :( ")
+            }
+        }
+    }
+    #[func]
+    fn init_autonomous_digdump(&self,x: f32, y: f32){
+         match self.client.send(common::FromLunabase::DigDump((x,y))){
+            Ok(_) => {}
+            Err(e) => {
+                godot_warn!("cannot initiate autonomous state packet failed to send :( ")
+            }
+        }
+    }
+    #[func]
+    fn disconnect(&self){
+         match self.client.send(common::FromLunabase::Disconnect){
+            Ok(_) => {}
+            Err(e) => {
+                godot_warn!("cannot disconnect ? ")
+            }
+        }
+    }
+
 }

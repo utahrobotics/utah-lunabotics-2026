@@ -8,4 +8,6 @@ extends Command
 # Go to pos
 # TODO: EXECUTE
 func execute(actor: Node) -> void:
+	var rustext = actor.get_node("../Main")
+	rustext.init_autonomous_navigate(target_pos.x,target_pos.y)
 	pass

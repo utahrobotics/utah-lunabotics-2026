@@ -1,8 +1,10 @@
-class_name ContinueMissionCommand
+class_name ContinureMissionCommand
 extends Command
 
-## Command to resume from stop to manual mode
+## Request software stop mode
 
 # TODO: EXECUTE
 func execute(actor: Node) -> void:
-	pass
+	var rustExt = actor.get_node("../Main")
+	rustExt.init_manual()
+	
