@@ -2,7 +2,7 @@ extends Button
 
 @onready var rust = $".."
 func _pressed() ->void:
-	var command = ManualControlCommand.new()
+	var command = ContinureMissionCommand.new()
 	
 	command.execute(rust)
 	print("Initiated Manual Control")
