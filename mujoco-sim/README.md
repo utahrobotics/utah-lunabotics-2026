@@ -3,11 +3,18 @@
 ## Setup
 1. Follow the installation instructions [here](https://mujoco-rs.readthedocs.io/en/v1.5.x/installation.html#static-linking) to build mujoco for static linking, except replace the two cmake commands listed there with this:
 ```bash
-cmake -B build -S . -DBUILD_SHARED_LIBS:BOOL=OFF -DMUJOCO_HARDEN:BOOL=OFF -DCMAKE_BUILD_TYPE:STRING=Release -DCMAKE_INTERPROCEDURAL_OPTIMIZATION:BOOL=ON -DMUJOCO_BUILD_EXAMPLES:BOOL=ON -DCMAKE_POLICY_VERSION_MINIMUM=3.5 -DCMAKE_EXE_LINKER_FLAGS:STRING=-Wl,--no-as-needed
+cmake -B build -S . \
+  -DBUILD_SHARED_LIBS:BOOL=OFF \
+  -DMUJOCO_HARDEN:BOOL=OFF \
+  -DCMAKE_BUILD_TYPE:STRING=Release \
+  -DCMAKE_INTERPROCEDURAL_OPTIMIZATION:BOOL=OFF \
+  -DMUJOCO_BUILD_EXAMPLES:BOOL=OFF \
+  -DGLFW_BUILD_WAYLAND=ON \
+  -DGLFW_BUILD_X11=OFF
 ```
 and this:
 ```bash
-cmake --build build --parallel --target simulate libsimulate --config=Release
+cmake --build build --parallel --target glfw libmujoco_simulate --config=Release
 ```
 2. Ensure that the correct environment variables are set to point to the mujoco library, e.g. ```export MUJOCO_STATIC_LINK_DIR=/home/matthew_a/mujoco-rs/mujoco/build/lib```
 
