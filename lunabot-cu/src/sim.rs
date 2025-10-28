@@ -9,8 +9,8 @@ pub mod utils;
 use cu29::prelude::*;
 use cu29_helpers::basic_copper_setup;
 use gputter::{init_gputter_blocking, is_gputter_initialized};
+use mujoco_rs::cpp_viewer::MjViewerCpp;
 use mujoco_rs::prelude::*;
-use mujoco_rs::viewer::MjViewerCpp;
 use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
@@ -22,7 +22,7 @@ pub static ROOT_NODE: OnceLock<StaticNode> = OnceLock::new();
 pub static TARGET_HZ: usize = 1000; // MUST BE THE SAME AS THE TARGET HZ IN COPPERCONFIG.RON
 
 pub static MJ_MODEL: OnceLock<&'static MjModel> = OnceLock::new();
-pub static MJ_DATA: OnceLock<Mutex<&'static mut MjData<'static>>> = OnceLock::new();
+pub static MJ_DATA: OnceLock<Mutex<&'static mut MjData<&'static MjModel>>> = OnceLock::new();
 
 #[copper_runtime(config = "copperconfig.ron", sim_mode = true)]
 struct LunabotApplication {}
@@ -170,8 +170,8 @@ fn main() {
 
 fn set_up_mujoco() -> (
     &'static MjModel,
-    MjViewerCpp<'static>,
-    &'static mut MjData<'static>,
+    MjViewerCpp<&'static MjModel>,
+    &'static mut MjData<&'static MjModel>,
 ) {
     println!("Creating model...");
     let model = Box::leak(Box::new(
@@ -187,8 +187,9 @@ fn set_up_mujoco() -> (
     model.opt_mut().enableflags |= MjtEnableBit::mjENBL_MULTICCD as i32;
     println!("Making Data...");
     let data = model.make_data();
+    let leaked_data = Box::leak(Box::new(data));
     println!("Launching Viewer...");
 
-    let viewer = MjViewerCpp::launch_passive(model, &data, 100);
-    (model, viewer, Box::leak(Box::new(data)))
+    let viewer = MjViewerCpp::launch_passive(model as &_, leaked_data as &_, 100);
+    (model, viewer, leaked_data)
 }
