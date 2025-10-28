@@ -80,10 +80,8 @@ impl CuSrcTask for Lunabase {
 
             if !self.connection.is_alive(self.max_pong_delay) {
                 self.message_buffer.clear();
-                self.message_buffer.push_back(FromLunabase::Disconnect);
-
-                output.set_payload(self.message_buffer.pop_front());
-                output.metadata.process_time.start = clock.now().into();
+                // self.message_buffer.push_back(FromLunabase::Disconnect);
+                output.set_payload(Some(FromLunabase::Disconnect));
 
                 return Err(CuError::new_with_cause(
                     "lunabase not connected",
