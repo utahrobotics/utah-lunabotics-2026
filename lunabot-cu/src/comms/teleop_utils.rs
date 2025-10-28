@@ -1,262 +1,126 @@
-#![cfg(not(feature = "resim"))]
 use std::{
-    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
-    ops::Deref,
-    sync::Arc,
+    sync::OnceLock,
+    thread::JoinHandle,
     time::{Duration, Instant},
 };
 
-use cakap2::{Event, PeerStateMachine, RecommendedAction, packet::Action};
+use common::{FromLunabase, FromLunabot};
 use crossbeam::atomic::AtomicCell;
-use cu29::prelude::*;
-use tasker::tokio::{self, net::UdpSocket, sync::mpsc};
-use tasker::{get_tokio_handle, tokio::sync::watch};
+use crossbeam_channel::{Receiver, Sender};
+use quic::QuicServer;
 
-use common::{FromLunabase, FromLunabot, LunabotStage, ports::TELEOP};
-
-#[derive(Clone)]
-pub struct PacketBuilder {
-    builder: cakap2::packet::PacketBuilder,
-    #[allow(dead_code)]
-    packet_tx: mpsc::UnboundedSender<Action>,
+pub static LAST_SEEN_TIMESTAMP: OnceLock<AtomicCell<Instant>> = OnceLock::new();
+/// Provides a non blocking interface to the QuicServer struct
+pub struct LunabaseConnection {
+    pub server: QuicServer<FromLunabot, FromLunabase>,
+    pub incoming_msg_queue: Receiver<FromLunabase>,
+    pub outoging_msg_queue: Sender<FromLunabot>,
+    pub recv_thread: JoinHandle<()>,
+    pub send_thread: JoinHandle<()>,
+    pub update_keep_alive_thread: JoinHandle<()>,
 }
 
-impl Deref for PacketBuilder {
-    type Target = cakap2::packet::PacketBuilder;
+impl LunabaseConnection {
+    pub fn new() -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+        let (tx_incoming, rx_incoming) = crossbeam_channel::unbounded();
+        let (tx_outgoing, rx_outgoing) = crossbeam_channel::unbounded();
 
-    fn deref(&self) -> &Self::Target {
-        &self.builder
-    }
-}
+        let server = QuicServer::listen(common::ports::TELEOP, Duration::from_millis(100))?;
 
-impl PacketBuilder {
-    #[allow(dead_code)]
-    pub fn send_packet(&self, packet: Action) {
-        let _ = self.packet_tx.send(packet);
-    }
-}
+        LAST_SEEN_TIMESTAMP.get_or_init(|| AtomicCell::new(Instant::now()));
 
-pub struct LunabaseConn<F> {
-    pub lunabase_address: Option<SocketAddr>,
-    pub on_msg: F,
-    pub lunabot_stage: Arc<AtomicCell<LunabotStage>>,
-}
-
-impl<F: FnMut(&[u8]) -> bool + Send + 'static> LunabaseConn<F> {
-    /// Connect to the lunabase and return a [`PacketBuilder`] to send packets to the lunabase.
-    ///
-    /// The `on_msg` closure is called whenever a message is received from the lunabase, and must
-    /// return `true` if the message was successfully parsed, and `false` otherwise.
-    pub fn connect_to_lunabase(mut self) -> PacketBuilder {
-        let mut cakap_sm = PeerStateMachine::new(Duration::from_millis(150), 1024, 1400);
-        let packet_builder = cakap_sm.get_packet_builder();
-        let (packet_tx, mut packet_rx) = mpsc::unbounded_channel();
-
-        get_tokio_handle().spawn(async move {
-            let udp = loop {
-                let udp = match UdpSocket::bind(SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, TELEOP)).await {
-                    Ok(x) => x,
-                    Err(e) => {
-                        error!("Failed to bind to lunabase address: {}", e.to_string());
-                        tokio::time::sleep(Duration::from_secs(1)).await;
-                        continue;
-                    }
-                };
-                // if let Err(e) = udp.connect(self.lunabase_address).await {
-                //     error!("Failed to connect to lunabase: {e}");
-                //     tokio::time::sleep(Duration::from_secs(1)).await;
-                //     continue;
-                // }
-                break udp;
-            };
-
-            let mut action: RecommendedAction<'_, '_> = cakap_sm.send_reconnection_msg(Instant::now()).0;
-            let mut wait_for: Option<Duration>;
-
-            macro_rules! send {
-                ($data: expr) => {{
-                    loop {
-                        if let Some(addr) = self.lunabase_address {
-                            if let Err(e) = udp.send_to($data, addr).await {
-                                if e.kind() == std::io::ErrorKind::ConnectionRefused {
-                                    if addr.ip().is_loopback() {
-                                        continue;
-                                    }
-                                }
-                                error!("Failed to send data to lunabase: {}", e.to_string());
-                                continue;
-                            }
-                        }
-                        action = cakap_sm.poll(Event::NoEvent, Instant::now());
-                        break;
-                    }
-                }};
-            }
-
-            let mut buf= [0u8; 1408];
-            macro_rules! handle {
-                () => {
-                    loop {
-                        match action {
-                            RecommendedAction::WaitForData => {
-                                wait_for = None;
-                                break;
-                            }
-                            RecommendedAction::WaitForDuration(duration) => {
-                                wait_for = Some(duration);
-                                break;
-                            }
-                            RecommendedAction::HandleError(cakap_error) => {
-                                error!("{}", cakap_error.to_string());
-                                action = cakap_sm.poll(Event::NoEvent, Instant::now());
-                            }
-                            RecommendedAction::HandleData(received) => {
-                                (self.on_msg)(&received);
-                                action = cakap_sm.poll(Event::NoEvent, Instant::now());
-                            }
-                            RecommendedAction::HandleDataAndSend { received, to_send } =>  if (self.on_msg)(&received) {
-                                send!(&to_send);
-                            }
-                            RecommendedAction::SendData(hot_packet) => {
-                                send!(&hot_packet);
-                            }
-                        }
-                    }
-                }
-            }
-            handle!();
-            let mut bitcode_buffer = bitcode::Buffer::new();
-            let mut ping_at = tokio::time::Instant::now();
-
+        // server is easily cloneable
+        let server_c = server.clone();
+        let recv_thread = std::thread::spawn(move || {
             loop {
-                tokio::select! {
-                    _ = tokio::time::sleep_until(ping_at) => {
-                        let bytes = bitcode_buffer.encode(&FromLunabot::Ping(self.lunabot_stage.load()));
-                        let packet = cakap_sm.get_packet_builder().new_unreliable(bytes.to_vec().into()).unwrap();
-                        action = cakap_sm.poll(Event::Action(Action::SendUnreliable(packet)), Instant::now());
-                        handle!();
-                        ping_at = tokio::time::Instant::now() + Duration::from_millis(100);
-                        continue;
-                    }
-                    _ = async {
-                        if let Some(duration) = wait_for {
-                            tokio::time::sleep(duration).await;
-                        } else {
-                            std::future::pending::<()>().await;
+                // recv messages in a loop,
+                // send the messages to the rx
+                // print a warning if there are more than 5 messages in the channel
+                match server_c.recv() {
+                    Ok(msg) => {
+                        if tx_incoming.len() > 5 {
+                            eprintln!(
+                                "Warning: incoming message queue has {} messages",
+                                tx_incoming.len()
+                            );
                         }
-                    } => {
-                        action = cakap_sm.poll(Event::NoEvent, Instant::now());
-                    }
-                    packet = async {
-                        if let Some(packet) = packet_rx.recv().await {
-                            packet
-                        } else {
-                            // warning!("Packet channel closed");
-                            std::future::pending().await
+                        if let Err(e) = tx_incoming.send(msg) {
+                            eprintln!("Failed to send incoming message to queue: {}", e);
+                            // break;
                         }
-                    } => {
-                        action = cakap_sm.poll(Event::Action(packet), Instant::now());
                     }
-                    result = udp.recv_from(&mut buf) => {
-                        let (n, addr) = match result {
-                            Ok(x) => x,
-                            Err(e) => {
-                                if e.kind() == std::io::ErrorKind::ConnectionRefused {
-                                    if let Some(addr) = self.lunabase_address {
-                                        if addr.ip().is_loopback() {
-                                            continue;
-                                        }
-                                    }
-                                }
-                                error!("Failed to receive data from lunabase: {}", e.to_string());
-                                continue;
-                            }
-                        };
-                        // if addr.port() != common::ports::TELEOP {
-                        //     error!("Received data from unexpected address on teleop: {addr}");
-                        //     continue;
-                        // }
-                        self.lunabase_address = Some(addr);
-                        action = cakap_sm.poll(Event::IncomingData(&buf[..n]), Instant::now());
+                    Err(e) => {
+                        eprintln!("Failed to receive message from server: {}", e);
+                        std::thread::sleep(Duration::from_millis(10));
                     }
                 }
-                handle!();
             }
         });
+        let server_c1 = server.clone();
+        let update_keep_alive_thread = std::thread::spawn(move || {
+            loop {
+                std::thread::sleep(Duration::from_millis(20));
+                if let Some(time_since) = server_c1.time_since_last_keep_alive() {
+                    if let Some(timestamp) = LAST_SEEN_TIMESTAMP.get() {
+                        let last_keep_alive = Instant::now() - time_since;
+                        timestamp.store(last_keep_alive);
+                    }
+                }
+            }
+        });
+        let server_c2 = server.clone();
+        let send_thread = std::thread::spawn(move || {
+            loop {
+                // rx outgoing recv
+                // send the message via the server_c1
+                match rx_outgoing.recv() {
+                    Ok(msg) => {
+                        if let Err(e) = server_c2.send(msg) {
+                            eprintln!("Failed to send message via server: {}", e);
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("Outgoing message queue disconnected: {}", e);
+                        // break;
+                    }
+                }
+            }
+        });
+        Ok(Self {
+            server,
+            incoming_msg_queue: rx_incoming,
+            recv_thread,
+            send_thread,
+            outoging_msg_queue: tx_outgoing,
+            update_keep_alive_thread,
+        })
+    }
 
-        PacketBuilder {
-            builder: packet_builder,
-            packet_tx,
+    /// Try to receive a message from Lunabase without blocking
+    pub fn try_recv(&self) -> Option<FromLunabase> {
+        self.incoming_msg_queue.try_recv().ok()
+    }
+
+    /// Try to send a message to Lunabase without blocking
+    pub fn try_send(
+        &self,
+        msg: FromLunabot,
+    ) -> Result<(), crossbeam_channel::TrySendError<FromLunabot>> {
+        self.outoging_msg_queue.try_send(msg)
+    }
+
+    /// Check if the connection is alive based on the last seen timestamp
+    /// Returns true if a message or keep-alive was received within the given timeout
+    pub fn is_alive(&self, timeout: Duration) -> bool {
+        if let Some(timestamp) = LAST_SEEN_TIMESTAMP.get() {
+            timestamp.load().elapsed() < timeout
+        } else {
+            false
         }
     }
-}
 
-pub fn default_max_pong_delay_ms() -> u64 {
-    1500
-}
-
-#[derive(Clone)]
-pub struct LunabotConnected {
-    connected: watch::Receiver<bool>,
-}
-
-impl LunabotConnected {
-    pub fn is_connected(&self) -> bool {
-        *self.connected.borrow()
+    /// Get the time since last activity (message or keep-alive)
+    pub fn time_since_last_seen() -> Option<Duration> {
+        LAST_SEEN_TIMESTAMP.get().map(|ts| ts.load().elapsed())
     }
-}
-
-pub fn create_packet_builder(
-    lunabase_address: Option<SocketAddr>,
-    lunabot_stage: Arc<AtomicCell<LunabotStage>>,
-    max_pong_delay_ms: u64,
-) -> (
-    PacketBuilder,
-    mpsc::UnboundedReceiver<FromLunabase>,
-    LunabotConnected,
-) {
-    let (from_lunabase_tx, from_lunabase_rx) = mpsc::unbounded_channel();
-    let mut bitcode_buffer = bitcode::Buffer::new();
-    let (pinged_tx, pinged_rx) = std::sync::mpsc::channel::<()>();
-
-    let packet_builder = LunabaseConn {
-        lunabase_address,
-        on_msg: move |bytes: &[u8]| match bitcode_buffer.decode(bytes) {
-            Ok(msg) => {
-                if msg == FromLunabase::Pong {
-                    let _ = pinged_tx.send(());
-                } else {
-                    let _ = from_lunabase_tx.send(msg);
-                }
-                true
-            }
-            Err(e) => {
-                error!("Failed to decode from lunabase: {}", e.to_string());
-                false
-            }
-        },
-        lunabot_stage,
-    }
-    .connect_to_lunabase();
-
-    let (connected_tx, connected_rx) = watch::channel(false);
-
-    std::thread::spawn(move || {
-        loop {
-            match pinged_rx.recv_timeout(Duration::from_millis(max_pong_delay_ms)) {
-                Ok(()) => {
-                    let _ = connected_tx.send(true);
-                }
-                Err(_) => {
-                    let _ = connected_tx.send(false);
-                }
-            }
-        }
-    });
-
-    let connected = LunabotConnected {
-        connected: connected_rx,
-    };
-
-    (packet_builder, from_lunabase_rx, connected)
 }

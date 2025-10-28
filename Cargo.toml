@@ -2,7 +2,6 @@
 resolver = "3"
 members = [
     "misc/simple-motion",
-    "misc/cakap2",
     "misc/tasker",
     "misc/thalassic",
     "misc/gputter",

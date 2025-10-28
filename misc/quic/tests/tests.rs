@@ -19,10 +19,10 @@ struct LargeMessage {
     payload: Vec<u8>,
 }
 
-const TEST_PORT_BASE: u32 = 9000;
+const TEST_PORT_BASE: u16 = 9000;
 const DEFAULT_KEEP_ALIVE_INTERVAL: Duration = Duration::from_millis(250);
 
-fn get_test_addr(port_offset: u32) -> SocketAddr {
+fn get_test_addr(port_offset: u16) -> SocketAddr {
     SocketAddr::from_str(&format!("127.0.0.1:{}", TEST_PORT_BASE + port_offset)).unwrap()
 }
 

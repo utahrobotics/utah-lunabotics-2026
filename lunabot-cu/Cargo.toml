@@ -32,14 +32,14 @@ production = [
     "launcher",
     "tokio-serial",
     "vesc-translator",
-    "cakap2",
     "mio",
     "cobs",
     "bytes",
+    "quic",
 ]
 logreader = ["dep:cu29-export"]
 resim = ["dep:cu29-export", "cu-apriltag/resim"]
-sim = ["cu-apriltag/sim", "cakap2", "mujoco-rs"]
+sim = ["cu-apriltag/sim", "mujoco-rs", "quic"]
 
 [[bin]]
 name = "lunabot-resim"
@@ -90,7 +90,6 @@ ron.workspace = true
 
 # misc
 simple-motion = { path = "../misc/simple-motion" }
-cakap2 = { path = "../misc/cakap2", optional = true }
 bitcode = "0.6.6"
 tasker = { path = "../misc/tasker" }
 iceoryx-types = { path = "../misc/iceoryx-types" }
@@ -98,6 +97,7 @@ launcher = { path = "../misc/launcher", optional = true }
 vesc-translator = { path = "../misc/vesc-translator", optional = true }
 thalassic = { path = "../misc/thalassic" }
 gputter = { path = "../misc/gputter" }
+quic = { path = "../misc/quic", optional = true }
 
 # common
 common = { path = "../common" }
@@ -122,7 +122,7 @@ cu-gstreamer = { workspace = true, optional = true }
 colorous = "1.0.16"
 
 # sim deps
-mujoco-rs = { git = "https://github.com/davidhozic/mujoco-rs.git", commit = "455da6fc2235354a4d3f121cdc68fda5c1fe8c25", features = [
+mujoco-rs = { version = "2.0.1+mj-3.3.7", features = [
     "cpp-viewer",
 ], optional = true }
 

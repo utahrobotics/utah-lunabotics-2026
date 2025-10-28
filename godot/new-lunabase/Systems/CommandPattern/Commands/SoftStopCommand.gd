@@ -3,6 +3,8 @@ extends Command
 
 ## Request software stop mode
 
-# TODO: EXECUTE
 func execute(actor: Node) -> void:
-	pass
+	if actor.has_method("send_soft_stop"):
+		actor.send_soft_stop()
+	else:
+		push_error("Actor does not have send_soft_stop method")

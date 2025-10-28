@@ -342,7 +342,7 @@ impl<Outgoing: Encode + Decode<()>, Incoming: Encode + Decode<()>> QuicServer<Ou
 
     /// Listens on 0.0.0.0:{port}
     /// Accepts incoming connections
-    pub fn listen(port: u32, keep_alive_interval: Duration) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+    pub fn listen(port: u16, keep_alive_interval: Duration) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         Self::ensure_runtime();
         let (endpoint, _cert) = tasker::get_tokio_handle().block_on(async {
             make_server_endpoint(std::net::SocketAddr::V4(
