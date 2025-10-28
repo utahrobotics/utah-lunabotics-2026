@@ -1,6 +1,7 @@
 extends Control
 
 @onready var connection: Node = $LunabaseConnection
+@onready var controller: LunabaseHumanController = $LunabaseHumanController
 @onready var ip_input: LineEdit = $VBoxContainer/TopPanel/IPInput
 @onready var connect_button: Button = $VBoxContainer/TopPanel/ConnectButton
 @onready var packet_label: Label = $VBoxContainer/TopPanel/PacketLabel
@@ -78,17 +79,14 @@ func _on_connect_pressed() -> void:
 
 func _on_soft_stop_pressed() -> void:
 	print("Sending SoftStop command")
-	Input.action_press("soft_stop")
-	Input.action_release("soft_stop")
+	controller.command_recorder.execute_and_store(SoftStopCommand.new())
 
 
 func _on_manual_pressed() -> void:
 	print("Sending ContinueMission command (Manual mode)")
-	Input.action_press("continue_mission")
-	Input.action_release("continue_mission")
+	controller.command_recorder.execute_and_store(ContinueMissionCommand.new())
 
 
 func _on_autonomous_pressed() -> void:
 	print("Sending Navigate command (Autonomous mode)")
-	Input.action_press("autonomy")
-	Input.action_release("autonomy")
+	controller.command_recorder.execute_and_store(NavigateCommand.new())
