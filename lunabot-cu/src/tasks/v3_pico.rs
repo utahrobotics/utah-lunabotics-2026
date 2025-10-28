@@ -360,8 +360,8 @@ mod resim_impl {
         fn process<'i, 'o>(
             &mut self,
             _clock: &RobotClock,
-            input: &Self::Input<'i>,
-            output: &mut Self::Output<'o>,
+            _input: &Self::Input<'i>,
+            _output: &mut Self::Output<'o>,
         ) -> CuResult<()> {
             Ok(())
         }
