@@ -72,20 +72,23 @@ func _on_connect_pressed() -> void:
 		return
 	
 	print("Connecting to: ", address)
+	# this should probably an action also idk
 	connection.reconnect(address)
 
 
 func _on_soft_stop_pressed() -> void:
 	print("Sending SoftStop command")
-	connection.send_soft_stop()
+	Input.action_press("soft_stop")
+	Input.action_release("soft_stop")
 
 
 func _on_manual_pressed() -> void:
 	print("Sending ContinueMission command (Manual mode)")
-	connection.send_continue_mission()
+	Input.action_press("continue_mission")
+	Input.action_release("continue_mission")
 
 
 func _on_autonomous_pressed() -> void:
-	print("Autonomous mode not yet implemented in Rust extension")
-	# TODO: Implement send_autonomous_mode() in Rust
-	# connection.send_autonomous_mode()
+	print("Sending Navigate command (Autonomous mode)")
+	Input.action_press("autonomy")
+	Input.action_release("autonomy")

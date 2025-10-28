@@ -115,3 +115,5 @@ func _process(_delta: float) -> void:
 		command_recorder.execute_and_store(ContinueMissionCommand.new())
 	if Input.is_action_just_pressed("soft_stop"):
 		command_recorder.execute_and_store(SoftStopCommand.new())
+	if Input.is_action_just_pressed("autonomy"):
+		command_recorder.execute_and_store(NavigateCommand.new())

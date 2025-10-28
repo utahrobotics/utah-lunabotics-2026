@@ -194,4 +194,18 @@ impl LunabaseConnection {
             godot_warn!("Cannot send continue mission: not connected");
         }
     }
+
+    #[func]
+    fn send_start_autonomy(&self) {
+        if let Some(ref client) = self.client {
+            match client.send(FromLunabase::Navigate((0.0, 0.0))) {
+                Ok(_) => {
+                    godot_print!("Sent Navigate command");
+                }
+                Err(e) => {
+                    godot_warn!("Cannot send start Autonomy command: {e}");
+                }
+            }
+        }
+    }
 }

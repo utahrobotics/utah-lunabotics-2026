@@ -8,4 +8,7 @@ extends Command
 # Go to pos
 # TODO: EXECUTE
 func execute(actor: Node) -> void:
-	pass
+	if actor.has_method("send_start_autonomy"):
+		actor.send_start_autonomy();
+	else:
+		push_error("Actor does not have send_soft_stop method")

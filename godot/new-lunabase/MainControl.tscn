@@ -1,7 +1,7 @@
-[gd_scene load_steps=4 format=3 uid="uid://cxqk5j2vp8obb"]
+[gd_scene load_steps=3 format=3 uid="uid://cxqk5j2vp8obb"]
 
-[ext_resource type="Script" path="res://MainControl.gd" id="1"]
-[ext_resource type="Script" path="res://Systems/CommandPattern/Controllers/LunabaseHumanController.gd" id="2"]
+[ext_resource type="Script" uid="uid://lfb3k4n5gotg" path="res://MainControl.gd" id="1"]
+[ext_resource type="Script" uid="uid://cyolsda2lojye" path="res://Systems/CommandPattern/Controllers/LunabaseHumanController.gd" id="2"]
 
 [node name="MainControl" type="Control"]
 layout_mode = 3
@@ -74,8 +74,8 @@ horizontal_alignment = 1
 
 [node name="BottomPanel" type="HBoxContainer" parent="VBoxContainer"]
 layout_mode = 2
-alignment = 1
 theme_override_constants/separation = 20
+alignment = 1
 
 [node name="SoftStopButton" type="Button" parent="VBoxContainer/BottomPanel"]
 custom_minimum_size = Vector2(150, 50)
@@ -93,12 +93,7 @@ layout_mode = 2
 text = "Autonomous Mode"
 
 [node name="LunabaseConnection" type="LunabaseConnection" parent="."]
-default_address = "127.0.0.1"
 
 [node name="LunabaseHumanController" type="Node" parent="."]
 script = ExtResource("2")
 actor_path = NodePath("../LunabaseConnection")
-default_path = "res://Systems/CommandPattern/SavedHistory/lunabotHistory.tres"
-deadzone = 0.2
-
-
