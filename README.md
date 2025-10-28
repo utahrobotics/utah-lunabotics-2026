@@ -265,7 +265,7 @@ Helper functions for:
 * Structures and helpers used for connecting to the base station.
 
 ## common/ 
-Legacy code containing structures that are used by the lunabase and the lunabot. (and the old behavior tree). \\
+Legacy code containing structures that are used by the lunabase and the lunabot. (and the old behavior tree). <br>
 *This will be useful when we actually move the lunabase to this repo*
 
 ## embedded_common
@@ -279,7 +279,7 @@ Utilities for connecting to rerun.
 
 
 ### lunabot-cu/src/motors.rs
-Legacy code for controlling motors via VESC. \\
+Legacy code for controlling motors via VESC. <br>
 The enumerate_motors() function (used by the motor_ctrl task) returns a structure that you can use to command the motors.
 
 ### lunabot-cu/src/simple_monitor.rs
