@@ -1,0 +1,28 @@
+<mujoco model="arena_rods">
+
+  <asset>
+    <material name="DefaultMaterialArenaRods" specular="0.5" shininess="0.5" rgba="1 1 1 1.0"/>
+    <mesh file="arena_rods.obj"/>
+    <mesh file="arena_rods_collision_0.obj"/>
+    <mesh file="arena_rods_collision_1.obj"/>
+    <mesh file="arena_rods_collision_2.obj"/>
+    <mesh file="arena_rods_collision_3.obj"/>
+    <mesh file="arena_rods_collision_4.obj"/>
+    <mesh file="arena_rods_collision_5.obj"/>
+    <mesh file="arena_rods_collision_6.obj"/>
+    <mesh file="arena_rods_collision_7.obj"/>
+  </asset>
+  <worldbody>
+    <body name="arena_rods">
+      <geom material="DefaultMaterialArenaRods" mesh="arena_rods" class="visual"/>
+      <geom mesh="arena_rods_collision_0" rgba="0.13457738193411994 0.1874449976087489 0.24934051894078424 1" class="collision"/>
+      <geom mesh="arena_rods_collision_1" rgba="0.20601990213779386 0.33238193568514907 0.4853147173750705 1" class="collision"/>
+      <geom mesh="arena_rods_collision_2" rgba="0.7287345251451243 0.028339740834414262 0.0565644689191076 1" class="collision"/>
+      <geom mesh="arena_rods_collision_3" rgba="0.6685059622828443 0.5093601616116757 0.5139232430677431 1" class="collision"/>
+      <geom mesh="arena_rods_collision_4" rgba="0.0451374206093883 0.7973927213964953 0.427846572088423 1" class="collision"/>
+      <geom mesh="arena_rods_collision_5" rgba="0.1088506799556056 0.9610182302594323 0.479941078278451 1" class="collision"/>
+      <geom mesh="arena_rods_collision_6" rgba="0.6721114805585828 0.12778661218197584 0.143034858932931 1" class="collision"/>
+      <geom mesh="arena_rods_collision_7" rgba="0.047340629461904093 0.413744122289887 0.8949454043826313 1" class="collision"/>
+    </body>
+  </worldbody>
+</mujoco>

@@ -1,0 +1,58 @@
+<mujoco model="arena_barriers">
+
+  <asset>
+    <material name="DefaultMaterialArenaBarriers" specular="0.5" shininess="0.5" rgba="1 1 1 1.0"/>
+    <mesh file="arena_barriers.obj"/>
+    <mesh file="arena_barriers_collision_0.obj"/>
+    <mesh file="arena_barriers_collision_1.obj"/>
+    <mesh file="arena_barriers_collision_2.obj"/>
+    <mesh file="arena_barriers_collision_3.obj"/>
+    <mesh file="arena_barriers_collision_4.obj"/>
+    <mesh file="arena_barriers_collision_5.obj"/>
+    <mesh file="arena_barriers_collision_6.obj"/>
+    <mesh file="arena_barriers_collision_7.obj"/>
+    <mesh file="arena_barriers_collision_8.obj"/>
+    <mesh file="arena_barriers_collision_9.obj"/>
+    <mesh file="arena_barriers_collision_10.obj"/>
+    <mesh file="arena_barriers_collision_11.obj"/>
+    <mesh file="arena_barriers_collision_12.obj"/>
+    <mesh file="arena_barriers_collision_13.obj"/>
+    <mesh file="arena_barriers_collision_14.obj"/>
+    <mesh file="arena_barriers_collision_15.obj"/>
+    <mesh file="arena_barriers_collision_16.obj"/>
+    <mesh file="arena_barriers_collision_17.obj"/>
+    <mesh file="arena_barriers_collision_18.obj"/>
+    <mesh file="arena_barriers_collision_19.obj"/>
+    <mesh file="arena_barriers_collision_20.obj"/>
+    <mesh file="arena_barriers_collision_21.obj"/>
+    <mesh file="arena_barriers_collision_22.obj"/>
+  </asset>
+  <worldbody>
+    <body name="arena_barriers">
+      <geom material="DefaultMaterialArenaBarriers" mesh="arena_barriers" class="visual"/>
+      <geom mesh="arena_barriers_collision_0" rgba="0.4426981786422861 0.6720485860521146 0.09767575243116 1" class="collision"/>
+      <geom mesh="arena_barriers_collision_1" rgba="0.10398784029416497 0.12403133703121849 0.42399608207532 1" class="collision"/>
+      <geom mesh="arena_barriers_collision_2" rgba="0.20790233200487207 0.27694008938616144 0.4435222263774675 1" class="collision"/>
+      <geom mesh="arena_barriers_collision_3" rgba="0.7760497430768293 0.45317616006559147 0.2725853598603877 1" class="collision"/>
+      <geom mesh="arena_barriers_collision_4" rgba="0.05280564001306853 0.7898918298302139 0.8524746383128927 1" class="collision"/>
+      <geom mesh="arena_barriers_collision_5" rgba="0.45335902662725946 0.6250706064489386 0.734196644187294 1" class="collision"/>
+      <geom mesh="arena_barriers_collision_6" rgba="0.2561218995244424 0.7192463370643174 0.22950229126940114 1" class="collision"/>
+      <geom mesh="arena_barriers_collision_7" rgba="0.025832356515735344 0.3842080561103801 0.5573237735199232 1" class="collision"/>
+      <geom mesh="arena_barriers_collision_8" rgba="0.15294999212987725 0.7839262757042885 0.4155222017994036 1" class="collision"/>
+      <geom mesh="arena_barriers_collision_9" rgba="0.27383852643571027 0.33074541877293107 0.9014483425863528 1" class="collision"/>
+      <geom mesh="arena_barriers_collision_10" rgba="0.8483831699201756 0.42786845097716386 0.3100943578543346 1" class="collision"/>
+      <geom mesh="arena_barriers_collision_11" rgba="0.6647843689498438 0.18570167142331684 0.37966725997778283 1" class="collision"/>
+      <geom mesh="arena_barriers_collision_12" rgba="0.9496108542604054 0.6131980562959425 0.44847758191499076 1" class="collision"/>
+      <geom mesh="arena_barriers_collision_13" rgba="0.4120468127940804 0.3606864426573879 0.16680399554239866 1" class="collision"/>
+      <geom mesh="arena_barriers_collision_14" rgba="0.7750489715343829 0.37731312081071966 0.6680236313909341 1" class="collision"/>
+      <geom mesh="arena_barriers_collision_15" rgba="0.4303788738490901 0.5274566958519282 0.5748216409619772 1" class="collision"/>
+      <geom mesh="arena_barriers_collision_16" rgba="0.8040451702313628 0.31192660658686266 0.5287010620326705 1" class="collision"/>
+      <geom mesh="arena_barriers_collision_17" rgba="0.10602774431944084 0.21255909050680044 0.8865644243601044 1" class="collision"/>
+      <geom mesh="arena_barriers_collision_18" rgba="0.8351730545925949 0.7342522734786632 0.6922926609933717 1" class="collision"/>
+      <geom mesh="arena_barriers_collision_19" rgba="0.4486893612195635 0.7723045331614845 0.3410554331054093 1" class="collision"/>
+      <geom mesh="arena_barriers_collision_20" rgba="0.09132298262281269 0.1234271209815816 0.5922413822635267 1" class="collision"/>
+      <geom mesh="arena_barriers_collision_21" rgba="0.21903147560053937 0.034524593458969854 0.4243755757958435 1" class="collision"/>
+      <geom mesh="arena_barriers_collision_22" rgba="0.8054381862141261 0.2928183563935792 0.2021794204795483 1" class="collision"/>
+    </body>
+  </worldbody>
+</mujoco>

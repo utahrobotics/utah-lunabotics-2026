@@ -1,0 +1,39 @@
+<mujoco model="artemis_arena">
+  <default>
+    <default class="visual">
+      <geom group="3" type="mesh" contype="0" conaffinity="0" />
+    </default>
+    <default class="collision">
+      <geom group="2" type="mesh" />
+    </default>
+    <default class="wheel">
+        <geom group="2" type="mesh" solimp="0.8" />
+    </default>
+  </default>
+  <visual>
+    <headlight ambient="0.4 0.4 0.4" diffuse="0.4 0.4 0.4" specular="0.1 0.1 0.1" />
+    <rgba fog="0.07 0.07 0.07 1" />
+    <global offwidth="1920" offheight="1080" />
+  </visual>
+
+  <!-- PUT NEW MESHES HERE FOR UCF -->
+  <include file="meshes/ucf_arena/arena_barriers/arena_barriers.xml" />
+  <include file="meshes/ucf_arena/arena_rods/arena_rods.xml" />
+  <include file="meshes/ucf_arena/arena_walls/arena_walls.xml" />
+  <include file="meshes/ucf_arena/arena_windows/arena_windows.xml" />
+
+  <!-- <include file="meshes/core/rock_rough/rock_rough.xml" /> -->
+  <include file="meshes/core/simplify_lunabot/simplify_lunabot.xml" />
+
+  <worldbody>
+
+    <light name="sun" directional="true" pos="0 0 10" dir="-0.5 0.1 -0.9"
+      diffuse="0.4 0.4 0.4" specular="0.1 0.1 0.1" />
+
+    <camera name="user_camera" pos="0.550397 7.43232 16.7573"
+      xyaxes="-0.997 -0.078 0 0.024 -0.309 0.951" />
+
+
+  </worldbody>
+
+</mujoco>

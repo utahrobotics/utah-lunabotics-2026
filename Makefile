@@ -21,9 +21,9 @@ sync:
 resim:
 	cd lunabot-cu && cargo run --release --bin lunabot-resim --features resim
 
-# Run the MuJoCo Simulation
+# Run the MuJoCo Simulation. Must include "ucf" or "artemis" as an arg to specify the arena to load
 sim:
-	cd lunabot-cu && RUSTFLAGS="-C linker-features=-lld" cargo run --release --bin lunabot-sim --features sim
+	cd lunabot-cu && RUSTFLAGS="-C linker-features=-lld" cargo run --release --bin lunabot-sim --features sim ucf
 
 # Clean build and sync, then build everything
 clean-build: clean sync
