@@ -54,8 +54,24 @@ text = "Stage: Unknown"
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="Label" type="Label" parent="VBoxContainer/CenterContainer"]
+[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer/CenterContainer"]
 layout_mode = 2
+theme_override_constants/separation = 30
+
+[node name="InfoPanel" type="PanelContainer" parent="VBoxContainer/CenterContainer/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="MarginContainer" type="MarginContainer" parent="VBoxContainer/CenterContainer/HBoxContainer/InfoPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 15
+theme_override_constants/margin_top = 15
+theme_override_constants/margin_right = 15
+theme_override_constants/margin_bottom = 15
+
+[node name="Label" type="Label" parent="VBoxContainer/CenterContainer/HBoxContainer/InfoPanel/MarginContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
 text = "Lunabase Control Interface
 
 KEYBOARD CONTROLS:
@@ -70,7 +86,40 @@ GAMEPAD CONTROLS:
 • Left Joystick: Turning
 • D-pad Up/Down: Lift Actuators
 • Y/A Buttons: Bucket Actuators"
+
+[node name="ErroredTasksPanel" type="PanelContainer" parent="VBoxContainer/CenterContainer/HBoxContainer"]
+custom_minimum_size = Vector2(400, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="MarginContainer" type="MarginContainer" parent="VBoxContainer/CenterContainer/HBoxContainer/ErroredTasksPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 15
+theme_override_constants/margin_top = 15
+theme_override_constants/margin_right = 15
+theme_override_constants/margin_bottom = 15
+
+[node name="ScrollContainer" type="ScrollContainer" parent="VBoxContainer/CenterContainer/HBoxContainer/ErroredTasksPanel/MarginContainer"]
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="VBoxContainer/CenterContainer/HBoxContainer/ErroredTasksPanel/MarginContainer/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="VBoxContainer/CenterContainer/HBoxContainer/ErroredTasksPanel/MarginContainer/ScrollContainer/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "⚠ Errored Tasks"
 horizontal_alignment = 1
+
+[node name="ErroredTasksLabel" type="Label" parent="VBoxContainer/CenterContainer/HBoxContainer/ErroredTasksPanel/MarginContainer/ScrollContainer/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.3, 0.3, 1)
+theme_override_font_sizes/font_size = 14
+text = "No errors"
+horizontal_alignment = 1
+autowrap_mode = 2
 
 [node name="BottomPanel" type="HBoxContainer" parent="VBoxContainer"]
 layout_mode = 2

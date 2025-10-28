@@ -3,8 +3,8 @@ use crate::utils::udev_poll;
 use core::f32;
 use crossbeam::{atomic::AtomicCell, utils::Backoff};
 use cu29::{config::Value, prelude::*};
-use fxhash::FxHashMap;
 use serde::Deserialize;
+use std::collections::HashMap;
 use std::{
     sync::mpmc::Receiver,
     time::{Duration, Instant},
@@ -38,8 +38,8 @@ impl MotorMask {
 #[derive(Default)]
 pub struct VescIDs {
     /// Map from Can ID to sibling Can ID
-    can_ids: FxHashMap<u8, Option<(u8, bool)>>,
-    motor_masks: FxHashMap<u8, MotorMask>,
+    can_ids: HashMap<u8, Option<(u8, bool)>>,
+    motor_masks: HashMap<u8, MotorMask>,
     device_count: usize,
 }
 

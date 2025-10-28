@@ -3416,6 +3416,7 @@ version = "0.1.0"
 dependencies = [
  "bincode 2.0.1",
  "common",
+ "crossbeam-channel",
  "godot",
  "quic",
 ]
@@ -3446,7 +3447,6 @@ dependencies = [
  "cu29-runtime",
  "embedded_common",
  "futures-util",
- "fxhash",
  "gputter",
  "gstreamer",
  "gstreamer-app",

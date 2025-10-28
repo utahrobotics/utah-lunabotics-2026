@@ -81,7 +81,7 @@ impl LunabaseConnection {
                     }
                     Err(e) => {
                         eprintln!("Outgoing message queue disconnected: {}", e);
-                        // break;
+                        break;
                     }
                 }
             }

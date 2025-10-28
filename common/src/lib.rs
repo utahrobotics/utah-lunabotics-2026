@@ -93,7 +93,7 @@ pub struct IMUReading {
     pub acceleration: [f64; 3],
 }
 
-use std::io::Write;
+use std::{collections::HashMap, io::Write};
 
 use bitcode::{Decode, Encode};
 use embedded_common::{Actuator, ActuatorCommand};
@@ -134,7 +134,6 @@ impl TryFrom<u8> for LunabotStage {
     bincode::Encode, bincode::Decode, Debug, Encode, Decode, Clone, Copy, PartialEq, Serialize,
 )]
 pub enum FromLunabase {
-    Pong,
     ContinueMission,
     Steering(Steering),
     LiftActuators(i8),
@@ -240,29 +239,9 @@ impl FromLunabase {
     }
 }
 
-#[derive(
-    Debug, bitcode::Encode, bitcode::Decode, Clone, Copy, bincode::Encode, bincode::Decode,
-)]
+#[derive(Debug, bitcode::Encode, bitcode::Decode, Clone, bincode::Encode, bincode::Decode)]
 pub enum FromLunabot {
     RobotIsometry { origin: [f32; 3], quat: [f32; 4] },
     ArmAngles { hinge: f32, bucket: f32 },
-    Ping(LunabotStage),
-}
-
-impl FromLunabot {
-    fn write_code(&self, mut w: impl Write) -> std::io::Result<()> {
-        let bytes = bitcode::encode(self);
-        write!(w, "{self:?} = 0x")?;
-        for b in bytes {
-            write!(w, "{b:x}")?;
-        }
-        writeln!(w, "")
-    }
-
-    pub fn write_code_sheet(mut w: impl Write) -> std::io::Result<()> {
-        FromLunabot::Ping(LunabotStage::Manual).write_code(&mut w)?;
-        FromLunabot::Ping(LunabotStage::SoftStop).write_code(&mut w)?;
-        FromLunabot::Ping(LunabotStage::Autonomy).write_code(&mut w)?;
-        Ok(())
-    }
+    ErroredTasks(HashMap<String, String>),
 }

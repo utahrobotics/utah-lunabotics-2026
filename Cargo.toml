@@ -38,6 +38,8 @@ cu-gstreamer = { git = "https://github.com/matthewashton-k/copper-rs.git", branc
 ] }
 iceoryx2 = { version = "0.7.0" }
 crossbeam = "0.8"
+crossbeam-channel = "0.5"
+
 
 toml = "0.9.5"
 bitcode = "0.6.7"

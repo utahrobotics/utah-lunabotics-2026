@@ -1,8 +1,12 @@
+use std::collections::HashMap;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
-use std::time::Instant;
+use std::sync::{Arc, Mutex};
+use std::thread::JoinHandle;
+use std::time::{Duration, Instant};
 
 use bincode::error::DecodeError;
 use common::{FromLunabase, FromLunabot, LunabotStage, Steering};
+use crossbeam_channel::{Receiver, Sender};
 use godot::prelude::*;
 use quic::QuicClient;
 
@@ -23,15 +27,20 @@ struct LunabaseConnection {
     client: Option<QuicClient<FromLunabase, FromLunabot>>,
     last_packet_time: Instant,
     current_stage: LunabotStage,
+    recv_thread: Option<JoinHandle<()>>,
+
+    errored_tasks: Arc<Mutex<HashMap<String, String>>>,
 }
 
 #[godot_api]
 impl INode for LunabaseConnection {
     fn init(base: Base<Node>) -> Self {
         LunabaseConnection {
+            errored_tasks: Arc::new(Mutex::new(HashMap::new())),
             base,
             default_address: GString::from("127.0.0.1"),
             client: None,
+            recv_thread: None,
             last_packet_time: Instant::now(),
             current_stage: LunabotStage::SoftStop,
         }
@@ -87,7 +96,29 @@ impl LunabaseConnection {
 
             match QuicClient::connect(socket_addr) {
                 Ok(client) => {
+                    let cleint_c = client.clone();
+                    let errored_tasks = self.errored_tasks.clone();
+                    let recv_thread = std::thread::spawn(move || {
+                        loop {
+                            match cleint_c.recv() {
+                                Ok(msg) => match msg {
+                                    FromLunabot::RobotIsometry { .. } => {}
+                                    FromLunabot::ArmAngles { .. } => {}
+                                    FromLunabot::ErroredTasks(hash_map) => {
+                                        if let Ok(mut guard) = errored_tasks.lock() {
+                                            *guard = hash_map;
+                                        }
+                                    }
+                                },
+                                Err(e) => {
+                                    eprintln!("Failed to receive message from server: {}", e);
+                                    std::thread::sleep(Duration::from_millis(5));
+                                }
+                            }
+                        }
+                    });
                     self.client = Some(client);
+                    self.recv_thread = Some(recv_thread);
                     godot_print!("Successfully connected to {address_str}");
                 }
                 Err(e) => {
@@ -207,5 +238,16 @@ impl LunabaseConnection {
                 }
             }
         }
+    }
+
+    #[func]
+    fn get_errored_tasks(&self) -> Dictionary {
+        let mut dict = Dictionary::new();
+        if let Ok(guard) = self.errored_tasks.lock() {
+            for (task_name, error_msg) in guard.iter() {
+                dict.set(task_name.as_str(), error_msg.as_str());
+            }
+        }
+        dict
     }
 }

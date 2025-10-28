@@ -9,6 +9,7 @@ extends Control
 @onready var soft_stop_button: Button = $VBoxContainer/BottomPanel/SoftStopButton
 @onready var manual_button: Button = $VBoxContainer/BottomPanel/ManualButton
 @onready var autonomous_button: Button = $VBoxContainer/BottomPanel/AutonomousButton
+@onready var errored_tasks_label: Label = $VBoxContainer/CenterContainer/HBoxContainer/ErroredTasksPanel/MarginContainer/ScrollContainer/VBox/ErroredTasksLabel
 
 # Should match the LunabotStage enum in the Rust extension
 enum LunabotStage {
@@ -60,6 +61,17 @@ func _process(delta: float) -> void:
 		LunabotStage.AUTONOMY:
 			stage_label.text = "Stage: Autonomy"
 			stage_label.modulate = Color.CYAN
+	
+	# Update errored tasks
+	var errored_tasks: Dictionary = connection.get_errored_tasks()
+	if errored_tasks.is_empty():
+		errored_tasks_label.text = "No errors"
+	else:
+		var error_text := ""
+		for task_name in errored_tasks.keys():
+			var error_msg: String = errored_tasks[task_name]
+			error_text += task_name + ":\n  " + error_msg + "\n\n"
+		errored_tasks_label.text = error_text.strip_edges()
 
 
 func _on_stage_changed(stage: int) -> void:
