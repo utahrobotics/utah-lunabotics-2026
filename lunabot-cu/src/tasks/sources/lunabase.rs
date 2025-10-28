@@ -32,6 +32,7 @@ impl CuSrcTask for Lunabase {
         Ok(Self {
             message_buffer: VecDeque::new(),
             max_pong_delay: Duration::from_millis(1000),
+            last_errored_tasks_packet: 0,
         })
     }
 
