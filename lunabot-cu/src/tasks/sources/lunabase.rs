@@ -98,9 +98,7 @@ impl CuSrcTask for Lunabase {
             if let Some(errored_tasks) = ERRORED_TASKS.get()
                 && clock.now().as_nanos() - self.last_errored_tasks_packet > secs_to_nanos(3.0)
             {
-                if let Ok(errored_tasks) = errored_tasks.lock()
-                    && !errored_tasks.is_empty()
-                {
+                if let Ok(errored_tasks) = errored_tasks.lock() {
                     let transformed_tasks: std::collections::HashMap<String, String> =
                         errored_tasks
                             .iter()
