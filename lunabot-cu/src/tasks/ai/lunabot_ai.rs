@@ -132,22 +132,23 @@ impl CuTask for LunabotAi {
                 },
                 LunabotAction::None => Success,
                 LunabotAction::IsObstacleMapReady => {
-                    if blackboard.latest_obstacle_map.is_some() {
-                        Success
-                    } else {
-                        Failure
-                    }
+                    // if blackboard.latest_obstacle_map.is_some() {
+                    //     Success
+                    // } else {
+                    //     Failure
+                    // }
+                    Success
                 }
                 LunabotAction::IsInOccupiedCell => todo!(),
                 LunabotAction::IsInFreeCell => todo!(),
                 LunabotAction::IsInUnknownCell => todo!(),
-                LunabotAction::CalculatePath => todo!(),
+                LunabotAction::CalculatePath => Success,
                 LunabotAction::FollowPathFor(meters) => {
                     // this will be a long running task in a different thread
                     // the task will live in the jobs folder, and be pollable to get the Status
                     todo!()
                 }
-                LunabotAction::CheckNavigation => todo!(),
+                LunabotAction::CheckNavigation => Running,
                 LunabotAction::GetUnstuck => todo!(),
                 LunabotAction::Yield => {
                     if !blackboard.yielded {

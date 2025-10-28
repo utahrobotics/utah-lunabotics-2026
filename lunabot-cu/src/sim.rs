@@ -63,7 +63,18 @@ fn sim_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::L2Pointcloud(_) => SimOverride::ExecutedBySim,
         default::SimStep::L2Imu(_) => SimOverride::ExecutedBySim,
         default::SimStep::V3Pico(_) => SimOverride::ExecutedBySim,
-        default::SimStep::MotorCtrl(CuTaskCallbackState::Process(input, output)) => {
+        default::SimStep::MotorCtrl(CuTaskCallbackState::Process(input, _)) => {
+            if let Some((Some(steering), _)) = input.payload() {
+                let (left, right) = steering.get_left_and_right();
+                let left = left * 50.0;
+                let right = right * 50.0;
+                // left vesc
+                data.actuator("motor_fl").unwrap().view_mut(&mut data).ctrl[0] = left;
+                data.actuator("motor_bl").unwrap().view_mut(&mut data).ctrl[0] = left;
+                // right vesc
+                data.actuator("motor_fr").unwrap().view_mut(&mut data).ctrl[0] = right;
+                data.actuator("motor_br").unwrap().view_mut(&mut data).ctrl[0] = right;
+            }
             SimOverride::ExecutedBySim
         }
         default::SimStep::MotorCtrl(..) => SimOverride::ExecutedBySim,
@@ -98,7 +109,7 @@ fn main() {
                 }
             }
             // Create mock robot clock for simulation
-            let (robot_clock, _robot_clock_mock) = RobotClock::mock();
+            let (robot_clock, robot_clock_mock) = RobotClock::mock();
 
             let copper_ctx = basic_copper_setup(
                 &PathBuf::from(&logger_path),
@@ -132,9 +143,11 @@ fn main() {
                 .expect("Failed to start all tasks.");
             let target_duration = std::time::Duration::from_nanos(1_000_000_000 / TARGET_HZ as u64);
             let mut last_time = std::time::Instant::now();
+            let start = std::time::Instant::now();
             let mut counter = 0;
             while viewer.running() {
                 counter += 1;
+                robot_clock_mock.set_value(start.elapsed().as_nanos() as u64);
                 application
                     .run_one_iteration(&mut sim_callback)
                     .expect("failed to run copper list iteration");
@@ -180,7 +193,7 @@ fn set_up_mujoco() -> (
     ));
     let mut timestep = 1.0 / (TARGET_HZ as f64);
     // speed up the simulation by a little
-    timestep *= 1.3;
+    timestep *= 1.6;
     model.opt_mut().timestep = timestep;
 
     model.opt_mut().disableflags |= MjtDisableBit::mjDSBL_NATIVECCD as i32;
