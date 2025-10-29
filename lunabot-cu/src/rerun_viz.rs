@@ -20,8 +20,11 @@ pub struct RecorderData {
 
 #[derive(Deserialize, Default, Debug)]
 pub enum RerunViz {
+    /// Streams results to a remote viewer, with the ip specified in the string.
     Grpc(Level, String),
+    /// Writes results to a file.
     Log(Level),
+    /// Displays the results in a application window.
     Viz(Level),
     #[default]
     Disabled,

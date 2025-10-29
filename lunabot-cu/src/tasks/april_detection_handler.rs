@@ -89,6 +89,14 @@ pub struct AprilDetectionHandler {
     known_tags: HashMap<usize, Isometry3<f64>>,
 }
 
+#[derive(Clone, Copy, Default, Debug, Encode, Decode, Serialize, ZeroCopySend)]
+#[repr(C)]
+pub struct AprilTagMeasurement {
+    position: [f64; 3],
+    orientation: [f64; 3],
+    variance: [f64; 36]
+}
+
 impl Freezable for AprilDetectionHandler {}
 
 impl CuTask for AprilDetectionHandler {
@@ -99,7 +107,7 @@ impl CuTask for AprilDetectionHandler {
         &'m input_msg!(AprilTagDetections),
     );
     // camera_id, estimated isometry of camera
-    type Output<'m> = output_msg!(Box<HashMap<String, EncodableIsometry>>);
+    type Output<'m> = output_msg!(Vec<AprilTagMeasurement>);
 
     fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
         let known_tags = load_known_apriltag_isometries()?;

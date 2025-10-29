@@ -19,9 +19,7 @@ use nalgebra::{Isometry3, UnitQuaternion, UnitVector3, Vector3};
 use simple_motion::StaticNode;
 
 use crate::{
-    ROOT_NODE,
-    rerun_viz::{self, RECORDER},
-    utils::{lerp, lerp_value, swing_twist_decomposition},
+    ROOT_NODE, rerun_viz::{self, RECORDER}, tasks::{IcpMeasurement, april_detection_handler::AprilTagMeasurement}, utils::{lerp, lerp_value, swing_twist_decomposition}
 };
 
 use kalman_filter::*;
@@ -49,10 +47,10 @@ impl Freezable for Localizer {}
 impl CuSinkTask for Localizer {
     // IMU from l2, apriltag detections
     type Input<'m> = input_msg!('m,
-        ImuMsg, // l2 imu
-        EncodableIsometry, // l2 kiss icp
+        ImuMeasurement, // l2 imu
+        IcpMeasurement, // l2 kiss icp
         FromPicoV3,
-        Box<HashMap<String, EncodableIsometry>> // apriltag detections
+        Vec<AprilTagMeasurement> // apriltag detections
     );
 
     fn new(_config: Option<&cu29::prelude::ComponentConfig>) -> cu29::CuResult<Self>
@@ -101,7 +99,7 @@ impl CuSinkTask for Localizer {
                 (
                     vec,
                     // e^a * e^b = e^(a+b), so the operation is consistent regardless of time division
-                    mat * SimpleSquareMatrix::from_diagonal_element(f64::powf(E.into(), dt)),
+                    mat + SimpleSquareMatrix::from_diagonal_element(100.0),
                 )
             },
         );

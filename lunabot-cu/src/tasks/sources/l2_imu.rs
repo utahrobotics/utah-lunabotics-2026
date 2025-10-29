@@ -1,3 +1,4 @@
+use bincode::{Encode, Decode};
 use cu29::cutask::CuMsg;
 use cu29::{
     CuError, CuResult,
@@ -10,6 +11,7 @@ use iceoryx2::node::NodeBuilder;
 use iceoryx2::port::subscriber::Subscriber;
 use iceoryx2::prelude::*;
 use iceoryx2::service::port_factory::publish_subscribe::PortFactory;
+use serde::Serialize;
 
 use crate::ROOT_NODE;
 use iceoryx_types::ImuMsg;
@@ -19,15 +21,24 @@ use simple_motion::StaticNode;
 pub struct ImuIceoryxReceiver {
     service_name: ServiceName,
     node: iceoryx2::node::Node<ipc::Service>,
-    service: Option<PortFactory<ipc::Service, ImuMsg, ()>>,
-    subscriber: Option<Subscriber<ipc::Service, ImuMsg, ()>>,
+    service: Option<PortFactory<ipc::Service, ImuMeasurement, ()>>,
+    subscriber: Option<Subscriber<ipc::Service, ImuMeasurement, ()>>,
     lidar_node: StaticNode,
+}
+
+#[derive(Clone, Copy, Default, Debug, Encode, Decode, Serialize, ZeroCopySend)]
+#[repr(C)]
+pub struct ImuMeasurement {
+    acceleration: [f64; 3],
+    orientation: [f64; 3],
+    angular_velocity: [f64; 3],
+    variance: [f64; 81]
 }
 
 impl Freezable for ImuIceoryxReceiver {}
 
 impl CuSrcTask for ImuIceoryxReceiver {
-    type Output<'m> = output_msg!(ImuMsg);
+    type Output<'m> = output_msg!(ImuMeasurement);
 
     fn new(config: Option<&ComponentConfig>) -> CuResult<Self> {
         let service_str = config

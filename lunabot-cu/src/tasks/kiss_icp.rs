@@ -18,11 +18,19 @@ pub struct KissIcp {
     pub max_accumulation: usize,
 }
 
+#[derive(Clone, Copy, Default, Debug, Encode, Decode, Serialize, ZeroCopySend)]
+#[repr(C)]
+pub struct IcpMeasurement {
+    position: [f64; 3],
+    orientation: [f64; 3],
+    variance: [f64; 36]
+}
+
 impl Freezable for KissIcp {}
 
 impl CuTask for KissIcp {
     type Input<'m> = input_msg!(IceoryxPointCloud);
-    type Output<'m> = output_msg!(EncodableIsometry);
+    type Output<'m> = output_msg!(IcpMeasurement);
 
     fn new(config: Option<&ComponentConfig>) -> CuResult<Self>
     where

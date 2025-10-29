@@ -175,7 +175,7 @@ fn main() {
             // ))
             // .expect("Failed to initialize rerun viz.");
 
-            rerun_viz::init_rerun(rerun_viz::RerunViz::Viz(rerun_viz::Level::All)).expect(
+            rerun_viz::init_rerun(rerun_viz::RerunViz::Log(rerun_viz::Level::All)).expect(
                 "Failed to initialize Rerun. Please check that the rerun binary is in your path.",
             );
 

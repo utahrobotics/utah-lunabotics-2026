@@ -140,21 +140,17 @@
         )
     ],
     cnx:[
-        (src:"l2_imu", dst:"localizer", msg:"iceoryx_types::ImuMsg"),
-        (src:"l2_pointcloud", dst: "l2_kiss_icp", msg:"iceoryx_types::IceoryxPointCloud"),
-        (src:"l2_kiss_icp", dst:"localizer", msg:"cu_spatial_payloads::EncodableIsometry"),
-        (src:"lunabase", dst:"new_ai", msg:"Option<common::FromLunabase>"),
+        (src:"l2_imu",                  dst:"localizer",               msg:"crate::tasks::sources::ImuMeasurement"),
+        (src:"l2_pointcloud",           dst:"l2_kiss_icp",             msg:"iceoryx_types::IceoryxPointCloud"),
+        (src:"l2_kiss_icp",             dst:"localizer",               msg:"cu_spatial_payloads::EncodableIsometry"),
+        (src:"lunabase",                dst:"new_ai",                  msg:"Option<common::FromLunabase>"),
         // copper doesn't support multiple outputs on a single task so for now we just put them in a tuple and ignore one side
-        (src:"realsense_subscriber",dst:"occupancy_grid_pipeline", msg:"(Option<iceoryx_types::IceoryxDepthFrame<307200>>, Option<iceoryx_types::ImuMsg>)"),
-        (src:"occupancy_grid_pipeline", dst: "new_ai", msg: "crate::tasks::OccupancyGrid"),
-        (src:"new_ai", dst:"motor_ctrl", msg:"(Option<common::Steering>, Option<embedded_common::ActuatorCommand>)"),
-        (src:"new_ai", dst:"v3_pico", msg:"(Option<common::Steering>, Option<embedded_common::ActuatorCommand>)"),
-        (src: "v3_pico", dst:"localizer", msg:"embedded_common::FromPicoV3"),
-        (
-            src: "detection_handler",
-            dst: "localizer",
-            msg: "Box<std::collections::HashMap<String, cu_spatial_payloads::EncodableIsometry>>"
-        ),
+        (src:"realsense_subscriber",    dst:"occupancy_grid_pipeline", msg:"(Option<iceoryx_types::IceoryxDepthFrame<307200>>, Option<iceoryx_types::ImuMsg>)"),
+        (src:"occupancy_grid_pipeline", dst:"new_ai",                  msg:"crate::tasks::OccupancyGrid"),
+        (src:"new_ai",                  dst:"motor_ctrl",              msg:"(Option<common::Steering>, Option<embedded_common::ActuatorCommand>)"),
+        (src:"new_ai",                  dst:"v3_pico",                 msg:"(Option<common::Steering>, Option<embedded_common::ActuatorCommand>)"),
+        (src:"v3_pico",                 dst:"localizer",               msg:"embedded_common::FromPicoV3"),
+        (src:"detection_handler",       dst: "localizer",              msg:"Vec<crate::tasks::AprilTagMeasurement>"),
     ],
     
     includes:[

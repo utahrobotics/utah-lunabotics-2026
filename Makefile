@@ -54,6 +54,9 @@ clear-simlogs:
 clear-logs:
 	rm lunabot-cu/logs/*
 
+clear-iceoryx2:
+	rm -r /tmp/iceoryx2; rm -r /dev/shm/iox2_*; rm -rf /dev/shm/*iceoryx*
+
 # Help target to show available commands
 help:
 	@echo "Available targets:"
