@@ -346,13 +346,16 @@ fn evolution_function(
 
 
     // Variances:
-    let result_variance = SimpleSquareMatrix::from_element(0);
+    let result_variance = prev_variance;
 
-    // What do I even do? Math is in progress
-    // TODO
-    result_variance = prev_variance;
+    // Formula: x = x + v*dt => o_x^2 = o_x^2 + o_v^2 * dt^2
+    // Translational
+    result_variance.view_mut((3,3), (3,3)) += result_variance.view((6,6), (3,3)) * dt*dt;
+    result_variance.view_mut((0,0), (3,3)) += result_variance.view((3,3), (3,3)) * dt*dt;
+    // Angular
+    result_variance.view_mut((9,9), (3,3)) += result_variance.view((12,12), (3,3)) * dt*dt;
 
-
+    
     (result_state, result_variance)
 }
 
