@@ -21,6 +21,7 @@
   <include file="meshes/ucf_arena/arena_rods/arena_rods.xml" />
   <include file="meshes/ucf_arena/arena_walls/arena_walls.xml" />
   <include file="meshes/ucf_arena/arena_windows/arena_windows.xml" />
+  <include file="meshes/ucf_arena/lunar_surface/lunar_surface.xml" />
 
   <!-- <include file="meshes/core/rock_rough/rock_rough.xml" /> -->
   <include file="meshes/core/simplify_lunabot/simplify_lunabot.xml" />
