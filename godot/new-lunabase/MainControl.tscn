@@ -1,0 +1,148 @@
+[gd_scene load_steps=3 format=3 uid="uid://cxqk5j2vp8obb"]
+
+[ext_resource type="Script" uid="uid://lfb3k4n5gotg" path="res://MainControl.gd" id="1"]
+[ext_resource type="Script" uid="uid://cyolsda2lojye" path="res://Systems/CommandPattern/Controllers/LunabaseHumanController.gd" id="2"]
+
+[node name="MainControl" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="TopPanel" type="HBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="Label" type="Label" parent="VBoxContainer/TopPanel"]
+layout_mode = 2
+text = "IP Address:"
+
+[node name="IPInput" type="LineEdit" parent="VBoxContainer/TopPanel"]
+custom_minimum_size = Vector2(150, 0)
+layout_mode = 2
+text = "127.0.0.1"
+placeholder_text = "127.0.0.1"
+
+[node name="ConnectButton" type="Button" parent="VBoxContainer/TopPanel"]
+layout_mode = 2
+text = "Connect"
+
+[node name="Spacer" type="Control" parent="VBoxContainer/TopPanel"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="PacketLabel" type="Label" parent="VBoxContainer/TopPanel"]
+layout_mode = 2
+text = "Last Packet: 0ms"
+
+[node name="StageLabel" type="Label" parent="VBoxContainer/TopPanel"]
+layout_mode = 2
+text = "Stage: Unknown"
+
+[node name="CenterContainer" type="CenterContainer" parent="VBoxContainer"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer/CenterContainer"]
+layout_mode = 2
+theme_override_constants/separation = 30
+
+[node name="InfoPanel" type="PanelContainer" parent="VBoxContainer/CenterContainer/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="MarginContainer" type="MarginContainer" parent="VBoxContainer/CenterContainer/HBoxContainer/InfoPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 15
+theme_override_constants/margin_top = 15
+theme_override_constants/margin_right = 15
+theme_override_constants/margin_bottom = 15
+
+[node name="Label" type="Label" parent="VBoxContainer/CenterContainer/HBoxContainer/InfoPanel/MarginContainer"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 14
+text = "Lunabase Control Interface
+
+KEYBOARD CONTROLS:
+• W/S: Forward/Backward
+• A/D: Turn Left/Right
+• Q/E: Lift Down/Up
+• Z/C: Bucket Down/Up
+
+GAMEPAD CONTROLS:
+• Right Trigger: Forward
+• Left Trigger: Backward
+• Left Joystick: Turning
+• D-pad Up/Down: Lift Actuators
+• Y/A Buttons: Bucket Actuators"
+
+[node name="ErroredTasksPanel" type="PanelContainer" parent="VBoxContainer/CenterContainer/HBoxContainer"]
+custom_minimum_size = Vector2(400, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="MarginContainer" type="MarginContainer" parent="VBoxContainer/CenterContainer/HBoxContainer/ErroredTasksPanel"]
+layout_mode = 2
+theme_override_constants/margin_left = 15
+theme_override_constants/margin_top = 15
+theme_override_constants/margin_right = 15
+theme_override_constants/margin_bottom = 15
+
+[node name="ScrollContainer" type="ScrollContainer" parent="VBoxContainer/CenterContainer/HBoxContainer/ErroredTasksPanel/MarginContainer"]
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="VBoxContainer/CenterContainer/HBoxContainer/ErroredTasksPanel/MarginContainer/ScrollContainer"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="VBoxContainer/CenterContainer/HBoxContainer/ErroredTasksPanel/MarginContainer/ScrollContainer/VBox"]
+layout_mode = 2
+theme_override_font_sizes/font_size = 18
+text = "⚠ Errored Tasks"
+horizontal_alignment = 1
+
+[node name="ErroredTasksLabel" type="Label" parent="VBoxContainer/CenterContainer/HBoxContainer/ErroredTasksPanel/MarginContainer/ScrollContainer/VBox"]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.3, 0.3, 1)
+theme_override_font_sizes/font_size = 14
+text = "No errors"
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="BottomPanel" type="HBoxContainer" parent="VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 20
+alignment = 1
+
+[node name="SoftStopButton" type="Button" parent="VBoxContainer/BottomPanel"]
+custom_minimum_size = Vector2(150, 50)
+layout_mode = 2
+text = "Software Stop"
+
+[node name="ManualButton" type="Button" parent="VBoxContainer/BottomPanel"]
+custom_minimum_size = Vector2(150, 50)
+layout_mode = 2
+text = "Manual Mode"
+
+[node name="AutonomousButton" type="Button" parent="VBoxContainer/BottomPanel"]
+custom_minimum_size = Vector2(150, 50)
+layout_mode = 2
+text = "Autonomous Mode"
+
+[node name="LunabaseConnection" type="LunabaseConnection" parent="."]
+
+[node name="LunabaseHumanController" type="Node" parent="."]
+script = ExtResource("2")
+actor_path = NodePath("../LunabaseConnection")
