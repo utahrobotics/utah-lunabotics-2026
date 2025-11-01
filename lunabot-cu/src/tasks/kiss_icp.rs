@@ -117,7 +117,8 @@ impl CuTask for KissIcp {
                 output.clear_payload();
                 return Ok(());
             }
-            self.pipeline.process_frame(&self.accumulated_frames);
+            self.pipeline.process_frame(&self.accumulated_frames, 200.0);
+
             let map_points = self.pipeline.get_last_batch_points();
             let position = self.pipeline.t_origin_current;
             output.set_payload(EncodableIsometry::from_na(&position));

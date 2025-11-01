@@ -75,8 +75,8 @@
             type:"crate::tasks::KissIcp",
             config:{
                 "voxel_size": .5,
-                "max_range": 50.0,
-                "min_range": 1.0,
+                "max_range": 10.0,
+                "min_range": 0.0,
                 "max_points_per_voxel": 20,
                 "initial_threshold": 2.0,
                 "min_motion_th": 0.2,
