@@ -6,12 +6,12 @@ mod iceoryx_utils;
 use enumerate::enumerate_depth_cameras;
 use std::time::Duration;
 
-use crate::constants::REALSENSE_SERIAL;
+use crate::constants::{REALSENSE_SERIAL, T265_SERIAL};
 
 fn main() {
     println!("Starting RealSense depth camera publisher with occupancy grid");
 
-    enumerate_depth_cameras(&[REALSENSE_SERIAL]);
+    enumerate_depth_cameras(&[T265_SERIAL, REALSENSE_SERIAL]);
 
     loop {
         std::thread::sleep(Duration::from_secs(1));

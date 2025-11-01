@@ -63,10 +63,12 @@ impl CuSrcTask for RealsenseSubscriber {
 
         let depth_subscriber = depth_service
             .subscriber_builder()
+            .buffer_size(19)
             .create()
             .map_err(|e| CuError::new_with_cause("subscriber creation error", e))?;
         let imu_subscriber = imu_service
             .subscriber_builder()
+            .buffer_size(19)
             .create()
             .map_err(|e| CuError::new_with_cause("subscriber creation error", e))?;
         Ok(Self {

@@ -1,18 +1,18 @@
 use crate::depth_camera::DepthCameraTask;
 use fxhash::FxHashMap;
 use realsense_rust::{
-    config::Config,
+    config::{Config, ConfigurationError},
     device::Device,
-    kind::{Rs2CameraInfo, Rs2Format, Rs2StreamKind},
+    kind::{Rs2CameraInfo, Rs2Format, Rs2ProductLine, Rs2StreamKind},
     pipeline::{ActivePipeline, InactivePipeline},
 };
-use std::sync::mpsc::SyncSender;
+use std::{collections::HashSet, sync::mpsc::SyncSender, thread, time::Duration};
 
 /// waits for a realsense to be plugged in and then starts a depth camera task that will publish depth frames
 pub fn enumerate_depth_cameras(serial_numbers: &[&str]) {
     let (init_tx, init_rx) = std::sync::mpsc::channel::<&'static str>();
     // start one depth camera task thread per serial number
-    let mut threads: FxHashMap<&str, SyncSender<(Device, ActivePipeline)>> = serial_numbers
+    let mut threads: FxHashMap<&str, SyncSender<ActivePipeline>> = serial_numbers
         .into_iter()
         .filter_map(|serial| {
             let serial: &'static str = Box::leak((*serial).to_string().into_boxed_str());
@@ -41,13 +41,6 @@ pub fn enumerate_depth_cameras(serial_numbers: &[&str]) {
             return;
         }
     };
-    let device_hub = match context.create_device_hub() {
-        Ok(x) => x,
-        Err(_e) => {
-            eprintln!("Failed to create RealSense DeviceHub: {_e}");
-            return;
-        }
-    };
 
     // Waits until a depth camera task asks for initialization, then sets up the device enabling the right streams and sends the pipeline back over to the depth camera task
     std::thread::Builder::new()
@@ -57,6 +50,13 @@ pub fn enumerate_depth_cameras(serial_numbers: &[&str]) {
                 break;
             };
             loop {
+                let device_hub = match context.create_device_hub() {
+                    Ok(x) => x,
+                    Err(_e) => {
+                        eprintln!("Failed to create RealSense DeviceHub: {_e}");
+                        return;
+                    }
+                };
                 let device = match device_hub.wait_for_device() {
                     Ok(x) => x,
                     Err(_e) => {
@@ -69,13 +69,16 @@ pub fn enumerate_depth_cameras(serial_numbers: &[&str]) {
                     eprintln!("Failed to get serial number for RealSense Camera");
                     continue;
                 };
+
                 let Ok(current_serial_str) = current_serial_cstr.to_str() else {
                     eprintln!("Failed to parse serial number {:?}", current_serial_cstr);
                     continue;
                 };
+
                 if target_serial != current_serial_str {
                     continue;
                 }
+                println!("Discovered camera {target_serial}");
 
                 let current_serial = current_serial_str.to_string();
 
@@ -114,21 +117,18 @@ pub fn enumerate_depth_cameras(serial_numbers: &[&str]) {
                     eprintln!("Failed to disable all streams: {}", e);
                     continue;
                 }
-
-                if let Err(e) =
-                    config.enable_stream(Rs2StreamKind::Depth, None, 640, 480, Rs2Format::Z16, 30)
-                {
-                    eprintln!("Failed to enable depth stream: {}", e);
+                let Some(prod_line) = device.info(Rs2CameraInfo::ProductLine) else {
                     continue;
+                };
+                if prod_line.to_string_lossy().to_string() == "T200".to_string() {
+                    println!("enabling t265 streams");
+                    enable_t265_streams(&mut config);
+                } else {
+                    enable_d455_streams(&mut config);
                 }
-
-                if let Err(e) =
-                    config.enable_stream(Rs2StreamKind::Accel, None, 0, 0, Rs2Format::Any, 0)
-                {
-                    eprintln!("Failed to enable imu stream: {}", e);
-                    continue;
-                }
-
+                // https://gitlab.com/tangram-vision/oss/realsense-rust/-/issues/29
+                drop(device);
+                drop(device_hub);
                 let pipeline = match InactivePipeline::try_from(&context) {
                     Ok(x) => x,
                     Err(e) => {
@@ -144,12 +144,23 @@ pub fn enumerate_depth_cameras(serial_numbers: &[&str]) {
                     }
                 };
 
-                if let Err(error) = pipeline_sender.send((device, pipeline)) {
-                    error.0 .1.stop();
+                if let Err(error) = pipeline_sender.send(pipeline) {
+                    error.0.stop();
                     threads.remove(current_serial.as_str());
                 }
                 break;
             }
         })
         .expect("Failed to spawn device hub thread");
+}
+
+fn enable_d455_streams(config: &mut Config) -> Result<(), ConfigurationError> {
+    config.enable_stream(Rs2StreamKind::Depth, None, 640, 480, Rs2Format::Z16, 30)?;
+    config.enable_stream(Rs2StreamKind::Accel, None, 0, 0, Rs2Format::Any, 0)?;
+    Ok(())
+}
+
+fn enable_t265_streams(config: &mut Config) -> Result<(), ConfigurationError> {
+    config.enable_stream(Rs2StreamKind::Pose, None, 0, 0, Rs2Format::Any, 0)?;
+    Ok(())
 }

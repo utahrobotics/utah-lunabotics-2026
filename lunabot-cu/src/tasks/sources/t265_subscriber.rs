@@ -2,38 +2,36 @@ use cu29::{
     cutask::{CuSrcTask, Freezable},
     prelude::*,
 };
-use iceoryx_types::{IceoryxDepthFrame, IceoryxPointCloud};
+use iceoryx_types::PoseMsg;
 use iceoryx2::{
     node::NodeBuilder,
     port::subscriber::Subscriber,
     prelude::{LogLevel, ServiceName, set_log_level},
     service::ipc,
 };
+use nalgebra::{Quaternion, UnitQuaternion};
 
-pub static DEPTH_FRAME_SIZE: usize = 640 * 480;
-pub static DEPTH_FRAME_WIDTH: u32 = 640;
-pub static DEPTH_FRAME_HEIGHT: u32 = 480;
-
-pub struct RealsenseDepth {
+pub struct T265Subscriber {
     last_seen: u64,
-    subscriber: Subscriber<ipc::Service, IceoryxDepthFrame<DEPTH_FRAME_SIZE>, ()>,
+    /// subscribes to pose frames published by the realsense external task (T265)
+    pose_subscriber: Subscriber<ipc::Service, PoseMsg, ()>,
 }
 
-impl Freezable for RealsenseDepth {}
+impl Freezable for T265Subscriber {}
 
-impl CuSrcTask for RealsenseDepth {
-    type Output<'m> = output_msg!(IceoryxDepthFrame<DEPTH_FRAME_SIZE>);
+impl CuSrcTask for T265Subscriber {
+    type Output<'m> = output_msg!(PoseMsg);
 
     fn new(config: Option<&cu29::prelude::ComponentConfig>) -> cu29::CuResult<Self>
     where
         Self: Sized,
     {
-        let service_str = config
-            .and_then(|c| c.get::<String>("service"))
-            .unwrap_or_else(|| "realsense/depth".to_string());
+        let serial_num = config
+            .and_then(|c| c.get::<String>("serial_num"))
+            .unwrap_or_else(|| "realsense/t265".to_string());
+        let pose_service_str = format!("realsense/{serial_num}/pose");
 
-        println!("using service string: {service_str}");
-        let service_name = ServiceName::new(&service_str)
+        let pose_service_name = ServiceName::new(&pose_service_str)
             .map_err(|e| CuError::new_with_cause("invalid service name", e))?;
 
         let node = NodeBuilder::new()
@@ -41,21 +39,22 @@ impl CuSrcTask for RealsenseDepth {
             .map_err(|e| CuError::new_with_cause("node create faliure", e))?;
 
         set_log_level(LogLevel::Debug);
-        let service = node
-            .service_builder(&service_name)
-            .publish_subscribe::<IceoryxDepthFrame<DEPTH_FRAME_SIZE>>()
+        let pose_service = node
+            .service_builder(&pose_service_name)
+            .publish_subscribe::<PoseMsg>()
             .enable_safe_overflow(true)
             .subscriber_max_buffer_size(20)
             .open_or_create()
             .map_err(|e| CuError::new_with_cause("service open error", e))?;
 
-        let subscriber = service
+        let pose_subscriber = pose_service
             .subscriber_builder()
+            .buffer_size(19)
             .create()
             .map_err(|e| CuError::new_with_cause("subscriber creation error", e))?;
         Ok(Self {
             last_seen: 0,
-            subscriber,
+            pose_subscriber,
         })
     }
 
@@ -66,22 +65,29 @@ impl CuSrcTask for RealsenseDepth {
     ) -> cu29::CuResult<()> {
         new_msg.clear_payload();
 
+        let mut output = None;
+
+        // gather any pending pose samples from the realsense T265 publisher
         while let Some(sample) = self
-            .subscriber
+            .pose_subscriber
             .receive()
             .map_err(|e| CuError::new_with_cause("subscriber receive failed", e))?
         {
-            new_msg.set_payload(sample.payload().clone());
+            output = Some(sample.payload().clone());
             self.last_seen = clock.now().into();
+        }
+
+        if output.is_some() {
+            new_msg.set_payload(output.unwrap());
         }
 
         if clock.now().as_nanos() - self.last_seen > 500_000_000 {
             return Err(CuError::new_with_cause(
-                "no depth frames seen in 500 ms",
-                std::io::Error::other("no depth frames seen in 500 ms"),
+                "no pose frames seen in 500 ms",
+                std::io::Error::other("no pose frames seen in 500 ms"),
             ));
         }
 
-        return Ok(());
+        Ok(())
     }
 }
