@@ -92,9 +92,9 @@ pub struct AprilDetectionHandler {
 #[derive(Clone, Copy, Default, Debug, Encode, Decode, Serialize, ZeroCopySend)]
 #[repr(C)]
 pub struct AprilTagMeasurement {
-    position: [f64; 3],
-    orientation: [f64; 3],
-    variance: [f64; 36]
+    pub position: [f64; 3],
+    pub orientation: [f64; 3],
+    pub variance: [f64; 36]
 }
 
 impl Freezable for AprilDetectionHandler {}

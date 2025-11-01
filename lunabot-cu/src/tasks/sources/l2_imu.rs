@@ -29,10 +29,10 @@ pub struct ImuIceoryxReceiver {
 #[derive(Clone, Copy, Default, Debug, Encode, Decode, Serialize, ZeroCopySend)]
 #[repr(C)]
 pub struct ImuMeasurement {
-    acceleration: [f64; 3],
-    orientation: [f64; 3],
-    angular_velocity: [f64; 3],
-    variance: [f64; 81]
+    pub acceleration: [f64; 3],
+    pub orientation: [f64; 3],
+    pub angular_velocity: [f64; 3],
+    pub variance: [f64; 81]
 }
 
 impl Freezable for ImuIceoryxReceiver {}
