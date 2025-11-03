@@ -145,6 +145,16 @@ pub struct ImuMsg {
     pub linear_acceleration: [f32; 3],
 }
 
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default, Encode, Decode, ZeroCopySend, Serialize)]
+#[type_name("PoseMsg")]
+pub struct PoseMsg {
+    /// position in meters
+    pub position: [f32; 3],
+    /// orientation quaternion (w, x, y, z)
+    pub quaternion: [f32; 4],
+}
+
 // -----------------------------------------------------------------------------
 // AI ↔ Host byte-buffer messages
 // -----------------------------------------------------------------------------

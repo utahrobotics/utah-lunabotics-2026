@@ -19,7 +19,7 @@ const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 
 pub static ROOT_NODE: OnceLock<StaticNode> = OnceLock::new();
 
-pub static TARGET_HZ: usize = 1000; // MUST BE THE SAME AS THE TARGET HZ IN COPPERCONFIG.RON
+pub static TARGET_HZ: usize = 100000; // MUST BE THE SAME AS THE TARGET HZ IN COPPERCONFIG.RON
 
 #[copper_runtime(config = "copperconfig.ron", sim_mode = true)]
 struct LunabotApplication {}
@@ -42,6 +42,7 @@ fn default_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::DetectorCamLaptopFront(_) => SimOverride::ExecutedBySim,
         default::SimStep::RealsenseSubscriber(_) => SimOverride::ExecutedBySim,
         default::SimStep::Lunabase(_) => SimOverride::ExecutedBySim,
+        default::SimStep::T265Subscriber(_) => SimOverride::ExecutedBySim,
         _ => SimOverride::ExecuteByRuntime,
     }
 }
@@ -77,6 +78,7 @@ fn run_one_copperlist(
             default::SimStep::GstConvertBack(..) => SimOverride::ExecutedBySim,
             default::SimStep::GstConvertSide(..) => SimOverride::ExecutedBySim,
             default::SimStep::GstConvertLaptopFront(..) => SimOverride::ExecutedBySim,
+            default::SimStep::T265Subscriber(_) => SimOverride::ExecutedBySim,
 
             default::SimStep::L2Pointcloud(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_l_2_pointcloud_output().clone();
