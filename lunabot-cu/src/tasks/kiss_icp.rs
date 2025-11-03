@@ -1,3 +1,4 @@
+use bincode::{Decode, Encode};
 use cu_spatial_payloads::{EncodableIsometry, Transform3D};
 use cu29::{
     CuResult,
@@ -8,6 +9,7 @@ use cu29::{
 };
 
 use iceoryx_types::IceoryxPointCloud;
+use iceoryx2::prelude::ZeroCopySend;
 use simple_icp::{config::Config, icp_pipeline::IcpPipeline};
 
 use crate::rerun_viz::{self, RECORDER};
@@ -18,12 +20,23 @@ pub struct KissIcp {
     pub max_accumulation: usize,
 }
 
-#[derive(Clone, Copy, Default, Debug, Encode, Decode, Serialize, ZeroCopySend)]
+#[derive(Clone, Copy, Debug, Encode, Decode, Serialize, ZeroCopySend)]
 #[repr(C)]
 pub struct IcpMeasurement {
     pub position: [f64; 3],
     pub orientation: [f64; 3],
+    #[serde(serialize_with = "<[_]>::serialize")]
     pub variance: [f64; 36]
+}
+
+impl Default for IcpMeasurement {
+    fn default() -> Self {
+        Self {
+            position: Default::default(),
+            orientation: Default::default(),
+            variance: [0.0; 36]
+        }
+    }
 }
 
 impl Freezable for KissIcp {}

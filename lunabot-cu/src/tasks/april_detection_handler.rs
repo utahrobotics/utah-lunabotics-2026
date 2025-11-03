@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::f64::consts::PI;
 
+use bincode::{Decode, Encode};
 use cu_apriltag::AprilTagDetections;
 use cu29::cutask::CuMsg;
 use cu29::{
@@ -8,6 +9,7 @@ use cu29::{
 };
 
 use cu_spatial_payloads::EncodableIsometry;
+use iceoryx2::prelude::ZeroCopySend;
 use ron::de::from_str as ron_from_str;
 use serde::Deserialize;
 use std::fs;
@@ -89,12 +91,23 @@ pub struct AprilDetectionHandler {
     known_tags: HashMap<usize, Isometry3<f64>>,
 }
 
-#[derive(Clone, Copy, Default, Debug, Encode, Decode, Serialize, ZeroCopySend)]
+#[derive(Clone, Copy, Debug, Encode, Decode, Serialize, ZeroCopySend)]
 #[repr(C)]
 pub struct AprilTagMeasurement {
     pub position: [f64; 3],
     pub orientation: [f64; 3],
+    #[serde(serialize_with = "<[_]>::serialize")]
     pub variance: [f64; 36]
+}
+
+impl Default for AprilTagMeasurement {
+    fn default() -> Self {
+        Self {
+            position: Default::default(), 
+            orientation: Default::default(), 
+            variance: [0.0; 36]
+        }
+    }
 }
 
 impl Freezable for AprilDetectionHandler {}

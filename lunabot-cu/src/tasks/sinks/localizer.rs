@@ -1,4 +1,4 @@
-use std::{collections::HashMap, f32::consts::E, f64::consts::PI};
+use std::{collections::HashMap, f64::consts::PI};
 
 use cu_spatial_payloads::EncodableIsometry;
 use cu29::{
@@ -8,22 +8,20 @@ use cu29::{
     input_msg,
 };
 use embedded_common::FromPicoV3;
-use iceoryx_types::ImuMsg;
 use iceoryx2::{
     node::NodeBuilder,
     port::publisher::Publisher,
     prelude::{ServiceName, UnableToDeliverStrategy},
     service::ipc,
 };
-use nalgebra::{Isometry3, Matrix, UnitQuaternion, UnitVector3, Vector3};
+use nalgebra::{Dim, Isometry3, Matrix, RawStorage, RawStorageMut, UnitQuaternion, UnitVector3, Vector3};
 use simple_motion::StaticNode;
 use crate::tasks::ImuMeasurement;
 use crate::tasks::IcpMeasurement;
 use crate::tasks::AprilTagMeasurement;
-use nalgebra::Matrix;
 
 use crate::{
-    ROOT_NODE, rerun_viz::{self, RECORDER}, tasks::{IcpMeasurement, april_detection_handler::AprilTagMeasurement}, utils::{lerp, lerp_value, swing_twist_decomposition}
+    ROOT_NODE, utils::{lerp, lerp_value, swing_twist_decomposition}
 };
 
 use kalman_filter::*;
@@ -101,14 +99,7 @@ impl CuSinkTask for Localizer {
         let kalman_filter = KalmanFilter::new(
             SimpleVector::from_element(0.0),
             SimpleSquareMatrix::from_diagonal_element(100.0),
-            |vec, mat, dt| {
-                (
-                    // TODO
-                    vec,
-                    // e^a * e^b = e^(a+b), so the operation is consistent regardless of time division
-                    mat + SimpleSquareMatrix::from_diagonal_element(100.0),
-                )
-            },
+            Self::evolution_function
         );
 
         if let Some(root_node) = ROOT_NODE.get() {
@@ -145,17 +136,17 @@ impl CuSinkTask for Localizer {
         // Apply all data
         if let Some(imu_measurement) = input.0.payload() {
             // Assemble measurement
-            let mut state = SimpleVector::from_element(0.0);
-            state.view_mut((6,0), (3,1)).set_column(0, SimpleVector::from_column_slice(imu_measurement.acceleration));
-            state.view_mut((9,0), (3,1)).set_column(0, SimpleVector::from_column_slice(imu_measurement.orientation));
-            state.view_mut((12,0), (3,1)).set_column(0, SimpleVector::from_column_slice(imu_measurement.angular_velocity));
+            let mut state: SimpleVector<15> = SimpleVector::from_element(0.0);
+            state.view_mut((6,0), (3,1)).set_column(0, &SimpleVector::<3>::from_column_slice(&imu_measurement.acceleration));
+            state.view_mut((9,0), (3,1)).set_column(0, &SimpleVector::<3>::from_column_slice(&imu_measurement.orientation));
+            state.view_mut((12,0), (3,1)).set_column(0, &SimpleVector::<3>::from_column_slice(&imu_measurement.angular_velocity));
 
-            let mut covariance_matrix = SimpleSquareMatrix::from_diagonal_element(UNKNOWN_PRIOR_VARIANCE);
-            let measurement_matrix = SimpleSquareMatrix::from_data(imu_measurement.variance);
+            let mut covariance_matrix: SimpleSquareMatrix<15> = SimpleSquareMatrix::from_diagonal_element(UNKNOWN_PRIOR_VARIANCE);
+            let measurement_matrix = array_to_matrix_9x9(&imu_measurement.variance);
             
             matrix_copy(
-                covariance_matrix.view_mut((6,6), (9,9)), 
-                measurement_matrix
+                &mut covariance_matrix.view_mut((6,6), (9,9)), 
+                &measurement_matrix.view((0,0), (9,9))
             );
 
             self.kalman_filter.apply_measurement(&state, &covariance_matrix);
@@ -163,58 +154,58 @@ impl CuSinkTask for Localizer {
 
         if let Some(icp_measurement) = input.1.payload() {
             // Assemble measurement
-            let mut state = SimpleVector::from_element(0.0);
-            state.view_mut((0,0), (3,1)).set_column(0, SimpleVector::from_column_slice(icp_measurement.position));
-            state.view_mut((9,0), (3,1)).set_column(0, SimpleVector::from_column_slice(icp_measurement.orientation));
+            let mut state: SimpleVector<15> = SimpleVector::from_element(0.0);
+            state.view_mut((0,0), (3,1)).set_column(0, &SimpleVector::<3>::from_column_slice(&icp_measurement.position));
+            state.view_mut((9,0), (3,1)).set_column(0, &SimpleVector::<3>::from_column_slice(&icp_measurement.orientation));
 
-            let mut covariance_matrix = SimpleSquareMatrix::from_diagonal_element(UNKNOWN_PRIOR_VARIANCE);
-            let measurement_matrix = SimpleSquareMatrix::from_data(icp_measurement.variance);
+            let mut covariance_matrix: SimpleSquareMatrix<15> = SimpleSquareMatrix::from_diagonal_element(UNKNOWN_PRIOR_VARIANCE);
+            let measurement_matrix = array_to_matrix_6x6(&icp_measurement.variance);
             
             matrix_copy(
-                covariance_matrix.view_mut((0,0), (3,3)), 
-                measurement_matrix.view((0,0), (3,3))
+                &mut covariance_matrix.view_mut((0,0), (3,3)), 
+                &measurement_matrix.view((0,0), (3,3))
             );
             matrix_copy(
-                covariance_matrix.view_mut((0,9), (3,3)), 
-                measurement_matrix.view((0,3), (3,3))
+                &mut covariance_matrix.view_mut((0,9), (3,3)), 
+                &measurement_matrix.view((0,3), (3,3))
             );
             matrix_copy(
-                covariance_matrix.view_mut((9,0), (3,3)), 
-                measurement_matrix.view((3,0), (3,3))
+                &mut covariance_matrix.view_mut((9,0), (3,3)), 
+                &measurement_matrix.view((3,0), (3,3))
             );
             matrix_copy(
-                covariance_matrix.view_mut((9,9), (3,3)), 
-                measurement_matrix.view((3,3), (3,3))
+                &mut covariance_matrix.view_mut((9,9), (3,3)), 
+                &measurement_matrix.view((3,3), (3,3))
             );
 
             self.kalman_filter.apply_measurement(&state, &covariance_matrix);
         }
 
         if let Some(tags) = input.3.payload() {
-            for tag in tags as Vec<AprilTagMeasurement> {
+            for tag in tags {
                 // Assemble measurement
-                let mut state = SimpleVector::from_element(0.0);
-                state.view_mut((0,0), (3,1)).set_column(0, SimpleVector::from_column_slice(tag.position));
-                state.view_mut((9,0), (3,1)).set_column(0, SimpleVector::from_column_slice(tag.orientation));
+                let mut state: SimpleVector<15> = SimpleVector::from_element(0.0);
+                state.view_mut((0,0), (3,1)).set_column(0, &SimpleVector::<3>::from_column_slice(&tag.position));
+                state.view_mut((9,0), (3,1)).set_column(0, &SimpleVector::<3>::from_column_slice(&tag.orientation));
 
-                let mut covariance_matrix = SimpleSquareMatrix::from_diagonal_element(UNKNOWN_PRIOR_VARIANCE);
-                let measurement_matrix = SimpleSquareMatrix::from_data(tag.variance);
+                let mut covariance_matrix: SimpleSquareMatrix<15> = SimpleSquareMatrix::from_diagonal_element(UNKNOWN_PRIOR_VARIANCE);
+                let measurement_matrix = array_to_matrix_6x6(&tag.variance);
                 
                 matrix_copy(
-                    covariance_matrix.view_mut((0,0), (3,3)), 
-                    measurement_matrix.view((0,0), (3,3))
+                    &mut covariance_matrix.view_mut((0,0), (3,3)), 
+                    &measurement_matrix.view((0,0), (3,3))
                 );
                 matrix_copy(
-                    covariance_matrix.view_mut((0,9), (3,3)), 
-                    measurement_matrix.view((0,3), (3,3))
+                    &mut covariance_matrix.view_mut((0,9), (3,3)), 
+                    &measurement_matrix.view((0,3), (3,3))
                 );
                 matrix_copy(
-                    covariance_matrix.view_mut((9,0), (3,3)), 
-                    measurement_matrix.view((3,0), (3,3))
+                    &mut covariance_matrix.view_mut((9,0), (3,3)), 
+                    &measurement_matrix.view((3,0), (3,3))
                 );
                 matrix_copy(
-                    covariance_matrix.view_mut((9,9), (3,3)), 
-                    measurement_matrix.view((3,3), (3,3))
+                    &mut covariance_matrix.view_mut((9,9), (3,3)), 
+                    &measurement_matrix.view((3,3), (3,3))
                 );
 
                 self.kalman_filter.apply_measurement(&state, &covariance_matrix);
@@ -224,59 +215,6 @@ impl CuSinkTask for Localizer {
 
         Ok(())
     }
-}
-
-/// The evolution function used by the kalman filter. Steps the
-/// state and variance forward by a given timestep in seconds, and
-/// returns the result. Does not use any external data.
-/// 
-/// Predictions use simple laws of motion. Variances are determined by TODO.
-fn evolution_function(
-    &self, 
-    prev_state: SimpleVector<15>, 
-    prev_variance: SimpleSquareMatrix<15>, 
-    dt: f64
-) -> (SimpleVector<15>, SimpleSquareMatrix<15>) {
-    // State:
-    let result_state = SimpleVector::from_element(0);
-
-    // Decompose prev and result state
-    let prev_position = prev_state.view((0,0), (3,1));
-    let prev_velocity = prev_state.view((3,0), (3,1));
-    let prev_acceleration = prev_state.view((6,0), (3,1));
-    let prev_orientation = prev_state.view((9,0), (3,1));
-    let prev_angular_velocity = prev_state.view((12,0), (3,1));
-
-    let result_position = result_state.view_mut((0,0), (3,1));
-    let result_velocity = result_state.view_mut((3,0), (3,1));
-    let result_acceleration = result_state.view_mut((6,0), (3,1));
-    let result_orientation = result_state.view_mut((9,0), (3,1));
-    let result_angular_velocity = result_state.view_mut((12,0), (3,1));
-
-    // Translational
-    result_position = prev_position + prev_velocity*dt + 0.5*prev_acceleration*dt*dt;
-    result_velocity = prev_velocity + prev_acceleration*dt;
-    result_acceleration = prev_acceleration;
-    // Angular
-    result_orientation = prev_orientation + prev_angular_velocity*dt;
-    if (result_orientation.magnitude_squared() > PI*PI) {
-        result_orientation -= result_orientation.normalize() * -2*PI;
-    }
-    result_angular_velocity = prev_angular_velocity;
-
-
-    // Variances:
-    let result_variance = prev_variance;
-
-    // Formula: x = x + v*dt => o_x^2 = o_x^2 + o_v^2 * dt^2
-    // Translational
-    result_variance.view_mut((3,3), (3,3)) += result_variance.view((6,6), (3,3)) * dt*dt;
-    result_variance.view_mut((0,0), (3,3)) += result_variance.view((3,3), (3,3)) * dt*dt;
-    // Angular
-    result_variance.view_mut((9,9), (3,3)) += result_variance.view((12,12), (3,3)) * dt*dt;
-
-
-    (result_state, result_variance)
 }
 
 fn vec_to_iso(vec: SimpleVector<6>) -> Isometry3<f64> {
@@ -300,10 +238,30 @@ fn iso_to_vec(iso: Isometry3<f64>) -> SimpleVector<6> {
     )
 }
 
-fn matrix_copy(target: &mut Matrix<f64, B, C, D>, src: &Matrix<f64, B, C, D>) {
+fn matrix_copy<R: Dim, C: Dim, S1: RawStorageMut<f64, R, C>, S2: RawStorage<f64, R, C>>(target: &mut Matrix<f64, R, C, S1>, src: &Matrix<f64, R, C, S2>) {
     for i in 1..target.ncols() {
-        target.set_column(i, src.column(i));
+        target.set_column(i, &src.column(i));
     }
+}
+
+fn array_to_matrix_9x9(array: &[f64; 81]) -> SimpleSquareMatrix<9> {
+    let mut result = SimpleSquareMatrix::default();
+
+    for i in 0..81 {
+        result[i] = array[i];
+    }
+
+    result
+}
+
+fn array_to_matrix_6x6(array: &[f64; 36]) -> SimpleSquareMatrix<6> {
+    let mut result = SimpleSquareMatrix::default();
+
+    for i in 0..36 {
+        result[i] = array[i];
+    }
+
+    result
 }
 
 #[derive(Debug, Clone)]
@@ -315,6 +273,85 @@ struct OrientationComponents {
 }
 
 impl Localizer {
+    /// The evolution function used by the kalman filter. Steps the
+    /// state and variance forward by a given timestep in seconds, and
+    /// returns the result. Does not use any external data.
+    /// 
+    /// Predictions for state and variance use simple laws of motion.
+    fn evolution_function(
+        prev_state: SimpleVector<15>, 
+        prev_variance: SimpleSquareMatrix<15>, 
+        dt: f64
+    ) -> (SimpleVector<15>, SimpleSquareMatrix<15>) {
+        // State:
+        let mut result_state: SimpleVector<15> = SimpleVector::from_element(0.0);
+
+        // Decompose prev state
+        let prev_position = prev_state.view((0,0), (3,1));
+        let prev_velocity = prev_state.view((3,0), (3,1));
+        let prev_acceleration = prev_state.view((6,0), (3,1));
+        let prev_orientation = prev_state.view((9,0), (3,1));
+        let prev_angular_velocity = prev_state.view((12,0), (3,1));
+
+        
+        // Translational
+        let mut result_position = result_state.view_mut((0,0), (3,1));
+        matrix_copy(
+            &mut result_position, 
+            &(prev_position + prev_velocity*dt + 0.5*prev_acceleration*dt*dt)
+        );
+        
+        let mut result_velocity = result_state.view_mut((3,0), (3,1));
+        matrix_copy(
+            &mut result_velocity, 
+            &(prev_velocity + prev_acceleration*dt)
+        );
+        
+        let mut result_acceleration = result_state.view_mut((6,0), (3,1));
+        matrix_copy(
+            &mut result_acceleration, 
+            &prev_acceleration
+        );
+        
+        // Angular
+        let mut result_orientation = result_state.view_mut((9,0), (3,1));
+        let mut temp_result_orientation = prev_orientation + prev_angular_velocity*dt;
+        if temp_result_orientation.magnitude_squared() > PI*PI {
+            temp_result_orientation -= temp_result_orientation.normalize() * -2.0*PI;
+        }
+        matrix_copy(
+            &mut result_orientation, 
+            &temp_result_orientation
+        );
+        
+        let mut result_angular_velocity = result_state.view_mut((12,0), (3,1));
+        matrix_copy(
+            &mut result_angular_velocity, 
+            &prev_angular_velocity
+        );
+
+
+        // Variances:
+        let mut result_variance = prev_variance;
+
+        // Formula: x = x + v*dt => o_x^2 = o_x^2 + o_v^2 * dt^2
+        // Translational
+        //   s_v += s_a * dt^2
+        let calculated_velocity_variance = result_variance.view((3,3), (3,3)) + result_variance.view((6,6), (3,3)) * dt*dt;
+        matrix_copy(&mut result_variance.view_mut((3,3), (3,3)), &calculated_velocity_variance);
+        //   s_x += s_v * dt^2
+        let calculated_position_variance = result_variance.view((0,0), (3,3)) + result_variance.view((3,3), (3,3)) * dt*dt;
+        matrix_copy(&mut result_variance.view_mut((0,0), (3,3)), &calculated_position_variance);
+
+        // Angular
+        //   s_theta += s_o * dt^2
+        let calculated_orientation_variance = result_variance.view((9,9), (3,3)) + result_variance.view((12,12), (3,3)) * dt*dt;
+        matrix_copy(&mut result_variance.view_mut((9,9), (3,3)), &calculated_orientation_variance);
+
+
+        (result_state, result_variance)
+    }
+
     /// Compute swing-twist components from IMU data
     /// Returns swing (pitch/roll from gravity) and twist (unreliable yaw)
     fn compute_imu_swing_twist(&self, acceleration: Vector3<f64>) -> Option<OrientationComponents> {

@@ -26,13 +26,25 @@ pub struct ImuIceoryxReceiver {
     lidar_node: StaticNode,
 }
 
-#[derive(Clone, Copy, Default, Debug, Encode, Decode, Serialize, ZeroCopySend)]
+#[derive(Clone, Copy, Debug, Encode, Decode, Serialize, ZeroCopySend)]
 #[repr(C)]
 pub struct ImuMeasurement {
     pub acceleration: [f64; 3],
     pub orientation: [f64; 3],
     pub angular_velocity: [f64; 3],
+    #[serde(serialize_with = "<[_]>::serialize")]
     pub variance: [f64; 81]
+}
+
+impl Default for ImuMeasurement {
+    fn default() -> Self {
+        Self {
+            acceleration: Default::default(), 
+            orientation: Default::default(), 
+            angular_velocity: Default::default(), 
+            variance: [0.0; 81]
+        }
+    }
 }
 
 impl Freezable for ImuIceoryxReceiver {}
