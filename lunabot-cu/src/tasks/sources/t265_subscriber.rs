@@ -9,7 +9,7 @@ use iceoryx2::{
     prelude::{LogLevel, ServiceName, set_log_level},
     service::ipc,
 };
-use nalgebra::{Quaternion, UnitQuaternion};
+use nalgebra::{Quaternion, UnitQuaternion, Vector3};
 
 pub struct T265Subscriber {
     last_seen: u64,
@@ -77,8 +77,26 @@ impl CuSrcTask for T265Subscriber {
             self.last_seen = clock.now().into();
         }
 
-        if output.is_some() {
-            new_msg.set_payload(output.unwrap());
+        if let Some(PoseMsg {
+            mut position,
+            mut quaternion,
+        }) = output
+        {
+            let transformed_translation = Vector3::new(-position[2], position[0], position[1]);
+            position[0] = transformed_translation.x;
+            position[1] = -transformed_translation.y;
+            position[2] = transformed_translation.z;
+
+            let (qx, qy, qz, qw) = (quaternion[0], quaternion[1], quaternion[2], quaternion[3]);
+
+            quaternion[0] = -qz;
+            quaternion[1] = -qx;
+            quaternion[2] = qy;
+            quaternion[3] = qw;
+            new_msg.set_payload(PoseMsg {
+                position,
+                quaternion,
+            });
         }
 
         if clock.now().as_nanos() - self.last_seen > 500_000_000 {
