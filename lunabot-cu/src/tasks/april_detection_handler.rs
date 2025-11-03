@@ -10,12 +10,19 @@ use cu29::{
 
 use cu_spatial_payloads::EncodableIsometry;
 use iceoryx2::prelude::ZeroCopySend;
+use kalman_filter::{SimpleSquareMatrix, SimpleVector};
 use ron::de::from_str as ron_from_str;
 use serde::Deserialize;
 use std::fs;
 use std::path::Path;
 
 use crate::rerun_viz::RECORDER;
+
+
+const LATERAL_VARIANCE_MODIFIER: f64 = 0.001;
+const DEPTH_VARIENCE_MODIFIER: f64 = 0.005;
+const ANGULAR_VARIANCE_MODIFIER: f64 = 0.005;
+
 
 /// Data definition that mirrors the contents of a `.ron` apriltag isometry file.
 /// The field names are intentionally kept simple so that we can be flexible with
@@ -136,36 +143,86 @@ impl CuTask for AprilDetectionHandler {
         output.clear_payload();
         let (input1, input2, input3) = input;
 
-        let mut result_map = HashMap::new();
+        let mut result_vec: Vec<AprilTagMeasurement> = Vec::new();
 
-        if let Some(dets) = input1.payload() {
-            let camera_id = dets.camera_id.as_ref().clone();
-            let tags = self.cu_detections_to_tag_observations(dets, &camera_id);
-            if !tags.is_empty() {
-                let observer_iso = self.estimate_observer_isometry_from_observations(&tags)?;
-                result_map.insert(camera_id, EncodableIsometry::from_na(&observer_iso));
+        for particular_input in [input1, input2, input3] {
+            if let Some(dets) = particular_input.payload() {
+                let camera_id = dets.camera_id.as_ref().clone();
+                for observation in self.cu_detections_to_tag_observations(dets, &camera_id) {
+                    let distrust = observation.decision_margin * observation.decision_margin;
+                    let isometry = observation.get_isometry_of_observer();
+
+                    // Translational
+                    let position_state: SimpleVector<3> = isometry.translation.vector;
+
+                    // Make covariance matrix. The eigenvalues associated with eigenvectors of 
+                    // a covarience matrix describe its variance in the directions of those eigenvectors.
+                    // So, a matrix is constructed from orthogonal eigenvectors, and chosen eigenvalues
+                    // This is done with the technique found here (https://math.stackexchange.com/questions/1261462/how-to-reconstruct-a-symmetric-matrix-given-the-eigenvalues-and-eigenvectors)
+                    let lateral_vector_1 = position_state.cross(&SimpleVector::<3>::new(0.0, 0.0, 1.0));
+                    let lateral_vector_2 = position_state.cross(&lateral_vector_1);
+
+                    let translational_eigenvector_matrix = SimpleSquareMatrix::<3>::from_columns(&[position_state, lateral_vector_1, lateral_vector_2]);
+
+                    let translational_eigenvalue_matrix = SimpleSquareMatrix::<3>::from_diagonal(&SimpleVector::<3>::new(
+                        DEPTH_VARIENCE_MODIFIER, 
+                        LATERAL_VARIANCE_MODIFIER, 
+                        LATERAL_VARIANCE_MODIFIER
+                    ));
+
+                    let position_base_covariance_matrix = 
+                        translational_eigenvector_matrix * 
+                        translational_eigenvalue_matrix * 
+                        translational_eigenvector_matrix.try_inverse().expect("April tag eigenvector matrix was not invertable. Likely a cross product edge case.")
+                    ;
+
+                    // Angular
+                    let orientation_state = 
+                        isometry.rotation.axis()
+                            .and_then(|vec| Some(vec.into_inner()))
+                            .unwrap_or(SimpleVector::<3>::zeros())
+                        * isometry.rotation.angle()
+                    ;
+
+                    let orientation_base_covarience_matrix = SimpleSquareMatrix::from_diagonal(&SimpleVector::<3>::new(
+                        ANGULAR_VARIANCE_MODIFIER,
+                        ANGULAR_VARIANCE_MODIFIER,
+                        ANGULAR_VARIANCE_MODIFIER
+                    ));
+
+                    // Combination and final prep
+                    let position = [
+                        position_state.x, 
+                        position_state.y,
+                        position_state.z,
+                    ];
+                    let orientation = [
+                        orientation_state.x,
+                        orientation_state.y,
+                        orientation_state.z,
+                    ];
+
+                    let mut combined_covariance = [0.0; 36];
+
+                    for i in 0..3 {
+                        for j in 0..3 {
+                            combined_covariance[6*i + j] = position_base_covariance_matrix[3*i + j] * distrust as f64;
+                        }
+                    }
+
+                    for i in 0..3 {
+                        for j in 0..3 {
+                            combined_covariance[6*(i+3) + (j+3)] = orientation_base_covarience_matrix[3*i + j] * distrust as f64;
+                        }
+                    }
+
+                    result_vec.push(AprilTagMeasurement { position, orientation, variance: combined_covariance });
+                }
             }
         }
-
-        if let Some(dets) = input2.payload() {
-            let camera_id = dets.camera_id.as_ref().clone();
-            let tags = self.cu_detections_to_tag_observations(dets, &camera_id);
-            if !tags.is_empty() {
-                let observer_iso = self.estimate_observer_isometry_from_observations(&tags)?;
-                result_map.insert(camera_id, EncodableIsometry::from_na(&observer_iso));
-            }
-        }
-
-        if let Some(dets) = input3.payload() {
-            let camera_id = dets.camera_id.as_ref().clone();
-            let tags = self.cu_detections_to_tag_observations(dets, &camera_id);
-            if !tags.is_empty() {
-                let observer_iso = self.estimate_observer_isometry_from_observations(&tags)?;
-                result_map.insert(camera_id, EncodableIsometry::from_na(&observer_iso));
-            }
-        }
-        if !result_map.is_empty() {
-            output.set_payload(Box::new(result_map));
+        
+        if !result_vec.is_empty() {
+            output.set_payload(result_vec);
         }
         Ok(())
     }
