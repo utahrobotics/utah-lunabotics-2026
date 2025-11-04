@@ -191,17 +191,17 @@ fn set_up_mujoco() -> (
 ) {
     println!("Creating model...");
     let args: Vec<String> = std::env::args().collect();
-    let model = Box::leak(Box::new(
-        if args.contains(&"artemis".to_string()) {
-            MjModel::from_xml("../mujoco-sim/artemis_arena.xml")
+    let model = Box::leak(Box::new(if args.contains(&"artemis".to_string()) {
+        MjModel::from_xml("../mujoco-sim/artemis_arena.xml")
             .expect("failed to create MjModel from artemis_arena.xml")
-        } else if args.contains(&"ucf".to_string()) {
-            MjModel::from_xml("../mujoco-sim/ucf_arena.xml")
+    } else if args.contains(&"ucf".to_string()) {
+        MjModel::from_xml("../mujoco-sim/ucf_arena.xml")
             .expect("failed to create MjModel from ucf_arena.xml")
-        } else {
-            panic!("Arena not specified in arguments. Valid args: ucf, artemis");
-        }
-    ));
+    } else {
+        panic!(
+            "Arena not specified in arguments. Valid args: ucf, artemis. (set with SIM_ARENA=ucf make sim)"
+        );
+    }));
     let mut timestep = 1.0 / (TARGET_HZ as f64);
     // speed up the simulation by a little
     timestep *= 1.6;
