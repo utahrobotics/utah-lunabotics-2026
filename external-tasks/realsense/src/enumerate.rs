@@ -1,9 +1,9 @@
 use crate::depth_camera::DepthCameraTask;
 use fxhash::FxHashMap;
 use realsense_rust::{
-    config::Config,
-    device::Device,
-    kind::{Rs2CameraInfo, Rs2Format, Rs2StreamKind},
+    config::{Config, ConfigurationError},
+    device::{self, Device},
+    kind::{Rs2CameraInfo, Rs2Format, Rs2ProductLine, Rs2StreamKind},
     pipeline::{ActivePipeline, InactivePipeline},
 };
 use std::sync::mpsc::SyncSender;
