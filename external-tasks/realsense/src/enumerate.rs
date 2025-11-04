@@ -2,7 +2,7 @@ use crate::depth_camera::DepthCameraTask;
 use fxhash::FxHashMap;
 use realsense_rust::{
     config::{Config, ConfigurationError},
-    device::Device,
+    device::{self, Device},
     kind::{Rs2CameraInfo, Rs2Format, Rs2ProductLine, Rs2StreamKind},
     pipeline::{ActivePipeline, InactivePipeline},
 };

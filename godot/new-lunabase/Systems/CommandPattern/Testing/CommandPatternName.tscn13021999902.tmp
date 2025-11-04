@@ -1,0 +1,27 @@
+[gd_scene load_steps=5 format=3 uid="uid://81kfbgjtlieb"]
+
+[ext_resource type="Script" uid="uid://bdprp7hdo4seh" path="res://Systems/CommandPattern/Controller/HumanController.gd" id="1_ctdwx"]
+[ext_resource type="Script" uid="uid://seb6w50qyguj" path="res://Systems/CommandPattern/Testing/test_move_command_pattern.gd" id="1_qeuis"]
+[ext_resource type="Texture2D" uid="uid://bjwlx7ar673ff" path="res://icon.svg" id="2_ctdwx"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_ias37"]
+radius = 89.005615
+
+[node name="CommandPatternName" type="Node2D" node_paths=PackedStringArray("actor")]
+script = ExtResource("1_ctdwx")
+actor = NodePath("CharacterBody2D")
+
+[node name="CharacterBody2D" type="CharacterBody2D" parent="."]
+script = ExtResource("1_qeuis")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="CharacterBody2D"]
+shape = SubResource("CircleShape2D_ias37")
+
+[node name="Sprite2D" type="Sprite2D" parent="CharacterBody2D"]
+texture = ExtResource("2_ctdwx")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+
+[node name="Sprite2D2" type="Sprite2D" parent="."]
+position = Vector2(-392, -178)
+texture = ExtResource("2_ctdwx")

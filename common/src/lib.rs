@@ -19,7 +19,6 @@ pub use constants::*;
     Zeroable,
     Serialize,
 )]
-
 pub struct Steering {
     left: i8,
     right: i8,
@@ -94,7 +93,7 @@ pub struct IMUReading {
     pub acceleration: [f64; 3],
 }
 
-use std::io::Write;
+use std::{collections::HashMap, io::Write};
 
 use bitcode::{Decode, Encode};
 use embedded_common::{Actuator, ActuatorCommand};
@@ -135,8 +134,6 @@ impl TryFrom<u8> for LunabotStage {
     bincode::Encode, bincode::Decode, Debug, Encode, Decode, Clone, Copy, PartialEq, Serialize,
 )]
 pub enum FromLunabase {
-    Pong,
-    /// Requests that the lunabot moves from software stop into Manual mode, or back into whatever mode it was before software stop was engage.
     ContinueMission,
     /// Skid steer message, 1,1 is full speed forward, -1,-1 is full speed back
     Steering(Steering),
@@ -251,34 +248,17 @@ impl FromLunabase {
     }
 }
 
-#[derive(
-    Debug, bitcode::Encode, bitcode::Decode, Clone, Copy, bincode::Encode, bincode::Decode,
-)]
+#[derive(Debug, bitcode::Encode, bitcode::Decode, Clone, bincode::Encode, bincode::Decode)]
 pub enum FromLunabot {
     /// Reports the robots pose
-    RobotIsometry { origin: [f32; 3], quat: [f32; 4] },
+    RobotIsometry {
+        origin: [f32; 3],
+        quat: [f32; 4],
+    },
     /// Angle in degrees of the hinge and bucket
-    ArmAngles { hinge: f32, bucket: f32 },
-
-    /// A ping message containing the current stage of operation.
-    /// Base station displays time of last ping, and updates the view accordingly depending on what stage of operation the lunabot is in.
-    Ping(LunabotStage),
-}
-
-impl FromLunabot {
-    fn write_code(&self, mut w: impl Write) -> std::io::Result<()> {
-        let bytes = bitcode::encode(self);
-        write!(w, "{self:?} = 0x")?;
-        for b in bytes {
-            write!(w, "{b:x}")?;
-        }
-        writeln!(w, "")
-    }
-
-    pub fn write_code_sheet(mut w: impl Write) -> std::io::Result<()> {
-        FromLunabot::Ping(LunabotStage::Manual).write_code(&mut w)?;
-        FromLunabot::Ping(LunabotStage::SoftStop).write_code(&mut w)?;
-        FromLunabot::Ping(LunabotStage::Autonomy).write_code(&mut w)?;
-        Ok(())
-    }
+    ArmAngles {
+        hinge: f32,
+        bucket: f32,
+    },
+    ErroredTasks(HashMap<String, String>),
 }

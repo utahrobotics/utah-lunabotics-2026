@@ -10,7 +10,7 @@ use crate::constants::{REALSENSE_SERIAL, T265_SERIAL};
 
 fn main() {
     println!("Starting RealSense depth camera publisher with occupancy grid");
-
+    std::thread::sleep(Duration::from_secs(3)); // dont question it
     enumerate_depth_cameras(&[T265_SERIAL, REALSENSE_SERIAL]);
 
     loop {
