@@ -1,0 +1,39 @@
+<mujoco model="arena_columns">
+
+  <asset>
+    <material name="DefaultMaterialArenaColumns" specular="0.5" shininess="0.5" rgba="1 1 1 1.0" />
+    <mesh file="arena_columns.obj" />
+    <mesh file="arena_columns_collision_0.obj" />
+    <mesh file="arena_columns_collision_1.obj" />
+    <mesh file="arena_columns_collision_2.obj" />
+    <mesh file="arena_columns_collision_3.obj" />
+    <mesh file="arena_columns_collision_4.obj" />
+    <mesh file="arena_columns_collision_5.obj" />
+    <mesh file="arena_columns_collision_6.obj" />
+    <mesh file="arena_columns_collision_7.obj" />
+    <mesh file="arena_columns_collision_8.obj" />
+  </asset>
+  <worldbody>
+    <body name="arena_columns">
+      <geom material="DefaultMaterialArenaColumns" mesh="arena_columns" class="visual" />
+      <geom mesh="arena_columns_collision_0"
+        rgba="0.07709513132448476 0.1525624663121371 0.42352277580517494 1" class="collision" />
+      <geom mesh="arena_columns_collision_1"
+        rgba="0.926542895680828 0.040302141396598934 0.1596805302125659 1" class="collision" />
+      <geom mesh="arena_columns_collision_2"
+        rgba="0.7688257535388028 0.6009682713105451 0.09561585133629469 1" class="collision" />
+      <geom mesh="arena_columns_collision_3"
+        rgba="0.7986174549417554 0.7304668126360399 0.16767129428808136 1" class="collision" />
+      <geom mesh="arena_columns_collision_4"
+        rgba="0.08028928812251246 0.5089480367340886 0.5022430911773571 1" class="collision" />
+      <geom mesh="arena_columns_collision_5"
+        rgba="0.1928765502855414 0.455556049519516 0.338851901355093 1" class="collision" />
+      <geom mesh="arena_columns_collision_6"
+        rgba="0.14498946887489172 0.7829405507366071 0.049897418998105625 1" class="collision" />
+      <geom mesh="arena_columns_collision_7"
+        rgba="0.11630462397807695 0.7674404732524608 0.979329804285229 1" class="collision" />
+      <geom mesh="arena_columns_collision_8"
+        rgba="0.4437390839397549 0.23639876309410157 0.18604442156617718 1" class="collision" />
+    </body>
+  </worldbody>
+</mujoco>

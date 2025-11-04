@@ -190,9 +190,17 @@ fn set_up_mujoco() -> (
     &'static mut MjData<&'static MjModel>,
 ) {
     println!("Creating model...");
+    let args: Vec<String> = std::env::args().collect();
     let model = Box::leak(Box::new(
-        MjModel::from_xml("../mujoco-sim/artemis_arena.xml")
-            .expect("failed to create MjModel from artemis_arena.xml"),
+        if args.contains(&"artemis".to_string()) {
+            MjModel::from_xml("../mujoco-sim/artemis_arena.xml")
+            .expect("failed to create MjModel from artemis_arena.xml")
+        } else if args.contains(&"ucf".to_string()) {
+            MjModel::from_xml("../mujoco-sim/ucf_arena.xml")
+            .expect("failed to create MjModel from ucf_arena.xml")
+        } else {
+            panic!("Arena not specified in arguments. Valid args: ucf, artemis");
+        }
     ));
     let mut timestep = 1.0 / (TARGET_HZ as f64);
     // speed up the simulation by a little

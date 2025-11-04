@@ -1,0 +1,124 @@
+<mujoco model="arena_walls">
+
+  <asset>
+    <material name="DefaultMaterialArenaWalls" specular="0.5" shininess="0.5" rgba="1 1 1 1.0"/>
+    <mesh file="arena_walls.obj"/>
+    <mesh file="arena_walls_collision_0.obj"/>
+    <mesh file="arena_walls_collision_1.obj"/>
+    <mesh file="arena_walls_collision_2.obj"/>
+    <mesh file="arena_walls_collision_3.obj"/>
+    <mesh file="arena_walls_collision_4.obj"/>
+    <mesh file="arena_walls_collision_5.obj"/>
+    <mesh file="arena_walls_collision_6.obj"/>
+    <mesh file="arena_walls_collision_7.obj"/>
+    <mesh file="arena_walls_collision_8.obj"/>
+    <mesh file="arena_walls_collision_9.obj"/>
+    <mesh file="arena_walls_collision_10.obj"/>
+    <mesh file="arena_walls_collision_11.obj"/>
+    <mesh file="arena_walls_collision_12.obj"/>
+    <mesh file="arena_walls_collision_13.obj"/>
+    <mesh file="arena_walls_collision_14.obj"/>
+    <mesh file="arena_walls_collision_15.obj"/>
+    <mesh file="arena_walls_collision_16.obj"/>
+    <mesh file="arena_walls_collision_17.obj"/>
+    <mesh file="arena_walls_collision_18.obj"/>
+    <mesh file="arena_walls_collision_19.obj"/>
+    <mesh file="arena_walls_collision_20.obj"/>
+    <mesh file="arena_walls_collision_21.obj"/>
+    <mesh file="arena_walls_collision_22.obj"/>
+    <mesh file="arena_walls_collision_23.obj"/>
+    <mesh file="arena_walls_collision_24.obj"/>
+    <mesh file="arena_walls_collision_25.obj"/>
+    <mesh file="arena_walls_collision_26.obj"/>
+    <mesh file="arena_walls_collision_27.obj"/>
+    <mesh file="arena_walls_collision_28.obj"/>
+    <mesh file="arena_walls_collision_29.obj"/>
+    <mesh file="arena_walls_collision_30.obj"/>
+    <mesh file="arena_walls_collision_31.obj"/>
+    <mesh file="arena_walls_collision_32.obj"/>
+    <mesh file="arena_walls_collision_33.obj"/>
+    <mesh file="arena_walls_collision_34.obj"/>
+    <mesh file="arena_walls_collision_35.obj"/>
+    <mesh file="arena_walls_collision_36.obj"/>
+    <mesh file="arena_walls_collision_37.obj"/>
+    <mesh file="arena_walls_collision_38.obj"/>
+    <mesh file="arena_walls_collision_39.obj"/>
+    <mesh file="arena_walls_collision_40.obj"/>
+    <mesh file="arena_walls_collision_41.obj"/>
+    <mesh file="arena_walls_collision_42.obj"/>
+    <mesh file="arena_walls_collision_43.obj"/>
+    <mesh file="arena_walls_collision_44.obj"/>
+    <mesh file="arena_walls_collision_45.obj"/>
+    <mesh file="arena_walls_collision_46.obj"/>
+    <mesh file="arena_walls_collision_47.obj"/>
+    <mesh file="arena_walls_collision_48.obj"/>
+    <mesh file="arena_walls_collision_49.obj"/>
+    <mesh file="arena_walls_collision_50.obj"/>
+    <mesh file="arena_walls_collision_51.obj"/>
+    <mesh file="arena_walls_collision_52.obj"/>
+    <mesh file="arena_walls_collision_53.obj"/>
+    <mesh file="arena_walls_collision_54.obj"/>
+    <mesh file="arena_walls_collision_55.obj"/>
+  </asset>
+  <worldbody>
+    <body name="arena_walls">
+      <geom material="DefaultMaterialArenaWalls" mesh="arena_walls" class="visual"/>
+      <geom mesh="arena_walls_collision_0" rgba="0.24005392570862905 0.27646511660967077 0.7343536367402101 1" class="collision"/>
+      <geom mesh="arena_walls_collision_1" rgba="0.27301233649202183 0.9833072785689125 0.5050841994021588 1" class="collision"/>
+      <geom mesh="arena_walls_collision_2" rgba="0.8274005777529094 0.19802403000331803 0.8487411342084754 1" class="collision"/>
+      <geom mesh="arena_walls_collision_3" rgba="0.2839575156259073 0.9919612348810926 0.24046441413616448 1" class="collision"/>
+      <geom mesh="arena_walls_collision_4" rgba="0.5884660183968332 0.6336378148094418 0.9009117763287853 1" class="collision"/>
+      <geom mesh="arena_walls_collision_5" rgba="0.9602224818306938 0.9925479644774524 0.6062569670192717 1" class="collision"/>
+      <geom mesh="arena_walls_collision_6" rgba="0.9717610000590404 0.746339611793876 0.32486867554553067 1" class="collision"/>
+      <geom mesh="arena_walls_collision_7" rgba="0.7543567315143157 0.15236354706615474 0.018632256655271018 1" class="collision"/>
+      <geom mesh="arena_walls_collision_8" rgba="0.11843047468420675 0.6098646781878596 0.37807743391325876 1" class="collision"/>
+      <geom mesh="arena_walls_collision_9" rgba="0.6235318433556286 0.5154151384822319 0.4904779268974815 1" class="collision"/>
+      <geom mesh="arena_walls_collision_10" rgba="0.44911076972677944 0.05432551347268688 0.25053082122509074 1" class="collision"/>
+      <geom mesh="arena_walls_collision_11" rgba="0.6319006674286707 0.9839455056750377 0.40845716214567385 1" class="collision"/>
+      <geom mesh="arena_walls_collision_12" rgba="0.007798462722411026 0.44864528540188187 0.3644038794720881 1" class="collision"/>
+      <geom mesh="arena_walls_collision_13" rgba="0.8197843937700603 0.8575772315626093 0.5148163701956547 1" class="collision"/>
+      <geom mesh="arena_walls_collision_14" rgba="0.21522246017791735 0.5615092583379128 0.4132934610954129 1" class="collision"/>
+      <geom mesh="arena_walls_collision_15" rgba="0.9073218601074502 0.7103499330676479 0.916491702737405 1" class="collision"/>
+      <geom mesh="arena_walls_collision_16" rgba="0.6263224728596297 0.8050380766256888 0.2941221189646457 1" class="collision"/>
+      <geom mesh="arena_walls_collision_17" rgba="0.10440452959954005 0.982170906882828 0.7501436616265317 1" class="collision"/>
+      <geom mesh="arena_walls_collision_18" rgba="0.3653994949492977 0.12000878869577003 0.44112360265112227 1" class="collision"/>
+      <geom mesh="arena_walls_collision_19" rgba="0.015357215553599812 0.1527737797466443 0.8662391170372307 1" class="collision"/>
+      <geom mesh="arena_walls_collision_20" rgba="0.8569739632392106 0.42277999219958406 0.0069024202760906705 1" class="collision"/>
+      <geom mesh="arena_walls_collision_21" rgba="0.21960628097221713 0.4293602776929971 0.681391817022305 1" class="collision"/>
+      <geom mesh="arena_walls_collision_22" rgba="0.8974930514914141 0.41851547522304033 0.11845870945792203 1" class="collision"/>
+      <geom mesh="arena_walls_collision_23" rgba="0.49772672142070795 0.8930389180031476 0.6485017820399293 1" class="collision"/>
+      <geom mesh="arena_walls_collision_24" rgba="0.6279718113081384 0.31326375125999284 0.2631147714533555 1" class="collision"/>
+      <geom mesh="arena_walls_collision_25" rgba="0.45294725891028453 0.172883478404932 0.7416436809697924 1" class="collision"/>
+      <geom mesh="arena_walls_collision_26" rgba="0.12176944197510498 0.887590878162076 0.7170524244065941 1" class="collision"/>
+      <geom mesh="arena_walls_collision_27" rgba="0.9535233667113834 0.7600761518626236 0.6968018908972564 1" class="collision"/>
+      <geom mesh="arena_walls_collision_28" rgba="0.6939023553216587 0.5734764050891776 0.6892364086009286 1" class="collision"/>
+      <geom mesh="arena_walls_collision_29" rgba="0.43578137454037513 0.7880720318776505 0.3149327492662739 1" class="collision"/>
+      <geom mesh="arena_walls_collision_30" rgba="0.5220908721954938 0.7020999477308767 0.7874856306615089 1" class="collision"/>
+      <geom mesh="arena_walls_collision_31" rgba="0.5966516276162076 0.8359180125682185 0.37052097674067574 1" class="collision"/>
+      <geom mesh="arena_walls_collision_32" rgba="0.16354786747104944 0.7628387482305985 0.5083386746762059 1" class="collision"/>
+      <geom mesh="arena_walls_collision_33" rgba="0.8939643185843168 0.7761301295652016 0.2610113655953663 1" class="collision"/>
+      <geom mesh="arena_walls_collision_34" rgba="0.4488867251614098 0.4843556896621418 0.10702265230602648 1" class="collision"/>
+      <geom mesh="arena_walls_collision_35" rgba="0.4017920919376643 0.8952686085302263 0.30008605832361024 1" class="collision"/>
+      <geom mesh="arena_walls_collision_36" rgba="0.19805015511821178 0.7375575379323928 0.25931341515416584 1" class="collision"/>
+      <geom mesh="arena_walls_collision_37" rgba="0.7009794664218633 0.3473826851591979 0.3156595042272673 1" class="collision"/>
+      <geom mesh="arena_walls_collision_38" rgba="0.1848249260970385 0.43053548557078414 0.9239548571544517 1" class="collision"/>
+      <geom mesh="arena_walls_collision_39" rgba="0.461543143489195 0.7916855598609711 0.13898456259727532 1" class="collision"/>
+      <geom mesh="arena_walls_collision_40" rgba="0.19869616789204703 0.6845057855924294 0.6878266901010219 1" class="collision"/>
+      <geom mesh="arena_walls_collision_41" rgba="0.37927568744038964 0.7923511609658639 0.5587680009191722 1" class="collision"/>
+      <geom mesh="arena_walls_collision_42" rgba="0.6397037692606825 0.2579599932390033 0.4113480467442343 1" class="collision"/>
+      <geom mesh="arena_walls_collision_43" rgba="0.7051860011029603 0.397343914003794 0.3162821581334636 1" class="collision"/>
+      <geom mesh="arena_walls_collision_44" rgba="0.4971657019625647 0.6133147229271879 0.5895600750369399 1" class="collision"/>
+      <geom mesh="arena_walls_collision_45" rgba="0.5813020862992777 0.8764292698186344 0.7771630366064841 1" class="collision"/>
+      <geom mesh="arena_walls_collision_46" rgba="0.9288869846674193 0.8218578463804593 0.9788454594726941 1" class="collision"/>
+      <geom mesh="arena_walls_collision_47" rgba="0.9671876081340994 0.994232642634901 0.9578413332138571 1" class="collision"/>
+      <geom mesh="arena_walls_collision_48" rgba="0.6250661908731155 0.21259956693413973 0.18047676265489399 1" class="collision"/>
+      <geom mesh="arena_walls_collision_49" rgba="0.767874072660735 0.7399283510718269 0.39130752365248045 1" class="collision"/>
+      <geom mesh="arena_walls_collision_50" rgba="0.46607534294764674 0.27276997032165373 0.45019894936692917 1" class="collision"/>
+      <geom mesh="arena_walls_collision_51" rgba="0.713104766634929 0.19437849582068434 0.5258749820570028 1" class="collision"/>
+      <geom mesh="arena_walls_collision_52" rgba="0.7196183632947988 0.8706914972907102 0.37825632265056286 1" class="collision"/>
+      <geom mesh="arena_walls_collision_53" rgba="0.512663645115564 0.228172545818765 0.10849538039265261 1" class="collision"/>
+      <geom mesh="arena_walls_collision_54" rgba="0.275004366319308 0.976515870516232 0.9984642088245477 1" class="collision"/>
+      <geom mesh="arena_walls_collision_55" rgba="0.02713767460434746 0.5194081928778752 0.9347334910550599 1" class="collision"/>
+    </body>
+  </worldbody>
+</mujoco>
