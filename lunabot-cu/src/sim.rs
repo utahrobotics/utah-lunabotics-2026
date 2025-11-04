@@ -44,6 +44,7 @@ fn default_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::DetectorCamSide(_) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamLaptopFront(_) => SimOverride::ExecutedBySim,
         default::SimStep::RealsenseSubscriber(_) => SimOverride::ExecutedBySim,
+        default::SimStep::T265Subscriber(_) => SimOverride::ExecutedBySim,
         _ => SimOverride::ExecuteByRuntime,
     }
 }
@@ -82,6 +83,8 @@ fn sim_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::DetectorCamSide(_) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamLaptopFront(_) => SimOverride::ExecutedBySim,
         default::SimStep::RealsenseSubscriber(_) => SimOverride::ExecutedBySim,
+        default::SimStep::T265Subscriber(_) => SimOverride::ExecutedBySim,
+
         _ => SimOverride::ExecuteByRuntime,
     }
 }
