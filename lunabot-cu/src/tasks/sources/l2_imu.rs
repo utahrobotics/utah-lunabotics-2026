@@ -39,9 +39,9 @@ pub struct ImuMeasurement {
 impl Default for ImuMeasurement {
     fn default() -> Self {
         Self {
-            acceleration: Default::default(), 
-            orientation: Default::default(), 
-            angular_velocity: Default::default(), 
+            acceleration: Default::default(),
+            orientation: Default::default(),
+            angular_velocity: Default::default(),
             variance: [0.0; 81]
         }
     }
@@ -83,7 +83,7 @@ impl CuSrcTask for ImuIceoryxReceiver {
         let service = self
             .node
             .service_builder(&self.service_name)
-            .publish_subscribe::<ImuMsg>()
+            .publish_subscribe::<ImuMeasurement>()
             .enable_safe_overflow(true)
             .open_or_create()
             .map_err(|e| CuError::new_with_cause("ImuIceoryxReceiver: service", e))?;
@@ -110,23 +110,28 @@ impl CuSrcTask for ImuIceoryxReceiver {
             .receive()
             .map_err(|e| CuError::new_with_cause("ImuIceoryxReceiver: receive", e))?
         {
-            let imu_raw: &ImuMsg = &*sample;
-            let imu_quaternion = UnitQuaternion::new_normalize(Quaternion::new(
-                imu_raw.quaternion[0] as f64,
-                imu_raw.quaternion[1] as f64,
-                imu_raw.quaternion[2] as f64,
-                imu_raw.quaternion[3] as f64,
-            ));
+            let imu_raw: &ImuMeasurement = &*sample;
+            // let imu_quaternion = UnitQuaternion::new_normalize(Quaternion::new(
+            //     imu_raw.quaternion[0] as f64,
+            //     imu_raw.quaternion[1] as f64,
+            //     imu_raw.quaternion[2] as f64,
+            //     imu_raw.quaternion[3] as f64,
+            // ));
+            
+            let imu_orientation = Vector3::new(
+                imu_raw.orientation[0] as f64,
+                imu_raw.orientation[1] as f64,
+                imu_raw.orientation[2] as f64,
+            );
 
             let rot_base_sensor: UnitQuaternion<f64> =
                 self.lidar_node.get_isometry_from_base().rotation;
-
-            let quat = rot_base_sensor * imu_quaternion;
-            let quat = quat.coords.as_slice();
+            // let quat = rot_base_sensor * imu_quaternion;
+            // let quat = quat.coords.as_slice();
             let imu_linear_acceleration = Vector3::new(
-                imu_raw.linear_acceleration[0] as f64,
-                imu_raw.linear_acceleration[1] as f64,
-                imu_raw.linear_acceleration[2] as f64,
+                imu_raw.acceleration[0] as f64,
+                imu_raw.acceleration[1] as f64,
+                imu_raw.acceleration[2] as f64,
             );
             let imu_angular_velocity = Vector3::new(
                 imu_raw.angular_velocity[0] as f64,
@@ -135,15 +140,17 @@ impl CuSrcTask for ImuIceoryxReceiver {
             );
             let acc = rot_base_sensor * imu_linear_acceleration;
             let gyr = rot_base_sensor * imu_angular_velocity;
-            let actual_message = ImuMsg {
-                linear_acceleration: [acc.x as f32, acc.y as f32, acc.z as f32],
-                angular_velocity: [gyr.x as f32, gyr.y as f32, gyr.z as f32],
-                quaternion: [
-                    quat[0] as f32,
-                    quat[1] as f32,
-                    quat[2] as f32,
-                    quat[3] as f32,
-                ],
+            let ori = rot_base_sensor * imu_orientation;
+            let actual_message = ImuMeasurement {
+                acceleration: [acc.x, acc.y, acc.z],
+                angular_velocity: [gyr.x, gyr.y, gyr.z],
+                orientation: [ori.x, ori.y, ori.z],
+                // quaternion: [
+                //     quat[0] as f32,
+                //     quat[1] as f32,
+                //     quat[2] as f32,
+                //     quat[3] as f32,
+                // ]
             };
             new_msg.set_payload(actual_message);
         }
