@@ -50,7 +50,7 @@ clean:
 
 # Kill all processes
 kill:
-	killall realsense unilidar_publisher lunabot-ai2
+	killall realsense unilidar_publisher lunabot-ai2 lunabot && pkill -f unilidar_iceoryx_publisher
 
 clear-simlogs:
 	cd lunabot-cu/logs && rm lunabotsim*; rm lunabotresim*;
