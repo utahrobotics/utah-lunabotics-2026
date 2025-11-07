@@ -70,6 +70,9 @@ build-lunabase:
 edit-lunabase: build-lunabase
 	cd godot/new-lunabase && godot project.godot
 
+autostart:
+	cargo run --release -p auto-start
+
 # Help target to show available commands
 help:
 	@echo "Available targets:"
@@ -92,5 +95,7 @@ help:
 	@echo "  sim               - Runs the Mujoco simulation"
 	@echo "  build-lunabase    - Builds the lunabase library"
 	@echo "  edit-lunabase     - Opens the lunabase Godot project after building the lunabase library"
+	@echo "  autostart         - Runs the Lunabot control panel on port 8080"
+
 
 .PHONY: prod debug sync clean-build build-publisher discover-cameras check clean help
