@@ -1,5 +1,4 @@
 use bincode::{Decode, Encode};
-use cu_spatial_payloads::{EncodableIsometry, Transform3D};
 use cu29::{
     CuResult,
     config::ComponentConfig,
@@ -10,14 +9,16 @@ use cu29::{
 
 use iceoryx_types::IceoryxPointCloud;
 use iceoryx2::prelude::ZeroCopySend;
+use kalman_filter::SimpleVector;
 use simple_icp::{config::Config, icp_pipeline::IcpPipeline};
 
-use crate::rerun_viz::{self, RECORDER};
+use crate::rerun_viz::{RECORDER};
 pub struct KissIcp {
     pipeline: simple_icp::icp_pipeline::IcpPipeline,
     pub accumulated_frames: Vec<simple_icp::point3d::Point3d>,
     pub frame_accumulation_index: usize,
     pub max_accumulation: usize,
+    icp_variance: [f64; 36],
 }
 
 #[derive(Clone, Copy, Debug, Encode, Decode, Serialize, ZeroCopySend)]
@@ -97,11 +98,23 @@ impl CuTask for KissIcp {
             deskew: enable_deskewing,
         };
         let pipeline = IcpPipeline::new_with_config(config);
+
+        let diagonal = SimpleVector::<6>::new(
+            0.05 as f64,   // Position variance
+            0.05 as f64,
+            0.05 as f64,
+            0.5 as f64,    // Orientation variance
+            0.5 as f64,
+            0.5 as f64,
+        );
+        let variance: [f64; 36] = kalman_filter::SimpleSquareMatrix::<6>::from_diagonal(&diagonal).as_slice().try_into().expect("Variance matrix in [kiss_icp.rs] was not 6x6");
+
         Ok(Self {
             pipeline,
             max_accumulation,
             accumulated_frames: Vec::new(),
             frame_accumulation_index: 0,
+            icp_variance: variance
         })
     }
 
@@ -141,7 +154,30 @@ impl CuTask for KissIcp {
             self.pipeline.process_frame(&self.accumulated_frames);
             let map_points = self.pipeline.get_last_batch_points();
             let position = self.pipeline.t_origin_current;
-            output.set_payload(EncodableIsometry::from_na(&position));
+
+            let trans = position.translation;
+            let rotat = 
+                position.rotation.axis()
+                    .and_then(|vec| Some(vec.into_inner()))
+                    .unwrap_or(SimpleVector::<3>::zeros())
+                * position.rotation.angle()
+            ;
+
+            let actual_message = IcpMeasurement {
+                position: [
+                    trans.x,
+                    trans.y,
+                    trans.z,
+                ],
+                orientation: [
+                    rotat.x,
+                    rotat.y,
+                    rotat.z
+                ],
+                variance: self.icp_variance,
+            };
+
+            output.set_payload(actual_message);
 
             self.log_accumulated_map(map_points)?;
             self.accumulated_frames.clear();

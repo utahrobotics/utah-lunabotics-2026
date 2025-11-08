@@ -16,7 +16,7 @@ use serde::Serialize;
 
 use crate::ROOT_NODE;
 use iceoryx_types::ImuMsg;
-use nalgebra::{Const, Quaternion, UnitQuaternion, Vector, Vector3};
+use nalgebra::{Quaternion, UnitQuaternion, Vector3};
 use simple_motion::StaticNode;
 
 pub struct ImuIceoryxReceiver {
@@ -35,7 +35,7 @@ pub struct ImuMeasurement {
     pub orientation: [f64; 3],
     pub angular_velocity: [f64; 3],
     #[serde(serialize_with = "<[_]>::serialize")]
-    pub imu_variance: [f64; 81]
+    pub variance: [f64; 81]
 }
 
 impl Default for ImuMeasurement {
@@ -44,7 +44,7 @@ impl Default for ImuMeasurement {
             acceleration: Default::default(),
             orientation: Default::default(),
             angular_velocity: Default::default(),
-            imu_variance: [0.0; 81]
+            variance: [0.0; 81]
         }
     }
 }
@@ -170,7 +170,7 @@ impl CuSrcTask for ImuIceoryxReceiver {
                 acceleration: [acc.x, acc.y, acc.z - 9.8],
                 angular_velocity: [gyr.x, gyr.y, gyr.z],
                 orientation: [imu_orientation.x, imu_orientation.y, imu_orientation.z],
-                imu_variance: self.imu_variance,
+                variance: self.imu_variance,
             };
             new_msg.set_payload(actual_message);
         }
