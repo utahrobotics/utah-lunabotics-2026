@@ -11,19 +11,21 @@ use iceoryx2::node::NodeBuilder;
 use iceoryx2::port::subscriber::Subscriber;
 use iceoryx2::prelude::*;
 use iceoryx2::service::port_factory::publish_subscribe::PortFactory;
+use kalman_filter::SimpleVector;
 use serde::Serialize;
 
 use crate::ROOT_NODE;
 use iceoryx_types::ImuMsg;
-use nalgebra::{Quaternion, UnitQuaternion, Vector3};
+use nalgebra::{Const, Quaternion, UnitQuaternion, Vector, Vector3};
 use simple_motion::StaticNode;
 
 pub struct ImuIceoryxReceiver {
     service_name: ServiceName,
     node: iceoryx2::node::Node<ipc::Service>,
-    service: Option<PortFactory<ipc::Service, ImuMeasurement, ()>>,
-    subscriber: Option<Subscriber<ipc::Service, ImuMeasurement, ()>>,
+    service: Option<PortFactory<ipc::Service, ImuMsg, ()>>,
+    subscriber: Option<Subscriber<ipc::Service, ImuMsg, ()>>,
     lidar_node: StaticNode,
+    imu_variance: [f64; 81],
 }
 
 #[derive(Clone, Copy, Debug, Encode, Decode, Serialize, ZeroCopySend)]
@@ -33,7 +35,7 @@ pub struct ImuMeasurement {
     pub orientation: [f64; 3],
     pub angular_velocity: [f64; 3],
     #[serde(serialize_with = "<[_]>::serialize")]
-    pub variance: [f64; 81]
+    pub imu_variance: [f64; 81]
 }
 
 impl Default for ImuMeasurement {
@@ -42,7 +44,7 @@ impl Default for ImuMeasurement {
             acceleration: Default::default(),
             orientation: Default::default(),
             angular_velocity: Default::default(),
-            variance: [0.0; 81]
+            imu_variance: [0.0; 81]
         }
     }
 }
@@ -63,6 +65,19 @@ impl CuSrcTask for ImuIceoryxReceiver {
         let node = NodeBuilder::new()
             .create::<ipc::Service>()
             .map_err(|e| CuError::new_with_cause("ImuIceoryxReceiver: node create", e))?;
+        
+        let diagonal = SimpleVector::<9>::from_column_slice(&[
+            0.005 as f64,   // Acceleration variance
+            0.005 as f64,
+            0.005 as f64,
+            0.05 as f64,    // Orientation variance
+            0.05 as f64,
+            0.05 as f64,
+            0.1 as f64,     // Angular velocity variance
+            0.1 as f64,
+            0.1 as f64,
+        ]);
+        let variance: [f64; 81] = kalman_filter::SimpleSquareMatrix::<9>::from_diagonal(&diagonal).as_slice().try_into().expect("Variance matrix in [l2_imu.rs] was not 9x9");
 
         Ok(Self {
             service_name,
@@ -75,6 +90,7 @@ impl CuSrcTask for ImuIceoryxReceiver {
                 .clone()
                 .get_node_with_name("l2_front")
                 .unwrap(),
+            imu_variance: variance,
         })
     }
 
@@ -83,7 +99,7 @@ impl CuSrcTask for ImuIceoryxReceiver {
         let service = self
             .node
             .service_builder(&self.service_name)
-            .publish_subscribe::<ImuMeasurement>()
+            .publish_subscribe::<ImuMsg>()
             .enable_safe_overflow(true)
             .open_or_create()
             .map_err(|e| CuError::new_with_cause("ImuIceoryxReceiver: service", e))?;
@@ -95,6 +111,7 @@ impl CuSrcTask for ImuIceoryxReceiver {
 
         self.service = Some(service);
         self.subscriber = Some(subscriber);
+
         Ok(())
     }
 
@@ -110,47 +127,50 @@ impl CuSrcTask for ImuIceoryxReceiver {
             .receive()
             .map_err(|e| CuError::new_with_cause("ImuIceoryxReceiver: receive", e))?
         {
-            let imu_raw: &ImuMeasurement = &*sample;
-            // let imu_quaternion = UnitQuaternion::new_normalize(Quaternion::new(
-            //     imu_raw.quaternion[0] as f64,
-            //     imu_raw.quaternion[1] as f64,
-            //     imu_raw.quaternion[2] as f64,
-            //     imu_raw.quaternion[3] as f64,
-            // ));
+            let imu_raw: &ImuMsg = &*sample;
             
-            let imu_orientation = Vector3::new(
-                imu_raw.orientation[0] as f64,
-                imu_raw.orientation[1] as f64,
-                imu_raw.orientation[2] as f64,
-            );
-
             let rot_base_sensor: UnitQuaternion<f64> =
                 self.lidar_node.get_isometry_from_base().rotation;
-            // let quat = rot_base_sensor * imu_quaternion;
-            // let quat = quat.coords.as_slice();
+            
             let imu_linear_acceleration = Vector3::new(
-                imu_raw.acceleration[0] as f64,
-                imu_raw.acceleration[1] as f64,
-                imu_raw.acceleration[2] as f64,
+                imu_raw.linear_acceleration[0] as f64,
+                imu_raw.linear_acceleration[1] as f64,
+                imu_raw.linear_acceleration[2] as f64,
             );
             let imu_angular_velocity = Vector3::new(
                 imu_raw.angular_velocity[0] as f64,
                 imu_raw.angular_velocity[1] as f64,
                 imu_raw.angular_velocity[2] as f64,
             );
+            let mut imu_quaternion = UnitQuaternion::new_normalize(Quaternion::new(
+                imu_raw.quaternion[0] as f64,
+                imu_raw.quaternion[1] as f64,
+                imu_raw.quaternion[2] as f64,
+                imu_raw.quaternion[3] as f64,
+            ));
+            imu_quaternion *= rot_base_sensor;
+            
+            let orientation_state = 
+                imu_quaternion.axis()
+                    .and_then(|vec| Some(vec.into_inner()))
+                    .unwrap_or(SimpleVector::<3>::zeros())
+                * imu_quaternion.angle()
+            ;
+
+            let imu_orientation = Vector3::new(
+                orientation_state.x as f64,
+                orientation_state.y as f64,
+                orientation_state.z as f64,
+            );
+
             let acc = rot_base_sensor * imu_linear_acceleration;
             let gyr = rot_base_sensor * imu_angular_velocity;
-            let ori = rot_base_sensor * imu_orientation;
+
             let actual_message = ImuMeasurement {
-                acceleration: [acc.x, acc.y, acc.z],
+                acceleration: [acc.x, acc.y, acc.z - 9.8],
                 angular_velocity: [gyr.x, gyr.y, gyr.z],
-                orientation: [ori.x, ori.y, ori.z],
-                // quaternion: [
-                //     quat[0] as f32,
-                //     quat[1] as f32,
-                //     quat[2] as f32,
-                //     quat[3] as f32,
-                // ]
+                orientation: [imu_orientation.x, imu_orientation.y, imu_orientation.z],
+                imu_variance: self.imu_variance,
             };
             new_msg.set_payload(actual_message);
         }
