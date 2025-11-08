@@ -4,6 +4,12 @@
 
 <img width="4378" height="726" alt="graphviz" src="https://github.com/user-attachments/assets/399a1f5c-2bb3-446b-83d5-b68da5d1582f" />
 
+
+## Detailed Copper Task Overview
+
+<img width="7098" height="4698" alt="graphviz(3)" src="https://github.com/user-attachments/assets/969af1fc-0d6c-4ccd-8cac-c86362b93b32" />
+
+
 ##### Check copperconfig.ron to see the definitions of all the tasks running and the datatypes passed between tasks.
 
 ## Dependencies
@@ -29,8 +35,14 @@
     libudev-dev \
    ```
 2. [Bazelisk](http://github.com/bazelbuild/bazelisk/releases/)
-3. [Realsense SDK](https://github.com/IntelRealSense/librealsense)
+3. [Realsense SDK](https://github.com/IntelRealSense/librealsense/blob/master/doc/installation.md#building-librealsense2-sdk)
 4. [Apriltag Library](https://github.com/AprilRobotics/apriltag)
+
+### Log Replay env (Windows, Macos, Linux)
+See ```Building and Running``` section for detailed instructions for your platform.
+
+### Simulation Environment 
+See [mujoco-sim/README.md](mujoco-sim/README.md) for dependencies and instructions.
 
 ### Optional Dependencies
 
@@ -46,10 +58,14 @@
 
 *NOTE: On some machines you have to increase the stack size for it to compile ```export RUST_MIN_STACK=107108864```.*
 
-### Production env (Linux only)
 
-1. run ```make sync``` to build/sync deps for the Unitree L2 publisher.
-2. run ```make prod``` to build and run the project.
+### Simulation Environment (Linux, Macos, Windows)
+See [mujoco-sim/README.md](mujoco-sim/README.md) for instructions.
+
+### Production env (Linux only)
+1. Install dependencies listed in the above ```Dependencies``` section for the production environment.
+2. run ```make sync``` to build/sync deps for the Unitree L2 publisher.
+3. run ```make prod``` to build and run the project.
 
 ### Log replay and development tools (Linux)
 
@@ -185,6 +201,14 @@ Package Manager: [Chocolatey](https://chocolatey.org/install). Follow the instru
 make discover-cameras
 ```
 
+# Trouble Shooting
+List of common problems and how to fix them can be found [here](https://github.com/utahrobotics/utah-lunabotics-2026/blob/main/TROUBLESHOOTING.md)
+
+# Using the Web Panel
+1. Connect to the same wifi network as the lunabot.
+2. Navigate to 192.168.0.103
+3. Click "Start Lunabot"
+4. Ensure that the lunabase software is running on your computer, and the ip in the top left corner is correct, then press connect.
 
 # Crate Layout
 
@@ -247,7 +271,7 @@ Helper functions for:
 * Structures and helpers used for connecting to the base station.
 
 ## common/ 
-Legacy code containing structures that are used by the lunabase and the lunabot. (and the old behavior tree). \\
+Legacy code containing structures that are used by the lunabase and the lunabot. (and the old behavior tree). <br>
 *This will be useful when we actually move the lunabase to this repo*
 
 ## embedded_common
@@ -261,7 +285,7 @@ Utilities for connecting to rerun.
 
 
 ### lunabot-cu/src/motors.rs
-Legacy code for controlling motors via VESC. \\
+Legacy code for controlling motors via VESC. <br>
 The enumerate_motors() function (used by the motor_ctrl task) returns a structure that you can use to command the motors.
 
 ### lunabot-cu/src/simple_monitor.rs

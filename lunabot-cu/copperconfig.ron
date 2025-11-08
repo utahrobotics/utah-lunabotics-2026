@@ -52,6 +52,18 @@
             run_in_sim: false
         ),
 
+        (
+            id: "t265_subscriber",
+            type: "crate::tasks::sources::T265Subscriber",
+            config: {
+                "serial_num": "929122111514",
+                "camera_node": "upper_depth_camera_t265"
+            },
+            logging: (
+                enabled: true
+            ),
+            run_in_sim: false
+        ),
         // takes depth frames and imu information from the realsense subscriber and uses obstacle detection to create an occupancy grid
         // the size of the arena
         (
@@ -75,8 +87,8 @@
             type:"crate::tasks::KissIcp",
             config:{
                 "voxel_size": .5,
-                "max_range": 50.0,
-                "min_range": 1.0,
+                "max_range": 10.0,
+                "min_range": 0.0,
                 "max_points_per_voxel": 20,
                 "initial_threshold": 2.0,
                 "min_motion_th": 0.2,
@@ -104,7 +116,7 @@
             id:"lunabase", type:"crate::tasks::sources::Lunabase", config:{
                 "max_pong_delay_ms": 500,
             },
-            run_in_sim: false,
+            run_in_sim: true,
         ),
         // receives messages from the ai_source and tells the motors to move accordingly
         (

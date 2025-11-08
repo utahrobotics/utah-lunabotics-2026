@@ -1,0 +1,62 @@
+[gd_scene load_steps=6 format=3 uid="uid://81kfbgjtlieb"]
+
+[ext_resource type="Script" uid="uid://bdprp7hdo4seh" path="res://Systems/CommandPattern/Testing/TestController/TestHumanController.gd" id="1_shq14"]
+[ext_resource type="Script" uid="uid://seb6w50qyguj" path="res://Systems/CommandPattern/Testing/test_move_command_pattern.gd" id="2_x1swg"]
+[ext_resource type="Texture2D" uid="uid://bjwlx7ar673ff" path="res://icon.svg" id="3_lwj7g"]
+[ext_resource type="Script" uid="uid://cvtpbf7s3dbvy" path="res://Systems/CommandPattern/Testing/test_replay.gd" id="4_31cek"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_ias37"]
+radius = 89.005615
+
+[node name="CommandPatternTestScene" type="Node2D"]
+
+[node name="CommandController" type="Node2D" parent="." node_paths=PackedStringArray("actor")]
+script = ExtResource("1_shq14")
+actor = NodePath("../CharacterBody2D")
+
+[node name="CharacterBody2D" type="CharacterBody2D" parent="."]
+script = ExtResource("2_x1swg")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="CharacterBody2D"]
+shape = SubResource("CircleShape2D_ias37")
+
+[node name="Sprite2D" type="Sprite2D" parent="CharacterBody2D"]
+texture = ExtResource("3_lwj7g")
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+
+[node name="Control" type="Control" parent="CanvasLayer"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="HBoxContainer" type="HBoxContainer" parent="CanvasLayer/Control"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -149.0
+offset_bottom = 40.0
+grow_horizontal = 0
+
+[node name="ButtonResetScene" type="Button" parent="CanvasLayer/Control/HBoxContainer"]
+layout_mode = 2
+text = "Reset"
+
+[node name="ButtonPlayback" type="Button" parent="CanvasLayer/Control/HBoxContainer"]
+layout_mode = 2
+text = "Playback
+"
+
+[node name="TestReplay" type="Node" parent="CanvasLayer"]
+script = ExtResource("4_31cek")
+
+[node name="Camera2D" type="Camera2D" parent="."]
+
+[connection signal="pressed" from="CanvasLayer/Control/HBoxContainer/ButtonResetScene" to="CanvasLayer/TestReplay" method="_on_button_reset_scene_pressed"]
+[connection signal="pressed" from="CanvasLayer/Control/HBoxContainer/ButtonPlayback" to="CanvasLayer/TestReplay" method="_on_button_playback_pressed"]

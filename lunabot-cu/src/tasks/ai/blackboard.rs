@@ -48,7 +48,7 @@ impl Default for LunabotBlackboard {
             last_bucket: None,
             last_steering: None,
             navigate_destination: None,
-            yielded: false
+            yielded: false,
         }
     }
 }
@@ -86,7 +86,6 @@ impl LunabotBlackboard {
                 LUNABOT_STAGE.store(LunabotStage::SoftStop);
             }
             common::FromLunabase::Disconnect => {
-                eprintln!("Lunabase Disconnected");
                 self.current_mission = LunabotStage::SoftStop;
                 LUNABOT_STAGE.store(LunabotStage::SoftStop);
             }

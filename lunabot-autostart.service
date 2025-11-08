@@ -1,0 +1,15 @@
+[Unit]
+Description=Utah Lunabotics Control Panel
+After=network.target
+
+[Service]
+Type=simple
+User=matthew_a
+WorkingDirectory=/home/matthew_a/utah-lunabotics-2026
+Environment="PATH=/home/matthew_a/.cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/usr/bin/make autostart
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

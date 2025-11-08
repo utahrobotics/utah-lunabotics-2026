@@ -27,7 +27,6 @@ use crate::{
 use kalman_filter::*;
 
 const ACCELEROMETER_LERP_SPEED: f64 = 150.0;
-const ICP_FILTER_SPEED: f64 = 100.0;
 const LOCALIZATION_DELTA: f64 = 1.0 / 60.0;
 /// Represents the variance assigned to values that are completely unknown. Should be extremely large.
 const UNKNOWN_PRIOR_VARIANCE: f64 = 1e64;

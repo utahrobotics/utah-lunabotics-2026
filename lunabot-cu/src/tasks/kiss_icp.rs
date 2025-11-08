@@ -12,7 +12,7 @@ use iceoryx2::prelude::ZeroCopySend;
 use kalman_filter::SimpleVector;
 use simple_icp::{config::Config, icp_pipeline::IcpPipeline};
 
-use crate::rerun_viz::{RECORDER};
+use crate::rerun_viz::RECORDER;
 pub struct KissIcp {
     pipeline: simple_icp::icp_pipeline::IcpPipeline,
     pub accumulated_frames: Vec<simple_icp::point3d::Point3d>,
@@ -151,7 +151,8 @@ impl CuTask for KissIcp {
                 output.clear_payload();
                 return Ok(());
             }
-            self.pipeline.process_frame(&self.accumulated_frames);
+            self.pipeline.process_frame(&self.accumulated_frames, 200.0);
+
             let map_points = self.pipeline.get_last_batch_points();
             let position = self.pipeline.t_origin_current;
 

@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3 uid="uid://bpljuxjxv0sa8"]
+
+[ext_resource type="Script" uid="uid://pbtk6ognxlw8" path="res://GUI/NotificationSystem/Assets/NotificationButton/NotifiactionButton.gd" id="1_4e4em"]
+
+[node name="NotificationButton" type="Button"]
+custom_minimum_size = Vector2(25, 50)
+autowrap_mode = 2
+script = ExtResource("1_4e4em")

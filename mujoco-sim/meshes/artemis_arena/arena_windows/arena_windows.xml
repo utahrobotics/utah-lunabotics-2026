@@ -1,0 +1,17 @@
+<mujoco model="arena_windows">
+  <asset>
+    <material name="DefaultMaterialWindows" specular="0.5" shininess="0.5" rgba="1 1 1 1.0" />
+    <mesh file="arena_windows.obj" />
+    <mesh file="arena_windows_collision_0.obj" />
+    <mesh file="arena_windows_collision_1.obj" />
+  </asset>
+  <worldbody>
+    <body name="arena_windows">
+      <geom material="DefaultMaterialWindows" mesh="arena_windows" class="visual" />
+      <geom mesh="arena_windows_collision_0"
+        rgba="0.9904621354876483 0.6722046480866822 0.2558248646148681 1" class="collision" />
+      <geom mesh="arena_windows_collision_1"
+        rgba="0.8495023968299922 0.9142529157618255 0.08752847217426551 1" class="collision" />
+    </body>
+  </worldbody>
+</mujoco>

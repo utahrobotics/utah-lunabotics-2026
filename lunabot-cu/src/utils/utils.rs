@@ -17,6 +17,10 @@ pub fn nanos_to_secs(nanos: u64) -> f64 {
     nanos as f64 / 1_000_000_000.0
 }
 
+pub fn secs_to_nanos(secs: f64) -> u64 {
+    (secs * 1_000_000_000.0) as u64
+}
+
 /// named as such to avoid confusion with `nalgebra::distance` and `pathfinding::distance`
 pub fn distance_between_tuples((x1, y1): (usize, usize), (x2, y2): (usize, usize)) -> f32 {
     Vector2::new(x1.abs_diff(x2) as f32, y1.abs_diff(y2) as f32).magnitude()

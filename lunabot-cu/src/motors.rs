@@ -3,8 +3,9 @@ use crate::utils::udev_poll;
 use core::f32;
 use crossbeam::{atomic::AtomicCell, utils::Backoff};
 use cu29::{config::Value, prelude::*};
-use fxhash::FxHashMap;
 use serde::Deserialize;
+use std::collections::HashMap;
+use std::sync::Arc;
 use std::{
     sync::mpmc::Receiver,
     time::{Duration, Instant},
@@ -18,6 +19,7 @@ use tasker::{
 };
 use tokio_serial::SerialPortBuilderExt;
 use udev::{EventType, MonitorBuilder, Udev};
+use vesc_translator::GetValuesResponse;
 use vesc_translator::{Alive, CanForwarded, GetValues, Getter, MinLength, SetRPM, VescPacker};
 
 #[derive(Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
@@ -38,8 +40,8 @@ impl MotorMask {
 #[derive(Default)]
 pub struct VescIDs {
     /// Map from Can ID to sibling Can ID
-    can_ids: FxHashMap<u8, Option<(u8, bool)>>,
-    motor_masks: FxHashMap<u8, MotorMask>,
+    can_ids: HashMap<u8, Option<(u8, bool)>>,
+    motor_masks: HashMap<u8, MotorMask>,
     device_count: usize,
 }
 
@@ -98,17 +100,38 @@ impl VescIDs {
 
 pub struct MotorRef {
     speeds: AtomicCell<Option<(f32, f32)>>,
+    latest_telemetry: std::sync::Mutex<HashMap<u8, GetValuesResponse>>,
+    speed_multiplier: Arc<AtomicCell<f32>>,
 }
 
 impl MotorRef {
+    pub fn set_speed_multiplier(&self, multiplier: f32) {
+        self.speed_multiplier.store(multiplier);
+    }
+
     pub fn set_speed(&self, left: f32, right: f32) {
         self.speeds.store(Some((left, right)));
+    }
+
+    /// Returns and clears any collected telemetry.
+    pub fn get_latest_telemetry(&self) -> Option<Vec<GetValuesResponse>> {
+        let mut map = self.latest_telemetry.lock().unwrap();
+        if map.is_empty() {
+            None
+        } else {
+            let v = map.values().cloned().collect();
+            map.clear();
+            Some(v)
+        }
     }
 }
 
 pub fn enumerate_motors(vesc_ids: VescIDs, speed_multiplier: f32) -> &'static MotorRef {
+    let speed_multiplier = Arc::new(AtomicCell::new(speed_multiplier));
     let motor_ref: &_ = Box::leak(Box::new(MotorRef {
         speeds: AtomicCell::new(None),
+        latest_telemetry: std::sync::Mutex::new(HashMap::new()),
+        speed_multiplier: Arc::clone(&speed_multiplier),
     }));
 
     let (tx, rx) = std::sync::mpmc::sync_channel::<String>(1);
@@ -120,7 +143,7 @@ pub fn enumerate_motors(vesc_ids: VescIDs, speed_multiplier: f32) -> &'static Mo
             vesc_packer: VescPacker::default(),
             motor_ref,
             vesc_ids,
-            speed_multiplier,
+            speed_multiplier: Arc::clone(&speed_multiplier),
         };
         std::thread::spawn(move || {
             loop {
@@ -226,7 +249,7 @@ struct MotorTask {
     vesc_packer: VescPacker,
     motor_ref: &'static MotorRef,
     vesc_ids: &'static VescIDs,
-    speed_multiplier: f32,
+    speed_multiplier: Arc<AtomicCell<f32>>,
 }
 
 impl MotorTask {
@@ -259,9 +282,9 @@ impl MotorTask {
         let master_can_id;
 
         loop {
-            let mut response = vec![];
             let mut tmp_buf = [0u8; 128];
             let task = async {
+                let mut response = vec![];
                 motor_port
                     .write_all(self.vesc_packer.pack(&GetValues))
                     .await?;
@@ -270,7 +293,7 @@ impl MotorTask {
                     let n = motor_port.read(&mut tmp_buf).await?;
                     response.extend_from_slice(&tmp_buf[..n]);
                 }
-                std::io::Result::Ok(())
+                std::io::Result::Ok(response)
             };
             let task = async {
                 tokio::select! {
@@ -280,10 +303,13 @@ impl MotorTask {
                     }
                 }
             };
-            if let Err(e) = task.block_on() {
-                error!("Failed to read/write to motor port {path_str}: {e}");
-                return;
-            }
+            let response = match task.block_on() {
+                Ok(resp) => resp,
+                Err(e) => {
+                    error!("Failed to read/write to motor port {path_str}: {e}");
+                    return;
+                }
+            };
 
             let Ok(buf) = MinLength::try_from(response.as_slice()) else {
                 error!("Received too short of a message from motor port {path_str}");
@@ -296,7 +322,6 @@ impl MotorTask {
                 std::thread::sleep(std::time::Duration::from_secs(1));
                 continue;
             };
-
             master_can_id = values.vesc_id;
             break;
         }
@@ -308,9 +333,9 @@ impl MotorTask {
 
         if let Some((can_id, _)) = slave_can {
             loop {
-                let mut response = vec![];
                 let mut tmp_buf = [0u8; 128];
                 let task = async {
+                    let mut response = vec![];
                     motor_port
                         .write_all(self.vesc_packer.pack(&CanForwarded {
                             can_id,
@@ -322,7 +347,7 @@ impl MotorTask {
                         let n = motor_port.read(&mut tmp_buf).await?;
                         response.extend_from_slice(&tmp_buf[..n]);
                     }
-                    std::io::Result::Ok(())
+                    std::io::Result::Ok(response)
                 };
                 let task = async {
                     tokio::select! {
@@ -332,10 +357,13 @@ impl MotorTask {
                         }
                     }
                 };
-                if let Err(e) = task.block_on() {
-                    error!("Failed to read/write to motor port {path_str}: {e}");
-                    return;
-                }
+                let response = match task.block_on() {
+                    Ok(resp) => resp,
+                    Err(e) => {
+                        error!("Failed to read/write to motor port {path_str}: {e}");
+                        return;
+                    }
+                };
 
                 let Ok(buf) = MinLength::try_from(response.as_slice()) else {
                     error!("Received too short of a message from motor port {path_str}");
@@ -348,6 +376,11 @@ impl MotorTask {
                     std::thread::sleep(std::time::Duration::from_secs(1));
                     continue;
                 };
+                self.motor_ref
+                    .latest_telemetry
+                    .lock()
+                    .unwrap()
+                    .insert(values.vesc_id, values);
                 if can_id != values.vesc_id {
                     error!(
                         "Received can id {} instead of {} from sibling",
@@ -369,7 +402,6 @@ impl MotorTask {
         let backoff = Backoff::new();
         let mut last_read_time = Instant::now();
 
-        let mut response = vec![];
         let mut tmp_buf = [0u8; 128];
 
         loop {
@@ -385,6 +417,7 @@ impl MotorTask {
             if last_read_time.elapsed() > Duration::from_millis(500) {
                 last_read_time = Instant::now();
                 let task = async {
+                    let mut response = vec![];
                     motor_port
                         .write_all(self.vesc_packer.pack(&GetValues))
                         .await?;
@@ -393,7 +426,7 @@ impl MotorTask {
                         let n = motor_port.read(&mut tmp_buf).await?;
                         response.extend_from_slice(&tmp_buf[..n]);
                     }
-                    std::io::Result::Ok(())
+                    std::io::Result::Ok(response)
                 };
 
                 let task = async {
@@ -405,10 +438,13 @@ impl MotorTask {
                     }
                 };
 
-                if let Err(e) = task.block_on() {
-                    error!("Failed to read/write to motor port {path_str}: {e}");
-                    return;
-                }
+                let response = match task.block_on() {
+                    Ok(resp) => resp,
+                    Err(e) => {
+                        error!("Failed to read/write to motor port {path_str}: {e}");
+                        return;
+                    }
+                };
 
                 let Ok(buf) = MinLength::try_from(response.as_slice()) else {
                     error!("Received too short of a message from motor port {path_str}");
@@ -431,9 +467,14 @@ impl MotorTask {
                 if values.v_in < 24.0 {
                     warning!("LOW VOLT WARNING {} => {:.1}", values.vesc_id, values.v_in);
                 }
-
+                self.motor_ref
+                    .latest_telemetry
+                    .lock()
+                    .unwrap()
+                    .insert(values.vesc_id, values);
                 if let Some((can_id, true)) = slave_can {
                     let task = async {
+                        let mut response = vec![];
                         motor_port
                             .write_all(self.vesc_packer.pack(&CanForwarded {
                                 can_id,
@@ -445,7 +486,7 @@ impl MotorTask {
                             let n = motor_port.read(&mut tmp_buf).await?;
                             response.extend_from_slice(&tmp_buf[..n]);
                         }
-                        std::io::Result::Ok(())
+                        std::io::Result::Ok(response)
                     };
 
                     let task = async {
@@ -457,10 +498,13 @@ impl MotorTask {
                         }
                     };
 
-                    if let Err(e) = task.block_on() {
-                        error!("Failed to read/write to motor port {path_str}: {e}");
-                        return;
-                    }
+                    let response = match task.block_on() {
+                        Ok(resp) => resp,
+                        Err(e) => {
+                            error!("Failed to read/write to motor port {path_str}: {e}");
+                            return;
+                        }
+                    };
 
                     let Ok(buf) = MinLength::try_from(response.as_slice()) else {
                         error!("Received too short of a message from motor port {path_str}");
@@ -473,7 +517,11 @@ impl MotorTask {
                         std::thread::sleep(std::time::Duration::from_secs(1));
                         continue;
                     };
-
+                    self.motor_ref
+                        .latest_telemetry
+                        .lock()
+                        .unwrap()
+                        .insert(values.vesc_id, values);
                     if values.temp_mos > 70.0 {
                         warning!("TEMPERATURE WARNING {can_id} => {:.1} °C", values.temp_mos);
                     }
@@ -489,17 +537,16 @@ impl MotorTask {
                         .write_all(self.vesc_packer.pack(&CanForwarded {
                             can_id,
                             payload: SetRPM(
-                                slave_mask.unwrap().mask(values) * self.speed_multiplier,
+                                slave_mask.unwrap().mask(values) * self.speed_multiplier.load(),
                             ),
                         }))
                         .await?;
                     motor_port.write_all(self.vesc_packer.pack(&Alive)).await?;
                 }
                 motor_port
-                    .write_all(
-                        self.vesc_packer
-                            .pack(&SetRPM(master_mask.mask(values) * self.speed_multiplier)),
-                    )
+                    .write_all(self.vesc_packer.pack(&SetRPM(
+                        master_mask.mask(values) * self.speed_multiplier.load(),
+                    )))
                     .await?;
                 // motor_port
                 //     .write_all(self.vesc_packer.pack(&Alive))

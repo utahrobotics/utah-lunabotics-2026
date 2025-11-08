@@ -61,6 +61,10 @@ impl CuSinkTask for MotorController {
 
         Ok(Self { motor_ref })
     }
+    fn start(&mut self, _clock: &RobotClock) -> CuResult<()> {
+        self.motor_ref.set_speed_multiplier(7000.0);
+        Ok(())
+    }
 
     fn preprocess(&mut self, _clock: &RobotClock) -> CuResult<()> {
         Ok(())
@@ -71,6 +75,18 @@ impl CuSinkTask for MotorController {
             if let Some(steering) = &payload.0 {
                 let (left, right) = steering.get_left_and_right();
                 self.motor_ref.set_speed(left as f32, right as f32);
+            }
+        }
+        if let Some(telemetry) = self.motor_ref.get_latest_telemetry() {
+            use crate::rerun_viz::RECORDER;
+
+            if let Some(rec) = RECORDER.get() {
+                use rerun::TextLog;
+                let _ = rec
+                    .recorder
+                    .log("vesc_telemetry", &TextLog::new(format!("{telemetry:?}")));
+            } else {
+                println!("{telemetry:?}");
             }
         }
         Ok(())

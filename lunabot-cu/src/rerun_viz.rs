@@ -20,11 +20,11 @@ pub struct RecorderData {
 
 #[derive(Deserialize, Default, Debug)]
 pub enum RerunViz {
-    /// Streams results to a remote viewer, with the ip specified in the string.
+    /// Send rerun logs over grpc
     Grpc(Level, String),
-    /// Writes results to a file.
+    /// Save logs to recording.rrd
     Log(Level),
-    /// Displays the results in a application window.
+    /// Spawn rerun as a process
     Viz(Level),
     #[default]
     Disabled,

@@ -21,6 +21,10 @@ sync:
 resim:
 	cd lunabot-cu && cargo run --release --bin lunabot-resim --features resim
 
+# Run the MuJoCo Simulation. Must include "ucf" or "artemis" as an env variable for it to load
+sim:
+	cd lunabot-cu && RUSTFLAGS="-C linker-features=-lld" cargo run --release --bin lunabot-sim --features sim ${SIM_ARENA}
+
 # Clean build and sync, then build everything
 clean-build: clean sync
 	cd $(UNILIDAR_DIR) && RULES_RUST_TOOLCHAIN_VERSION=$(RUST_TOOLCHAIN_VERSION) bazel build //:unilidar_publisher $(BAZEL_BUILD_FLAGS)
@@ -46,10 +50,10 @@ clean:
 
 # Kill all processes
 kill:
-	killall realsense unilidar_publisher lunabot-ai2
+	killall realsense unilidar_publisher lunabot-ai2 lunabot && pkill -f unilidar_iceoryx_publisher
 
 clear-simlogs:
-	cd lunabot-cu/logs && rm lunabotsim*
+	cd lunabot-cu/logs && rm lunabotsim*; rm lunabotresim*;
 
 clear-logs:
 	rm lunabot-cu/logs/*
@@ -57,9 +61,26 @@ clear-logs:
 clear-iceoryx2:
 	rm -r /tmp/iceoryx2; rm -r /dev/shm/iox2_*; rm -rf /dev/shm/*iceoryx*
 
+validate-config:
+	cargo run --release -p copperconfig-validator -- -c lunabot-cu/copperconfig.ron
+
+visualize-config:
+	cargo run --release -p copperconfig-validator -- -c lunabot-cu/copperconfig.ron --output-svg graph.svg
+
+build-lunabase:
+	cd lunabase-lib && cargo build --release && cargo build 
+
+edit-lunabase: build-lunabase
+	cd godot/new-lunabase && godot project.godot
+
+autostart:
+	cargo run --release -p auto-start
+
 # Help target to show available commands
 help:
 	@echo "Available targets:"
+	@echo "  validate-config   - Validates that the copperconfig is a directed acyclic graph, and provides friendlier error messages than the compile time errors"
+	@echo "  visualize-config  - Validates copper config and generates graph.svg graph.svg.dot"
 	@echo "  prod              - Build unilidar_publisher with Bazel and run lunabot-cu in release mode"
 	@echo "  debug             - Build unilidar_publisher with Bazel and run lunabot-cu in debug mode"
 	@echo "  sync              - Sync Bazel dependencies (run this if you update dependencies)"
@@ -72,5 +93,12 @@ help:
 	@echo "  kill              - Kill any lunabot sub processes that may still be running"
 	@echo "  help              - Show this help message"
 	@echo "  resim			   - Run re-simulation from logs/lunabot.copper"
+	@echo "  clear-logs        - Removes all unified logs from the simulation"
+	@echo "  clear-logs        - Removes all copper unified logs"
+	@echo "  sim               - Runs the Mujoco simulation"
+	@echo "  build-lunabase    - Builds the lunabase library"
+	@echo "  edit-lunabase     - Opens the lunabase Godot project after building the lunabase library"
+	@echo "  autostart         - Runs the Lunabot control panel on port 8080"
+
 
 .PHONY: prod debug sync clean-build build-publisher discover-cameras check clean help
