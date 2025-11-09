@@ -163,6 +163,7 @@
         (src:"new_ai",                  dst:"v3_pico",                 msg:"(Option<common::Steering>, Option<embedded_common::ActuatorCommand>)"),
         (src:"v3_pico",                 dst:"localizer",               msg:"embedded_common::FromPicoV3"),
         (src:"detection_handler",       dst: "localizer",              msg:"Vec<crate::tasks::AprilTagMeasurement>"),
+        (src:"t265_subscriber",         dst:"localizer",               msg:"iceoryx_types::PoseMsg"),
     ],
     
     includes:[
