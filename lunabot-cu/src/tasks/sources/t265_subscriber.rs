@@ -10,7 +10,7 @@ use iceoryx2::{
     prelude::{LogLevel, ServiceName, set_log_level},
     service::ipc,
 };
-use nalgebra::{Isometry3, Quaternion, UnitQuaternion, Vector3};
+use nalgebra::{Isometry3, UnitQuaternion, Vector3};
 use simple_motion::StaticNode;
 
 use crate::ROOT_NODE;
@@ -20,6 +20,8 @@ pub struct T265Subscriber {
     /// subscribes to pose frames published by the realsense external task (T265)
     pose_subscriber: Subscriber<ipc::Service, PoseMsg, ()>,
     node: StaticNode,
+    /// Initial yaw offset captured on first pose to align T265's arbitrary tracking frame with world
+    initial_yaw_offset: Option<f32>,
 }
 
 impl Freezable for T265Subscriber {}
@@ -69,6 +71,7 @@ impl CuSrcTask for T265Subscriber {
             last_seen: 0,
             pose_subscriber,
             node: t265_node,
+            initial_yaw_offset: None,
         })
     }
 
@@ -96,7 +99,7 @@ impl CuSrcTask for T265Subscriber {
             quaternion,
         }) = output
         {
-            // Apply coordinate system transform from T265 to robot coordinate frame
+            // T265 to robot coordinate frame
             let transformed_translation = Vector3::new(-position[2], position[0], position[1]);
             let t265_translation = Vector3::new(
                 transformed_translation.x,
@@ -108,18 +111,31 @@ impl CuSrcTask for T265Subscriber {
             let t265_rotation =
                 UnitQuaternion::new_normalize(nalgebra::Quaternion::new(qw, -qz, -qx, qy));
 
-            // T265 sensor's pose in the world (its tracking frame)
             let t265_pose_in_world = Isometry3::from_parts(t265_translation.into(), t265_rotation);
 
-            // Get the transform from robot base to T265 sensor
-            // "T265 is at this position/orientation relative to the robot base"
             let base_to_t265 = self.node.get_isometry_from_base().cast::<f32>();
 
-            // Calculate robot base pose in world
             // robot_pose * base_to_t265 = t265_pose_in_world
             let robot_pose = t265_pose_in_world * base_to_t265.inverse();
 
-            new_msg.set_payload(EncodableIsometry::from_na(&robot_pose.cast::<f64>()));
+            // t264 starts with a basically arbitrary "twist" error
+            if self.initial_yaw_offset.is_none() {
+                let initial_yaw = robot_pose.rotation.euler_angles().2;
+                self.initial_yaw_offset = Some(initial_yaw);
+            }
+
+            // align with world frame (robot starts facing +X)
+            let yaw_correction = UnitQuaternion::from_axis_angle(
+                &Vector3::z_axis(),
+                -self.initial_yaw_offset.unwrap(),
+            );
+
+            let corrected_robot_pose =
+                yaw_correction * Isometry3::from_parts(robot_pose.translation, robot_pose.rotation);
+
+            new_msg.set_payload(EncodableIsometry::from_na(
+                &corrected_robot_pose.cast::<f64>(),
+            ));
         }
 
         if clock.now().as_nanos() - self.last_seen > 500_000_000 {
