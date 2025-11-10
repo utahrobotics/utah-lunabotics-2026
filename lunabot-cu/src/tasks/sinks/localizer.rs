@@ -60,7 +60,7 @@ impl CuSinkTask for Localizer {
         IcpMeasurement, // l2 kiss icp
         FromPicoV3,
         Vec<AprilTagMeasurement>, // apriltag detections
-        PoseMsg // reading from the t265
+        EncodableIsometry // reading from the t265, estimation of the robots isometry
     );
 
     fn new(_config: Option<&cu29::prelude::ComponentConfig>) -> cu29::CuResult<Self>
@@ -148,12 +148,13 @@ impl CuSinkTask for Localizer {
     ) -> cu29::CuResult<()> {
         if let Some(pose_msg) = input.4.payload()
             && let Some(logger) = RECORDER.get()
+            && let Some(pose_msg) = pose_msg.to_na()
         {
             let _ = logger.recorder.log(
                 "t265",
                 &rerun::Transform3D::from_translation_rotation(
-                    pose_msg.position,
-                    Quaternion::from_xyzw(pose_msg.quaternion),
+                    pose_msg.translation.vector.data.0[0],
+                    Quaternion::from_xyzw(pose_msg.rotation.as_vector().cast::<f32>().data.0[0]),
                 ),
             );
         }
