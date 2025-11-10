@@ -27,7 +27,7 @@ impl TargetDevice {
 fn main() {
     let args = std::env::args().collect::<Vec<String>>();
     if args.len() < 2 {
-        panic!("need target reset param: realsense or v3pico");
+        panic!("need target reset param: t265 or v3pico or depth");
     }
 
     // technically the target vendor or serial
