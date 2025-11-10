@@ -8,15 +8,17 @@ use std::{
 use udev::{Device, Enumerator};
 
 enum TargetDevice {
-    Realsense,
+    T265,
+    RealsenseDepth,
     V3Pico,
 }
 
 impl TargetDevice {
     fn serial(&self) -> &'static str {
         match self {
-            TargetDevice::Realsense => "Intel",
+            TargetDevice::RealsenseDepth => "Depth",
             TargetDevice::V3Pico => "USR_V3PICO",
+            TargetDevice::T265 => "Movidius",
         }
     }
 }
@@ -30,10 +32,11 @@ fn main() {
 
     // technically the target vendor or serial
     let target_serial = match args[1].as_str() {
-        "realsense" => TargetDevice::Realsense,
+        "depth" => TargetDevice::RealsenseDepth,
         "v3pico" => TargetDevice::V3Pico,
+        "t265" | "T265" => TargetDevice::T265,
         _ => {
-            panic!("unknown arg. options: realsense, v3pico");
+            panic!("unknown arg. options: depth, v3pico, t265");
         }
     }
     .serial();
@@ -41,9 +44,14 @@ fn main() {
     let mut enumerator = Enumerator::new().expect("failed to create enumerator");
     for device in enumerator.scan_devices().expect("failed to scan devices") {
         for property in device.properties() {
-            if (property.name() == "ID_SERIAL" || property.name() == "ID_VENDOR")
+            if (property.name() == "ID_SERIAL"
+                || property.name() == "ID_VENDOR"
+                || property.name() == "ID_MODEL_FROM_DATABASE")
                 && property.value().to_string_lossy().contains(target_serial)
             {
+                if device.devnode().is_none() {
+                    continue;
+                }
                 println!("attempting to reset device");
                 let fd = fs::OpenOptions::new()
                     .read(true)

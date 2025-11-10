@@ -1,4 +1,5 @@
 use std::{
+    process::Command,
     sync::mpsc::{Receiver, Sender},
     time::Duration,
 };
@@ -145,7 +146,7 @@ impl DepthCameraTask {
                         self.serial
                     );
                     if matches!(e, FrameWaitError::DidTimeoutBeforeFrameArrival) {
-                        todo!(" do something here to reset the device")
+                        let _ = Command::new("usb-reset").arg("depth").spawn();
                         // device.hardware_reset();
                     }
                     break;

@@ -196,8 +196,6 @@ impl CuTask for OccupancyGridTask {
             Some(&mut point_cloud),
         );
 
-
-
         // Project the unfiltered point cloud - to compare in rerun
         let mut unfiltered_point_cloud: Box<[AlignedVec4<f32>]> = std::iter::repeat_n(
             AlignedVec4::from(Vector4::default()),
@@ -212,9 +210,6 @@ impl CuTask for OccupancyGridTask {
             depth_frame.depth_scale,
             Some(&mut unfiltered_point_cloud),
         );
-
-        
-
 
         // self.depth_projector_pipeline.project(
         //     &depth_frame.depths,
@@ -239,23 +234,26 @@ impl CuTask for OccupancyGridTask {
 
         // log unfiltered point cloud - still every nth point
         if let Some(logger) = RECORDER.get() {
-            let _ = logger.recorder.log(
-                "realsense/pcl_unfiltered",
-                &Points3D::new(unfiltered_point_cloud.iter().enumerate().filter_map(|(i, p)| {
-                    if p.w != 0.0 && i % 10 == 0 {
-                        Some([p.x, p.y, p.z])
-                    } else {
-                        None
-                    }
-                })),
-            );
+            let _ =
+                logger.recorder.log(
+                    "realsense/pcl_unfiltered",
+                    &Points3D::new(unfiltered_point_cloud.iter().enumerate().filter_map(
+                        |(i, p)| {
+                            if p.w != 0.0 && i % 10 == 0 {
+                                Some([p.x, p.y, p.z])
+                            } else {
+                                None
+                            }
+                        },
+                    )),
+                );
         }
 
         let mut height_map_out = vec![0u32; THALASSIC_CELL_COUNT as usize];
         let point_count = self.depth_projector_pipeline.get_pixel_count().get();
 
         if self.height_map_pipeline.will_process() {
-            self.height_map_pipeline.request_clear_cells();
+            // self.height_map_pipeline.request_clear_cells();
             self.height_map_pipeline
                 .process(point_count, &mut height_map_out);
 
@@ -318,20 +316,25 @@ fn index_to_xy(index: usize) -> (usize, usize) {
 // Compute weight using depth difference - Gaussian range weight
 // Combine weights to get final weight for each neighbor
 // Find a weighted average of neighbor depths
-fn bilateral_filter(frame: &mut IceoryxDepthFrame<DEPTH_FRAME_SIZE>, radius: i32, sigma_spatial: f32, sigma_range: f32) {
+fn bilateral_filter(
+    frame: &mut IceoryxDepthFrame<DEPTH_FRAME_SIZE>,
+    radius: i32,
+    sigma_spatial: f32,
+    sigma_range: f32,
+) {
     let width = DEPTH_FRAME_WIDTH as i32;
     let height = DEPTH_FRAME_HEIGHT as i32;
-    
-    // temporary copy for reading 
+
+    // temporary copy for reading
     let mut temp_frame = frame.clone();
-    
+
     // Precompute spatial weights for efficiency
     let mut spatial_weights = vec![0.0f32; (2 * radius + 1) as usize];
     for i in 0..spatial_weights.len() {
         let distance = (i as i32 - radius) as f32;
         spatial_weights[i] = (-distance * distance / (2.0 * sigma_spatial * sigma_spatial)).exp();
     }
-    
+
     // get depth value at position, handling invalid depths (0)
     let get_depth = |depths: &[u16], x: i32, y: i32| -> Option<u16> {
         if x < 0 || x >= width || y < 0 || y >= height {
@@ -341,33 +344,33 @@ fn bilateral_filter(frame: &mut IceoryxDepthFrame<DEPTH_FRAME_SIZE>, radius: i32
         let depth = depths[idx];
         if depth == 0 { None } else { Some(depth) }
     };
-    
+
     // compute range weight
     let range_weight = |center_depth: u16, neighbor_depth: u16| -> f32 {
         let diff = (center_depth as f32 - neighbor_depth as f32) * frame.depth_scale;
         (-diff * diff / (2.0 * sigma_range * sigma_range)).exp()
     };
-    
+
     // Pass 1: Horizontal filtering
     for y in 0..height {
         for x in 0..width {
             let idx = (y * width + x) as usize;
-            
+
             if let Some(center_depth) = get_depth(&temp_frame.depths, x, y) {
                 let mut sum_weights = 0.0f32;
                 let mut sum_depth = 0.0f32;
-                
+
                 for dx in -radius..=radius {
                     if let Some(neighbor_depth) = get_depth(&temp_frame.depths, x + dx, y) {
                         let spatial_w = spatial_weights[(dx + radius) as usize];
                         let range_w = range_weight(center_depth, neighbor_depth);
                         let weight = spatial_w * range_w;
-                        
+
                         sum_weights += weight;
                         sum_depth += neighbor_depth as f32 * weight;
                     }
                 }
-                
+
                 if sum_weights > 0.0 {
                     frame.depths[idx] = (sum_depth / sum_weights).round() as u16;
                 } else {
@@ -377,31 +380,30 @@ fn bilateral_filter(frame: &mut IceoryxDepthFrame<DEPTH_FRAME_SIZE>, radius: i32
             // If center depth is invalid (0), leave it as is
         }
     }
-    
+
     // Update temp with horizontal filtered results for vertical pass
     temp_frame = frame.clone();
-    
+
     // Pass 2: Vertical filtering
     for y in 0..height {
         for x in 0..width {
             let idx = (y * width + x) as usize;
-            
+
             if let Some(center_depth) = get_depth(&temp_frame.depths, x, y) {
                 let mut sum_weights = 0.0f32;
                 let mut sum_depth = 0.0f32;
-                
+
                 for dy in -radius..=radius {
                     if let Some(neighbor_depth) = get_depth(&temp_frame.depths, x, y + dy) {
-
                         let spatial_w = spatial_weights[(dy + radius) as usize];
                         let range_w = range_weight(center_depth, neighbor_depth);
                         let weight = spatial_w * range_w;
-                        
+
                         sum_weights += weight;
                         sum_depth += neighbor_depth as f32 * weight;
                     }
                 }
-                
+
                 if sum_weights > 0.0 {
                     frame.depths[idx] = (sum_depth / sum_weights).round() as u16;
                 } else {
