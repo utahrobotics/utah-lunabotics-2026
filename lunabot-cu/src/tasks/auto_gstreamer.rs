@@ -19,6 +19,9 @@ use crate::tasks::NewDevice;
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 pub use cu_gstreamer::CuGstBuffer;
 
+use crate::rerun_viz::RECORDER;
+use rerun::{VideoStream, components::VideoCodec};
+
 pub type CuDefaultAutoGStreamer = CuAutoGStreamer<16>;
 
 /// Automatically starts a GStreamer pipeline when the desired camera is detected by `UdevMonitor`.
@@ -145,9 +148,17 @@ impl<const N: usize> CuTask for CuAutoGStreamer<N> {
         // Process frames (non-blocking)
         let frame = self.circular_buffer.lock().unwrap().pop_front();
         if let Some(buffer) = frame {
+
             output.tov = clock.now().into();
             output.set_payload(buffer);
             self.last_frame_time = Some(Instant::now());
+
+            let _ = RECORDER.get().unwrap().recorder.log(
+                "auto_gstreamer",
+                &VideoStream::new(VideoCodec::H265)
+                    .with_sample(frame)
+            );
+            
         } else {
             output.clear_payload();
         }
