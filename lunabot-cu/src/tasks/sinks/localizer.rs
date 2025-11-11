@@ -157,11 +157,12 @@ impl CuSinkTask for Localizer {
                     Quaternion::from_xyzw(pose_msg.rotation.as_vector().cast::<f32>().data.0[0]),
                 ),
             );
-            self.root_node.set_isometry(pose_msg);
+            //self.root_node.set_isometry(pose_msg);
         }
 
         // Step filter forward in time
         let dt: f64 = ((clock.now() - self.most_recent_update).as_nanos() as f64) / 1e9;
+        self.most_recent_update = clock.now();
         self.kalman_filter.step_time(dt);
 
         // Apply all data
@@ -266,6 +267,43 @@ impl CuSinkTask for Localizer {
                 self.kalman_filter
                     .apply_measurement(&state, &covariance_matrix);
             }
+        }
+
+
+
+        // Convert to isometry (ideally, in the future, all parts of the state
+        // and covariance would be sent)
+        let current_state = self.kalman_filter.get_current_state();
+        let mut iso_vector = SimpleVector::<6>::from_element(0.0);
+        iso_vector[(0,0)] = current_state[(0, 0)];
+        iso_vector[(1,0)] = current_state[(1, 0)];
+        iso_vector[(2,0)] = current_state[(2, 0)];
+        iso_vector[(3,0)] = current_state[(9, 0)];
+        iso_vector[(4,0)] = current_state[(10, 0)];
+        iso_vector[(5,0)] = current_state[(11, 0)];
+        let current_iso = vec_to_iso(iso_vector);
+        self.root_node.set_isometry(current_iso);
+
+        // Log
+        if 
+            let Some(logger) = RECORDER.get() 
+            && self.last_rerun_log.elapsed().as_millis() > 1000/60
+        {
+            self.last_rerun_log = Instant::now();
+            let _ = logger.recorder.log(
+                "kalman_state/state",
+                &rerun::Tensor::new(
+                    current_state.data.as_slice()
+                ),
+            );
+            let _ = logger.recorder.log(
+                "kalman_state/pose",
+                &rerun::Transform3D::from_translation_rotation(
+                    current_iso.translation.vector.data.0[0],
+                    Quaternion::from_xyzw(current_iso.rotation.as_vector().cast::<f32>().data.0[0]),
+                ),
+            );
+            // TODO add proper logging and display for other state components
         }
 
         Ok(())
