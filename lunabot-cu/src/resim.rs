@@ -19,7 +19,7 @@ const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 
 pub static ROOT_NODE: OnceLock<StaticNode> = OnceLock::new();
 
-pub static TARGET_HZ: usize = 100000; // MUST BE THE SAME AS THE TARGET HZ IN COPPERCONFIG.RON
+pub static TARGET_HZ: usize = 1000000; // MUST BE THE SAME AS THE TARGET HZ IN COPPERCONFIG.RON
 
 #[copper_runtime(config = "copperconfig.ron", sim_mode = true)]
 struct LunabotApplication {}
@@ -78,7 +78,6 @@ fn run_one_copperlist(
             default::SimStep::GstConvertBack(..) => SimOverride::ExecutedBySim,
             default::SimStep::GstConvertSide(..) => SimOverride::ExecutedBySim,
             default::SimStep::GstConvertLaptopFront(..) => SimOverride::ExecutedBySim,
-            default::SimStep::T265Subscriber(_) => SimOverride::ExecutedBySim,
 
             default::SimStep::L2Pointcloud(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_l_2_pointcloud_output().clone();
@@ -126,6 +125,11 @@ fn run_one_copperlist(
             }
             default::SimStep::RealsenseSubscriber(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_realsense_subscriber_output().clone();
+                output.tov = robot_clock.now().into();
+                SimOverride::ExecutedBySim
+            }
+            default::SimStep::T265Subscriber(CuTaskCallbackState::Process(_, output)) => {
+                *output = msgs.get_t_265_subscriber_output().clone();
                 output.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
@@ -177,7 +181,7 @@ fn main() {
             // ))
             // .expect("Failed to initialize rerun viz.");
 
-            rerun_viz::init_rerun(rerun_viz::RerunViz::Log(rerun_viz::Level::All)).expect(
+            rerun_viz::init_rerun(rerun_viz::RerunViz::Viz(rerun_viz::Level::All)).expect(
                 "Failed to initialize Rerun. Please check that the rerun binary is in your path.",
             );
 

@@ -157,8 +157,8 @@ impl CuSinkTask for Localizer {
                     Quaternion::from_xyzw(pose_msg.rotation.as_vector().cast::<f32>().data.0[0]),
                 ),
             );
-            //self.root_node.set_isometry(pose_msg);
         }
+
 
         // Step filter forward in time
         let dt: f64 = ((clock.now() - self.most_recent_update).as_nanos() as f64) / 1e9;

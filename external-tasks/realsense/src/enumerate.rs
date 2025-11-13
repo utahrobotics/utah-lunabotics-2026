@@ -120,12 +120,9 @@ pub fn enumerate_depth_cameras(serial_numbers: &[&str]) {
                 let Some(prod_line) = device.info(Rs2CameraInfo::ProductLine) else {
                     continue;
                 };
-                if prod_line.to_string_lossy().to_string() == "T200".to_string() {
-                    println!("enabling t265 streams");
-                    enable_t265_streams(&mut config);
-                } else {
-                    enable_d455_streams(&mut config);
-                }
+
+                enable_d455_streams(&mut config);
+
                 // https://gitlab.com/tangram-vision/oss/realsense-rust/-/issues/29
                 drop(device);
                 drop(device_hub);
@@ -157,10 +154,5 @@ pub fn enumerate_depth_cameras(serial_numbers: &[&str]) {
 fn enable_d455_streams(config: &mut Config) -> Result<(), ConfigurationError> {
     config.enable_stream(Rs2StreamKind::Depth, None, 640, 480, Rs2Format::Z16, 30)?;
     config.enable_stream(Rs2StreamKind::Accel, None, 0, 0, Rs2Format::Any, 0)?;
-    Ok(())
-}
-
-fn enable_t265_streams(config: &mut Config) -> Result<(), ConfigurationError> {
-    config.enable_stream(Rs2StreamKind::Pose, None, 0, 0, Rs2Format::Any, 0)?;
     Ok(())
 }
