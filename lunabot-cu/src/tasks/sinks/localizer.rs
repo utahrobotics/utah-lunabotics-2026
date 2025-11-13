@@ -1,4 +1,4 @@
-use std::{collections::HashMap, f64::consts::PI};
+use std::f64::consts::PI;
 
 use crate::rerun_viz;
 use crate::rerun_viz::RECORDER;
@@ -13,40 +13,21 @@ use cu29::{
     input_msg,
 };
 use embedded_common::FromPicoV3;
-use iceoryx_types::PoseMsg;
-use iceoryx2::{
-    node::NodeBuilder,
-    port::publisher::Publisher,
-    prelude::{ServiceName, UnableToDeliverStrategy},
-    service::ipc,
-};
-use nalgebra::{
-    Dim, Isometry3, Matrix, RawStorage, RawStorageMut, UnitQuaternion, UnitVector3, Vector3,
-};
+
+use nalgebra::{Dim, Isometry3, Matrix, RawStorage, RawStorageMut, Vector3};
 use rerun::Quaternion;
 use simple_motion::StaticNode;
 
-use crate::{
-    ROOT_NODE,
-    utils::{lerp, lerp_value, swing_twist_decomposition},
-};
+use crate::ROOT_NODE;
 
 use kalman_filter::*;
 
-const ACCELEROMETER_LERP_SPEED: f64 = 150.0;
-const LOCALIZATION_DELTA: f64 = 1.0 / 60.0;
 /// Represents the variance assigned to values that are completely unknown. Should be extremely large.
 const UNKNOWN_PRIOR_VARIANCE: f64 = 1e64;
 
 pub struct Localizer {
     root_node: StaticNode,
     last_rerun_log: Instant,
-    kiss_icp_correction: Option<Isometry3<f64>>,
-    last_icp_reading: Option<(Isometry3<f64>, u64)>,
-    last_imu_orientation: Option<(OrientationComponents, u64)>,
-    // publishes EncodableIsometry at 60hz
-    root_node_publisher: Publisher<ipc::Service, [f64; 16], ()>,
-    realsense_node_publisher: Publisher<ipc::Service, [f64; 16], ()>,
     /// Stores all information of kalman filter, including past values, and update logic.
     kalman_filter: KalmanFilter<15>,
     most_recent_update: CuTime,
@@ -68,41 +49,6 @@ impl CuSinkTask for Localizer {
     where
         Self: Sized,
     {
-        let node = NodeBuilder::new()
-            .create::<ipc::Service>()
-            .map_err(|e| CuError::new_with_cause("Localizer: node create", e))?;
-
-        let service = node
-            .service_builder(
-                &ServiceName::new("localizer/root_isometry")
-                    .map_err(|e| CuError::new_with_cause("Localizer: invalid service name", e))?,
-            )
-            .publish_subscribe::<[f64; 16]>()
-            .enable_safe_overflow(true)
-            .open_or_create()
-            .map_err(|e| CuError::new_with_cause("Localizer: service", e))?;
-
-        let publisher = service
-            .publisher_builder()
-            .create()
-            .map_err(|e| CuError::new_with_cause("Localizer: publisher", e))?;
-
-        let service_realsense = node
-            .service_builder(
-                &ServiceName::new("localizer/realsense_isometry")
-                    .map_err(|e| CuError::new_with_cause("Localizer: invalid service name", e))?,
-            )
-            .publish_subscribe::<[f64; 16]>()
-            .enable_safe_overflow(true)
-            .open_or_create()
-            .map_err(|e| CuError::new_with_cause("Localizer: service", e))?;
-
-        let publisher_realsense = service_realsense
-            .publisher_builder()
-            .unable_to_deliver_strategy(UnableToDeliverStrategy::Block)
-            .create()
-            .map_err(|e| CuError::new_with_cause("Localizer: publisher", e))?;
-
         let kalman_filter = KalmanFilter::new(
             SimpleVector::from_element(0.0),
             SimpleSquareMatrix::from_diagonal_element(100.0),
@@ -113,11 +59,6 @@ impl CuSinkTask for Localizer {
             return Ok(Self {
                 root_node: root_node.clone(),
                 last_rerun_log: Instant::now(),
-                kiss_icp_correction: None,
-                last_icp_reading: None,
-                last_imu_orientation: None,
-                root_node_publisher: publisher,
-                realsense_node_publisher: publisher_realsense,
                 kalman_filter,
                 most_recent_update: CuTime::default(),
             });
@@ -321,6 +262,7 @@ fn vec_to_iso(vec: SimpleVector<6>) -> Isometry3<f64> {
     Isometry3::<f64>::new(translation, rotation)
 }
 
+#[allow(unused)]
 fn iso_to_vec(iso: Isometry3<f64>) -> SimpleVector<6> {
     let rotation_vector = iso.rotation.scaled_axis();
 
@@ -361,14 +303,6 @@ fn array_to_matrix_6x6(array: &[f64; 36]) -> SimpleSquareMatrix<6> {
     }
 
     result
-}
-
-#[derive(Debug, Clone)]
-struct OrientationComponents {
-    swing: UnitQuaternion<f64>,
-    twist: UnitQuaternion<f64>,
-    full_rotation: UnitQuaternion<f64>,
-    translation: Vector3<f64>,
 }
 
 impl Localizer {
@@ -451,156 +385,11 @@ impl Localizer {
         (result_state, result_variance)
     }
 
-    /// Compute swing-twist components from IMU data
-    /// Returns swing (pitch/roll from gravity) and twist (unreliable yaw)
-    fn compute_imu_swing_twist(&self, acceleration: Vector3<f64>) -> Option<OrientationComponents> {
-        let mut isometry = self.root_node.get_global_isometry();
-        let down_axis = Vector3::z_axis();
-
-        if acceleration.x.is_finite() && acceleration.y.is_finite() && acceleration.z.is_finite() {
-            let acceleration_world =
-                UnitVector3::new_normalize(isometry.transform_vector(&acceleration));
-
-            let angle = down_axis.angle(&acceleration_world)
-                * lerp_value(LOCALIZATION_DELTA, ACCELEROMETER_LERP_SPEED);
-
-            if angle > 0.001 {
-                let cross = UnitVector3::new_normalize(down_axis.cross(&acceleration_world));
-                isometry.append_rotation_wrt_center_mut(&UnitQuaternion::from_axis_angle(
-                    &cross, -angle,
-                ));
-            }
-
-            let (swing, twist) = swing_twist_decomposition(&isometry.rotation, &down_axis);
-
-            Some(OrientationComponents {
-                swing,
-                twist,
-                full_rotation: isometry.rotation,
-                translation: isometry.translation.vector,
-            })
-        } else {
-            None
-        }
-    }
-
-    /// Compute swing-twist components from AprilTag data
-    fn compute_apriltag_swing_twist(
-        &self,
-        camera_transforms: &Box<HashMap<String, EncodableIsometry>>,
-    ) -> Option<OrientationComponents> {
-        let mut isometry = Isometry3::identity();
-        let mut all_observer_isometries = Vec::new();
-
-        for (camera_id, transform) in camera_transforms.iter() {
-            if let Some(camera_node) = self.root_node.get_node_with_name(camera_id) {
-                let mut camera_isometry = camera_node.get_isometry_from_base();
-                camera_isometry.inverse_mut();
-
-                let camera_observer_iso: Isometry3<f64> = transform.to_na()?;
-                let robot_frame_observer_iso = camera_observer_iso * camera_isometry;
-
-                all_observer_isometries.push(robot_frame_observer_iso);
-            } else {
-                eprintln!("camera node: {} not found", camera_id);
-                return None;
-            }
-        }
-
-        if !all_observer_isometries.is_empty() {
-            let combined_observer_iso = if all_observer_isometries.len() == 1 {
-                all_observer_isometries[0]
-            } else {
-                let mut sum_translation = Vector3::zeros();
-                for iso in &all_observer_isometries {
-                    sum_translation += iso.translation.vector;
-                }
-                let mean_translation = sum_translation / all_observer_isometries.len() as f64;
-
-                // TODO: make this an actual avg
-                let mean_rotation = all_observer_isometries[0].rotation;
-
-                Isometry3::from_parts(mean_translation.into(), mean_rotation)
-            };
-
-            let down_axis = Vector3::z_axis();
-
-            isometry.translation = combined_observer_iso.translation;
-
-            // Decompose the AprilTag rotation
-            let (swing, twist) =
-                swing_twist_decomposition(&combined_observer_iso.rotation, &down_axis);
-
-            Some(OrientationComponents {
-                swing,
-                twist,
-                full_rotation: combined_observer_iso.rotation,
-                translation: isometry.translation.vector,
-            })
-        } else {
-            None
-        }
-    }
-
-    /// Fuse IMU and AprilTag sensor data using swing-twist decomposition
-    /// Takes swing (pitch/roll) from IMU and twist (yaw) from AprilTags
-    fn fuse_sensor_data(
-        &mut self,
-        imu_components: &Option<OrientationComponents>,
-        apriltag_components: &Option<OrientationComponents>,
-    ) -> Option<Isometry3<f64>> {
-        match (imu_components, apriltag_components) {
-            (Some(imu), Some(apriltag)) => {
-                let fused_rotation = imu.swing * apriltag.twist;
-
-                if fused_rotation.w.is_finite()
-                    && fused_rotation.i.is_finite()
-                    && fused_rotation.j.is_finite()
-                    && fused_rotation.k.is_finite()
-                {
-                    let current_rotation = self.root_node.get_global_isometry().rotation;
-                    let dot_product = current_rotation.coords.dot(&fused_rotation.coords);
-
-                    let target_quat = if dot_product < 0.0 {
-                        UnitQuaternion::new_normalize(-fused_rotation.into_inner())
-                    } else {
-                        fused_rotation
-                    };
-
-                    let interpolated_rotation = UnitQuaternion::new_normalize(lerp(
-                        current_rotation.into_inner(),
-                        target_quat.into_inner(),
-                        LOCALIZATION_DELTA,
-                        ACCELEROMETER_LERP_SPEED,
-                    ));
-
-                    Some(Isometry3::from_parts(
-                        apriltag.translation.into(),
-                        interpolated_rotation,
-                    ))
-                } else {
-                    Some(Isometry3::from_parts(
-                        apriltag.translation.into(),
-                        apriltag.full_rotation,
-                    ))
-                }
-            }
-            (Some(imu), None) => Some(Isometry3::from_parts(
-                imu.translation.into(),
-                imu.full_rotation,
-            )),
-            (None, Some(apriltag)) => Some(Isometry3::from_parts(
-                apriltag.translation.into(),
-                apriltag.full_rotation,
-            )),
-            (None, None) => None,
-        }
-    }
-
     /// Returns the transformation needed to transform src to dst.
     /// Used to find the correction between where kiss_icp thinks the robot
     /// is relative to where the algorithm started mapping, to where the robot
     /// actually is in world coords
+    #[allow(unused)]
     fn transformation_between(relative: Isometry3<f64>, actual: Isometry3<f64>) -> Isometry3<f64> {
         actual * relative.inverse()
     }
