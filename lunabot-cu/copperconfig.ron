@@ -97,7 +97,7 @@
                 "max_num_threads": 10,
                 "convergence_criterion": 0.0001,
                 "max_num_iterations": 500,
-                "max_accumulation": 2
+                "max_accumulation": 3
             },
             logging: (
                 enabled: false

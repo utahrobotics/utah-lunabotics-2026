@@ -3,12 +3,12 @@ use std::f64::consts::PI;
 
 use bincode::{Decode, Encode};
 use cu_apriltag::AprilTagDetections;
+use cu_spatial_payloads::EncodableIsometry;
 use cu29::cutask::CuMsg;
 use cu29::{
     CuResult, clock::RobotClock, config::ComponentConfig, cutask::Freezable, input_msg, prelude::*,
 };
 
-use cu_spatial_payloads::EncodableIsometry;
 use iceoryx2::prelude::ZeroCopySend;
 use kalman_filter::{SimpleSquareMatrix, SimpleVector};
 use ron::de::from_str as ron_from_str;
@@ -98,11 +98,11 @@ pub struct AprilDetectionHandler {
     known_tags: HashMap<usize, Isometry3<f64>>,
 }
 
-#[derive(Clone, Copy, Debug, Encode, Decode, Serialize, ZeroCopySend)]
+#[derive(Clone, Copy, Debug, Encode, Decode, Serialize)]
 #[repr(C)]
 pub struct AprilTagMeasurement {
-    pub position: [f64; 3],
-    pub orientation: [f64; 3],
+    /// Estimated isometry of the observer
+    pub estimated_isometry: EncodableIsometry,
     #[serde(serialize_with = "<[_]>::serialize")]
     pub variance: [f64; 36]
 }
@@ -110,8 +110,7 @@ pub struct AprilTagMeasurement {
 impl Default for AprilTagMeasurement {
     fn default() -> Self {
         Self {
-            position: Default::default(), 
-            orientation: Default::default(), 
+            estimated_isometry: EncodableIsometry::default(),
             variance: [0.0; 36]
         }
     }
@@ -216,7 +215,12 @@ impl CuTask for AprilDetectionHandler {
                         }
                     }
 
-                    result_vec.push(AprilTagMeasurement { position, orientation, variance: combined_covariance });
+                    result_vec.push(AprilTagMeasurement { 
+                        estimated_isometry: EncodableIsometry::from_na(
+                            &Isometry3::from_parts(position.into(), 
+                            UnitQuaternion::from_scaled_axis(orientation.into()))), 
+                        variance: combined_covariance
+                    });
                 }
             }
         }
@@ -270,44 +274,6 @@ impl AprilDetectionHandler {
         Isometry3::from_parts(physics_translation.into(), physics_rotation)
     }
 
-    /// estimates the observers isometry from each observation individually, and then averages them all together
-    /// additionally logs the tags known global coords to rerun with a timestamp so we know the tag has been seen recently.
-    /// filters out tags that are more than 3m away
-    fn estimate_observer_isometry_from_observations(
-        &self,
-        observations: &[TagObservation],
-    ) -> CuResult<Isometry3<f64>> {
-        let mut observer_isometries = Vec::new();
-
-        for observation in observations {
-            let isometry_of_observer = observation.get_isometry_of_observer();
-
-            if isometry_of_observer
-                .translation
-                .vector
-                .metric_distance(&observation.tag_global_isometry.translation.vector)
-                > 3.0
-            {
-                println!(
-                    "apriltag too far away, distance: {}",
-                    isometry_of_observer
-                        .translation
-                        .vector
-                        .metric_distance(&observation.tag_global_isometry.translation.vector)
-                );
-                continue;
-            }
-            observer_isometries.push(isometry_of_observer);
-        }
-
-        if observer_isometries.is_empty() {
-            return Err("No valid tag observations".into());
-        }
-
-        let combined = combine_isometries(&observer_isometries);
-
-        Ok(combined)
-    }
 
     fn cu_detections_to_tag_observations(
         &self,
@@ -381,98 +347,13 @@ impl AprilDetectionHandler {
     }
 }
 
-/// Helper to combine a list of isometries by averaging translation and quaternion
-fn combine_isometries(isometries: &[Isometry3<f64>]) -> Isometry3<f64> {
-    if isometries.is_empty() {
-        return Isometry3::identity();
-    }
-    if isometries.len() == 1 {
-        return isometries[0];
-    }
 
-    let mut sum_translation = Vector3::zeros();
-    for isometry in isometries {
-        sum_translation += isometry.translation.vector;
-    }
-    let mean_translation = sum_translation / isometries.len() as f64;
-
-    let mean_rotation = average_quaternions(
-        &isometries
-            .iter()
-            .map(|iso| iso.rotation)
-            .collect::<Vec<_>>(),
-    );
-
-    Isometry3::from_parts(Translation3::from(mean_translation), mean_rotation)
-}
-
-/// This method converts quaternions to rotation matrices, averages them, and converts back
-fn average_quaternions(quaternions: &[UnitQuaternion<f64>]) -> UnitQuaternion<f64> {
-    if quaternions.is_empty() {
-        return UnitQuaternion::identity();
-    }
-    if quaternions.len() == 1 {
-        return quaternions[0];
-    }
-
-    let mut sum_matrix = nalgebra::Matrix3::zeros();
-    for quat in quaternions {
-        sum_matrix += quat.to_rotation_matrix().matrix();
-    }
-    sum_matrix /= quaternions.len() as f64;
-
-    let svd = sum_matrix.svd(true, true);
-    if let (Some(u), Some(v_t)) = (svd.u, svd.v_t) {
-        let mut rotation_matrix = u * v_t;
-        if rotation_matrix.determinant() < 0.0 {
-            let mut u_corrected = u;
-            u_corrected.set_column(2, &(-u.column(2)));
-            rotation_matrix = u_corrected * v_t;
-        }
-
-        UnitQuaternion::from_rotation_matrix(&nalgebra::Rotation3::from_matrix_unchecked(
-            rotation_matrix,
-        ))
-    } else {
-        // Fallback to component averaging if SVD fails
-        average_quaternions_component_based(quaternions)
-    }
-}
-
-/// Fallback quaternion averaging using component-based approach
-/// This handles the quaternion double-cover issue (q and -q represent the same rotation)
-fn average_quaternions_component_based(quaternions: &[UnitQuaternion<f64>]) -> UnitQuaternion<f64> {
-    if quaternions.is_empty() {
-        return UnitQuaternion::identity();
-    }
-    if quaternions.len() == 1 {
-        return quaternions[0];
-    }
-
-    // Use the first quaternion as reference for handling double-cover
-    let reference = quaternions[0];
-    let mut sum = reference.coords;
-
-    for quat in &quaternions[1..] {
-        // Handle quaternion double-cover: choose the quaternion representation
-        let quat_coords = if reference.coords.dot(&quat.coords) >= 0.0 {
-            quat.coords
-        } else {
-            -quat.coords
-        };
-        sum += quat_coords;
-    }
-
-    // Average and normalize
-    let mean_coords = sum / quaternions.len() as f64;
-    UnitQuaternion::new_normalize(nalgebra::Quaternion::from(mean_coords))
-}
 
 use nalgebra::{
-    Isometry3, Matrix3, Matrix4, Quaternion, Rotation, Rotation3, Translation3, UnitQuaternion,
-    UnitVector3, Vector3,
+    Isometry3, Rotation3, UnitQuaternion,
+    Vector3,
 };
-use rerun::{Archetype, Arrows3D, Boxes3D, Vector3D};
+use rerun::{Boxes3D};
 
 /// An observation of the global orientation and position
 /// of the camera that observed an apriltag.

@@ -111,12 +111,11 @@ impl CuSrcTask for T265Subscriber {
             let t265_rotation =
                 UnitQuaternion::new_normalize(nalgebra::Quaternion::new(qw, -qz, -qx, qy));
 
-            let t265_pose_in_world = Isometry3::from_parts(t265_translation.into(), t265_rotation);
+            let t265_pose = Isometry3::from_parts(t265_translation.into(), t265_rotation);
 
             let base_to_t265 = self.node.get_isometry_from_base().cast::<f32>();
 
-            // robot_pose * base_to_t265 = t265_pose_in_world
-            let robot_pose = t265_pose_in_world * base_to_t265.inverse();
+            let robot_pose = t265_pose * base_to_t265.inverse();
 
             // t264 starts with a basically arbitrary "twist" error
             if self.initial_yaw_offset.is_none() {
