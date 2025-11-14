@@ -74,7 +74,7 @@ impl CuSinkTask for MotorController {
     fn preprocess(&mut self, _clock: &RobotClock) -> CuResult<()> {
         Ok(())
     }
-// this checks for changes in weight and appies weight && sets speed :)
+
 
     fn process(&mut self, _clock: &RobotClock, input: &Self::Input<'_>) -> CuResult<()> {
         if let Some(payload) = input.payload() {
