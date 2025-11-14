@@ -7,6 +7,7 @@ var actor: Node
 
 @export var deadzone: float = 0.2
 
+
 var command_recorder: CommandRecorder
 
 # track previous state to detect button releases
@@ -16,6 +17,9 @@ var prev_bucket_input: float = 0.0
 # previous steering to avoid sending duplicate commands
 var prev_left_speed: float = 0.0
 var prev_right_speed: float = 0.0
+
+#high low gear boolean 
+var is_low_gear: bool = true
 
 
 func _ready() -> void:
@@ -48,6 +52,7 @@ func _process(_delta: float) -> void:
 	var backward_input: float = max(backward_trigger, keyboard_backward)
 	var turn_input: float = joy_turn if abs(joy_turn) > deadzone else keyboard_turn
 	
+	
 	# apply deadzone to turn input
 	if abs(turn_input) < deadzone:
 		turn_input = 0.0
@@ -59,8 +64,8 @@ func _process(_delta: float) -> void:
 	var left_speed: float = forward_backward + turn_input
 	var right_speed: float = forward_backward - turn_input
 	
-	left_speed = clamp(left_speed, -1.0, 1.0)
-	right_speed = clamp(right_speed, -1.0, 1.0)
+	left_speed = clamp(left_speed, -1, 1)
+	right_speed = clamp(right_speed, -1, 1)
 	
 	# Only send steering command if it changed (avoid spamming)
 	# I have had problems where if the trigger is partially pressed it sends a bajillion commands with tiny changes
@@ -71,6 +76,8 @@ func _process(_delta: float) -> void:
 		command_recorder.execute_and_store(cmd)
 		prev_left_speed = left_speed
 		prev_right_speed = right_speed
+		
+
 	
 	# === LIFT ACTUATORS (Keyboard Q/E + D-pad) ===
 	# Sim env doesnt have actuators yet, this will need testing in real life
@@ -91,6 +98,23 @@ func _process(_delta: float) -> void:
 		cmd.lift = int(lift_input * 127.0)
 		command_recorder.execute_and_store(cmd)
 		prev_lift_input = lift_input
+		
+	#=====High and Low Feature, maybe reverse mode (r1 to toggle high and low)
+	if Input.is_action_just_pressed("toggle_high") or Input.is_action_just_pressed("toggle_high_keyboard"):
+		is_low_gear = !is_low_gear
+		if is_low_gear:
+			var cmd := SetSpeedMultiplier.new()
+			cmd.weight = 1250
+			command_recorder.execute_and_store(cmd)
+			print("speed multiplier now 1250")
+		else:
+			var cmd := SetSpeedMultiplier.new()
+			cmd.weight = 7000
+			command_recorder.execute_and_store(cmd)
+			print("speed multiplier now 7000")
+		
+	
+	
 	
 	# === BUCKET ACTUATORS (Keyboard Z/C + Y/A buttons) ===
 	# This might be a bit clunky tbh, someone who is a gamer might have better ideas

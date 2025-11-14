@@ -10,6 +10,8 @@ extends Control
 @onready var manual_button: Button = $VBoxContainer/BottomPanel/ManualButton
 @onready var autonomous_button: Button = $VBoxContainer/BottomPanel/AutonomousButton
 @onready var errored_tasks_label: Label = $VBoxContainer/CenterContainer/HBoxContainer/ErroredTasksPanel/MarginContainer/ScrollContainer/VBox/ErroredTasksLabel
+@onready var current_gear: Label = $VBoxContainer/TopPanel/GearLabel
+
 
 # Should match the LunabotStage enum in the Rust extension
 enum LunabotStage {
@@ -61,6 +63,16 @@ func _process(delta: float) -> void:
 		LunabotStage.AUTONOMY:
 			stage_label.text = "Stage: Autonomy"
 			stage_label.modulate = Color.CYAN
+	
+	
+	if controller.is_low_gear:
+		current_gear.text = "Gear: Low"
+		current_gear.modulate = Color.YELLOW
+	else:
+		current_gear.text = "Gear: High"
+		current_gear.modulate = Color.LIME_GREEN
+	
+	
 	
 	# Update errored tasks
 	var errored_tasks: Dictionary = connection.get_errored_tasks()

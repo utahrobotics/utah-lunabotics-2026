@@ -50,6 +50,10 @@ text = "Last Packet: 0ms"
 layout_mode = 2
 text = "Stage: Unknown"
 
+[node name="GearLabel" type="Label" parent="VBoxContainer/TopPanel"]
+layout_mode = 2
+text = "Gear: unknown"
+
 [node name="CenterContainer" type="CenterContainer" parent="VBoxContainer"]
 layout_mode = 2
 size_flags_vertical = 3
