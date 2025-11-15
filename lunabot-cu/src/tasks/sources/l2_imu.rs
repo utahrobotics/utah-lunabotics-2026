@@ -166,12 +166,11 @@ impl CuSrcTask for ImuIceoryxReceiver {
                 );
                 //self.root_node.set_isometry(pose_msg);
             }
+            let imu_quaternion_base = base_to_l2.inverse() * imu_quaternion_sensor;
 
             // TODO: figure out if these transformations are right
-            let acc = base_to_l2.inverse() * imu_linear_acceleration;
+            let acc = imu_quaternion_base * (base_to_l2.inverse() * imu_linear_acceleration);
             let gyr = base_to_l2.inverse() * imu_angular_velocity;
-
-            let imu_quaternion_base = base_to_l2.inverse() * imu_quaternion_sensor;
 
             let orientation_state = imu_quaternion_base
                 .axis()
