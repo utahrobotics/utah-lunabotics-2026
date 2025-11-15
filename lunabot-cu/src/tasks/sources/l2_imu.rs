@@ -13,6 +13,7 @@ use iceoryx2::prelude::*;
 use iceoryx2::service::port_factory::publish_subscribe::PortFactory;
 use kalman_filter::SimpleVector;
 use serde::Serialize;
+use crate::rerun_viz::RECORDER;
 
 use crate::ROOT_NODE;
 use iceoryx_types::ImuMsg;
@@ -156,6 +157,15 @@ impl CuSrcTask for ImuIceoryxReceiver {
                 imu_raw.quaternion[2] as f64,
                 imu_raw.quaternion[3] as f64,
             ));
+            
+            if let Some(logger) = RECORDER.get()
+            {
+                let _ = logger.recorder.log(
+                    "imu_raw",
+                    &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(imu_linear_acceleration.x as f32, imu_linear_acceleration.y as f32, imu_linear_acceleration.z as f32)]),
+                );
+                //self.root_node.set_isometry(pose_msg);
+            }
 
             // TODO: figure out if these transformations are right
             let acc = base_to_l2.inverse() * imu_linear_acceleration;

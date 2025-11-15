@@ -102,6 +102,16 @@ impl CuSinkTask for Localizer {
             //self.root_node.set_isometry(pose_msg);
         }
 
+        if let Some(imu_measurement) = input.0.payload()
+            && let Some(logger) = RECORDER.get()
+        {
+            let _ = logger.recorder.log(
+                "imu_corercted",
+                &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(imu_measurement.acceleration[0] as f32, imu_measurement.acceleration[1] as f32, imu_measurement.acceleration[2] as f32)]),
+            );
+            //self.root_node.set_isometry(pose_msg);
+        }
+
         // Step filter forward in time
         let dt: f64 = ((clock.now() - self.most_recent_update).as_nanos() as f64) / 1e9;
         self.most_recent_update = clock.now();
@@ -221,10 +231,35 @@ impl CuSinkTask for Localizer {
             let current_iso = vec_to_iso(iso_vector);
             self.root_node.set_isometry(current_iso);
 
+            // Variance
             let _ = logger.recorder.log(
                 "kalman_state/state",
-                &rerun::Tensor::new(current_state.data.as_slice()),
+                &rerun::Tensor::new(self.kalman_filter.get_current_covariance().data.as_slice()),
             );
+
+            // State
+            let _ = logger.recorder.log(
+                "kalman_state/position",
+                &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(current_state[0] as f32, current_state[1] as f32, current_state[2] as f32)]),
+            );
+            let _ = logger.recorder.log(
+                "kalman_state/velocity",
+                &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(current_state[3] as f32, current_state[4] as f32, current_state[5] as f32)]),
+            );
+            let _ = logger.recorder.log(
+                "kalman_state/acceleration",
+                &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(current_state[6] as f32, current_state[7] as f32, current_state[8] as f32)]),
+            );
+            let _ = logger.recorder.log(
+                "kalman_state/orientation",
+                &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(current_state[9] as f32, current_state[10] as f32, current_state[11] as f32)]),
+            );
+            let _ = logger.recorder.log(
+                "kalman_state/angular_velocity",
+                &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(current_state[12] as f32, current_state[13] as f32, current_state[14] as f32)]),
+            );
+
+            // Robot position
             if let Err(e) = logger.recorder.log(
                 rerun_viz::ROBOT_STRUCTURE,
                 &rerun::Transform3D::from_translation_rotation(
