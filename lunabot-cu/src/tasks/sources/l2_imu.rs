@@ -71,15 +71,15 @@ impl CuSrcTask for ImuIceoryxReceiver {
             .map_err(|e| CuError::new_with_cause("ImuIceoryxReceiver: node create", e))?;
 
         let diagonal = SimpleVector::<9>::from_column_slice(&[
-            0.005 as f64, // Acceleration variance
-            0.005 as f64,
-            0.005 as f64,
-            0.05 as f64, // Orientation variance
+            0.05 as f64, // Acceleration variance
             0.05 as f64,
             0.05 as f64,
-            0.1 as f64, // Angular velocity variance
-            0.1 as f64,
-            0.1 as f64,
+            0.005 as f64, // Orientation variance
+            0.005 as f64,
+            0.005 as f64,
+            0.1 * 1E64 as f64, // Angular velocity variance
+            0.1 * 1E64 as f64,
+            0.1 * 1E64 as f64,
         ]);
         let variance: [f64; 81] = kalman_filter::SimpleSquareMatrix::<9>::from_diagonal(&diagonal)
             .as_slice()
@@ -169,7 +169,7 @@ impl CuSrcTask for ImuIceoryxReceiver {
             let imu_quaternion_base = base_to_l2.inverse() * imu_quaternion_sensor;
 
             // TODO: figure out if these transformations are right
-            let acc = imu_quaternion_base * (base_to_l2.inverse() * imu_linear_acceleration);
+            let acc = imu_quaternion_base * imu_linear_acceleration;
             let gyr = base_to_l2.inverse() * imu_angular_velocity;
 
             let orientation_state = imu_quaternion_base
@@ -211,7 +211,7 @@ impl CuSrcTask for ImuIceoryxReceiver {
 
             // After warmup, subtract the measured gravity magnitude in the z direction
             let actual_message = ImuMeasurement {
-                acceleration: [acc.x, acc.y, acc.z - self.gravity_magnitude],
+                acceleration: [acc.x, acc.y, acc.z - 9.8],//self.gravity_magnitude],
                 angular_velocity: [gyr.x, gyr.y, gyr.z],
                 orientation: [imu_orientation.x, imu_orientation.y, imu_orientation.z],
                 variance: self.imu_variance,
