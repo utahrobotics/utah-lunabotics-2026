@@ -10,7 +10,17 @@ extends Control
 @onready var manual_button: Button = $VBoxContainer/BottomPanel/ManualButton
 @onready var autonomous_button: Button = $VBoxContainer/BottomPanel/AutonomousButton
 @onready var errored_tasks_label: Label = $VBoxContainer/CenterContainer/HBoxContainer/ErroredTasksPanel/MarginContainer/ScrollContainer/VBox/ErroredTasksLabel
-@onready var current_gear: Label = $VBoxContainer/TopPanel/GearLabel
+@onready var speed_label: Label = $VBoxContainer/TopPanel/SpeedLabel
+@onready var speed_slider: HSlider = $SpeedMultiplierSlider
+
+var command_recorder: CommandRecorder
+
+#Speed Slider
+
+var set_weight:= SetSpeedMultiplier.new()
+var weight: float
+
+
 
 
 # Should match the LunabotStage enum in the Rust extension
@@ -27,6 +37,14 @@ func _ready() -> void:
 	soft_stop_button.pressed.connect(_on_soft_stop_pressed)
 	manual_button.pressed.connect(_on_manual_pressed)
 	autonomous_button.pressed.connect(_on_autonomous_pressed)
+	
+	
+	speed_slider.value = 0;
+	var new_weight = connection.set_speed(weight)
+	
+	speed_label.text = "SpeedMultiplier set to " + str(new_weight)
+	
+	
 
 
 func _process(delta: float) -> void:
@@ -65,12 +83,7 @@ func _process(delta: float) -> void:
 			stage_label.modulate = Color.CYAN
 	
 	
-	if controller.is_low_gear:
-		current_gear.text = "Gear: Low"
-		current_gear.modulate = Color.YELLOW
-	else:
-		current_gear.text = "Gear: High"
-		current_gear.modulate = Color.LIME_GREEN
+
 	
 	
 	
@@ -114,3 +127,12 @@ func _on_manual_pressed() -> void:
 func _on_autonomous_pressed() -> void:
 	print("Sending Navigate command (Autonomous mode)")
 	controller.command_recorder.execute_and_store(NavigateCommand.new())
+	
+
+func _on_speed_multiplier_slider_value_changed(value: float) -> void:
+	# Update slider weight
+	var new_weight = connection.set_speed(value)
+
+	# Update UI
+	speed_label.text = "SpeedMultiplier set to " + str(new_weight)
+	print("Speed Multiplier set to ", new_weight)

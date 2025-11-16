@@ -22,6 +22,7 @@ var prev_right_speed: float = 0.0
 var is_low_gear: bool = true
 
 
+
 func _ready() -> void:
 	if actor_path:
 		actor = get_node(actor_path)
