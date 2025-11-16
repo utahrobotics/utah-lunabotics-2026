@@ -84,13 +84,15 @@ KEYBOARD CONTROLS:
 • A/D: Turn Left/Right
 • Q/E: Lift Down/Up
 • Z/C: Bucket Down/Up
+-Shift:Low Gear/High Gear
 
 GAMEPAD CONTROLS:
 • Right Trigger: Forward
 • Left Trigger: Backward
 • Left Joystick: Turning
 • D-pad Up/Down: Lift Actuators
-• Y/A Buttons: Bucket Actuators"
+• Y/A Buttons: Bucket Actuators
+-R1Bumper: Low/HighGear"
 
 [node name="ErroredTasksPanel" type="PanelContainer" parent="VBoxContainer/CenterContainer/HBoxContainer"]
 custom_minimum_size = Vector2(400, 0)
