@@ -14,7 +14,7 @@ members = [
     "misc/copperconfig-validator",
     "external-tasks/realsense",
     "lunabase-lib",
-    "misc/quic", "misc/auto-start",
+    "misc/quic", "misc/auto-start", "misc/pcl",
 ]
 exclude = ["misc/usb-reset"]
 # Shared dependencies across workspace members

@@ -1,0 +1,9 @@
+[package]
+name = "pcl"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+cubecl = { version = "0.8.1", features = ["wgpu"] }
+nalgebra.workspace = true
+wgpu = { version = "26.0.0", default-features = false }
