@@ -29,7 +29,7 @@
         {
             "name": Some("cam_laptop_front"),
             "origin": [0.2, 0.0, 0.0],
-            "euler": [0.0, 0.0, 180.0]
+            "euler": [0.0, 0.0, 0.0]
         },
         {
             "name": Some("cam_side"),
