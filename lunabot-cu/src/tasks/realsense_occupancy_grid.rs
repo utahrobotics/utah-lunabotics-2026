@@ -10,8 +10,8 @@ use cu29::prelude::*;
 use iceoryx_types::{IceoryxDepthFrame, ImuMsg};
 use nalgebra::{Vector2, Vector4};
 use pcl::cubecl::wgpu::{WgpuDevice, WgpuRuntime};
-use pcl::launch_depth_to_pcl;
 use pcl::utils::get_and_init_cubecl;
+use pcl::{cubecl, launch_depth_to_pcl};
 use rerun::{Color, Points3D};
 use simple_motion::StaticNode;
 
