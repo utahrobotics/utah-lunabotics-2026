@@ -16,6 +16,7 @@ use serde::Deserialize;
 use std::fs;
 use std::path::Path;
 
+use crate::ROOT_NODE;
 use crate::rerun_viz::RECORDER;
 
 
@@ -101,7 +102,7 @@ pub struct AprilDetectionHandler {
 #[derive(Clone, Copy, Debug, Encode, Decode, Serialize)]
 #[repr(C)]
 pub struct AprilTagMeasurement {
-    /// Estimated isometry of the observer
+    /// Estimated isometry of the robot base
     pub estimated_isometry: EncodableIsometry,
     #[serde(serialize_with = "<[_]>::serialize")]
     pub variance: [f64; 36]
@@ -149,7 +150,11 @@ impl CuTask for AprilDetectionHandler {
                 let camera_id = dets.camera_id.as_ref().clone();
                 for observation in self.cu_detections_to_tag_observations(dets, &camera_id) {
                     let distrust = observation.decision_margin * observation.decision_margin;
-                    let isometry = observation.get_isometry_of_observer();
+                    let Some(isometry) = observation.get_isometry_of_observer() else {
+                        eprintln!("tag observed by unknown camera. (make sure the camera node is correct and defined in the chain");
+                        continue;
+                    };
+
 
                     // Translational
                     let position_state: SimpleVector<3> = isometry.translation.vector;
@@ -283,6 +288,7 @@ impl AprilDetectionHandler {
         let mut apriltags = Vec::new();
         for (id, pose, _) in dets.filtered_by_decision_margin(60.0) {
             if !self.known_tags.contains_key(&id) {
+                eprintln!("apriltag {id} seen but not defined in list of known apriltags");
                 continue;
             }
 
@@ -387,12 +393,26 @@ impl std::fmt::Debug for TagObservation {
 }
 
 impl TagObservation {
-    pub fn get_isometry_of_observer(&self) -> Isometry3<f64> {
+    /// gets the isometry of the robot base frame as observed by the camera.
+    /// will return none if the camera node doesn't exist in the chain.
+    pub fn get_isometry_of_observer(&self) -> Option<Isometry3<f64>> {
+        let camera_node = ROOT_NODE.get()?.get_node_with_name(&self.camera_id)?;
+
+        // inverse of the camera isometry relative to robot base
+        let camera_isometry_inverse = camera_node.get_isometry_from_base().inverse();
+
+
+        // tag local isometry is the observed location of the tag as if the camera was always at 0,0,0 facing forward
         let inv_rotation = self.tag_local_isometry.rotation.inverse();
-        self.tag_global_isometry
+
+        // this should be the isometry of the camera relative to the apriltags position.
+        let isometry_of_observer_in_camera_frame = self.tag_global_isometry
             * Isometry3::from_parts(
                 (inv_rotation * -self.tag_local_isometry.translation.vector).into(),
                 inv_rotation,
-            )
+            );
+        
+        // this should be the position of the robot base
+        Some(isometry_of_observer_in_camera_frame * camera_isometry_inverse)
     }
 }
