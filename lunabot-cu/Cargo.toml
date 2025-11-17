@@ -79,7 +79,7 @@ rayon = "1.10"
 
 crossbeam.workspace = true
 
-rerun = { version = "0.25.1", features = ["sdk"], default-features = false }
+rerun = { version = "0.27.2", features = ["sdk"], default-features = false }
 
 # embedded
 embedded_common = { path = "../embedded_common", features = ["std"] }
