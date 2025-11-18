@@ -84,7 +84,9 @@ KEYBOARD CONTROLS:
 • A/D: Turn Left/Right
 • Q/E: Lift Down/Up
 • Z/C: Bucket Down/Up
--Shift:Low Gear/High Gear
+-Up arrow: increment speed
+-Down arrow : decrement
+speed
 
 GAMEPAD CONTROLS:
 • Right Trigger: Forward
@@ -92,7 +94,9 @@ GAMEPAD CONTROLS:
 • Left Joystick: Turning
 • D-pad Up/Down: Lift Actuators
 • Y/A Buttons: Bucket Actuators
--R1Bumper: Low/HighGear"
+-R1Bumper:  increment speed
+-L1 Bumper: decrement speed
+              "
 
 [node name="ErroredTasksPanel" type="PanelContainer" parent="VBoxContainer/CenterContainer/HBoxContainer"]
 custom_minimum_size = Vector2(400, 0)
@@ -159,15 +163,15 @@ layout_mode = 1
 anchors_preset = -1
 anchor_right = 0.263
 anchor_bottom = 0.025
-offset_left = 838.0
-offset_top = 27.0
-offset_right = 772.024
-offset_bottom = 63.8
+offset_left = 755.0
+offset_top = 21.0
+offset_right = 689.0239
+offset_bottom = 57.8
 max_value = 7000.0
 
 [node name="BackgroundImage" type="Sprite2D" parent="."]
 show_behind_parent = true
-position = Vector2(709, 364)
+position = Vector2(631, 332)
 scale = Vector2(0.20234582, 0.15254329)
 texture = ExtResource("3_w6ul0")
 

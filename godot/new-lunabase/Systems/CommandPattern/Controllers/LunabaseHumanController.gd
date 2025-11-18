@@ -7,6 +7,7 @@ var actor: Node
 
 @export var deadzone: float = 0.2
 
+@onready var speed_slider = $"../SpeedMultiplierSlider"
 
 var command_recorder: CommandRecorder
 
@@ -18,8 +19,6 @@ var prev_bucket_input: float = 0.0
 var prev_left_speed: float = 0.0
 var prev_right_speed: float = 0.0
 
-#high low gear boolean 
-var is_low_gear: bool = true
 
 
 
@@ -51,12 +50,15 @@ func _process(_delta: float) -> void:
 	
 	var forward_input: float = max(forward_trigger, keyboard_forward)
 	var backward_input: float = max(backward_trigger, keyboard_backward)
+	
 	var turn_input: float = joy_turn if abs(joy_turn) > deadzone else keyboard_turn
 	
-	
+
+
 	# apply deadzone to turn input
 	if abs(turn_input) < deadzone:
 		turn_input = 0.0
+		
 	
 	# forward backward speed
 	var forward_backward: float = forward_input - backward_input
@@ -100,20 +102,21 @@ func _process(_delta: float) -> void:
 		command_recorder.execute_and_store(cmd)
 		prev_lift_input = lift_input
 		
-	#=====High and Low Feature, maybe reverse mode (r1 to toggle high and low)
-	if Input.is_action_just_pressed("toggle_high") or Input.is_action_just_pressed("toggle_high_keyboard"):
-		is_low_gear = !is_low_gear
-		if is_low_gear:
-			var cmd := SetSpeedMultiplier.new()
-			cmd.weight = 1250
-			command_recorder.execute_and_store(cmd)
-			print("speed multiplier now 1250")
-		else:
-			var cmd := SetSpeedMultiplier.new()
-			cmd.weight = 7000
-			command_recorder.execute_and_store(cmd)
-			print("speed multiplier now 7000")
 		
+		
+	#=====Speed Slider increment and decrement
+	const SPEED_SLIDER_STEP := 100
+	if Input.is_action_pressed("increment_speed") || Input.is_action_pressed("increment_speed_keyboard"):
+		speed_slider.value = clamp(speed_slider.value + 
+		SPEED_SLIDER_STEP, 
+		speed_slider.min_value,speed_slider.max_value)
+	
+	if Input.is_action_pressed("decrement_speed") || Input.is_action_pressed("decrement_speed_keyboard"):
+		speed_slider.value = clamp(speed_slider.value -
+		SPEED_SLIDER_STEP,
+		speed_slider.min_value,
+		speed_slider.max_value)
+	
 	
 	
 	
