@@ -36,17 +36,12 @@ func _process(_delta: float) -> void:
 	
 	# === STEERING (Keyboard + Gamepad) ===
 	# GAMEPAD INPUT IS UNTESTED, I DONT OWN A CONTROLLER. (this will need testing and tweaking likely)
-	var forward_trigger := Input.get_joy_axis(0, JOY_AXIS_TRIGGER_RIGHT)
-	var backward_trigger := Input.get_joy_axis(0, JOY_AXIS_TRIGGER_LEFT)
-	var joy_turn := Input.get_joy_axis(0, JOY_AXIS_LEFT_X)
+
+	# Clamping values from 0 to 1 to keep cohesion
+	var forward_input : float = clampf(Input.get_action_strength("move_forward"), 0.0, 1.0)
+	var backward_input : float = clampf(Input.get_action_strength("move_backward"), 0.0, 1.0)
 	
-	var keyboard_forward := 1.0 if Input.is_action_pressed("move_forward") else 0.0
-	var keyboard_backward := 1.0 if Input.is_action_pressed("move_backward") else 0.0
-	var keyboard_turn := Input.get_axis("move_left", "move_right")
-	
-	var forward_input: float = max(forward_trigger, keyboard_forward)
-	var backward_input: float = max(backward_trigger, keyboard_backward)
-	var turn_input: float = joy_turn if abs(joy_turn) > deadzone else keyboard_turn
+	var turn_input: float = Input.get_action_strength("move_right") - Input.get_action_strength("move_left")
 	
 	# apply deadzone to turn input
 	if abs(turn_input) < deadzone:
@@ -76,14 +71,9 @@ func _process(_delta: float) -> void:
 	# Sim env doesnt have actuators yet, this will need testing in real life
 	var lift_input: float = 0.0
 	
-
 	if Input.is_action_pressed("lift_up"):
 		lift_input = 1.0
 	elif Input.is_action_pressed("lift_down"):
-		lift_input = -1.0
-	elif Input.is_joy_button_pressed(0, JOY_BUTTON_DPAD_UP):
-		lift_input = 1.0
-	elif Input.is_joy_button_pressed(0, JOY_BUTTON_DPAD_DOWN):
 		lift_input = -1.0
 	
 	if lift_input != prev_lift_input:
@@ -99,10 +89,6 @@ func _process(_delta: float) -> void:
 	if Input.is_action_pressed("bucket_up"):
 		bucket_input = 1.0
 	elif Input.is_action_pressed("bucket_down"):
-		bucket_input = -1.0
-	elif Input.is_joy_button_pressed(0, JOY_BUTTON_Y):
-		bucket_input = 1.0
-	elif Input.is_joy_button_pressed(0, JOY_BUTTON_A):
 		bucket_input = -1.0
 	
 	if bucket_input != prev_bucket_input:
