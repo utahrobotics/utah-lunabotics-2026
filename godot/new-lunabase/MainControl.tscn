@@ -171,8 +171,8 @@ max_value = 7000.0
 
 [node name="BackgroundImage" type="Sprite2D" parent="."]
 show_behind_parent = true
-position = Vector2(631, 332)
-scale = Vector2(0.20234582, 0.15254329)
+position = Vector2(66.40618, 588.619)
+scale = Vector2(0.087393455, 0.07955249)
 texture = ExtResource("3_w6ul0")
 
 [connection signal="value_changed" from="SpeedMultiplierSlider" to="." method="_on_speed_multiplier_slider_value_changed"]
