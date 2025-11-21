@@ -24,7 +24,7 @@
                 "block_radius": 50,
             },
             logging: (
-                enabled: false
+                enabled: true
             ),
             background: true
         ),

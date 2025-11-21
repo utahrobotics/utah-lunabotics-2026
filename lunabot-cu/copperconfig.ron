@@ -195,7 +195,7 @@
             path:"camera_configs/camera_template_gstreamer.ron",
             params:{
                 "id":"laptop_front",
-                "port":"pci-0000:00:14.0-usb-0:4:1.0",
+                "port":"pci-0000:80:14.0-usb-0:11:1.0",
                 "fx":939.93,
                 "fy":938.93,
                 "cx":640.84,

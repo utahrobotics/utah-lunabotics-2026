@@ -13,6 +13,9 @@ use std::sync::Arc;
 
 use crate::tasks::auto_gstreamer::CuGstBuffer;
 
+use crate::rerun_viz::RECORDER;
+use rerun::EncodedImage;
+
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 pub trait PixelReadAccess<U> {
     fn get_pixel(&self, x: usize, y: usize, width: usize) -> U;
@@ -215,6 +218,11 @@ impl CuTask for GstToImage {
                     .map_err(|_| CuError::from("Failed to convert pixel format to byte array"))?,
             },
             handle,
+        );
+
+        let _log = RECORDER.get().unwrap().recorder.log(
+            "gst_to_image",
+            &EncodedImage::new(src)
         );
 
         output.tov = input.tov;
