@@ -1,7 +1,13 @@
 # Lunabot
 
 ## Architecture Overview
-<img width="4150" height="818" alt="graphviz(8)" src="https://github.com/user-attachments/assets/a53d91de-1872-44cc-9cf0-02a6a0bba5c2" />
+
+<img width="4378" height="726" alt="graphviz" src="https://github.com/user-attachments/assets/399a1f5c-2bb3-446b-83d5-b68da5d1582f" />
+
+
+## Detailed Copper Task Overview
+
+<img width="7098" height="4698" alt="graphviz(3)" src="https://github.com/user-attachments/assets/969af1fc-0d6c-4ccd-8cac-c86362b93b32" />
 
 
 ##### Check copperconfig.ron to see the definitions of all the tasks running and the datatypes passed between tasks.
@@ -29,7 +35,7 @@
     libudev-dev \
    ```
 2. [Bazelisk](http://github.com/bazelbuild/bazelisk/releases/)
-3. [Realsense SDK](https://github.com/IntelRealSense/librealsense)
+3. [Realsense SDK](https://github.com/IntelRealSense/librealsense/blob/master/doc/installation.md#building-librealsense2-sdk)
 4. [Apriltag Library](https://github.com/AprilRobotics/apriltag)
 
 ### Log Replay env (Windows, Macos, Linux)
@@ -195,6 +201,8 @@ Package Manager: [Chocolatey](https://chocolatey.org/install). Follow the instru
 make discover-cameras
 ```
 
+# Trouble Shooting
+List of common problems and how to fix them can be found [here](https://github.com/utahrobotics/utah-lunabotics-2026/blob/main/TROUBLESHOOTING.md)
 
 # Crate Layout
 
@@ -257,7 +265,7 @@ Helper functions for:
 * Structures and helpers used for connecting to the base station.
 
 ## common/ 
-Legacy code containing structures that are used by the lunabase and the lunabot. (and the old behavior tree). \\
+Legacy code containing structures that are used by the lunabase and the lunabot. (and the old behavior tree). <br>
 *This will be useful when we actually move the lunabase to this repo*
 
 ## embedded_common
@@ -271,7 +279,7 @@ Utilities for connecting to rerun.
 
 
 ### lunabot-cu/src/motors.rs
-Legacy code for controlling motors via VESC. \\
+Legacy code for controlling motors via VESC. <br>
 The enumerate_motors() function (used by the motor_ctrl task) returns a structure that you can use to command the motors.
 
 ### lunabot-cu/src/simple_monitor.rs

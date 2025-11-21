@@ -11,9 +11,7 @@ members = [
     "common",
     "lunabot-cu",
     "embedded_common",
-    "external-tasks/realsense",
-    "lunabase-lib",
-    "misc/quic",
+    "external-tasks/realsense", "misc/copperconfig-validator",
 ]
 exclude = ["misc/usb-reset"]
 # Shared dependencies across workspace members

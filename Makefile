@@ -58,15 +58,17 @@ clear-simlogs:
 clear-logs:
 	rm lunabot-cu/logs/*
 
-build-lunabase:
-	cd lunabase-lib && cargo build --release && cargo build 
+validate-config:
+	cargo run --release -p copperconfig-validator -- -c lunabot-cu/copperconfig.ron
 
-edit-lunabase: build-lunabase
-	cd godot/new-lunabase && godot project.godot
+visualize-config:
+	cargo run --release -p copperconfig-validator -- -c lunabot-cu/copperconfig.ron --output-svg graph.svg
 
 # Help target to show available commands
 help:
 	@echo "Available targets:"
+	@echo "  validate-config   - Validates that the copperconfig is a directed acyclic graph, and provides friendlier error messages than the compile time errors"
+	@echo "  visualize-config  - Validates copper config and generates graph.svg graph.svg.dot"
 	@echo "  prod              - Build unilidar_publisher with Bazel and run lunabot-cu in release mode"
 	@echo "  debug             - Build unilidar_publisher with Bazel and run lunabot-cu in debug mode"
 	@echo "  sync              - Sync Bazel dependencies (run this if you update dependencies)"
