@@ -36,7 +36,17 @@
     <camera name="user_camera" pos="0.550397 7.43232 16.7573"
       xyaxes="-0.997 -0.078 0 0.024 -0.309 0.951" />
 
+    <site name="depth_camera_site" pos="0 0 1.0" size="0.01"/>
 
   </worldbody>
+
+  <sensor>
+    <rangefinder name="depth_sensor" 
+                 site="depth_camera_site"
+                 cutoff="10.0"/>
+    <accelerometer name="base_accel" site="base_imu_site"/>
+    <gyro name="base_gyro" site="base_imu_site"/>
+    <framequat name="base_quat" objtype="site" objname="base_imu_site"/>
+  </sensor>
 
 </mujoco>

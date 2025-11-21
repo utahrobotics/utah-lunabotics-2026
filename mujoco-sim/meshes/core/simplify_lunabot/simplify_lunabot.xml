@@ -79,6 +79,7 @@
     <body name="simplify_lunabot" pos="1 1 0.4" euler = "0 0 0 ">
       <inertial mass="80" pos="0.5 -0.20 0" diaginertia="1 1 1" />
       <joint type="free" />
+      <site name="base_imu_site" pos="0.5 -0.20 0" size="0.01" />
       <geom material="DefaultMaterialLunabot" mesh="simplify_lunabot" class="visual" />
       <geom mesh="simplify_lunabot_collision_0"
         rgba="0.18854816059541724 0.5994212665208022 0.2845419190857421 1" class="collision" />

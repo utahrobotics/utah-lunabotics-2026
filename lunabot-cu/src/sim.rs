@@ -1,6 +1,7 @@
 #![feature(try_blocks, f16, mpmc_channel)]
 pub mod comms;
 pub mod rerun_viz;
+pub mod sim_sensors;
 
 pub mod simple_monitor;
 pub mod tasks;
@@ -23,6 +24,7 @@ pub static TARGET_HZ: usize = 1000; // MUST BE THE SAME AS THE TARGET HZ IN COPP
 
 pub static MJ_MODEL: OnceLock<&'static MjModel> = OnceLock::new();
 pub static MJ_DATA: OnceLock<Mutex<&'static mut MjData<&'static MjModel>>> = OnceLock::new();
+pub static SIM_SENSORS: OnceLock<sim_sensors::SimSensors> = OnceLock::new();
 
 #[copper_runtime(config = "copperconfig.ron", sim_mode = true)]
 struct LunabotApplication {}
@@ -62,6 +64,13 @@ fn sim_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::GstConvertSide(_) => SimOverride::ExecutedBySim,
         default::SimStep::GstConvertLaptopFront(_) => SimOverride::ExecutedBySim,
         default::SimStep::L2Pointcloud(_) => SimOverride::ExecutedBySim,
+        // default::SimStep::L2Imu(_) => SimOverride::ExecutedBySim,
+        default::SimStep::L2Imu(CuTaskCallbackState::Process(_, output)) => {
+            let sensors = SIM_SENSORS.get().unwrap();
+            let imu_data = sensors.read_imu_data(model, &data);
+            output.set_payload(imu_data);
+            SimOverride::ExecutedBySim
+        }
         default::SimStep::L2Imu(_) => SimOverride::ExecutedBySim,
         default::SimStep::V3Pico(_) => SimOverride::ExecutedBySim,
         default::SimStep::MotorCtrl(CuTaskCallbackState::Process(input, _)) => {
@@ -83,11 +92,12 @@ fn sim_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::DetectorCamBack(_) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamSide(_) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamLaptopFront(_) => SimOverride::ExecutedBySim,
-        default::SimStep::RealsenseSubscriber(_) => SimOverride::ExecutedBySim,
+        default::SimStep::RealsenseSubscriber(_) => SimOverride::ExecutedBySim,   //TODO : implement simulated realsense
         default::SimStep::T265Subscriber(_) => SimOverride::ExecutedBySim,
 
         _ => SimOverride::ExecuteByRuntime,
     }
+    // TODO implement IMU 
 }
 
 fn main() {
@@ -216,5 +226,10 @@ fn set_up_mujoco() -> (
     println!("Launching Viewer...");
 
     let viewer = MjViewerCpp::launch_passive(model as &_, leaked_data as &_, 100);
+    
+    println!("Initializing sensors...");
+    let sensors = sim_sensors::SimSensors::new(model).expect("Failed to initialize sensors");
+    SIM_SENSORS.set(sensors).expect("Failed to set sim sensors");
+    
     (model, viewer, leaked_data)
 }
