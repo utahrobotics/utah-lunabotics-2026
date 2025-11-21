@@ -1,5 +1,9 @@
 class_name ControlSchemeResource extends Resource
 
+@export var scheme_name : String
+
+@export var left_wheel  : Array[InputEvent]
+@export var right_wheel  : Array[InputEvent]
 @export var move_left  : Array[InputEvent]
 @export var move_right  : Array[InputEvent]
 @export var move_forward  : Array[InputEvent]
@@ -14,6 +18,8 @@ class_name ControlSchemeResource extends Resource
 
 func get_all_actions() -> Dictionary:
 	var all_actions : Dictionary = {}
+	all_actions["left_wheel"] = left_wheel
+	all_actions["right_wheel"] = right_wheel
 	all_actions["move_left"] = move_left
 	all_actions["move_right"] = move_right
 	all_actions["move_forward"] = move_forward

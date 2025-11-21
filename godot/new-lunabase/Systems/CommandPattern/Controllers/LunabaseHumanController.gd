@@ -29,6 +29,12 @@ func _ready() -> void:
 	command_recorder = CommandRecorder.new(actor, default_path)
 	add_child(command_recorder)
 
+# TODO
+#new control layout: left stick controls left wheels forward and back, right stick controls right wheels forward and back. 
+#
+#Left bumper/trigger makes bucket tilt up/down respectively
+#
+#Right bumper/trigger makes bucket lift up/down respectively
 
 func _process(_delta: float) -> void:
 	if not actor:
@@ -44,6 +50,9 @@ func _process(_delta: float) -> void:
 	var turn_input: float = Input.get_action_strength("move_right") - Input.get_action_strength("move_left")
 	
 	# apply deadzone to turn input
+	#TODO: Check if this is necessary, I think the input map already
+	# handles deadzones which can be tweaked. Right now all inputs have a
+	# deadzone of 0.2
 	if abs(turn_input) < deadzone:
 		turn_input = 0.0
 	
@@ -51,8 +60,19 @@ func _process(_delta: float) -> void:
 	var forward_backward: float = forward_input - backward_input
 	
 	# diff steering calculation
-	var left_speed: float = forward_backward + turn_input
-	var right_speed: float = forward_backward - turn_input
+	
+	# The inputs of moving the left or right wheels individually
+	var left_wheel : float = Input.get_action_strength("left_wheel")
+	var right_wheel : float = Input.get_action_strength("right_wheel")
+	
+	# Gets left and right wheel speed if using the forward/backward input
+	var calculated_left_speed: float = forward_backward + turn_input
+	var calculated_right_speed: float = forward_backward - turn_input
+	
+	# Should return the current used value
+	var left_speed: float = left_wheel if left_wheel != 0.0 else calculated_left_speed
+	var right_speed: float = right_wheel if right_wheel != 0.0 else calculated_right_speed
+	
 	
 	left_speed = clamp(left_speed, -1.0, 1.0)
 	right_speed = clamp(right_speed, -1.0, 1.0)

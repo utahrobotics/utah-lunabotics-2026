@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="ControlSchemeResource" load_steps=3 format=3 uid="uid://dpp2ow0myixqw"]
+
+[ext_resource type="Script" uid="uid://cojf71u62eagl" path="res://Systems/ControlSchemes/scheme_resource.gd" id="1_qq072"]
+
+[sub_resource type="InputEventKey" id="InputEventKey_qq072"]
+device = -1
+keycode = 76
+unicode = 108
+
+[resource]
+script = ExtResource("1_qq072")
+scheme_name = "Keyboard scheme 2"
+left_wheel = Array[InputEvent]([SubResource("InputEventKey_qq072")])
+metadata/_custom_type_script = "uid://cojf71u62eagl"

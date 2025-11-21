@@ -1,0 +1,26 @@
+[gd_scene load_steps=2 format=3 uid="uid://bm44cf3l53nfk"]
+
+[ext_resource type="Script" uid="uid://cwwvb5mondipu" path="res://GUI/ControlSchemeSwitcher/control_scheme_switcher.gd" id="1_5b5wv"]
+
+[node name="ControlSchemeSwitcher" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_5b5wv")
+
+[node name="ControllerSchemeOptionButton" type="OptionButton" parent="."]
+layout_mode = 0
+offset_right = 32.0
+offset_bottom = 20.0
+
+[node name="KeyboardSchemeOptionButton" type="OptionButton" parent="."]
+layout_mode = 0
+offset_left = 37.0
+offset_top = 93.0
+offset_right = 69.0
+offset_bottom = 113.0
+
+[connection signal="item_selected" from="KeyboardSchemeOptionButton" to="." method="_on_keyboard_scheme_option_button_item_selected"]
