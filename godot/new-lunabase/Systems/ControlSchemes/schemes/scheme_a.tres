@@ -1,7 +1,0 @@
-[gd_resource type="Resource" script_class="ControlSchemeResource" load_steps=2 format=3 uid="uid://835q1p0p75se"]
-
-[ext_resource type="Script" uid="uid://cojf71u62eagl" path="res://Systems/ControlSchemes/scheme_resource.gd" id="1_m4qru"]
-
-[resource]
-script = ExtResource("1_m4qru")
-metadata/_custom_type_script = "uid://cojf71u62eagl"

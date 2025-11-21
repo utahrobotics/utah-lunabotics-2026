@@ -1,7 +1,7 @@
 extends Control
 
-@onready var controller_scheme_option_button: OptionButton = $ControllerSchemeOptionButton
-@onready var keyboard_scheme_option_button: OptionButton = $KeyboardSchemeOptionButton
+@onready var controller_scheme_option_button: OptionButton = $Panel/VBoxContainer/HBoxContainer/ControllerSchemeOptionButton
+@onready var keyboard_scheme_option_button: OptionButton = $Panel/VBoxContainer/HBoxContainer2/KeyboardSchemeOptionButton
 
 @export var controller_path : String = "res://Systems/ControlSchemes/schemes/ControllerSchemes"
 @export var keyboard_path : String = "res://Systems/ControlSchemes/schemes/KeyboardSchemes"
@@ -20,9 +20,10 @@ func populate_schemes():
 	keyboard_scheme_option_button.clear()
 	
 	# Load controller schemes
-	#for file in ResourceLoader.list_directory(controller_path):
-		#var new_resource : ControlSchemeResource = ResourceLoader.load(controller_path + file)
-		#controller_schemes.append(new_resource)
+	for file in ResourceLoader.list_directory(controller_path):
+		var new_resource : ControlSchemeResource = ResourceLoader.load(controller_path + "/" + file)
+		controller_schemes.append(new_resource)
+		controller_scheme_option_button.add_item(new_resource.scheme_name)
 
 	
 	for file in ResourceLoader.list_directory(keyboard_path):
@@ -65,3 +66,10 @@ func _on_keyboard_scheme_option_button_item_selected(index: int) -> void:
 		unload_scheme(keyboard_schemes[keyboard_prev_index])
 	populate_from_scheme(keyboard_schemes[index])
 	keyboard_prev_index = index
+
+
+func _on_controller_scheme_option_button_item_selected(index: int) -> void:
+	if controller_prev_index >= 0:
+		unload_scheme(controller_schemes[controller_prev_index])
+	populate_from_scheme(controller_schemes[index])
+	controller_prev_index = index

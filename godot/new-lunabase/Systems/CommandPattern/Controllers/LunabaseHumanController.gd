@@ -29,13 +29,6 @@ func _ready() -> void:
 	command_recorder = CommandRecorder.new(actor, default_path)
 	add_child(command_recorder)
 
-# TODO
-#new control layout: left stick controls left wheels forward and back, right stick controls right wheels forward and back. 
-#
-#Left bumper/trigger makes bucket tilt up/down respectively
-#
-#Right bumper/trigger makes bucket lift up/down respectively
-
 func _process(_delta: float) -> void:
 	if not actor:
 		return

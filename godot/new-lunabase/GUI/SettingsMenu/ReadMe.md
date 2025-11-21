@@ -3,3 +3,9 @@ Things are getting cluttered. I want to have a simple settings menu that can tog
 
 # How it works
 This is a global scene. You can add buttons or signals that other scripts can connect to.
+
+
+# TODOS
+- Make it pretty
+- Possibly adding scene switcher
+- Possibly adding IP address input to this menu
