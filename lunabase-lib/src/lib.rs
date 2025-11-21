@@ -30,6 +30,7 @@ struct LunabaseConnection {
     recv_thread: Option<JoinHandle<()>>,
 
     errored_tasks: Arc<Mutex<HashMap<String, String>>>,
+    current_weight: f64,
 }
 
 #[godot_api]
@@ -43,6 +44,7 @@ impl INode for LunabaseConnection {
             recv_thread: None,
             last_packet_time: Instant::now(),
             current_stage: LunabotStage::SoftStop,
+            current_weight: 1250.0,
         }
     }
 
@@ -155,7 +157,11 @@ impl LunabaseConnection {
     #[func]
     fn execute_steering(&self, left: f64, right: f64) {
         if let Some(ref client) = self.client {
-            match client.send(FromLunabase::Steering(Steering::new(left, right, 1.0))) {
+            match client.send(FromLunabase::Steering(Steering::new(
+                left,
+                right,
+                self.current_weight,
+            ))) {
                 Ok(_) => {}
                 Err(e) => {
                     godot_warn!("Failed to send steering packet: {e}");
@@ -250,4 +256,27 @@ impl LunabaseConnection {
         }
         dict
     }
+
+    #[func]
+    fn set_speed(&mut self, weight: f64) -> f64{
+        self.current_weight = weight;
+        if let Some(ref client) = self.client {
+            match client.send(FromLunabase::Steering(Steering::new(
+                0.0,
+                0.0,
+                self.current_weight,
+            ))) {
+                Ok(_) => {}
+                Err(e) => {
+                    godot_warn!("Failed to send (weight) steering packet: {e}");
+                }
+            }
+        } else {
+            godot_warn!("Cannot send steering: not connected");
+        }
+        
+        self.current_weight
+
+    }
+    
 }

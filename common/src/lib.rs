@@ -57,6 +57,13 @@ impl Steering {
         f16::from_bits(self.weight) as f64
     }
 
+    /* pub fn set_weight(&mut self, weight: f64){
+      let weight = weight as f16;
+      let weight = weight.to_bits();
+      self.weight = weight;
+
+    } */
+
     pub fn new(mut left: f64, mut right: f64, weight: f64) -> Self {
         left = left.max(-1.0).min(1.0);
         right = right.max(-1.0).min(1.0);

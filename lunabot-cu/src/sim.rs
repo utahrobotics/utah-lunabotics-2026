@@ -66,8 +66,9 @@ fn sim_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::MotorCtrl(CuTaskCallbackState::Process(input, _)) => {
             if let Some((Some(steering), _)) = input.payload() {
                 let (left, right) = steering.get_left_and_right();
-                let left = left * 50.0;
-                let right = right * 50.0;
+                let speed_mult = steering.get_weight();
+                let left = (left * speed_mult) * 0.05;
+                let right = (right * speed_mult) * 0.05;
                 // left vesc
                 data.actuator("motor_fl").unwrap().view_mut(&mut data).ctrl[0] = left;
                 data.actuator("motor_bl").unwrap().view_mut(&mut data).ctrl[0] = left;

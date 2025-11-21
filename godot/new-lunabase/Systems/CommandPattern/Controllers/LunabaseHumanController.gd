@@ -7,6 +7,8 @@ var actor: Node
 
 @export var deadzone: float = 0.2
 
+@onready var speed_slider = $"../SpeedMultiplierSlider"
+
 var command_recorder: CommandRecorder
 
 # track previous state to detect button releases
@@ -16,6 +18,8 @@ var prev_bucket_input: float = 0.0
 # previous steering to avoid sending duplicate commands
 var prev_left_speed: float = 0.0
 var prev_right_speed: float = 0.0
+
+
 
 
 func _ready() -> void:
@@ -46,11 +50,15 @@ func _process(_delta: float) -> void:
 	
 	var forward_input: float = max(forward_trigger, keyboard_forward)
 	var backward_input: float = max(backward_trigger, keyboard_backward)
+	
 	var turn_input: float = joy_turn if abs(joy_turn) > deadzone else keyboard_turn
 	
+
+
 	# apply deadzone to turn input
 	if abs(turn_input) < deadzone:
 		turn_input = 0.0
+		
 	
 	# forward backward speed
 	var forward_backward: float = forward_input - backward_input
@@ -59,8 +67,8 @@ func _process(_delta: float) -> void:
 	var left_speed: float = forward_backward + turn_input
 	var right_speed: float = forward_backward - turn_input
 	
-	left_speed = clamp(left_speed, -1.0, 1.0)
-	right_speed = clamp(right_speed, -1.0, 1.0)
+	left_speed = clamp(left_speed, -1, 1)
+	right_speed = clamp(right_speed, -1, 1)
 	
 	# Only send steering command if it changed (avoid spamming)
 	# I have had problems where if the trigger is partially pressed it sends a bajillion commands with tiny changes
@@ -71,6 +79,8 @@ func _process(_delta: float) -> void:
 		command_recorder.execute_and_store(cmd)
 		prev_left_speed = left_speed
 		prev_right_speed = right_speed
+		
+
 	
 	# === LIFT ACTUATORS (Keyboard Q/E + D-pad) ===
 	# Sim env doesnt have actuators yet, this will need testing in real life
@@ -91,6 +101,24 @@ func _process(_delta: float) -> void:
 		cmd.lift = int(lift_input * 127.0)
 		command_recorder.execute_and_store(cmd)
 		prev_lift_input = lift_input
+		
+		
+		
+	#=====Speed Slider increment and decrement
+	const SPEED_SLIDER_STEP := 100
+	if Input.is_action_pressed("increment_speed") || Input.is_action_pressed("increment_speed_keyboard"):
+		speed_slider.value = clamp(speed_slider.value + 
+		SPEED_SLIDER_STEP, 
+		speed_slider.min_value,speed_slider.max_value)
+	
+	if Input.is_action_pressed("decrement_speed") || Input.is_action_pressed("decrement_speed_keyboard"):
+		speed_slider.value = clamp(speed_slider.value -
+		SPEED_SLIDER_STEP,
+		speed_slider.min_value,
+		speed_slider.max_value)
+	
+	
+	
 	
 	# === BUCKET ACTUATORS (Keyboard Z/C + Y/A buttons) ===
 	# This might be a bit clunky tbh, someone who is a gamer might have better ideas
