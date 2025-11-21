@@ -1,6 +1,6 @@
 use bonsai_bt::Behavior::{self, Action};
 use bonsai_bt::Status::{Failure, Running, Success};
-use bonsai_bt::{BT, Event, Status, UpdateArgs};
+use bonsai_bt::{BT, Event, RUNNING, Status, UpdateArgs};
 use common::{FromLunabase, LUNABOT_STAGE, LunabotStage, Steering};
 use cu29::prelude::*;
 use cu29::{
@@ -11,10 +11,12 @@ use embedded_common::{Actuator, ActuatorCommand};
 
 use std::sync::mpsc::Receiver;
 
+use crate::ROOT_NODE;
 use crate::tasks::OccupancyGrid;
 use crate::tasks::ai::action::LunabotAction;
 use crate::tasks::ai::behaviors::teleop::teleop_behavior;
 use crate::tasks::ai::blackboard::LunabotBlackboard;
+use crate::tasks::ai::jobs::follow_path_job;
 use crate::utils::nanos_to_secs;
 
 pub struct LunabotAi {
@@ -143,10 +145,34 @@ impl CuTask for LunabotAi {
                 LunabotAction::IsInFreeCell => todo!(),
                 LunabotAction::IsInUnknownCell => todo!(),
                 LunabotAction::CalculatePath => Success,
-                LunabotAction::FollowPathFor(meters) => {
-                    // this will be a long running task in a different thread
-                    // the task will live in the jobs folder, and be pollable to get the Status
-                    todo!()
+                LunabotAction::FollowPath => {
+                    if ROOT_NODE.get().is_none() {
+                        eprintln!(
+                            "Cannot start follow path job because ROOT_NODE is not initialized"
+                        );
+                        Failure
+                    } else if let Some(ref mut path_follower) = blackboard.path_follower {
+                        blackboard.outgoing_steering_msg = path_follower.get_output();
+                        let status = path_follower.get_status();
+                        if status == Success || status == Failure {
+                            println!("Follow path job completed with status: {:?}", status);
+                            // ensure the task is no longer running just in case
+                            path_follower.cancel();
+                            blackboard.path_follower = None;
+                        }
+                        status
+                    } else {
+                        println!("Starting new follow path job");
+                        let mut follower_job =
+                            follow_path_job(5.0, *ROOT_NODE.get().unwrap(), vec![]);
+                        let job_initial_status = follower_job.get_status();
+                        blackboard.path_follower = Some(follower_job);
+                        println!(
+                            "Follow path job started with initial status: {:?}",
+                            job_initial_status
+                        );
+                        job_initial_status
+                    }
                 }
                 LunabotAction::CheckNavigation => Running,
                 LunabotAction::GetUnstuck => todo!(),
@@ -158,6 +184,14 @@ impl CuTask for LunabotAi {
                         blackboard.yielded = false;
                         Success
                     }
+                }
+                LunabotAction::SetStage(stage) => {
+                    println!("Setting stage to {:?}", stage);
+                    blackboard.last_mission = LunabotStage::Manual;
+                    blackboard.current_mission = stage;
+                    blackboard.path_follower = None;
+                    LUNABOT_STAGE.store(stage);
+                    Success
                 }
             };
             (status, remaining_dt) //passing 0.0 consumes all the remaining time for a tick
