@@ -2,7 +2,10 @@
 
 [ext_resource type="Script" uid="uid://bfwxau0mdtqc5" path="res://GUI/NotificationSystem/Assets/NotificationCanvas.gd" id="1_1ygk3"]
 
-[node name="NotificationCanvas" type="Control"]
+[node name="CanvasLayer" type="CanvasLayer"]
+script = ExtResource("1_1ygk3")
+
+[node name="NotificationCanvas" type="Control" parent="."]
 layout_mode = 3
 anchors_preset = 1
 anchor_left = 1.0
@@ -11,9 +14,9 @@ offset_left = -302.0
 offset_bottom = 601.0
 grow_horizontal = 0
 mouse_filter = 1
-script = ExtResource("1_1ygk3")
+mouse_behavior_recursive = 2
 
-[node name="ScrollContainer" type="ScrollContainer" parent="."]
+[node name="ScrollContainer" type="ScrollContainer" parent="NotificationCanvas"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -21,11 +24,11 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="ScrollContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="NotificationCanvas/ScrollContainer"]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="TotalLabel" type="Label" parent="."]
+[node name="TotalLabel" type="Label" parent="NotificationCanvas"]
 layout_mode = 1
 anchors_preset = 3
 anchor_left = 1.0
@@ -40,7 +43,7 @@ grow_horizontal = 0
 grow_vertical = 0
 text = "Total: 0"
 
-[node name="ClearAllButton" type="Button" parent="."]
+[node name="ClearAllButton" type="Button" parent="NotificationCanvas"]
 layout_mode = 1
 anchors_preset = 3
 anchor_left = 1.0
@@ -54,4 +57,4 @@ grow_vertical = 0
 text = "ClearAll
 "
 
-[connection signal="pressed" from="ClearAllButton" to="." method="_on_clear_all_button_pressed"]
+[connection signal="pressed" from="NotificationCanvas/ClearAllButton" to="NotificationCanvas" method="_on_clear_all_button_pressed"]

@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="ControlSchemeResource" load_steps=12 format=3 uid="uid://8u5und3iwc0v"]
+[gd_resource type="Resource" script_class="ControlSchemeResource" load_steps=11 format=3 uid="uid://8u5und3iwc0v"]
 
 [ext_resource type="Script" uid="uid://cojf71u62eagl" path="res://Systems/ControlSchemes/scheme_resource.gd" id="1_4f6eg"]
 
@@ -30,9 +30,6 @@ axis_value = -1.0
 [sub_resource type="InputEventJoypadMotion" id="InputEventJoypadMotion_uej3p"]
 axis_value = 1.0
 
-[sub_resource type="InputEventJoypadButton" id="InputEventJoypadButton_qo22r"]
-button_index = 4
-
 [resource]
 script = ExtResource("1_4f6eg")
 scheme_name = "Original Controller Scheme"
@@ -41,7 +38,6 @@ move_right = Array[InputEvent]([SubResource("InputEventJoypadMotion_uej3p")])
 move_forward = Array[InputEvent]([SubResource("InputEventJoypadMotion_xgh0w")])
 move_backward = Array[InputEvent]([SubResource("InputEventJoypadMotion_ktdos")])
 continue_mission = Array[InputEvent]([SubResource("InputEventJoypadButton_ke7ah")])
-stop_mission = Array[InputEvent]([SubResource("InputEventJoypadButton_qo22r")])
 lift_up = Array[InputEvent]([SubResource("InputEventJoypadButton_ow1wb")])
 lift_down = Array[InputEvent]([SubResource("InputEventJoypadButton_uib11")])
 bucket_up = Array[InputEvent]([SubResource("InputEventJoypadButton_sdjqw")])
