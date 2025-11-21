@@ -3,6 +3,7 @@ use cubecl::prelude::*;
 use nalgebra::{Isometry3, Vector3};
 pub mod utils;
 pub use cubecl;
+pub mod pcl_to_height;
 
 #[cube(launch_unchecked)]
 fn depth_to_pcl<F: Float>(
