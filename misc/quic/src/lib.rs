@@ -62,6 +62,7 @@ impl InnerSharedWriter {
     }
 }
 
+/// Anything that both send and recv need
 pub struct InnerShared {
     pub connection: Option<Connection>,
     /// heartbeat message to send with ping/pong
@@ -304,13 +305,15 @@ fn start_client_keep_alive_task(
 
             match recv_keep_alive(&connection).await {
                 Ok(KeepAlivePacket::Ping(msg)) => {
+                    let resp_msg;
                     {
                         let mut shared_lock = shared.lock();
                         shared_lock.last_keep_alive_received = Some(Instant::now());
                         shared_lock.last_received_keep_alive_msg = Some(msg.clone());
+                        resp_msg = shared_lock.keep_alive_msg.clone();
                     }
 
-                    if let Err(e) = send_keep_alive(&connection, KeepAlivePacket::Pong(msg)).await {
+                    if let Err(e) = send_keep_alive(&connection, KeepAlivePacket::Pong(resp_msg)).await {
                         eprintln!("[CLIENT] Failed to send pong ({})", e);
                     }
                 }
@@ -464,12 +467,14 @@ impl<Outgoing: Encode + Decode<()>, Incoming: Encode + Decode<()>> QuicServer<Ou
 
     /// checks if the connection has not been reported as closed
     /// you should not use this to check if the connection is alive, use the last seen keep-alive mechanism instead
-    /// this is only useful for detecting if the connection has been closed by the remote end
+    /// this is only useful for detecting if the connection has been closed by the remote end.
+    /// Sometimes the connection may be dead but not yet reported as closed.
     pub fn is_connected(&self) -> bool {
         let connection = &self.shared.lock().connection;
         connection.is_some() && connection.as_ref().unwrap().close_reason().is_none()
     }
 
+    /// get the last received keep-alive message
     pub fn get_last_keep_alive_msg(&self) -> Option<Vec<u8>> {
         self.shared.lock().last_received_keep_alive_msg.clone()
     }
@@ -624,6 +629,12 @@ impl<Outgoing: Encode + Decode<()>, Incoming: Encode + Decode<()>> QuicClient<Ou
     pub fn get_last_keep_alive_msg(&self) -> Option<Vec<u8>> {
         self.shared.lock().last_received_keep_alive_msg.clone()
     }
+    
+    /// typically used to communicate the lunabot stage
+    pub fn set_keep_alive_msg(&self, msg: &[u8]) {
+        self.shared.lock().keep_alive_msg = msg.to_vec();
+    }
+
 
     pub fn time_since_last_keep_alive(&self) -> Option<Duration> {
         self.shared
@@ -657,7 +668,7 @@ fn recv_common<Msg: Encode + Decode<()>>(
         let shared_c = Arc::clone(shared);
         let result = tasker::get_tokio_handle().block_on(async move {
             // Mark the current generation as seen
-            let current_gen = *watch_rx.borrow_and_update();
+            let _ = *watch_rx.borrow_and_update();
             
             // either complete recv or detect new connection
             tasker::tokio::select! {
