@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="ControlSchemeResource" load_steps=13 format=3 uid="uid://ct30wqsr155vy"]
+[gd_resource type="Resource" script_class="ControlSchemeResource" load_steps=14 format=3 uid="uid://ct30wqsr155vy"]
 
 [ext_resource type="Script" uid="uid://cojf71u62eagl" path="res://Systems/ControlSchemes/scheme_resource.gd" id="1_drseg"]
 
@@ -21,6 +21,14 @@ unicode = 99
 device = -1
 ctrl_pressed = true
 keycode = 4194309
+
+[sub_resource type="InputEventKey" id="InputEventKey_k1h6m"]
+device = -1
+keycode = 4194322
+
+[sub_resource type="InputEventKey" id="InputEventKey_8rq36"]
+device = -1
+keycode = 4194320
 
 [sub_resource type="InputEventKey" id="InputEventKey_hiu01"]
 device = -1
@@ -52,10 +60,6 @@ device = -1
 keycode = 68
 unicode = 100
 
-[sub_resource type="InputEventKey" id="InputEventKey_3j20n"]
-device = -1
-keycode = 4194312
-
 [resource]
 script = ExtResource("1_drseg")
 scheme_name = "Keyboard A"
@@ -64,10 +68,11 @@ move_right = Array[InputEvent]([SubResource("InputEventKey_dokkf")])
 move_forward = Array[InputEvent]([SubResource("InputEventKey_l5e1i")])
 move_backward = Array[InputEvent]([SubResource("InputEventKey_yu8fg")])
 continue_mission = Array[InputEvent]([SubResource("InputEventKey_statr")])
-stop_mission = Array[InputEvent]([SubResource("InputEventKey_3j20n")])
 lift_up = Array[InputEvent]([SubResource("InputEventKey_mop5c")])
 lift_down = Array[InputEvent]([SubResource("InputEventKey_hiu01")])
 bucket_up = Array[InputEvent]([SubResource("InputEventKey_gwh4k")])
 bucket_down = Array[InputEvent]([SubResource("InputEventKey_drseg")])
 autonomy = Array[InputEvent]([SubResource("InputEventKey_vuwor")])
+increment_speed = Array[InputEvent]([SubResource("InputEventKey_8rq36")])
+decrement_speed = Array[InputEvent]([SubResource("InputEventKey_k1h6m")])
 metadata/_custom_type_script = "uid://cojf71u62eagl"

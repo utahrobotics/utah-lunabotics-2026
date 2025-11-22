@@ -20,8 +20,6 @@ var prev_left_speed: float = 0.0
 var prev_right_speed: float = 0.0
 
 
-
-
 func _ready() -> void:
 	if actor_path:
 		actor = get_node(actor_path)
@@ -71,7 +69,6 @@ func _process(_delta: float) -> void:
 	var left_speed: float = left_wheel if left_wheel != 0.0 else calculated_left_speed
 	var right_speed: float = right_wheel if right_wheel != 0.0 else calculated_right_speed
 	
-	
 	left_speed = clamp(left_speed, -1, 1)
 	right_speed = clamp(right_speed, -1, 1)
 	
@@ -85,7 +82,6 @@ func _process(_delta: float) -> void:
 		prev_left_speed = left_speed
 		prev_right_speed = right_speed
 		
-
 	
 	# === LIFT ACTUATORS (Keyboard Q/E + D-pad) ===
 	# Sim env doesnt have actuators yet, this will need testing in real life
@@ -102,23 +98,18 @@ func _process(_delta: float) -> void:
 		command_recorder.execute_and_store(cmd)
 		prev_lift_input = lift_input
 		
-		
-		
 	#=====Speed Slider increment and decrement
 	const SPEED_SLIDER_STEP := 100
-	if Input.is_action_pressed("increment_speed") || Input.is_action_pressed("increment_speed_keyboard"):
+	if Input.is_action_pressed("increment_speed"):
 		speed_slider.value = clamp(speed_slider.value + 
 		SPEED_SLIDER_STEP, 
 		speed_slider.min_value,speed_slider.max_value)
 	
-	if Input.is_action_pressed("decrement_speed") || Input.is_action_pressed("decrement_speed_keyboard"):
+	if Input.is_action_pressed("decrement_speed"):
 		speed_slider.value = clamp(speed_slider.value -
 		SPEED_SLIDER_STEP,
 		speed_slider.min_value,
 		speed_slider.max_value)
-	
-	
-	
 	
 	# === BUCKET ACTUATORS (Keyboard Z/C + Y/A buttons) ===
 	# This might be a bit clunky tbh, someone who is a gamer might have better ideas
