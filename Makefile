@@ -21,9 +21,9 @@ sync:
 resim:
 	cd lunabot-cu && cargo run --release --bin lunabot-resim --features resim
 
-# Run the MuJoCo Simulation
+# Run the MuJoCo Simulation. Must include "ucf" or "artemis" as an env variable for it to load
 sim:
-	cd lunabot-cu && RUSTFLAGS="-C linker-features=-lld" cargo run --release --bin lunabot-sim --features sim
+	cd lunabot-cu && RUSTFLAGS="-C linker-features=-lld" cargo run --release --bin lunabot-sim --features sim ${SIM_ARENA}
 
 # Clean build and sync, then build everything
 clean-build: clean sync
@@ -50,7 +50,7 @@ clean:
 
 # Kill all processes
 kill:
-	killall realsense unilidar_publisher lunabot-ai2
+	killall realsense unilidar_publisher lunabot-ai2 lunabot && pkill -f unilidar_iceoryx_publisher
 
 clear-simlogs:
 	cd lunabot-cu/logs && rm lunabotsim*; rm lunabotresim*;
@@ -63,6 +63,15 @@ validate-config:
 
 visualize-config:
 	cargo run --release -p copperconfig-validator -- -c lunabot-cu/copperconfig.ron --output-svg graph.svg
+
+build-lunabase:
+	cd lunabase-lib && cargo build --release && cargo build 
+
+edit-lunabase: build-lunabase
+	cd godot/new-lunabase && godot project.godot
+
+autostart:
+	cargo run --release -p auto-start
 
 # Help target to show available commands
 help:
@@ -86,5 +95,7 @@ help:
 	@echo "  sim               - Runs the Mujoco simulation"
 	@echo "  build-lunabase    - Builds the lunabase library"
 	@echo "  edit-lunabase     - Opens the lunabase Godot project after building the lunabase library"
+	@echo "  autostart         - Runs the Lunabot control panel on port 8080"
+
 
 .PHONY: prod debug sync clean-build build-publisher discover-cameras check clean help

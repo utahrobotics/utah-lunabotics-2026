@@ -8,7 +8,7 @@ use cu29::{
     input_msg,
 };
 use embedded_common::FromPicoV3;
-use iceoryx_types::ImuMsg;
+use iceoryx_types::{ImuMsg, PoseMsg};
 use iceoryx2::{
     node::NodeBuilder,
     port::publisher::Publisher,
@@ -16,6 +16,7 @@ use iceoryx2::{
     service::ipc,
 };
 use nalgebra::{Isometry3, UnitQuaternion, UnitVector3, Vector3};
+use rerun::{Arrows3D, Quaternion, Transform3D};
 use simple_motion::StaticNode;
 
 use crate::{
@@ -45,6 +46,7 @@ impl CuSinkTask for Localizer {
     type Input<'m> = input_msg!('m,
         ImuMsg, // l2 imu
         EncodableIsometry, // l2 kiss icp
+        PoseMsg,
         FromPicoV3,
         Box<HashMap<String, EncodableIsometry>> // apriltag detections
     );
@@ -111,6 +113,35 @@ impl CuSinkTask for Localizer {
         clock: &cu29::prelude::RobotClock,
         input: &Self::Input<'i>,
     ) -> cu29::CuResult<()> {
+        if let Some(pose) = input.2.payload() {
+            RECORDER
+                .get()
+                .unwrap()
+                .recorder
+                .log(
+                    "t265",
+                    &Arrows3D::from_vectors(vec![
+                        [1.0, 0.0, 0.0],
+                        [0.0, 1.0, 0.0],
+                        [0.0, 0.0, 1.0],
+                    ])
+                    .with_colors([[255, 0, 0], [0, 255, 0], [0, 0, 255]])
+                    .with_labels(vec!["x", "y", "z"]),
+                )
+                .unwrap();
+            RECORDER
+                .get()
+                .unwrap()
+                .recorder
+                .log(
+                    "t265",
+                    &Transform3D::from_translation_rotation(
+                        pose.position,
+                        Quaternion::from_xyzw(pose.quaternion),
+                    ),
+                )
+                .unwrap();
+        }
         let imu_components = if let Some(imu_raw) = input.0.payload() {
             let acceleration = Vector3::new(
                 imu_raw.linear_acceleration[0] as f64,
@@ -124,7 +155,7 @@ impl CuSinkTask for Localizer {
             None
         };
 
-        let apriltag_components = if let Some(estimated_camera_isometries) = input.3.payload() {
+        let apriltag_components = if let Some(estimated_camera_isometries) = input.4.payload() {
             self.compute_apriltag_swing_twist(estimated_camera_isometries)
         } else {
             None

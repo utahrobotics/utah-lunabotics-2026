@@ -251,6 +251,7 @@ mod prod_impl {
                 && *is_broken.borrow()
             {
                 error!("Pico broken");
+                powercycle_ioctl();
                 return Err(CuError::new_with_cause(
                     "Error reading form pico",
                     std::io::Error::other("is broken signal received"),
@@ -302,12 +303,6 @@ mod prod_impl {
                 let Ok(reading) = FromPicoV3::deserialize(reading) else {
                     error!("Failed to deserialize message from picov3 serial port");
                     let _ = is_broken_tx.send(true);
-                    match powercycle_ioctl() {
-                        Ok(_) => {}
-                        Err(e) => {
-                            error!("ioctl failed: {}", e.to_string());
-                        }
-                    }
                     break;
                 };
                 if let Err(_) = from_pico.push(reading) {

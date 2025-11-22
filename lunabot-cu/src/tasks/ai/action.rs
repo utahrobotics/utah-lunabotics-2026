@@ -1,4 +1,4 @@
-use common::Steering;
+use common::{LunabotStage, Steering};
 use embedded_common::ActuatorCommand;
 
 #[derive(Clone, Debug)]
@@ -28,8 +28,7 @@ pub enum LunabotAction {
     IsInUnknownCell,
     /// calculates path from the robots position to x,y
     CalculatePath,
-    /// follow a path for x meters
-    /// path typically recalculated after a certain distance
-    FollowPathFor(f32),
+    FollowPath,
+    SetStage(LunabotStage),
     GetUnstuck,
 }

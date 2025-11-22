@@ -1,5 +1,5 @@
-mod follow_path_for;
+mod follow_path;
 mod job;
 
-pub use follow_path_for::*;
+pub use follow_path::*;
 pub use job::*;

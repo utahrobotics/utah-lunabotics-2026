@@ -44,6 +44,7 @@ fn default_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::DetectorCamSide(_) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamLaptopFront(_) => SimOverride::ExecutedBySim,
         default::SimStep::RealsenseSubscriber(_) => SimOverride::ExecutedBySim,
+        default::SimStep::T265Subscriber(_) => SimOverride::ExecutedBySim,
         _ => SimOverride::ExecuteByRuntime,
     }
 }
@@ -66,8 +67,9 @@ fn sim_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::MotorCtrl(CuTaskCallbackState::Process(input, _)) => {
             if let Some((Some(steering), _)) = input.payload() {
                 let (left, right) = steering.get_left_and_right();
-                let left = left * 50.0;
-                let right = right * 50.0;
+                let speed_mult = steering.get_weight();
+                let left = (left * speed_mult) * 0.05;
+                let right = (right * speed_mult) * 0.05;
                 // left vesc
                 data.actuator("motor_fl").unwrap().view_mut(&mut data).ctrl[0] = left;
                 data.actuator("motor_bl").unwrap().view_mut(&mut data).ctrl[0] = left;
@@ -82,6 +84,8 @@ fn sim_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::DetectorCamSide(_) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamLaptopFront(_) => SimOverride::ExecutedBySim,
         default::SimStep::RealsenseSubscriber(_) => SimOverride::ExecutedBySim,
+        default::SimStep::T265Subscriber(_) => SimOverride::ExecutedBySim,
+
         _ => SimOverride::ExecuteByRuntime,
     }
 }
@@ -187,10 +191,18 @@ fn set_up_mujoco() -> (
     &'static mut MjData<&'static MjModel>,
 ) {
     println!("Creating model...");
-    let model = Box::leak(Box::new(
+    let args: Vec<String> = std::env::args().collect();
+    let model = Box::leak(Box::new(if args.contains(&"artemis".to_string()) {
         MjModel::from_xml("../mujoco-sim/artemis_arena.xml")
-            .expect("failed to create MjModel from artemis_arena.xml"),
-    ));
+            .expect("failed to create MjModel from artemis_arena.xml")
+    } else if args.contains(&"ucf".to_string()) {
+        MjModel::from_xml("../mujoco-sim/ucf_arena.xml")
+            .expect("failed to create MjModel from ucf_arena.xml")
+    } else {
+        panic!(
+            "Arena not specified in arguments. Valid args: ucf, artemis. (set with SIM_ARENA=ucf make sim)"
+        );
+    }));
     let mut timestep = 1.0 / (TARGET_HZ as f64);
     // speed up the simulation by a little
     timestep *= 1.6;

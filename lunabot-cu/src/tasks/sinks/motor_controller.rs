@@ -17,6 +17,7 @@ use crate::motors::{MotorRef, VescIDs, VescPair, enumerate_motors};
 
 pub struct MotorController {
     motor_ref: &'static MotorRef,
+    prev_speed_multi: f32,/*  */
 }
 
 impl Freezable for MotorController {}
@@ -28,11 +29,13 @@ impl CuSinkTask for MotorController {
 
     fn new(config: Option<&ComponentConfig>) -> CuResult<Self> {
         let motor_ref;
+        let mut prev_speed_multi: f32;
         if let Some(config) = config
             && let Some(vesc_pairs) = config.get::<Vec<VescPair>>("vesc_pairs")
         {
             let mut vesc_ids = VescIDs::default();
             let speed_multiplier = config.get::<f64>("speed_multiplier").unwrap_or(2000.) as f32;
+            prev_speed_multi = speed_multiplier;
             for VescPair {
                 id1,
                 id2,
@@ -59,20 +62,47 @@ impl CuSinkTask for MotorController {
             ));
         }
 
-        Ok(Self { motor_ref })
+        Ok(Self {
+            motor_ref,
+            prev_speed_multi,
+        })
+    }
+    fn start(&mut self, _clock: &RobotClock) -> CuResult<()> {
+        self.motor_ref.set_speed_multiplier(self.prev_speed_multi);
+        Ok(())
     }
 
     fn preprocess(&mut self, _clock: &RobotClock) -> CuResult<()> {
         Ok(())
     }
 
+
     fn process(&mut self, _clock: &RobotClock, input: &Self::Input<'_>) -> CuResult<()> {
         if let Some(payload) = input.payload() {
             if let Some(steering) = &payload.0 {
+                let new_weight:f32 = steering.get_weight() as f32;
+                if (new_weight - self.prev_speed_multi).abs() > 0.0001 {
+                    self.prev_speed_multi = new_weight;
+                    self.motor_ref.set_speed_multiplier(new_weight);
+                }
                 let (left, right) = steering.get_left_and_right();
                 self.motor_ref.set_speed(left as f32, right as f32);
             }
         }
+
+        if let Some(telemetry) = self.motor_ref.get_latest_telemetry() {
+            use crate::rerun_viz::RECORDER;
+
+            if let Some(rec) = RECORDER.get() {
+                use rerun::TextLog;
+                let _ = rec
+                    .recorder
+                    .log("vesc_telemetry", &TextLog::new(format!("{telemetry:?}")));
+            } else {
+                println!("{telemetry:?}");
+            }
+        }
+
         Ok(())
     }
 }

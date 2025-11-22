@@ -204,6 +204,12 @@ make discover-cameras
 # Trouble Shooting
 List of common problems and how to fix them can be found [here](https://github.com/utahrobotics/utah-lunabotics-2026/blob/main/TROUBLESHOOTING.md)
 
+# Using the Web Panel
+1. Connect to the same wifi network as the lunabot.
+2. Navigate to 192.168.0.103
+3. Click "Start Lunabot"
+4. Ensure that the lunabase software is running on your computer, and the ip in the top left corner is correct, then press connect.
+
 # Crate Layout
 
 ## Entry points
