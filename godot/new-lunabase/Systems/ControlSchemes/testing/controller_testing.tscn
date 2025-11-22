@@ -1,0 +1,38 @@
+[gd_scene load_steps=9 format=3 uid="uid://cvi4g2l0j0cfx"]
+
+[ext_resource type="Script" uid="uid://b5ucvi7ati7td" path="res://Systems/ControlSchemes/scheme_controller.gd" id="1_5gcoj"]
+[ext_resource type="Script" uid="uid://cojf71u62eagl" path="res://Systems/ControlSchemes/scheme_resource.gd" id="2_2e8s8"]
+[ext_resource type="Script" uid="uid://c1wi4dr3ntdsc" path="res://Systems/ControlSchemes/testing/test_script.gd" id="3_gvyrl"]
+
+[sub_resource type="InputEventKey" id="InputEventKey_gvyrl"]
+device = -1
+keycode = 87
+unicode = 119
+
+[sub_resource type="InputEventKey" id="InputEventKey_oa6s2"]
+device = -1
+keycode = 68
+unicode = 100
+
+[sub_resource type="InputEventKey" id="InputEventKey_i6vv8"]
+device = -1
+keycode = 65
+unicode = 97
+
+[sub_resource type="InputEventKey" id="InputEventKey_s5npd"]
+device = -1
+keycode = 83
+unicode = 115
+
+[sub_resource type="Resource" id="Resource_70nd5"]
+script = ExtResource("2_2e8s8")
+move_left = Array[InputEvent]([SubResource("InputEventKey_gvyrl"), SubResource("InputEventKey_oa6s2")])
+move_right = Array[InputEvent]([SubResource("InputEventKey_i6vv8"), SubResource("InputEventKey_s5npd")])
+metadata/_custom_type_script = "uid://cojf71u62eagl"
+
+[node name="ControllerTesting" type="Node2D"]
+script = ExtResource("1_5gcoj")
+new_control_scheme = SubResource("Resource_70nd5")
+
+[node name="Node" type="Node" parent="."]
+script = ExtResource("3_gvyrl")

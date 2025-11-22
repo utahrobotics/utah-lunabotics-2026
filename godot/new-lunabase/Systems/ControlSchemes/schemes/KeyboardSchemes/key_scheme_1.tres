@@ -1,0 +1,76 @@
+[gd_resource type="Resource" script_class="ControlSchemeResource" load_steps=14 format=3 uid="uid://ct56nj2utq5of"]
+
+[ext_resource type="Script" uid="uid://cojf71u62eagl" path="res://Systems/ControlSchemes/scheme_resource.gd" id="1_vuwor"]
+
+[sub_resource type="InputEventKey" id="InputEventKey_vuwor"]
+device = -1
+keycode = 92
+unicode = 92
+
+[sub_resource type="InputEventKey" id="InputEventKey_awo36"]
+device = -1
+keycode = 90
+unicode = 122
+
+[sub_resource type="InputEventKey" id="InputEventKey_5b6ri"]
+device = -1
+keycode = 81
+unicode = 113
+
+[sub_resource type="InputEventKey" id="InputEventKey_statr"]
+device = -1
+ctrl_pressed = true
+keycode = 4194309
+
+[sub_resource type="InputEventKey" id="InputEventKey_3j20n"]
+device = -1
+keycode = 4194322
+
+[sub_resource type="InputEventKey" id="InputEventKey_6ent0"]
+device = -1
+keycode = 4194320
+
+[sub_resource type="InputEventKey" id="InputEventKey_gtglt"]
+device = -1
+keycode = 4194322
+
+[sub_resource type="InputEventKey" id="InputEventKey_f5r7n"]
+device = -1
+keycode = 4194320
+
+[sub_resource type="InputEventKey" id="InputEventKey_yu8fg"]
+device = -1
+keycode = 83
+unicode = 115
+
+[sub_resource type="InputEventKey" id="InputEventKey_l5e1i"]
+device = -1
+keycode = 87
+unicode = 119
+
+[sub_resource type="InputEventKey" id="InputEventKey_e42d4"]
+device = -1
+keycode = 65
+unicode = 97
+
+[sub_resource type="InputEventKey" id="InputEventKey_dokkf"]
+device = -1
+keycode = 68
+unicode = 100
+
+[resource]
+script = ExtResource("1_vuwor")
+scheme_name = "Keyboard A (DEFAULT)"
+move_left = Array[InputEvent]([SubResource("InputEventKey_e42d4")])
+move_right = Array[InputEvent]([SubResource("InputEventKey_dokkf")])
+move_forward = Array[InputEvent]([SubResource("InputEventKey_l5e1i")])
+move_backward = Array[InputEvent]([SubResource("InputEventKey_yu8fg")])
+continue_mission = Array[InputEvent]([SubResource("InputEventKey_statr")])
+lift_up = Array[InputEvent]([SubResource("InputEventKey_f5r7n")])
+lift_down = Array[InputEvent]([SubResource("InputEventKey_gtglt")])
+bucket_up = Array[InputEvent]([SubResource("InputEventKey_5b6ri")])
+bucket_down = Array[InputEvent]([SubResource("InputEventKey_awo36")])
+autonomy = Array[InputEvent]([SubResource("InputEventKey_vuwor")])
+increment_speed = Array[InputEvent]([SubResource("InputEventKey_6ent0")])
+decrement_speed = Array[InputEvent]([SubResource("InputEventKey_3j20n")])
+metadata/_custom_type_script = "uid://cojf71u62eagl"

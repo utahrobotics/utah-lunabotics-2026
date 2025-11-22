@@ -1,7 +1,6 @@
-class_name NotificationCanvas extends Control
-
-@onready var total_label: Label = $TotalLabel
-@onready var v_box_container: VBoxContainer = $ScrollContainer/VBoxContainer
+class_name NotificationCanvas extends Node
+@onready var total_label: Label = $NotificationCanvas/TotalLabel
+@onready var v_box_container: VBoxContainer = $NotificationCanvas/ScrollContainer/VBoxContainer
 
 func add_notification(notif_text = "NOT SET", lifetime = -1):
 	var new_notif := NotificationButton.new(notif_text, lifetime)
