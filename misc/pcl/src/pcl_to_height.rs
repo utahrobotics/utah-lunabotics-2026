@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 
 use cubecl::{CubeType, post_processing::unroll, prelude::*};
+use nalgebra::Vector3;
 
 #[derive(CubeType, CubeLaunch, Clone, Copy, Debug)]
 pub struct MapBounds<F: Float> {
@@ -15,9 +16,6 @@ pub struct MapBounds<F: Float> {
 
     /// Size of each cell in the heightmap in meters
     pub cell_size: F,
-
-    /// private field to force people to use the constructor for bounds checking
-    _force_constructor: (),
 }
 
 impl<F: Float> MapBounds<F> {
@@ -35,8 +33,11 @@ impl<F: Float> MapBounds<F> {
             max_y,
             min_y,
             cell_size,
-            _force_constructor: (),
         })
+    }
+    pub fn buffer_len(&self) -> u32 {
+        let size = ((self.width() * self.height()) / self.cell_size).to_f32();
+        size.map_or(0, |float| float as u32)
     }
 }
 
@@ -74,7 +75,7 @@ fn pcl_to_height<F: Float>(
     if hmap_index != -1 {
         let current_height = Atomic::load(&height_map[hmap_index as u32]);
         let point_height = point[2];
-        if point_height > current_height {
+        if point_height > current_height && point_height != F::new(0.0) {
             Atomic::store(&mut height_map[hmap_index as u32], point_height);
         }
     }
@@ -110,15 +111,55 @@ fn point_to_heightmap_index<F: Float, I: Int>(point: &Line<F>, bounds: &MapBound
 
 /// height_px: height of depth img in pixels
 /// width_px: width of depth img in pixels
-pub fn launch_pcl_to_height(
+pub fn launch_pcl_to_height<R: Runtime>(
     max_x: f32,
     min_x: f32,
     max_y: f32,
     min_y: f32,
     cell_size: f32,
-    height_px: f32,
-    width_px: f32,
-) {
-    let pcl_shape = vec![height_px as usize * width_px as usize, 3];
+    cube_size: u32,
+    pcl: Vec<Vector3<f32>>,
+    device: &R::Device,
+) -> Result<Vec<f32>, String> {
+    let client = R::client(device);
+    let pcl_shape = vec![pcl.len(), 3];
     let pcl_strides = vec![3, 1];
+    let pcl = pcl
+        .iter()
+        .flat_map(|v| v.iter())
+        .cloned()
+        .collect::<Vec<f32>>();
+    let pcl_handle = client.create(&pcl);
+
+    let bounds = MapBounds::new(max_x, min_x, max_y, min_y, cell_size)?;
+    let hmap_handle = client.empty((bounds.buffer_len() * size_of::<f32>() as u32) as usize);
+    unsafe {
+        pcl_to_height::launch_unchecked(
+            &client,
+            CubeCount::Static(
+                (width_px as u32 + cube_size - 1) / cube_size,
+                (height_px as u32 + cube_size - 1) / cube_size,
+                1,
+            ),
+            CubeDim::new_2d(cube_size, cube_size),
+            MapBoundsLaunch::<f32, R>::new(
+                ScalarArg::new(max_x),
+                ScalarArg::new(min_x),
+                ScalarArg::new(max_y),
+                ScalarArg::new(min_x),
+                ScalarArg::new(cell_size),
+            ),
+            TensorArg::from_raw_parts::<f32>(&pcl_handle, &pcl_strides, &pcl_shape, 1),
+            ArrayArg::from_raw_parts_and_size(
+                &hmap_handle,
+                bounds.buffer_len() as usize,
+                1,
+                size_of::<f32>(),
+            ),
+        );
+    }
+
+    let hmap = client.read_one(hmap_handle);
+    let output = f32::from_bytes(&hmap);
+    Ok(output.to_vec())
 }

@@ -157,6 +157,7 @@ impl CuTask for OccupancyGridTask {
             8,
             &self.device,
         );
+        // let height_map = pcl::pcl_to_height::launch_pcl_to_height(10.0, -10.0, 10.0, -10.0, 0.03, DEPTH_FRAME_HEIGHT, DEPTH_FRAME_WIDTH, cube_size, pcl, device)
         if let Some(logger) = RECORDER.get() {
             let _ = logger.recorder.log(
                 format!("realsense/pcl"),

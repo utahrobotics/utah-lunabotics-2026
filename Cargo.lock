@@ -6328,37 +6328,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "re_types_builder"
-version = "0.25.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "090920f78dd766f56eee4da48c75520f89e04864815630cb3604a323af9fb0e9"
-dependencies = [
- "anyhow",
- "camino",
- "clang-format",
- "colored",
- "flatbuffers",
- "indent",
- "itertools 0.14.0",
- "prettyplease",
- "proc-macro2",
- "quote",
- "rayon",
- "re_build_tools",
- "re_case",
- "re_error",
- "re_log",
- "re_tracing",
- "rust-format",
- "serde",
- "syn 2.0.110",
- "tempfile",
- "toml 0.8.23",
- "unindent",
- "xshell",
-]
-
-[[package]]
 name = "re_types_core"
 version = "0.27.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8345,6 +8314,7 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.110",
+ "wasm-bindgen-backend",
  "wasm-bindgen-shared",
 ]
 
