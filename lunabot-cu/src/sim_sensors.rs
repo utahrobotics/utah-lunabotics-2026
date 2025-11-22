@@ -5,64 +5,73 @@ use mujoco_rs::prelude::*;
 use crate::tasks::{DEPTH_FRAME_SIZE, DEPTH_FRAME_WIDTH, DEPTH_FRAME_HEIGHT};
 
 pub struct SimSensors {
-    accel_sensor_id: i32,
-    gyro_sensor_id: i32,
-    quat_sensor_id: i32,
+    accel_sensor_idx: usize,
+    gyro_sensor_idx: usize,
+    quat_sensor_idx: usize,
 }
 
 impl SimSensors {
     pub fn new(model: &MjModel) -> CuResult<Self> {
-        let accel_sensor_id = model.sensor("base_accel")
-            .ok_or_else(|| CuError::new_with_cause("base_accel sensor not found", ""))?;
-        let gyro_sensor_id = model.sensor("base_gyro")
-            .ok_or_else(|| CuError::new_with_cause("base_gyro sensor not found", ""))?;
-        let quat_sensor_id = model.sensor("base_quat")
-            .ok_or_else(|| CuError::new_with_cause("base_quat sensor not found", ""))?;
-        
+        let accel_sensor_idx = model
+            .sensor("base_accel")
+            .ok_or_else(|| CuError::from("base_accel sensor not found"))?
+            .id;
+        let gyro_sensor_idx = model
+            .sensor("base_gyro")
+            .ok_or_else(|| CuError::from("base_gyro sensor not found"))?
+            .id;
+        let quat_sensor_idx = model
+            .sensor("base_quat")
+            .ok_or_else(|| CuError::from("base_quat sensor not found"))?
+            .id;
+
         Ok(Self {
-            accel_sensor_id,
-            gyro_sensor_id,
-            quat_sensor_id,
+            accel_sensor_idx,
+            gyro_sensor_idx,
+            quat_sensor_idx,
         })
     }
     
-    pub fn read_depth_frame(
+    pub fn read_depth_frame<'m>(
         &self, 
-        _model: &MjModel, 
-        _data: &MjData
+        _model: &'m MjModel, 
+        _data: &MjData<&'m MjModel>
     ) -> IceoryxDepthFrame<DEPTH_FRAME_SIZE> {
         // TODO: implement depth rendering
         IceoryxDepthFrame::default()
     }
     
-    pub fn read_imu_data(
+    pub fn read_imu_data<'m>(
         &self,
-        model: &MjModel,
-        data: &MjData
+        model: &'m MjModel,
+        data: &MjData<&'m MjModel>
     ) -> ImuMsg {
-        let accel_adr = model.sensor_adr(self.accel_sensor_id);
-        let gyro_adr = model.sensor_adr(self.gyro_sensor_id);
-        let quat_adr = model.sensor_adr(self.quat_sensor_id);
-        
+        let sensor_adr = model.sensor_adr();
+        let sensordata = data.sensordata();
+
+        let accel_adr = sensor_adr[self.accel_sensor_idx] as usize;
+        let gyro_adr = sensor_adr[self.gyro_sensor_idx] as usize;
+        let quat_adr = sensor_adr[self.quat_sensor_idx] as usize;
+
         let linear_acceleration = [
-            data.sensordata(accel_adr),
-            data.sensordata(accel_adr + 1),
-            data.sensordata(accel_adr + 2),
+            sensordata[accel_adr] as f32,
+            sensordata[accel_adr + 1] as f32,
+            sensordata[accel_adr + 2] as f32,
         ];
-        
+
         let angular_velocity = [
-            data.sensordata(gyro_adr),
-            data.sensordata(gyro_adr + 1),
-            data.sensordata(gyro_adr + 2),
+            sensordata[gyro_adr] as f32,
+            sensordata[gyro_adr + 1] as f32,
+            sensordata[gyro_adr + 2] as f32,
         ];
-        
+
         let quaternion = [
-            data.sensordata(quat_adr),
-            data.sensordata(quat_adr + 1),
-            data.sensordata(quat_adr + 2),
-            data.sensordata(quat_adr + 3),
+            sensordata[quat_adr] as f32,
+            sensordata[quat_adr + 1] as f32,
+            sensordata[quat_adr + 2] as f32,
+            sensordata[quat_adr + 3] as f32,
         ];
-        
+
         ImuMsg {
             quaternion,
             angular_velocity,

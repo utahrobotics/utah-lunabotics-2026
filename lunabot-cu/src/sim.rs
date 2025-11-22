@@ -15,6 +15,7 @@ use mujoco_rs::prelude::*;
 use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 
@@ -25,6 +26,7 @@ pub static TARGET_HZ: usize = 1000; // MUST BE THE SAME AS THE TARGET HZ IN COPP
 pub static MJ_MODEL: OnceLock<&'static MjModel> = OnceLock::new();
 pub static MJ_DATA: OnceLock<Mutex<&'static mut MjData<&'static MjModel>>> = OnceLock::new();
 pub static SIM_SENSORS: OnceLock<sim_sensors::SimSensors> = OnceLock::new();
+static IMU_LOG_DECIMATOR: AtomicUsize = AtomicUsize::new(0);
 
 #[copper_runtime(config = "copperconfig.ron", sim_mode = true)]
 struct LunabotApplication {}
@@ -68,6 +70,16 @@ fn sim_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::L2Imu(CuTaskCallbackState::Process(_, output)) => {
             let sensors = SIM_SENSORS.get().unwrap();
             let imu_data = sensors.read_imu_data(model, &data);
+            let count = IMU_LOG_DECIMATOR.fetch_add(1, Ordering::Relaxed);
+            // debug printout every 100th imu message
+            if count % 100 == 0 {
+                println!(
+                    "Sim IMU -> quat: {:?}, omega: {:?}, accel: {:?}",
+                    imu_data.quaternion,
+                    imu_data.angular_velocity,
+                    imu_data.linear_acceleration
+                );
+            }
             output.set_payload(imu_data);
             SimOverride::ExecutedBySim
         }
@@ -229,7 +241,9 @@ fn set_up_mujoco() -> (
     
     println!("Initializing sensors...");
     let sensors = sim_sensors::SimSensors::new(model).expect("Failed to initialize sensors");
-    SIM_SENSORS.set(sensors).expect("Failed to set sim sensors");
+    if SIM_SENSORS.set(sensors).is_err() {
+        panic!("Failed to set sim sensors");
+    }
     
     (model, viewer, leaked_data)
 }
