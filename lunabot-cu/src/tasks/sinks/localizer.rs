@@ -178,13 +178,6 @@ impl CuSinkTask for Localizer {
 
         if self.last_rerun_log.elapsed().as_nanos() > 16_666_667 {
             let isometry = self.root_node.get_global_isometry();
-            let encodeable_isometry = EncodableIsometry::from_na(&isometry);
-
-            let realsense_iso = self
-                .root_node
-                .get_node_with_name("upper_depth_camera")
-                .unwrap()
-                .get_global_isometry();
 
             self.last_rerun_log = Instant::now();
             if let Some(recorder) = rerun_viz::RECORDER.get() {
