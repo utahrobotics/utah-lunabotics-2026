@@ -6,9 +6,14 @@ use cu29::{
     cutask::{CuSrcTask, Freezable},
     output_msg,
 };
+
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use iceoryx2::node::NodeBuilder;
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use iceoryx2::port::subscriber::Subscriber;
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use iceoryx2::prelude::*;
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use iceoryx2::service::port_factory::publish_subscribe::PortFactory;
 
 use crate::ROOT_NODE;
@@ -17,15 +22,19 @@ use nalgebra::{Quaternion, UnitQuaternion, Vector3};
 use simple_motion::StaticNode;
 
 pub struct ImuIceoryxReceiver {
+    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     service_name: ServiceName,
+    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     node: iceoryx2::node::Node<ipc::Service>,
+    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     service: Option<PortFactory<ipc::Service, ImuMsg, ()>>,
+    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     subscriber: Option<Subscriber<ipc::Service, ImuMsg, ()>>,
     lidar_node: StaticNode,
 }
 
 impl Freezable for ImuIceoryxReceiver {}
-
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 impl CuSrcTask for ImuIceoryxReceiver {
     type Output<'m> = output_msg!(ImuMsg);
 
@@ -130,6 +139,27 @@ impl CuSrcTask for ImuIceoryxReceiver {
     fn stop(&mut self, _clock: &RobotClock) -> CuResult<()> {
         self.service = None;
         self.subscriber = None;
+        Ok(())
+    }
+}
+
+#[cfg(any(feature = "resim", feature = "sim"))]
+impl CuSrcTask for ImuIceoryxReceiver {
+    type Output<'m> = output_msg!(ImuMsg);
+
+    fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
+        Ok(Self {
+            lidar_node: ROOT_NODE
+                .get()
+                .unwrap()
+                .clone()
+                .get_node_with_name("l2_front")
+                .unwrap(),
+        })
+    }
+
+    fn process(&mut self, _clock: &RobotClock, new_msg: &mut Self::Output<'_>) -> CuResult<()> {
+        new_msg.clear_payload();
         Ok(())
     }
 }

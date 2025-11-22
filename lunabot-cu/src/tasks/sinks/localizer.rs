@@ -9,12 +9,7 @@ use cu29::{
 };
 use embedded_common::FromPicoV3;
 use iceoryx_types::{ImuMsg, PoseMsg};
-use iceoryx2::{
-    node::NodeBuilder,
-    port::publisher::Publisher,
-    prelude::{ServiceName, UnableToDeliverStrategy},
-    service::ipc,
-};
+
 use nalgebra::{Isometry3, UnitQuaternion, UnitVector3, Vector3};
 use rerun::{Arrows3D, Quaternion, Transform3D};
 use simple_motion::StaticNode;
@@ -34,9 +29,6 @@ pub struct Localizer {
     kiss_icp_correction: Option<Isometry3<f64>>,
     last_icp_reading: Option<(Isometry3<f64>, u64)>,
     last_imu_orientation: Option<(OrientationComponents, u64)>,
-    // publishes EncodableIsometry at 60hz
-    root_node_publisher: Publisher<ipc::Service, [f64; 16], ()>,
-    realsense_node_publisher: Publisher<ipc::Service, [f64; 16], ()>,
 }
 
 impl Freezable for Localizer {}
@@ -55,41 +47,6 @@ impl CuSinkTask for Localizer {
     where
         Self: Sized,
     {
-        let node = NodeBuilder::new()
-            .create::<ipc::Service>()
-            .map_err(|e| CuError::new_with_cause("Localizer: node create", e))?;
-
-        let service = node
-            .service_builder(
-                &ServiceName::new("localizer/root_isometry")
-                    .map_err(|e| CuError::new_with_cause("Localizer: invalid service name", e))?,
-            )
-            .publish_subscribe::<[f64; 16]>()
-            .enable_safe_overflow(true)
-            .open_or_create()
-            .map_err(|e| CuError::new_with_cause("Localizer: service", e))?;
-
-        let publisher = service
-            .publisher_builder()
-            .create()
-            .map_err(|e| CuError::new_with_cause("Localizer: publisher", e))?;
-
-        let service_realsense = node
-            .service_builder(
-                &ServiceName::new("localizer/realsense_isometry")
-                    .map_err(|e| CuError::new_with_cause("Localizer: invalid service name", e))?,
-            )
-            .publish_subscribe::<[f64; 16]>()
-            .enable_safe_overflow(true)
-            .open_or_create()
-            .map_err(|e| CuError::new_with_cause("Localizer: service", e))?;
-
-        let publisher_realsense = service_realsense
-            .publisher_builder()
-            .unable_to_deliver_strategy(UnableToDeliverStrategy::Block)
-            .create()
-            .map_err(|e| CuError::new_with_cause("Localizer: publisher", e))?;
-
         if let Some(root_node) = ROOT_NODE.get() {
             return Ok(Self {
                 root_node: root_node.clone(),
@@ -97,8 +54,6 @@ impl CuSinkTask for Localizer {
                 kiss_icp_correction: None,
                 last_icp_reading: None,
                 last_imu_orientation: None,
-                root_node_publisher: publisher,
-                realsense_node_publisher: publisher_realsense,
             });
         } else {
             return Err(CuError::new_with_cause(
@@ -224,23 +179,13 @@ impl CuSinkTask for Localizer {
         if self.last_rerun_log.elapsed().as_nanos() > 16_666_667 {
             let isometry = self.root_node.get_global_isometry();
             let encodeable_isometry = EncodableIsometry::from_na(&isometry);
-            if let Err(e) = self
-                .root_node_publisher
-                .send_copy(encodeable_isometry.inner)
-            {
-                eprintln!("localizer publish err: {e}");
-            }
+
             let realsense_iso = self
                 .root_node
                 .get_node_with_name("upper_depth_camera")
                 .unwrap()
                 .get_global_isometry();
-            if let Err(e) = self
-                .realsense_node_publisher
-                .send_copy(EncodableIsometry::from_na(&realsense_iso).inner)
-            {
-                eprintln!("localizer publish err: {e}");
-            }
+
             self.last_rerun_log = Instant::now();
             if let Some(recorder) = rerun_viz::RECORDER.get() {
                 if let Err(e) = recorder.recorder.log(

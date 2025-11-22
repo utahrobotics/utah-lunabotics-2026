@@ -10,7 +10,7 @@ use cu29::{
 use iceoryx_types::IceoryxPointCloud;
 use simple_icp::{config::Config, icp_pipeline::IcpPipeline};
 
-use crate::rerun_viz::RECORDER;
+use crate::{ROOT_NODE, rerun_viz::RECORDER};
 pub struct KissIcp {
     pipeline: simple_icp::icp_pipeline::IcpPipeline,
     pub accumulated_frames: Vec<simple_icp::point3d::Point3d>,
