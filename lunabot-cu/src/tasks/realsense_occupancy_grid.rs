@@ -157,7 +157,18 @@ impl CuTask for OccupancyGridTask {
             8,
             &self.device,
         );
-        // let height_map = pcl::pcl_to_height::launch_pcl_to_height(10.0, -10.0, 10.0, -10.0, 0.03, DEPTH_FRAME_HEIGHT, DEPTH_FRAME_WIDTH, cube_size, pcl, device)
+        let height_map = pcl::pcl_to_height::launch_pcl_to_height::<WgpuRuntime>(
+            10.0,
+            -10.0,
+            10.0,
+            -10.0,
+            0.03,
+            8,
+            &points,
+            &self.device,
+        )
+        .unwrap();
+
         if let Some(logger) = RECORDER.get() {
             let _ = logger.recorder.log(
                 format!("realsense/pcl"),
@@ -168,6 +179,28 @@ impl CuTask for OccupancyGridTask {
                     // None
                     // }
                 })),
+            );
+            // use the magic numbers passed to the launch pcl to height for now instead of the thallassic constants
+            let _ = logger.recorder.log(
+                "heightmap",
+                &Points3D::new(
+                    height_map
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(i, h)| {
+                            if *h > 0.0 {
+                                let (x, y) = index_to_xy(i);
+                                Some([
+                                    x as f32 * 0.03 - 10.0 + 0.015,
+                                    y as f32 * 0.03 - 10.0 + 0.015,
+                                    *h as f32,
+                                ])
+                            } else {
+                                None
+                            }
+                        })
+                        .collect::<Vec<[f32; 3]>>(),
+                ),
             );
         }
         Ok(())

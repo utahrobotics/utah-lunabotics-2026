@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use cubecl::{CubeType, post_processing::unroll, prelude::*};
+use cubecl::{CubeType, post_processing::unroll, prelude::*, server::Binding};
 use nalgebra::Vector3;
 
 #[derive(CubeType, CubeLaunch, Clone, Copy, Debug)]
@@ -118,7 +118,7 @@ pub fn launch_pcl_to_height<R: Runtime>(
     min_y: f32,
     cell_size: f32,
     cube_size: u32,
-    pcl: Vec<Vector3<f32>>,
+    pcl: &Vec<Vector3<f32>>,
     device: &R::Device,
 ) -> Result<Vec<f32>, String> {
     let client = R::client(device);
@@ -129,18 +129,21 @@ pub fn launch_pcl_to_height<R: Runtime>(
         .flat_map(|v| v.iter())
         .cloned()
         .collect::<Vec<f32>>();
-    let pcl_handle = client.create(&pcl);
+    let pcl_handle = client.create(f32::as_bytes(&pcl));
 
     let bounds = MapBounds::new(max_x, min_x, max_y, min_y, cell_size)?;
     let hmap_handle = client.empty((bounds.buffer_len() * size_of::<f32>() as u32) as usize);
     unsafe {
         pcl_to_height::launch_unchecked(
             &client,
-            CubeCount::Static(
-                (width_px as u32 + cube_size - 1) / cube_size,
-                (height_px as u32 + cube_size - 1) / cube_size,
-                1,
-            ),
+            CubeCount::Dynamic(Binding::new(
+                pcl_handle.clone().binding().memory,
+                pcl_handle.offset_start,
+                pcl_handle.offset_end,
+                pcl_handle.stream,
+                0,
+                ((size_of::<f32>() * 3) * pcl.len()) as u64,
+            )),
             CubeDim::new_2d(cube_size, cube_size),
             MapBoundsLaunch::<f32, R>::new(
                 ScalarArg::new(max_x),
