@@ -1,4 +1,4 @@
-use bonsai_bt::Behavior::{self, Action, Sequence, WaitForever};
+use bonsai_bt::Behavior::{self, Action, AlwaysSucceed, Sequence, WaitForever};
 
 use crate::tasks::ai::{
     action::LunabotAction,
@@ -11,9 +11,9 @@ pub fn teleop_behavior() -> Behavior<LunabotAction> {
     Behavior::While(
         Box::new(WaitForever),
         vec![Sequence(vec![
-            soft_stop_behavior(),
-            manual_ctrl_behavior(),
-            autonomy_main(),
+            AlwaysSucceed(Box::new(soft_stop_behavior())),
+            AlwaysSucceed(Box::new(manual_ctrl_behavior())),
+            AlwaysSucceed(Box::new(autonomy_main())),
         ])],
     )
 }

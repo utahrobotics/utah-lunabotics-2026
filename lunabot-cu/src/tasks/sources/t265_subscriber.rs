@@ -4,6 +4,7 @@ use cu29::{
     prelude::*,
 };
 use iceoryx_types::PoseMsg;
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use iceoryx2::{
     node::NodeBuilder,
     port::subscriber::Subscriber,
@@ -18,6 +19,7 @@ use crate::ROOT_NODE;
 pub struct T265Subscriber {
     last_seen: u64,
     /// subscribes to pose frames published by the realsense external task (T265)
+    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     pose_subscriber: Subscriber<ipc::Service, PoseMsg, ()>,
     node: StaticNode,
     /// Initial yaw offset captured on first pose to align T265's arbitrary tracking frame with world
@@ -26,6 +28,7 @@ pub struct T265Subscriber {
 
 impl Freezable for T265Subscriber {}
 
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 impl CuSrcTask for T265Subscriber {
     type Output<'m> = output_msg!(EncodableIsometry);
 
@@ -144,6 +147,24 @@ impl CuSrcTask for T265Subscriber {
             ));
         }
 
+        Ok(())
+    }
+}
+
+#[cfg(any(feature = "resim", feature = "sim"))]
+impl CuSrcTask for T265Subscriber {
+    type Output<'m> = output_msg!(PoseMsg);
+    fn new(config: Option<&cu29::prelude::ComponentConfig>) -> cu29::CuResult<Self>
+    where
+        Self: Sized,
+    {
+        Ok(Self { last_seen: 0 })
+    }
+    fn process<'o>(
+        &mut self,
+        _clock: &cu29::prelude::RobotClock,
+        _new_msg: &mut Self::Output<'o>,
+    ) -> cu29::CuResult<()> {
         Ok(())
     }
 }

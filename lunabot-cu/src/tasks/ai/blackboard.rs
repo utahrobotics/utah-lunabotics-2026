@@ -5,14 +5,20 @@ use embedded_common::ActuatorCommand;
 use iceoryx_types::IceoryxOccupancyGrid;
 use simple_motion::StaticNode;
 
-use crate::ROOT_NODE;
+use crate::{ROOT_NODE, tasks::ai::jobs::Job};
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct LunabotBlackboard {
     pub root_node: StaticNode,
     pub latest_obstacle_map: Option<IceoryxOccupancyGrid>,
+
+    /// stores the last lift actuator message received from lunabase
     pub last_lift: Option<i8>,
+
+    /// stores the last bucket actuator message received from lunabase
     pub last_bucket: Option<i8>,
+
+    /// stores the last steering message recieved from the lunabase
     pub last_steering: Option<Steering>,
 
     /// populated when the navigate command comes in
@@ -32,6 +38,9 @@ pub struct LunabotBlackboard {
     pub current_mission: LunabotStage,
 
     pub yielded: bool,
+
+    /// if a path following long running task is going, the job will be stored here
+    pub path_follower: Option<Job<Steering>>,
 }
 
 impl Default for LunabotBlackboard {
@@ -49,6 +58,7 @@ impl Default for LunabotBlackboard {
             last_steering: None,
             navigate_destination: None,
             yielded: false,
+            path_follower: None,
         }
     }
 }

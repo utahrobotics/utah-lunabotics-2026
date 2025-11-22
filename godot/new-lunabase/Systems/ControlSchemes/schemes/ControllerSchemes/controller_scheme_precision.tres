@@ -1,0 +1,51 @@
+[gd_resource type="Resource" script_class="ControlSchemeResource" load_steps=11 format=3 uid="uid://ocq8nj7hqfr7"]
+
+[ext_resource type="Script" uid="uid://cojf71u62eagl" path="res://Systems/ControlSchemes/scheme_resource.gd" id="1_0mr7s"]
+
+[sub_resource type="InputEventJoypadMotion" id="InputEventJoypadMotion_0mr7s"]
+axis = 4
+axis_value = 1.0
+
+[sub_resource type="InputEventJoypadButton" id="InputEventJoypadButton_gpvd3"]
+button_index = 9
+
+[sub_resource type="InputEventJoypadButton" id="InputEventJoypadButton_sqnyb"]
+device = -1
+button_index = 6
+
+[sub_resource type="InputEventJoypadButton" id="InputEventJoypadButton_0mr7s"]
+button_index = 13
+
+[sub_resource type="InputEventJoypadButton" id="InputEventJoypadButton_kxk82"]
+button_index = 14
+
+[sub_resource type="InputEventJoypadMotion" id="InputEventJoypadMotion_kxk82"]
+device = -1
+axis = 1
+axis_value = -1.0
+
+[sub_resource type="InputEventJoypadMotion" id="InputEventJoypadMotion_46fuj"]
+axis = 5
+axis_value = 1.0
+
+[sub_resource type="InputEventJoypadButton" id="InputEventJoypadButton_bkh38"]
+button_index = 10
+
+[sub_resource type="InputEventJoypadMotion" id="InputEventJoypadMotion_yhdsm"]
+device = -1
+axis = 3
+axis_value = -1.0
+
+[resource]
+script = ExtResource("1_0mr7s")
+scheme_name = "New Control Layout"
+left_wheel_axis = Array[InputEvent]([SubResource("InputEventJoypadMotion_kxk82")])
+right_wheel_axis = Array[InputEvent]([SubResource("InputEventJoypadMotion_yhdsm")])
+continue_mission = Array[InputEvent]([SubResource("InputEventJoypadButton_sqnyb")])
+lift_up = Array[InputEvent]([SubResource("InputEventJoypadButton_bkh38")])
+lift_down = Array[InputEvent]([SubResource("InputEventJoypadMotion_46fuj")])
+bucket_up = Array[InputEvent]([SubResource("InputEventJoypadButton_gpvd3")])
+bucket_down = Array[InputEvent]([SubResource("InputEventJoypadMotion_0mr7s")])
+increment_speed = Array[InputEvent]([SubResource("InputEventJoypadButton_kxk82")])
+decrement_speed = Array[InputEvent]([SubResource("InputEventJoypadButton_0mr7s")])
+metadata/_custom_type_script = "uid://cojf71u62eagl"

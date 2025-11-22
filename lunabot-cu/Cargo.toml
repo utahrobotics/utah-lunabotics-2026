@@ -36,7 +36,9 @@ production = [
     "cobs",
     "bytes",
     "quic",
+    "iceoryx2",
 ]
+
 logreader = ["dep:cu29-export"]
 resim = ["dep:cu29-export", "cu-apriltag/resim"]
 sim = ["cu-apriltag/sim", "mujoco-rs", "quic"]
@@ -67,7 +69,7 @@ cu-apriltag.workspace = true
 crossbeam-channel.workspace = true
 anyhow = "1"
 serde.workspace = true
-iceoryx2.workspace = true
+iceoryx2 = { workspace = true, optional = true }
 # libc = "0.2.173"
 # nix = { version = "0.30.1", features = ["time"] }
 bytemuck.workspace = true

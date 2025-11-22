@@ -9,17 +9,27 @@ use cu29::{
     output_msg,
     prelude::*,
 };
+
 use iceoryx_types::{IceoryxPointCloud, PointXYZIR};
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use iceoryx2::node::NodeBuilder;
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use iceoryx2::port::subscriber::Subscriber;
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use iceoryx2::prelude::*;
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use iceoryx2::service::port_factory::publish_subscribe::PortFactory;
+
 use simple_motion::StaticNode;
 
 pub struct PointCloudIceoryxReceiver {
+    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     service_name: ServiceName,
+    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     node: iceoryx2::node::Node<ipc::Service>,
+    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     service: Option<PortFactory<ipc::Service, IceoryxPointCloud, ()>>,
+    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     subscriber: Option<Subscriber<ipc::Service, IceoryxPointCloud, ()>>,
     l2_node: StaticNode,
     last_seen: u64,
@@ -27,6 +37,7 @@ pub struct PointCloudIceoryxReceiver {
 
 impl Freezable for PointCloudIceoryxReceiver {}
 
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 impl CuSrcTask for PointCloudIceoryxReceiver {
     type Output<'m> = output_msg!(IceoryxPointCloud);
 
@@ -134,6 +145,35 @@ impl CuSrcTask for PointCloudIceoryxReceiver {
     fn stop(&mut self, _clock: &RobotClock) -> CuResult<()> {
         self.service = None;
         self.subscriber = None;
+        Ok(())
+    }
+}
+
+#[cfg(any(feature = "resim", feature = "sim"))]
+impl CuSrcTask for PointCloudIceoryxReceiver {
+    type Output<'m> = output_msg!(IceoryxPointCloud);
+
+    fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
+        Ok(Self {
+            l2_node: ROOT_NODE
+                .get()
+                .unwrap()
+                .get_node_with_name("l2_front")
+                .unwrap()
+                .clone(),
+            last_seen: 0,
+        })
+    }
+
+    fn start(&mut self, _clock: &RobotClock) -> CuResult<()> {
+        Ok(())
+    }
+
+    fn process(&mut self, _clock: &RobotClock, _new_msg: &mut Self::Output<'_>) -> CuResult<()> {
+        Ok(())
+    }
+
+    fn stop(&mut self, _clock: &RobotClock) -> CuResult<()> {
         Ok(())
     }
 }
