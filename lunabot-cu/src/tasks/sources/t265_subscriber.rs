@@ -68,6 +68,7 @@ impl CuSrcTask for T265Subscriber {
         let t265_node = ROBOT_STATE
             .get()
             .expect("root node should be defined")
+            .kinematic_root
             .get_node_with_name(&node_name)
             .expect("node not found in chain");
         Ok(Self {

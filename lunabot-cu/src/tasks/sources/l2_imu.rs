@@ -103,6 +103,7 @@ impl CuSrcTask for ImuIceoryxReceiver {
             lidar_node: ROBOT_STATE
                 .get()
                 .unwrap()
+                .kinematic_root
                 .clone()
                 .get_node_with_name("l2_front")
                 .unwrap(),

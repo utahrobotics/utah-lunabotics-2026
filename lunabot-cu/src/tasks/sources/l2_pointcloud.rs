@@ -62,6 +62,7 @@ impl CuSrcTask for PointCloudIceoryxReceiver {
             l2_node: ROBOT_STATE
                 .get()
                 .unwrap()
+                .kinematic_root
                 .get_node_with_name("l2_front")
                 .unwrap()
                 .clone(),
