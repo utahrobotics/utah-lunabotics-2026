@@ -9,7 +9,9 @@ use crossbeam::atomic::AtomicCell;
 use crossbeam_channel::{Receiver, Sender};
 use quic::QuicServer;
 
-pub static LAST_SEEN_TIMESTAMP: OnceLock<AtomicCell<Instant>> = OnceLock::new();
+/// Timestamp of the last received message or keep-alive from Lunabase
+static LAST_SEEN_TIMESTAMP: OnceLock<AtomicCell<Instant>> = OnceLock::new();
+
 /// Provides a non blocking interface to the QuicServer struct
 pub struct LunabaseConnection {
     pub server: QuicServer<FromLunabot, FromLunabase>,
