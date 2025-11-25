@@ -885,10 +885,6 @@ fn test_reconnect_after_abrupt_disconnect() {
     drop(client1);
     println!("✓ Client dropped without close frame");
 
-    // Server doesn't know yet that client is gone
-    // Wait just a tiny bit (not enough for timeout)
-    thread::sleep(Duration::from_millis(100));
-
     // Second connection (reconnect) happens BEFORE server detects the first is dead
     println!("\n--- Phase 3: Reconnect with New Client (before server detects disconnect) ---");
     let client2 = QuicClient::<TestMessage, TestMessage>::connect(addr)

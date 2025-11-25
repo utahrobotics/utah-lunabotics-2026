@@ -224,6 +224,10 @@ List of common problems and how to fix them can be found [here](https://github.c
 * Runs the lunabot in simulation mode which allows you to selectively decide which task's process functions are simulated "Mocked", and which tasks process functions are not.
 * Allows you to set a task with a mocked process function to output to whatever was read in from the logs, effectively allowing for deterministic replay of whatever was captured.
 
+### lunabot-cu/src/sim.rs
+* Launches mujoco cpp-viewer, and starts the lunabot.
+* Simulates some sensor inputs, and controls the motor nodes defined in the simulation
+
 ### external-tasks/realsense
 * Launched by lunabot-cu. 
 * Detects when a realsense device is plugged in, automatically opens device and publishes point clouds.
@@ -235,7 +239,7 @@ List of common problems and how to fix them can be found [here](https://github.c
 * Not compiled or executed in log replay mode.
 
 ## misc/ 
-Contains libraries for kinematics, network protocols, GPU utilites/Shader pipelines, camera auto discovery, behavior trees, and interaction with VESC boards.
+Contains libraries for kinematics, network protocols, GPU utilites/Shader pipelines, camera auto discovery, and interaction with VESC boards.
 
 ## lunabot-cu/src/tasks/sources
 Contains source tasks for:
@@ -271,8 +275,7 @@ Helper functions for:
 * Structures and helpers used for connecting to the base station.
 
 ## common/ 
-Legacy code containing structures that are used by the lunabase and the lunabot. (and the old behavior tree). <br>
-*This will be useful when we actually move the lunabase to this repo*
+Legacy code containing structures that are used by the lunabase and the lunabot. <br>
 
 ## embedded_common
 A no_std crate containing structures used by the embedded code as well as our tasks. 
@@ -289,7 +292,8 @@ Legacy code for controlling motors via VESC. <br>
 The enumerate_motors() function (used by the motor_ctrl task) returns a structure that you can use to command the motors.
 
 ### lunabot-cu/src/simple_monitor.rs
-Hooks into the copper runtime and prints messages when a task's process, preprocess, etc return Err.
+* Hooks into the copper runtime and prints messages when a task's process, preprocess, etc return Err.
+* Sets the list of errored tasks, which are then read by the lunabase and sent to the base station.
 
 Example output:
 ```
