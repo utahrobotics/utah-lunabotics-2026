@@ -393,8 +393,9 @@ impl std::fmt::Debug for TagObservation {
 }
 
 impl TagObservation {
-    /// gets the isometry of the robot base frame as observed by the camera.
-    /// will return none if the camera node doesn't exist in the chain.
+    /// Computes T_world_base: the robot base pose in arena/world coordinates.
+    /// Uses: world tag position * (tag observation)^-1 * (camera mount)^-1
+    /// Returns None if camera node doesn't exist.
     pub fn get_isometry_of_observer(&self) -> Option<Isometry3<f64>> {
         let camera_node = ROOT_NODE.get()?.get_node_with_name(&self.camera_id)?;
 
