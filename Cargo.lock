@@ -7577,7 +7577,10 @@ dependencies = [
 name = "wgsl-pcl"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "bytemuck",
  "pollster",
+ "thiserror 2.0.17",
  "wgpu 27.0.1",
 ]
 
