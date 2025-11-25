@@ -14,10 +14,11 @@ use mujoco_rs::prelude::*;
 use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
+use utils::RobotState;
 
 const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 
-pub static ROOT_NODE: OnceLock<StaticNode> = OnceLock::new();
+pub static ROBOT_STATE: OnceLock<RobotState> = OnceLock::new();
 
 pub static TARGET_HZ: usize = 1000; // MUST BE THE SAME AS THE TARGET HZ IN COPPERCONFIG.RON
 
@@ -134,7 +135,11 @@ fn main() {
             .expect("Failed to parse robot chain");
 
             let robot_chain = ChainBuilder::from(robot_chain).finish_static();
-            let _ = ROOT_NODE.set(robot_chain);
+            let _ = ROBOT_STATE.set( RobotState {
+                kinematic_root: robot_chain,
+                kalman_state: Arc::new(SimpleVector::<15>::from_element(0.0)),
+                kalman_variances: Arc::new(SimpleSquareMatrix::<15>::from_diagonal_element(1E64)),
+            });
 
             let mut application = LunabotApplicationBuilder::new()
                 .with_sim_callback(&mut default_callback)

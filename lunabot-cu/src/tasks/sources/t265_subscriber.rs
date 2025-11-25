@@ -14,7 +14,7 @@ use iceoryx2::{
 use nalgebra::{Isometry3, UnitQuaternion, Vector3};
 use simple_motion::StaticNode;
 
-use crate::ROOT_NODE;
+use crate::ROBOT_STATE;
 
 pub struct T265Subscriber {
     last_seen: u64,
@@ -65,7 +65,7 @@ impl CuSrcTask for T265Subscriber {
             .buffer_size(19)
             .create()
             .map_err(|e| CuError::new_with_cause("subscriber creation error", e))?;
-        let t265_node = ROOT_NODE
+        let t265_node = ROBOT_STATE
             .get()
             .expect("root node should be defined")
             .get_node_with_name(&node_name)

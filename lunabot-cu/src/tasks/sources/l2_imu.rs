@@ -20,7 +20,7 @@ use kalman_filter::SimpleVector;
 use serde::Serialize;
 use crate::rerun_viz::RECORDER;
 
-use crate::ROOT_NODE;
+use crate::ROBOT_STATE;
 use iceoryx_types::ImuMsg;
 use nalgebra::{Quaternion, UnitQuaternion, Vector3};
 use simple_motion::StaticNode;
@@ -100,7 +100,7 @@ impl CuSrcTask for ImuIceoryxReceiver {
             node,
             service: None,
             subscriber: None,
-            lidar_node: ROOT_NODE
+            lidar_node: ROBOT_STATE
                 .get()
                 .unwrap()
                 .clone()
@@ -243,9 +243,10 @@ impl CuSrcTask for ImuIceoryxReceiver {
 
     fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
         Ok(Self {
-            lidar_node: ROOT_NODE
+            lidar_node: ROBOT_STATE
                 .get()
                 .unwrap()
+                .kinematic_root
                 .clone()
                 .get_node_with_name("l2_front")
                 .unwrap(),

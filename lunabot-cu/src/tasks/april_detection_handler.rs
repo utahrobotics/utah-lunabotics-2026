@@ -16,7 +16,7 @@ use serde::Deserialize;
 use std::fs;
 use std::path::Path;
 
-use crate::ROOT_NODE;
+use crate::ROBOT_STATE;
 use crate::rerun_viz::RECORDER;
 
 
@@ -397,7 +397,7 @@ impl TagObservation {
     /// Uses: world tag position * (tag observation)^-1 * (camera mount)^-1
     /// Returns None if camera node doesn't exist.
     pub fn get_isometry_of_observer(&self) -> Option<Isometry3<f64>> {
-        let camera_node = ROOT_NODE.get()?.get_node_with_name(&self.camera_id)?;
+        let camera_node = ROBOT_STATE.get()?.kinematic_root.get_node_with_name(&self.camera_id)?;
 
         // inverse of the camera isometry relative to robot base
         let camera_isometry_inverse = camera_node.get_isometry_from_base().inverse();

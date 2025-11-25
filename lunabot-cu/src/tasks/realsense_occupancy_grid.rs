@@ -15,7 +15,7 @@ use thalassic::{
     PipelineSharedItems,
 };
 
-use crate::ROOT_NODE;
+use crate::ROBOT_STATE;
 use crate::rerun_viz::RECORDER;
 use crate::tasks::{DEPTH_FRAME_HEIGHT, DEPTH_FRAME_SIZE, DEPTH_FRAME_WIDTH};
 
@@ -99,9 +99,10 @@ impl CuTask for OccupancyGridTask {
             .and_then(|c| c.get::<u32>("gaussian_kernel_size"))
             .expect("specify kernel size for gaussian blur");
 
-        let camera_node = ROOT_NODE
+        let camera_node = ROBOT_STATE
             .get()
-            .ok_or_else(|| CuError::from("RealSensePointCloudReceiver: ROOT_NODE not initialized"))?
+            .ok_or_else(|| CuError::from("RealSensePointCloudReceiver: ROBOT_STATE not initialized"))?
+            .kinematic_root
             .get_node_with_name(&camera_name)
             .ok_or_else(|| {
                 CuError::from(format!(

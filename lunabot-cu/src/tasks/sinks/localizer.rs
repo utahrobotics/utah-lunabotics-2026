@@ -5,6 +5,7 @@ use crate::rerun_viz::RECORDER;
 use crate::tasks::AprilTagMeasurement;
 use crate::tasks::IcpMeasurement;
 use crate::tasks::ImuMeasurement;
+use crate::utils::RobotState;
 use cu_spatial_payloads::EncodableIsometry;
 use cu29::{
     CuError,
@@ -14,11 +15,13 @@ use cu29::{
 };
 use embedded_common::FromPicoV3;
 
+use nalgebra::Const;
+use nalgebra::SMatrixViewMut;
 use nalgebra::{Isometry3, Vector3};
 use rerun::Quaternion;
 use simple_motion::StaticNode;
 
-use crate::ROOT_NODE;
+use crate::ROBOT_STATE;
 
 use kalman_filter::*;
 
@@ -26,7 +29,7 @@ use kalman_filter::*;
 const UNKNOWN_PRIOR_VARIANCE: f64 = 1e64;
 
 pub struct Localizer {
-    root_node: StaticNode,
+    robot_state: RobotState,
     last_rerun_log: Instant,
     /// Stores all information of kalman filter, including past values, and update logic.
     kalman_filter: KalmanFilter<15>,
@@ -55,9 +58,9 @@ impl CuSinkTask for Localizer {
             Self::evolution_function,
         );
 
-        if let Some(root_node) = ROOT_NODE.get() {
+        if let Some(robot_state) = ROBOT_STATE.get() {
             return Ok(Self {
-                root_node: root_node.clone(),
+                robot_state: robot_state.clone(),
                 last_rerun_log: Instant::now(),
                 kalman_filter,
                 most_recent_update: CuTime::default(),
@@ -222,8 +225,9 @@ impl CuSinkTask for Localizer {
             && self.last_rerun_log.elapsed().as_millis() > 1000 / 60
         {
             self.last_rerun_log = Instant::now();
-            // Convert to isometry (ideally, in the future, all parts of the state
-            // and covariance would be sent)
+
+            //   Push data to rest of robot
+            // Convert to isometry for the kinematics object
             let current_state = self.kalman_filter.get_current_state();
             let mut iso_vector = SimpleVector::<6>::from_element(0.0);
             iso_vector[(0, 0)] = current_state[(0, 0)];
@@ -233,8 +237,21 @@ impl CuSinkTask for Localizer {
             iso_vector[(4, 0)] = current_state[(10, 0)];
             iso_vector[(5, 0)] = current_state[(11, 0)];
             let current_iso = vec_to_iso(iso_vector);
-            self.root_node.set_isometry(current_iso);
+            self.robot_state.kinematic_root.set_isometry(current_iso);
 
+            {
+                let mut global_variance_lock = self.robot_state.kalman_variances.write();
+                let mut global_variance_view: SMatrixViewMut<f64, 15, 15> = global_variance_lock.as_mut().unwrap().as_view_mut();
+                global_variance_view.copy_from(&self.kalman_filter.get_current_covariance());
+            }
+
+            {
+                let mut global_state_lock = self.robot_state.kalman_state.write();
+                let mut global_state_view: SMatrixViewMut<f64, 15, 1> = global_state_lock.as_mut().unwrap().as_view_mut();
+                global_state_view.copy_from(&self.kalman_filter.get_current_state());
+            }
+
+            //   Log data to rerun
             // Variance
             let _ = logger.recorder.log(
                 "kalman_state/state",

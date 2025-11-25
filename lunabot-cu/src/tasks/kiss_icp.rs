@@ -12,7 +12,7 @@ use iceoryx2::prelude::ZeroCopySend;
 use kalman_filter::SimpleVector;
 use simple_icp::{config::Config, icp_pipeline::IcpPipeline};
 
-use crate::{ROOT_NODE, rerun_viz::RECORDER};
+use crate::{ROBOT_STATE, rerun_viz::RECORDER};
 pub struct KissIcp {
     pipeline: simple_icp::icp_pipeline::IcpPipeline,
     pub accumulated_frames: Vec<simple_icp::point3d::Point3d>,
