@@ -16,7 +16,7 @@ members = [
     "lunabase-lib",
     "misc/quic", "misc/auto-start",
 ]
-exclude = ["misc/usb-reset"]
+exclude = ["misc/usb-reset", "misc/wgsl-pcl"]
 # Shared dependencies across workspace members
 [workspace.dependencies]
 cu29 = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu29", features = [
