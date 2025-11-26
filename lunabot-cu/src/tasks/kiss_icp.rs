@@ -10,15 +10,20 @@ use cu29::{
 use iceoryx_types::IceoryxPointCloud;
 use iceoryx2::prelude::ZeroCopySend;
 use kalman_filter::SimpleVector;
+use nalgebra::{Isometry, Quaternion, Unit};
 use simple_icp::{config::Config, icp_pipeline::IcpPipeline};
 
 use crate::{ROBOT_STATE, rerun_viz::RECORDER};
+
+const REFERENCE_VARIANCE_THRESHOLD: f64 = 1.0;
+
 pub struct KissIcp {
     pipeline: simple_icp::icp_pipeline::IcpPipeline,
     pub accumulated_frames: Vec<simple_icp::point3d::Point3d>,
     pub frame_accumulation_index: usize,
     pub max_accumulation: usize,
     icp_variance: [f64; 36],
+    reference_offset: Option<Isometry<f64, Unit<Quaternion<f64>>, 3>>
 }
 
 #[derive(Clone, Copy, Debug, Encode, Decode, Serialize, ZeroCopySend)]
@@ -114,7 +119,8 @@ impl CuTask for KissIcp {
             max_accumulation,
             accumulated_frames: Vec::new(),
             frame_accumulation_index: 0,
-            icp_variance: variance
+            icp_variance: variance,
+            reference_offset: None,
         })
     }
 
@@ -154,31 +160,56 @@ impl CuTask for KissIcp {
             self.pipeline.process_frame(&self.accumulated_frames, 200.0);
 
             let map_points = self.pipeline.get_last_batch_points();
-            let position = self.pipeline.t_origin_current;
+            let relative_position = self.pipeline.t_origin_current;
 
-            let trans = position.translation;
-            let rotat = 
-                position.rotation.axis()
-                    .and_then(|vec| Some(vec.into_inner()))
-                    .unwrap_or(SimpleVector::<3>::zeros())
-                * position.rotation.angle()
-            ;
 
-            let actual_message = IcpMeasurement {
-                position: [
-                    trans.x,
-                    trans.y,
-                    trans.z,
-                ],
-                orientation: [
-                    rotat.x,
-                    rotat.y,
-                    rotat.z
-                ],
-                variance: self.icp_variance,
-            };
+            if let Some(reference_offset) = self.reference_offset {
+                let position = reference_offset * relative_position;
 
-            output.set_payload(actual_message);
+                let trans = position.translation;
+                let rotat = 
+                    position.rotation.axis()
+                        .and_then(|vec| Some(vec.into_inner()))
+                        .unwrap_or(SimpleVector::<3>::zeros())
+                    * position.rotation.angle()
+                ;
+
+                let actual_message = IcpMeasurement {
+                    position: [
+                        trans.x,
+                        trans.y,
+                        trans.z,
+                    ],
+                    orientation: [
+                        rotat.x,
+                        rotat.y,
+                        rotat.z
+                    ],
+                    variance: self.icp_variance,
+                };
+
+                output.set_payload(actual_message);
+            } else {
+                let position_variance = ROBOT_STATE.get().unwrap().get_position_variance();
+                let orientation_variance = ROBOT_STATE.get().unwrap().get_orientation_variance();
+
+                // Get total variance, to determine if we have good values yet.
+                let mut total_variance: f64 = 0.0;
+                for variance in position_variance.diagonal().as_slice() {
+                    total_variance += variance;
+                }
+
+                for variance in orientation_variance.diagonal().as_slice() {
+                    total_variance += variance;
+                }
+
+                if total_variance < REFERENCE_VARIANCE_THRESHOLD {
+                    // Think about this being substituted into the uses of reference offset
+                    self.reference_offset = Some(
+                        ROBOT_STATE.get().unwrap().kinematic_root.get_global_isometry() * relative_position.inverse()
+                    );
+                }
+            }
 
             self.log_accumulated_map(map_points)?;
             self.accumulated_frames.clear();
