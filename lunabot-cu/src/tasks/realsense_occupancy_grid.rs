@@ -156,10 +156,7 @@ impl CuTask for OccupancyGridTask {
                 depth_frame.depth_scale,
             )
             .map_err(|e| CuError::new_with_cause("failed to process depth frame", &*e))?;
-        println!(
-            "Completed depth to PCL GPU processing, got {} points",
-            point_cloud.len()
-        );
+
         // only log every nth point so my laptop doesnt catch on fire
         if let Some(logger) = RECORDER.get() {
             let _ = logger

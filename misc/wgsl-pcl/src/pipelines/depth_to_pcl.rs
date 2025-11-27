@@ -126,12 +126,6 @@ impl DepthToPclPipeline {
         camera_transform: AlignedMatrix4<f32>,
         depth_scale: f32,
     ) -> anyhow::Result<Vec<Vector3<f32>>> {
-        println!(
-            "Processing frame with: {} depth pixels. scale: {}. cam_transform: {:?}",
-            depths.len(),
-            depth_scale,
-            camera_transform
-        );
         self.camera_transform_buffer
             .write_data(device, camera_transform.to_bytes(), 0);
         self.input_img_buffer.write_data(device, depths, 0);
