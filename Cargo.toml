@@ -3,8 +3,6 @@ resolver = "3"
 members = [
     "misc/simple-motion",
     "misc/tasker",
-    "misc/thalassic",
-    "misc/gputter",
     "misc/iceoryx-types",
     "misc/launcher",
     "misc/vesc-translator",
@@ -14,7 +12,9 @@ members = [
     "misc/copperconfig-validator",
     "external-tasks/realsense",
     "lunabase-lib",
-    "misc/quic", "misc/auto-start","misc/wgsl-pcl"
+    "misc/quic",
+    "misc/auto-start",
+    "misc/wgsl-pcl",
 ]
 exclude = ["misc/usb-reset"]
 # Shared dependencies across workspace members

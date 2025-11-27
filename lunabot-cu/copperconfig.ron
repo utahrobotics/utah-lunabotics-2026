@@ -43,7 +43,8 @@
             id:"realsense_subscriber",
             type: "crate::tasks::sources::RealsenseSubscriber",
             config: {
-                "serial_num": "044422250424",
+                // "serial_num": "044422250424",
+                "serial_num": "311322302990",
                 "camera_node": "upper_depth_camera"
             },
             logging: (

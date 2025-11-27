@@ -37,11 +37,12 @@ production = [
     "bytes",
     "quic",
     "iceoryx2",
+    "iceoryx-types/production",
 ]
 
 logreader = ["dep:cu29-export"]
-resim = ["dep:cu29-export", "cu-apriltag/resim"]
-sim = ["cu-apriltag/sim", "mujoco-rs", "quic"]
+resim = ["dep:cu29-export", "cu-apriltag/resim", "iceoryx-types/resim"]
+sim = ["cu-apriltag/sim", "mujoco-rs", "quic", "iceoryx-types/sim"]
 
 [[bin]]
 name = "lunabot-resim"
@@ -96,9 +97,8 @@ tasker = { path = "../misc/tasker" }
 iceoryx-types = { path = "../misc/iceoryx-types" }
 launcher = { path = "../misc/launcher", optional = true }
 vesc-translator = { path = "../misc/vesc-translator", optional = true }
-thalassic = { path = "../misc/thalassic" }
-gputter = { path = "../misc/gputter" }
 quic = { path = "../misc/quic", optional = true }
+wgsl-pcl = { path = "../misc/wgsl-pcl" }
 
 # common
 common = { path = "../common" }

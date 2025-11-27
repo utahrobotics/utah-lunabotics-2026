@@ -1,3 +1,4 @@
+///! Author: Najman Husaini
 use std::marker::PhantomData;
 
 /// A trait for types that can accurately represent the size of a buffer.

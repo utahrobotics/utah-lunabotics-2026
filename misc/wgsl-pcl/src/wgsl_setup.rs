@@ -12,7 +12,7 @@ pub struct GpuDevice {
 
 static GPU_DEVICE: OnceLock<GpuDevice> = OnceLock::new();
 
-pub async fn init_gputter() -> anyhow::Result<()> {
+pub async fn init_gpu() -> anyhow::Result<()> {
     let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
         backends: wgpu::Backends::all(),
         ..Default::default()
@@ -53,10 +53,10 @@ pub fn get_device() -> &'static GpuDevice {
         .expect("GpuDevice was not initialized. Call init_gputter first")
 }
 
-pub fn init_gputter_blocking() -> anyhow::Result<()> {
-    init_gputter().block_on()
+pub fn init_gpu_blocking() -> anyhow::Result<()> {
+    init_gpu().block_on()
 }
 
-pub fn is_gputter_initialized() -> bool {
+pub fn is_gpu_initialized() -> bool {
     GPU_DEVICE.get().is_some()
 }

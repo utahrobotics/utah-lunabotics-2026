@@ -1,4 +1,5 @@
-//! Alignment on `wgpu` is annoying as it is vastly different from
+//! Author: Najman Husaini
+//!  Alignment on `wgpu` is annoying as it is vastly different from
 //! how equivalent types are aligned in Rust. Refer to this website
 //! for info https://webgpufundamentals.org/webgpu/lessons/webgpu-memory-layout.html
 
