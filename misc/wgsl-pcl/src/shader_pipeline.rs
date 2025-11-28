@@ -10,7 +10,7 @@ use wgpu::{
 pub struct ComputePipeline {
     pub pipeline: wgpu::ComputePipeline,
     pub pipeline_layout: PipelineLayout,
-    pub bind_groups: Vec<(BindGroupLayout, BindGroup)>,
+    pub bind_groups: Vec<(usize, BindGroupLayout, BindGroup)>,
 }
 
 impl ComputePipeline {
@@ -18,7 +18,7 @@ impl ComputePipeline {
     fn new(
         device: &GpuDevice,
         shader_module_descriptor: ShaderModuleDescriptor,
-        bind_groups: &[(BindGroupLayout, BindGroup)],
+        bind_groups: &[(usize, BindGroupLayout, BindGroup)],
         entry_point: Option<&str>,
         label: Option<&str>,
         constants: Option<HashMap<&str, f64>>,
@@ -32,7 +32,7 @@ impl ComputePipeline {
                     label: Some("compute_pipeline_layout"),
                     bind_group_layouts: bind_groups
                         .iter()
-                        .map(|(layout, _)| layout)
+                        .map(|(_, layout, _)| layout)
                         .collect::<Vec<&BindGroupLayout>>()
                         .as_slice(),
                     push_constant_ranges: &[],
@@ -80,8 +80,8 @@ impl ComputePipeline {
 
             compute_pass.set_pipeline(&self.pipeline);
 
-            for (index, (_, bind_group)) in self.bind_groups.iter().enumerate() {
-                compute_pass.set_bind_group(index as u32, bind_group, &[]);
+            for (index, (bind_group_index, _, bind_group)) in self.bind_groups.iter().enumerate() {
+                compute_pass.set_bind_group(*bind_group_index as u32, bind_group, &[]);
             }
 
             compute_pass.dispatch_workgroups(workgroups.0, workgroups.1, workgroups.2);
@@ -127,7 +127,7 @@ impl ComputePipeline {
 pub struct ComputePipelineBuilder<'a> {
     device: &'a GpuDevice,
     shader_module: Option<ShaderModuleDescriptor<'a>>,
-    bind_groups: Vec<(BindGroupLayout, BindGroup)>,
+    bind_groups: Vec<(usize, BindGroupLayout, BindGroup)>,
     entry_point: Option<&'a str>,
     label: Option<&'a str>,
     constants: Option<HashMap<&'a str, f64>>,
@@ -165,12 +165,22 @@ impl<'a> ComputePipelineBuilder<'a> {
         self
     }
 
-    pub fn with_bind_group(mut self, layout: BindGroupLayout, grp: BindGroup) -> Self {
-        self.bind_groups.push((layout, grp));
+    pub fn with_bind_group(
+        mut self,
+        index: usize,
+        layout: BindGroupLayout,
+        grp: BindGroup,
+    ) -> Self {
+        self.bind_groups.push((index, layout, grp));
         self
     }
 
-    pub fn with_bind_group_layouts(mut self, grps: Vec<(BindGroupLayout, BindGroup)>) -> Self {
+    /// Add multiple bind groups at once
+    /// tuple format: (bind group index, layout, bind group)
+    pub fn with_bind_group_layouts(
+        mut self,
+        grps: Vec<(usize, BindGroupLayout, BindGroup)>,
+    ) -> Self {
         self.bind_groups.extend(grps);
         self
     }
@@ -275,7 +285,7 @@ impl ComputePipelineChain {
 
             compute_pass.set_pipeline(&stage.pipeline.pipeline);
 
-            for (index, (_layout, bind_group)) in stage.pipeline.bind_groups.iter().enumerate() {
+            for (index, (_, _layout, bind_group)) in stage.pipeline.bind_groups.iter().enumerate() {
                 compute_pass.set_bind_group(index as u32, bind_group, &[]);
             }
 

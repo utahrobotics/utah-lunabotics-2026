@@ -148,6 +148,7 @@ impl CuTask for OccupancyGridTask {
                 (ppx, ppy),
                 get_device(),
                 (8, 8),
+                (16, 16),
                 MapLayout::new(max_x, min_x, max_y, min_y, cell_size),
                 bilateral_filter_sigma_spatial,
                 bilateral_filter_sigma_range,

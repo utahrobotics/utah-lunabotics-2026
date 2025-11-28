@@ -161,8 +161,8 @@ impl DepthToPclAndHeightPipeline {
 
         let pipeline = ComputePipelineBuilder::new(device)
             .with_constants(constants)
-            .with_bind_group(layout_1, bind_group_1)
-            .with_bind_group(layout_2, bind_group_2)
+            .with_bind_group(0, layout_1, bind_group_1)
+            .with_bind_group(1, layout_2, bind_group_2)
             .with_shader_module(include_wgsl!("../../shaders/depth_to_pcl_and_height.wgsl"))
             .with_label("depth_to_pcl_pipeline")
             .build()?;
@@ -221,7 +221,7 @@ impl DepthToPclAndHeightPipeline {
         let filter_pipeline = ComputePipelineBuilder::new(device)
             .with_label("bilateral_filter")
             .with_shader_module(include_wgsl!("../../shaders/bilateral_filter.wgsl"))
-            .with_bind_group(filter_layout, filter_bind_group)
+            .with_bind_group(0, filter_layout, filter_bind_group)
             .with_constants(filter_constants)
             .build()?;
         let combined_pipeline = ComputePipelineChainBuilder::new()
