@@ -92,6 +92,25 @@ impl GpuBuffer {
         Self { buffer, size }
     }
 
+    pub fn new_uniform_with_data<T: bytemuck::Pod>(
+        device: &GpuDevice,
+        data: &T,
+        label: Option<&str>,
+    ) -> Self {
+        let bytes = bytemuck::bytes_of(data);
+        let buffer = device.device.create_buffer(&wgpu::BufferDescriptor {
+            label,
+            size: bytes.len() as u64,
+            usage: BufferUsages::UNIFORM | BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        });
+        device.queue.write_buffer(&buffer, 0, bytes);
+        Self {
+            buffer,
+            size: bytes.len() as u64,
+        }
+    }
+
     /// Create a buffer with custom usage flags
     pub fn new_with_usage(
         device: &GpuDevice,
