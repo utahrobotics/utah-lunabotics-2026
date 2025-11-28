@@ -19,7 +19,6 @@ use crate::{
 
 pub struct DepthToPclAndHeightPipeline {
     pipeline: ComputePipelineChain,
-    /// Max depth in meters
     depth_image_dimensions_px: (u32, u32),
     depth_scale_buffer: GpuBuffer,
     input_img_buffer: GpuBuffer,
@@ -47,6 +46,7 @@ impl DepthToPclAndHeightPipeline {
         bilateral_filter_kernel_radius: u32,
         min_depth: f32,
     ) -> Result<Self, WgslPclError> {
+        // Create buffers for depth -> pcl -> height map shader
         let input_img_buffer = GpuBuffer::new_storage(
             &device,
             ((depth_image_dimensions.0 * depth_image_dimensions.1) * size_of::<u16>() as u32)
@@ -77,6 +77,8 @@ impl DepthToPclAndHeightPipeline {
             ],
             Some("height_map"),
         );
+
+        // define layout and bind groups for depth -> pcl -> height map shader
         let (layout_1, bind_group_1) = BindGroupLayoutBuilder::new(None)
             .with_entry(
                 0,
@@ -110,6 +112,7 @@ impl DepthToPclAndHeightPipeline {
             )
             .build(&device, "bind_group_0".to_string());
 
+        // define layout and bind groups for camera transform and depth scale
         let (layout_2, bind_group_2) = BindGroupLayoutBuilder::new(None)
             .with_entry(
                 0,
@@ -143,6 +146,7 @@ impl DepthToPclAndHeightPipeline {
             )
             .build(&device, "depth_to_pcl_bind_group".to_string());
 
+        // overridable constants for depth -> pcl -> height map shader
         let constants: HashMap<&str, f64> = HashMap::from([
             ("IMAGE_WIDTH", depth_image_dimensions.0 as f64),
             ("IMAGE_HEIGHT", depth_image_dimensions.1 as f64),
@@ -154,6 +158,7 @@ impl DepthToPclAndHeightPipeline {
             ("WORKGROUP_X", workgroup_size_stage1.0 as f64),
             ("WORKGROUP_Y", workgroup_size_stage1.1 as f64),
         ]);
+
         let pipeline = ComputePipelineBuilder::new(device)
             .with_constants(constants)
             .with_bind_group(layout_1, bind_group_1)
@@ -161,6 +166,8 @@ impl DepthToPclAndHeightPipeline {
             .with_shader_module(include_wgsl!("../../shaders/depth_to_pcl_and_height.wgsl"))
             .with_label("depth_to_pcl_pipeline")
             .build()?;
+
+        // Create buffers and pipeline for bilateral filter
         let filtered_height_map_buffer = GpuBuffer::new_storage_with_data(
             &device,
             &vec![
@@ -170,6 +177,8 @@ impl DepthToPclAndHeightPipeline {
             ],
             Some("filtered_height_map"),
         );
+
+        // define layout and bind groups for bilateral filter shader
         let (filter_layout, filter_bind_group) = BindGroupLayoutBuilder::new(None)
             .with_entry(
                 0,
@@ -192,6 +201,7 @@ impl DepthToPclAndHeightPipeline {
                 filtered_height_map_buffer.as_entire_binding(),
             )
             .build(&device, "height_map_filter_bind_group".to_string());
+
         let filter_constants: HashMap<&str, f64> = HashMap::from([
             (
                 "MAP_WIDTH",
@@ -207,6 +217,7 @@ impl DepthToPclAndHeightPipeline {
             ("WORKGROUP_X", workgroup_size_stage2.0 as f64),
             ("WORKGROUP_Y", workgroup_size_stage2.1 as f64),
         ]);
+
         let filter_pipeline = ComputePipelineBuilder::new(device)
             .with_label("bilateral_filter")
             .with_shader_module(include_wgsl!("../../shaders/bilateral_filter.wgsl"))
@@ -223,6 +234,7 @@ impl DepthToPclAndHeightPipeline {
                 (workgroup_size_stage2.0, workgroup_size_stage2.1, 1),
             ))
             .build()?;
+
         Ok(Self {
             pipeline: combined_pipeline,
             depth_image_dimensions_px: depth_image_dimensions,
@@ -253,8 +265,10 @@ impl DepthToPclAndHeightPipeline {
             .write_data(device, depth_scale.to_bytes(), 0);
 
         let workgroups_pcl = (
-            (self.depth_image_dimensions_px.0 + self.workgroup_size_stage1.0 - 1) / self.workgroup_size_stage1.0,
-            (self.depth_image_dimensions_px.1 + self.workgroup_size_stage1.1 - 1) / self.workgroup_size_stage1.1,
+            (self.depth_image_dimensions_px.0 + self.workgroup_size_stage1.0 - 1)
+                / self.workgroup_size_stage1.0,
+            (self.depth_image_dimensions_px.1 + self.workgroup_size_stage1.1 - 1)
+                / self.workgroup_size_stage1.1,
             1,
         );
         let workgroups_filter = (
@@ -312,21 +326,19 @@ impl BenchmarkableComputePipeline for DepthToPclAndHeightPipeline {
     where
         Self: Sized,
     {
-        // For benchmarking, we use the same workgroup size for both stages
-        // In production, these can be tuned separately
         Ok(Self::new(
-            3.0,                                            // max_depth
-            (640, 480),                                    // dimensions
-            383.0,                                         // focal_length
-            (317.44882, 245.91605),                        // principal point
+            3.0,                    // max_depth
+            (640, 480),             // dimensions
+            383.0,                  // focal_length
+            (317.44882, 245.91605), // principal point
             device,
-            (workgroup_size.0, workgroup_size.1),          // stage1 workgroup
-            (8, 8),                                        // stage2 workgroup (fixed for now)
-            map_layout::MapLayout::new(10.0, -10.0, 10.0, -10.0, 0.05),  // map layout
-            9,                                             // sigma_spatial
-            0.3,                                           // sigma_range
-            9,                                             // kernel_radius
-            1.0,                                           // min_depth
+            (workgroup_size.0, workgroup_size.1), // stage1 workgroup
+            (8, 8),                               // stage2 workgroup (fixed for now)
+            map_layout::MapLayout::new(10.0, -10.0, 10.0, -10.0, 0.05), // map layout
+            9,                                    // sigma_spatial
+            0.3,                                  // sigma_range
+            9,                                    // kernel_radius
+            1.0,                                  // min_depth
         )?)
     }
 
