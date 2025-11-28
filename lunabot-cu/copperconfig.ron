@@ -76,6 +76,11 @@
                 "focal_length": 383,
                 "ppx": 317.44882,
                 "ppy": 245.91605,
+                "heightmap_max_x": 10.0,
+                "heightmap_max_y": 10.0,
+                "heightmap_min_x": -10.0,
+                "heightmap_min_y": -10.0,
+                "heightmap_cell_size": 0.05
             },
             // FIXME: use a custom backrounding implementation instead of going through copper for support, because
             // in resimulation mode the pipeline process will take way too long
