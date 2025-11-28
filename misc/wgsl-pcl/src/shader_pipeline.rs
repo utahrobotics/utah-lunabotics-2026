@@ -10,6 +10,7 @@ use wgpu::{
 pub struct ComputePipeline {
     pub pipeline: wgpu::ComputePipeline,
     pub pipeline_layout: PipelineLayout,
+    pub bind_groups: Vec<(BindGroupLayout, BindGroup)>,
 }
 
 impl ComputePipeline {
@@ -17,7 +18,7 @@ impl ComputePipeline {
     fn new(
         device: &GpuDevice,
         shader_module_descriptor: ShaderModuleDescriptor,
-        bind_group_layouts: &[&BindGroupLayout],
+        bind_groups: &[(BindGroupLayout, BindGroup)],
         entry_point: Option<&str>,
         label: Option<&str>,
         constants: Option<HashMap<&str, f64>>,
@@ -29,7 +30,11 @@ impl ComputePipeline {
                 .device
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                     label: Some("compute_pipeline_layout"),
-                    bind_group_layouts,
+                    bind_group_layouts: bind_groups
+                        .iter()
+                        .map(|(layout, _)| layout)
+                        .collect::<Vec<&BindGroupLayout>>()
+                        .as_slice(),
                     push_constant_ranges: &[],
                 });
 
@@ -55,16 +60,12 @@ impl ComputePipeline {
         Ok(Self {
             pipeline,
             pipeline_layout,
+            bind_groups: bind_groups.to_vec(),
         })
     }
 
     /// Execute the compute pipeline with the given bind groups and workgroup counts
-    pub fn execute(
-        &self,
-        device: &GpuDevice,
-        bind_groups: &[&BindGroup],
-        workgroups: (u32, u32, u32),
-    ) {
+    pub fn execute(&self, device: &GpuDevice, workgroups: (u32, u32, u32)) {
         let mut encoder = device
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -79,8 +80,8 @@ impl ComputePipeline {
 
             compute_pass.set_pipeline(&self.pipeline);
 
-            for (index, bind_group) in bind_groups.iter().enumerate() {
-                compute_pass.set_bind_group(index as u32, *bind_group, &[]);
+            for (index, (_, bind_group)) in self.bind_groups.iter().enumerate() {
+                compute_pass.set_bind_group(index as u32, bind_group, &[]);
             }
 
             compute_pass.dispatch_workgroups(workgroups.0, workgroups.1, workgroups.2);
@@ -126,7 +127,7 @@ impl ComputePipeline {
 pub struct ComputePipelineBuilder<'a> {
     device: &'a GpuDevice,
     shader_module: Option<ShaderModuleDescriptor<'a>>,
-    bind_group_layouts: Vec<&'a BindGroupLayout>,
+    bind_groups: Vec<(BindGroupLayout, BindGroup)>,
     entry_point: Option<&'a str>,
     label: Option<&'a str>,
     constants: Option<HashMap<&'a str, f64>>,
@@ -137,7 +138,7 @@ impl<'a> ComputePipelineBuilder<'a> {
         Self {
             device,
             shader_module: None,
-            bind_group_layouts: Vec::new(),
+            bind_groups: Vec::new(),
             entry_point: None,
             label: None,
             constants: None,
@@ -164,13 +165,13 @@ impl<'a> ComputePipelineBuilder<'a> {
         self
     }
 
-    pub fn with_bind_group_layout(mut self, layout: &'a BindGroupLayout) -> Self {
-        self.bind_group_layouts.push(layout);
+    pub fn with_bind_group(mut self, layout: BindGroupLayout, grp: BindGroup) -> Self {
+        self.bind_groups.push((layout, grp));
         self
     }
 
-    pub fn with_bind_group_layouts(mut self, layouts: Vec<&'a BindGroupLayout>) -> Self {
-        self.bind_group_layouts.extend(layouts);
+    pub fn with_bind_group_layouts(mut self, grps: Vec<(BindGroupLayout, BindGroup)>) -> Self {
+        self.bind_groups.extend(grps);
         self
     }
 
@@ -192,7 +193,7 @@ impl<'a> ComputePipelineBuilder<'a> {
         ComputePipeline::new(
             self.device,
             shader_module,
-            &self.bind_group_layouts,
+            &self.bind_groups,
             self.entry_point,
             self.label,
             self.constants,
@@ -201,22 +202,17 @@ impl<'a> ComputePipelineBuilder<'a> {
 }
 
 /// Represents a single stage in a multi-stage compute pipeline
-pub struct PipelineStage<'a> {
+pub struct PipelineStage {
     pub pipeline: ComputePipeline,
-    pub bind_groups: Vec<&'a BindGroup>,
     pub workgroups: (u32, u32, u32),
     pub label: Option<String>,
 }
 
-impl<'a> PipelineStage<'a> {
-    pub fn new(
-        pipeline: ComputePipeline,
-        bind_groups: Vec<&'a BindGroup>,
-        workgroups: (u32, u32, u32),
-    ) -> Self {
+impl PipelineStage {
+    /// you should provide workgroups before calling execute blocking also
+    pub fn new(pipeline: ComputePipeline, workgroups: (u32, u32, u32)) -> Self {
         Self {
             pipeline,
-            bind_groups,
             workgroups,
             label: None,
         }
@@ -226,36 +222,52 @@ impl<'a> PipelineStage<'a> {
         self.label = Some(label);
         self
     }
+
+    pub fn set_workgroup(&mut self, workgroups: (u32, u32, u32)) {
+        self.workgroups = workgroups;
+    }
 }
 
 /// A multi-stage compute pipeline that chains multiple shaders together
 /// All data stays on the GPU between stages for maximum performance
-pub struct ComputePipelineChain<'a> {
-    stages: Vec<PipelineStage<'a>>,
+pub struct ComputePipelineChain {
+    stages: Vec<PipelineStage>,
 }
 
-impl<'a> ComputePipelineChain<'a> {
-    pub fn new(stages: Vec<PipelineStage<'a>>) -> Self {
+impl ComputePipelineChain {
+    pub fn new(stages: Vec<PipelineStage>) -> Self {
         Self { stages }
     }
 
     /// Execute all stages in sequence within a single command encoder
     /// This keeps all data on the GPU and provides optimal performance
-    pub fn execute(&self, device: &GpuDevice) {
+    pub fn execute(
+        &mut self,
+        device: &GpuDevice,
+        workgroups: Vec<(u32, u32, u32)>,
+    ) -> Result<(), WgslPclError> {
+        if workgroups.len() != self.stages.len() {
+            return Err(WgslPclError::WorkgroupError(format!(
+                "Expected {} workgroup tuples, but got {}",
+                self.stages.len(),
+                workgroups.len()
+            )));
+        }
         let mut encoder = device
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("multi_stage_compute_encoder"),
             });
 
-        for (stage_idx, stage) in self.stages.iter().enumerate() {
+        for (stage_idx, (stage, workgroup)) in self.stages.iter_mut().zip(workgroups).enumerate() {
             let default_label = format!("compute_pass_stage_{}", stage_idx);
+            stage.set_workgroup(workgroup);
+
             let label = stage
                 .label
                 .as_ref()
                 .map(|s| s.as_str())
                 .unwrap_or(&default_label);
-
             let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
                 label: Some(label),
                 timestamp_writes: None,
@@ -263,8 +275,8 @@ impl<'a> ComputePipelineChain<'a> {
 
             compute_pass.set_pipeline(&stage.pipeline.pipeline);
 
-            for (index, bind_group) in stage.bind_groups.iter().enumerate() {
-                compute_pass.set_bind_group(index as u32, *bind_group, &[]);
+            for (index, (_layout, bind_group)) in stage.pipeline.bind_groups.iter().enumerate() {
+                compute_pass.set_bind_group(index as u32, bind_group, &[]);
             }
 
             compute_pass.dispatch_workgroups(
@@ -275,12 +287,18 @@ impl<'a> ComputePipelineChain<'a> {
         }
 
         device.queue.submit(Some(encoder.finish()));
+        Ok(())
     }
 
     /// Execute all stages and wait for completion
-    pub fn execute_blocking(&self, device: &GpuDevice) {
-        self.execute(device);
+    pub fn execute_blocking(
+        &mut self,
+        device: &GpuDevice,
+        workgroups: Vec<(u32, u32, u32)>,
+    ) -> Result<(), WgslPclError> {
+        self.execute(device, workgroups)?;
         let _ = device.device.poll(wgpu::PollType::wait_indefinitely());
+        Ok(())
     }
 
     /// Get the number of stages in this pipeline chain
@@ -290,17 +308,17 @@ impl<'a> ComputePipelineChain<'a> {
 }
 
 /// Builder for creating multi-stage compute pipelines
-pub struct ComputePipelineChainBuilder<'a> {
-    stages: Vec<PipelineStage<'a>>,
+pub struct ComputePipelineChainBuilder {
+    stages: Vec<PipelineStage>,
 }
 
-impl<'a> ComputePipelineChainBuilder<'a> {
+impl ComputePipelineChainBuilder {
     pub fn new() -> Self {
         Self { stages: Vec::new() }
     }
 
     /// Add a stage to the pipeline chain
-    pub fn add_stage(mut self, stage: PipelineStage<'a>) -> Self {
+    pub fn add_stage(mut self, stage: PipelineStage) -> Self {
         self.stages.push(stage);
         self
     }
@@ -309,11 +327,10 @@ impl<'a> ComputePipelineChainBuilder<'a> {
     pub fn add_stage_with(
         mut self,
         pipeline: ComputePipeline,
-        bind_groups: Vec<&'a BindGroup>,
         workgroups: (u32, u32, u32),
         label: Option<String>,
     ) -> Self {
-        let mut stage = PipelineStage::new(pipeline, bind_groups, workgroups);
+        let mut stage = PipelineStage::new(pipeline, workgroups);
         if let Some(l) = label {
             stage = stage.with_label(l);
         }
@@ -322,7 +339,7 @@ impl<'a> ComputePipelineChainBuilder<'a> {
     }
 
     /// Build the pipeline chain
-    pub fn build(self) -> Result<ComputePipelineChain<'a>, WgslPclError> {
+    pub fn build(self) -> Result<ComputePipelineChain, WgslPclError> {
         if self.stages.is_empty() {
             return Err(WgslPclError::CompilationError(
                 "Pipeline chain must have at least one stage".to_string(),
@@ -332,7 +349,7 @@ impl<'a> ComputePipelineChainBuilder<'a> {
     }
 }
 
-impl<'a> Default for ComputePipelineChainBuilder<'a> {
+impl Default for ComputePipelineChainBuilder {
     fn default() -> Self {
         Self::new()
     }

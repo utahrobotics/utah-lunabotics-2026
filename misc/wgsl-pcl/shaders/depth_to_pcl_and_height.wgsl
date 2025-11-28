@@ -6,9 +6,6 @@
 @group(1) @binding(1) var<uniform> depth_scale: f32;
 @group(1) @binding(2) var<uniform> map_layout: MapLayout;
 
-var<workgroup> shared_transform: mat4x4f;
-var<workgroup> shared_depth_scale: f32;
-var<workgroup> shared_map_layout: MapLayout;
 // width corresponds with x axis
 var<workgroup> heightmap_width_cells: u32;
 // height corresponds with y axis
@@ -23,7 +20,8 @@ override MAX_DEPTH: f32 = 2.0;
 
 override WORKGROUP_X: u32 = 8;
 override WORKGROUP_Y: u32 = 8;
-override GAUSSIAN_KERNEL_SIZE: u32 = 8;
+
+override MIN_DEPTH: f32 = 0.20;
 
 @compute
 @workgroup_size(WORKGROUP_X, WORKGROUP_Y, 1)
@@ -33,9 +31,6 @@ fn depth(
 ) {
     // load transform, depth scale, and map layout just once per block
     if local_id.x == 0u && local_id.y == 0u {
-        shared_transform = transform;
-        shared_depth_scale = depth_scale;
-        shared_map_layout = map_layout;
         let width = map_layout.max_x - map_layout.min_x;
         let height = map_layout.max_y - map_layout.min_y;
         heightmap_width_cells = u32(ceil(width / map_layout.cell_size));
@@ -67,9 +62,9 @@ fn depth(
     
     let x = f32(x_coord) - PRINCIPAL_POINT_PX_X;
     let y = f32(y_coord) - PRINCIPAL_POINT_PX_Y;
-    let depth = f32(depthu) * shared_depth_scale;
+    let depth = f32(depthu) * depth_scale;
     
-    if depth > MAX_DEPTH {
+    if depth > MAX_DEPTH || depth < MIN_DEPTH {
         points[i].w = 0.0;
         return;
     }
@@ -80,18 +75,21 @@ fn depth(
     
     // Transform coordinate system: x=right, y=up, z=forward(negative)
     // to: x=forward, y=left, z=up
-    let transformed_point = vec3(-point.z, -point.x, point.y);
-    var point_transformed = shared_transform * vec4<f32>(transformed_point, 1.0);
+    let point_in_camera = vec3(-point.z, -point.x, point.y);
+    var point_transformed = transform * vec4<f32>(point_in_camera, 1.0);
     point_transformed.w = 1.0;
     points[i] = point_transformed;
 
     // ---------------
     // HEIGHT MAPPING
     // ---------------
-    let cell_idx = point_to_cell_index(
-        point_transformed.x, 
-        point_transformed.y, 
-        shared_map_layout
+    let cell_x = u32(floor((point_transformed.x - map_layout.min_x) / map_layout.cell_size));
+    let cell_y = u32(floor((point_transformed.y - map_layout.min_y) / map_layout.cell_size));
+
+    let cell_idx = cell_xy_to_linear_address(
+        cell_x, 
+        cell_y, 
+        map_layout
     );
     
     // Update height map if point is within bounds
@@ -105,21 +103,15 @@ fn depth(
 
 // will return -1 if point is out of bounds
 // Converts world coordinates to a cell index in the height map buffer
-fn point_to_cell_index(x: f32, y: f32, map_layout: MapLayout) -> i32 {
-    if x < map_layout.min_x || x > map_layout.max_x || 
-       y < map_layout.min_y || y > map_layout.max_y {
-        return -1;
-    }
-    
-    let cell_x = u32(floor((x - map_layout.min_x) / map_layout.cell_size));
-    let cell_y = u32(floor((y - map_layout.min_y) / map_layout.cell_size));
-    
+fn cell_xy_to_linear_address(cell_x: u32, cell_y: u32, map_layout: MapLayout) -> i32 {
     if cell_x >= heightmap_width_cells || cell_y >= heightmap_height_cells {
         return -1;
     }
     
     return i32(cell_x + cell_y * heightmap_width_cells);
 }
+
+
 
 struct MapLayout {
     max_x: f32,

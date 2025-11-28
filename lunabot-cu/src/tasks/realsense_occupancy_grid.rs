@@ -96,10 +96,6 @@ impl CuTask for OccupancyGridTask {
             .and_then(|c| c.get::<f64>("ppy"))
             .expect("specify depth format ppy") as f32;
 
-        let gaussian_kernel_size = config
-            .and_then(|c| c.get::<u32>("gaussian_kernel_size"))
-            .expect("specify kernel size for gaussian blur");
-
         let max_x = config
             .and_then(|c| c.get::<f64>("heightmap_max_x"))
             .unwrap_or(5.0) as f32;
@@ -116,6 +112,20 @@ impl CuTask for OccupancyGridTask {
         let cell_size = config
             .and_then(|c| c.get::<f64>("heightmap_cell_size"))
             .unwrap_or(0.1) as f32;
+
+        let bilateral_filter_kernel_radius = config
+            .and_then(|c| c.get::<u64>("bilateral_filter_kernel_radius"))
+            .unwrap_or(5) as u32;
+        let bilateral_filter_sigma_spatial = config
+            .and_then(|c| c.get::<u64>("bilateral_filter_sigma_spatial"))
+            .unwrap_or(6) as u32;
+        let bilateral_filter_sigma_range = config
+            .and_then(|c| c.get::<f64>("bilateral_filter_sigma_range"))
+            .unwrap_or(0.1) as f32;
+
+        let min_depth = config
+            .and_then(|c| c.get::<f64>("min_depth"))
+            .unwrap_or(0.3) as f32;
 
         let camera_node = ROOT_NODE
             .get()
@@ -139,6 +149,10 @@ impl CuTask for OccupancyGridTask {
                 get_device(),
                 (8, 8),
                 MapLayout::new(max_x, min_x, max_y, min_y, cell_size),
+                bilateral_filter_sigma_spatial,
+                bilateral_filter_sigma_range,
+                bilateral_filter_kernel_radius,
+                min_depth,
             )
             .map_err(|e| {
                 CuError::new_with_cause("failed to create depth to pcl and height pipeline", &e)
@@ -164,11 +178,6 @@ impl CuTask for OccupancyGridTask {
 
         // TODO: utilize imu messages from the realsense here for more accurate pitch information
 
-        // std::fs::write(
-        //     format!("depth_frame_{}.bin", clock.now().0),
-        //     bytemuck::cast_slice(&depth_frame.depths),
-        // )
-        // .unwrap();
         let depth_camera_transform: AlignedMatrix4<f32> = self
             .camera_node
             .get_global_isometry()
@@ -244,117 +253,5 @@ impl CuTask for OccupancyGridTask {
         }
 
         Ok(())
-    }
-}
-
-fn index_to_xy(index: usize) -> (usize, usize) {
-    (
-        index % THALASSIC_WIDTH as usize,
-        index / THALASSIC_WIDTH as usize,
-    )
-}
-
-// Bilateral filter for depth images
-// For each pixel: examine neighbors within radius
-// Compute weight using pixel distance - Gaussian spatial weight
-// Compute weight using depth difference - Gaussian range weight
-// Combine weights to get final weight for each neighbor
-// Find a weighted average of neighbor depths
-fn bilateral_filter(
-    frame: &mut IceoryxDepthFrame<DEPTH_FRAME_SIZE>,
-    radius: i32,
-    sigma_spatial: f32,
-    sigma_range: f32,
-) {
-    let width = DEPTH_FRAME_WIDTH as i32;
-    let height = DEPTH_FRAME_HEIGHT as i32;
-
-    // temporary copy for reading
-    let mut temp_frame = frame.clone();
-
-    // Precompute spatial weights for efficiency
-    let mut spatial_weights = vec![0.0f32; (2 * radius + 1) as usize];
-    for i in 0..spatial_weights.len() {
-        let distance = (i as i32 - radius) as f32;
-        spatial_weights[i] = (-distance * distance / (2.0 * sigma_spatial * sigma_spatial)).exp();
-    }
-
-    // get depth value at position, handling invalid depths (0)
-    let get_depth = |depths: &[u16], x: i32, y: i32| -> Option<u16> {
-        if x < 0 || x >= width || y < 0 || y >= height {
-            return None;
-        }
-        let idx = (y * width + x) as usize;
-        let depth = depths[idx];
-        if depth == 0 { None } else { Some(depth) }
-    };
-
-    // compute range weight
-    let range_weight = |center_depth: u16, neighbor_depth: u16| -> f32 {
-        let diff = (center_depth as f32 - neighbor_depth as f32) * frame.depth_scale;
-        (-diff * diff / (2.0 * sigma_range * sigma_range)).exp()
-    };
-
-    // Pass 1: Horizontal filtering
-    for y in 0..height {
-        for x in 0..width {
-            let idx = (y * width + x) as usize;
-
-            if let Some(center_depth) = get_depth(&temp_frame.depths, x, y) {
-                let mut sum_weights = 0.0f32;
-                let mut sum_depth = 0.0f32;
-
-                for dx in -radius..=radius {
-                    if let Some(neighbor_depth) = get_depth(&temp_frame.depths, x + dx, y) {
-                        let spatial_w = spatial_weights[(dx + radius) as usize];
-                        let range_w = range_weight(center_depth, neighbor_depth);
-                        let weight = spatial_w * range_w;
-
-                        sum_weights += weight;
-                        sum_depth += neighbor_depth as f32 * weight;
-                    }
-                }
-
-                if sum_weights > 0.0 {
-                    frame.depths[idx] = (sum_depth / sum_weights).round() as u16;
-                } else {
-                    frame.depths[idx] = center_depth;
-                }
-            }
-            // If center depth is invalid (0), leave it as is
-        }
-    }
-
-    // Update temp with horizontal filtered results for vertical pass
-    temp_frame = frame.clone();
-
-    // Pass 2: Vertical filtering
-    for y in 0..height {
-        for x in 0..width {
-            let idx = (y * width + x) as usize;
-
-            if let Some(center_depth) = get_depth(&temp_frame.depths, x, y) {
-                let mut sum_weights = 0.0f32;
-                let mut sum_depth = 0.0f32;
-
-                for dy in -radius..=radius {
-                    if let Some(neighbor_depth) = get_depth(&temp_frame.depths, x, y + dy) {
-                        let spatial_w = spatial_weights[(dy + radius) as usize];
-                        let range_w = range_weight(center_depth, neighbor_depth);
-                        let weight = spatial_w * range_w;
-
-                        sum_weights += weight;
-                        sum_depth += neighbor_depth as f32 * weight;
-                    }
-                }
-
-                if sum_weights > 0.0 {
-                    frame.depths[idx] = (sum_depth / sum_weights).round() as u16;
-                } else {
-                    frame.depths[idx] = center_depth;
-                }
-            }
-            // If center depth is invalid (0), leave it as is
-        }
     }
 }

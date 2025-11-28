@@ -96,22 +96,17 @@ impl BenchmarkSuite {
     }
 
     pub fn print_summary(&self) {
-        println!("\n=== Benchmark Suite Results ===");
-        for (idx, result) in self.results.iter().enumerate() {
-            result.print_summary(Some(&format!("Config {}", idx + 1)));
-        }
-
         if let Some(fastest) = self.fastest() {
-            println!("\nFastest Configuration:");
-            println!("  Workgroup Size: {:?}", fastest.workgroup_size);
-            println!("  Avg Duration: {:?}", fastest.avg_duration);
+            let ws = fastest.workgroup_size;
+            println!("Fastest: {}x{}x{} @ {:.3}ms", 
+                ws.0, ws.1, ws.2,
+                fastest.avg_duration.as_secs_f64() * 1000.0);
         }
-
         if self.results.len() > 1 {
             if let (Some(fastest), Some(slowest)) = (self.fastest(), self.slowest()) {
                 let speedup = slowest.avg_duration.as_secs_f64() 
                     / fastest.avg_duration.as_secs_f64();
-                println!("\n📊 Speedup: {:.2}x", speedup);
+                println!("Speedup: {:.2}x (best vs worst)", speedup);
             }
         }
     }
@@ -210,16 +205,15 @@ pub trait BenchmarkableComputePipeline {
     {
         let mut suite = BenchmarkSuite::new();
 
-        for config in configs {
-            println!(
-                "Benchmarking workgroup size: {:?}",
-                config.workgroup_size
-            );
+        for (i, config) in configs.iter().enumerate() {
+            let ws = config.workgroup_size;
+            print!("[{}/{}] {}x{}x{} ... ", i + 1, configs.len(), ws.0, ws.1, ws.2);
+            std::io::Write::flush(&mut std::io::stdout()).ok();
             
             let mut pipeline = Self::create_with_workgroup(device, config.workgroup_size)?;
             let result = pipeline.benchmark_config(device, input, config)?;
             
-            println!("  Avg: {:?}", result.avg_duration);
+            println!("{:.3}ms", result.avg_duration.as_secs_f64() * 1000.0);
             suite.add_result(result);
         }
 

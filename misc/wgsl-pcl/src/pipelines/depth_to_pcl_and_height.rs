@@ -10,23 +10,25 @@ use crate::{
     gpu_types::{AlignedMatrix4, AlignedVec4, GpuType},
     map_layout,
     mem_layouts::{BindGroupLayoutBuilder, GpuBuffer},
-    shader_pipeline::{ComputePipeline, ComputePipelineBuilder},
+    shader_pipeline::{
+        ComputePipeline, ComputePipelineBuilder, ComputePipelineChain, ComputePipelineChainBuilder,
+        PipelineStage,
+    },
     wgsl_setup::GpuDevice,
 };
 
 pub struct DepthToPclAndHeightPipeline {
-    pipeline: ComputePipeline,
+    pipeline: ComputePipelineChain,
     /// Max depth in meters
     depth_image_dimensions_px: (u32, u32),
-
     depth_scale_buffer: GpuBuffer,
-    bind_group_1: wgpu::BindGroup,
-    bind_group_2: wgpu::BindGroup,
     input_img_buffer: GpuBuffer,
     output_pcl_buffer: GpuBuffer,
     output_height_map_buffer: GpuBuffer,
+    output_filtered_height_map_buffer: GpuBuffer,
     camera_transform_buffer: GpuBuffer,
-    workgroup_size: (u32, u32),
+    workgroup_size_stage1: (u32, u32, u32),
+    workgroup_size_stage2: (u32, u32, u32),
     pub map_layout: map_layout::MapLayout,
 }
 
@@ -37,8 +39,13 @@ impl DepthToPclAndHeightPipeline {
         focal_length_px: f32,
         principal_point_px: (f32, f32),
         device: &GpuDevice,
-        workgroup_size: (u32, u32),
+        workgroup_size_stage1: (u32, u32),
+        workgroup_size_stage2: (u32, u32),
         map_layout: map_layout::MapLayout,
+        bilateral_filter_sigma_spatial: u32,
+        bilateral_filter_sigma_range: f32,
+        bilateral_filter_kernel_radius: u32,
+        min_depth: f32,
     ) -> Result<Self, WgslPclError> {
         let input_img_buffer = GpuBuffer::new_storage(
             &device,
@@ -143,28 +150,91 @@ impl DepthToPclAndHeightPipeline {
             ("PRINCIPAL_POINT_PX_X", principal_point_px.0 as f64),
             ("PRINCIPAL_POINT_PX_Y", principal_point_px.1 as f64),
             ("MAX_DEPTH", max_depth as f64),
-            ("WORKGROUP_X", workgroup_size.0 as f64),
-            ("WORKGROUP_Y", workgroup_size.1 as f64),
+            ("MIN_DEPTH", min_depth as f64),
+            ("WORKGROUP_X", workgroup_size_stage1.0 as f64),
+            ("WORKGROUP_Y", workgroup_size_stage1.1 as f64),
         ]);
         let pipeline = ComputePipelineBuilder::new(device)
             .with_constants(constants)
-            .with_bind_group_layout(&layout_1)
-            .with_bind_group_layout(&layout_2)
+            .with_bind_group(layout_1, bind_group_1)
+            .with_bind_group(layout_2, bind_group_2)
             .with_shader_module(include_wgsl!("../../shaders/depth_to_pcl_and_height.wgsl"))
             .with_label("depth_to_pcl_pipeline")
             .build()?;
+        let filtered_height_map_buffer = GpuBuffer::new_storage_with_data(
+            &device,
+            &vec![
+                f32::MIN;
+                ((map_layout.width_meters() / map_layout.cell_size).ceil() as usize)
+                    * ((map_layout.height_meters() / map_layout.cell_size).ceil() as usize)
+            ],
+            Some("filtered_height_map"),
+        );
+        let (filter_layout, filter_bind_group) = BindGroupLayoutBuilder::new(None)
+            .with_entry(
+                0,
+                ShaderStages::COMPUTE,
+                wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                height_map_buffer.as_entire_binding(),
+            )
+            .with_entry(
+                1,
+                ShaderStages::COMPUTE,
+                wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                filtered_height_map_buffer.as_entire_binding(),
+            )
+            .build(&device, "height_map_filter_bind_group".to_string());
+        let filter_constants: HashMap<&str, f64> = HashMap::from([
+            (
+                "MAP_WIDTH",
+                (map_layout.width_meters() / map_layout.cell_size).ceil() as f64,
+            ),
+            (
+                "MAP_HEIGHT",
+                (map_layout.height_meters() / map_layout.cell_size).ceil() as f64,
+            ),
+            ("SIGMA_SPATIAL", bilateral_filter_sigma_spatial as f64),
+            ("SIGMA_RANGE", bilateral_filter_sigma_range as f64),
+            ("KERNEL_RADIUS", bilateral_filter_kernel_radius as f64),
+            ("WORKGROUP_X", workgroup_size_stage2.0 as f64),
+            ("WORKGROUP_Y", workgroup_size_stage2.1 as f64),
+        ]);
+        let filter_pipeline = ComputePipelineBuilder::new(device)
+            .with_label("bilateral_filter")
+            .with_shader_module(include_wgsl!("../../shaders/bilateral_filter.wgsl"))
+            .with_bind_group(filter_layout, filter_bind_group)
+            .with_constants(filter_constants)
+            .build()?;
+        let combined_pipeline = ComputePipelineChainBuilder::new()
+            .add_stage(PipelineStage::new(
+                pipeline,
+                (workgroup_size_stage1.0, workgroup_size_stage1.1, 1),
+            ))
+            .add_stage(PipelineStage::new(
+                filter_pipeline,
+                (workgroup_size_stage2.0, workgroup_size_stage2.1, 1),
+            ))
+            .build()?;
         Ok(Self {
-            pipeline,
+            pipeline: combined_pipeline,
             depth_image_dimensions_px: depth_image_dimensions,
-            bind_group_1,
-            bind_group_2,
             output_height_map_buffer: height_map_buffer,
             input_img_buffer,
             output_pcl_buffer,
             camera_transform_buffer,
             depth_scale_buffer,
-            workgroup_size,
             map_layout,
+            output_filtered_height_map_buffer: filtered_height_map_buffer,
+            workgroup_size_stage1: (workgroup_size_stage1.0, workgroup_size_stage1.1, 1),
+            workgroup_size_stage2: (workgroup_size_stage2.0, workgroup_size_stage2.1, 1),
         })
     }
 
@@ -182,19 +252,28 @@ impl DepthToPclAndHeightPipeline {
         self.depth_scale_buffer
             .write_data(device, depth_scale.to_bytes(), 0);
 
-        self.pipeline.execute_blocking(
-            device,
-            &[&self.bind_group_1, &self.bind_group_2],
-            (
-                (self.depth_image_dimensions_px.0 + self.workgroup_size.0 - 1)
-                    / self.workgroup_size.0,
-                (self.depth_image_dimensions_px.1 + self.workgroup_size.1 - 1)
-                    / self.workgroup_size.1,
-                1,
-            ),
+        let workgroups_pcl = (
+            (self.depth_image_dimensions_px.0 + self.workgroup_size_stage1.0 - 1) / self.workgroup_size_stage1.0,
+            (self.depth_image_dimensions_px.1 + self.workgroup_size_stage1.1 - 1) / self.workgroup_size_stage1.1,
+            1,
         );
+        let workgroups_filter = (
+            ((self.map_layout.width_meters() / self.map_layout.cell_size).ceil() as u32
+                + self.workgroup_size_stage2.0
+                - 1)
+                / self.workgroup_size_stage2.0,
+            ((self.map_layout.height_meters() / self.map_layout.cell_size).ceil() as u32
+                + self.workgroup_size_stage2.1
+                - 1)
+                / self.workgroup_size_stage2.1,
+            1,
+        );
+        let workgroups = vec![workgroups_pcl, workgroups_filter];
+        self.pipeline.execute_blocking(device, workgroups)?;
         let pcl_data: Vec<AlignedVec4<f32>> = self.output_pcl_buffer.read_data_blocking(device)?;
-        let heightmap_data: Vec<f32> = self.output_height_map_buffer.read_data_blocking(device)?;
+        let heightmap_data: Vec<f32> = self
+            .output_filtered_height_map_buffer
+            .read_data_blocking(device)?;
 
         Ok((
             pcl_data
@@ -233,14 +312,21 @@ impl BenchmarkableComputePipeline for DepthToPclAndHeightPipeline {
     where
         Self: Sized,
     {
+        // For benchmarking, we use the same workgroup size for both stages
+        // In production, these can be tuned separately
         Ok(Self::new(
-            3.0,
-            (640, 480),
-            383.0,
-            (320.0, 240.0),
+            3.0,                                            // max_depth
+            (640, 480),                                    // dimensions
+            383.0,                                         // focal_length
+            (317.44882, 245.91605),                        // principal point
             device,
-            (workgroup_size.0, workgroup_size.1),
-            map_layout::MapLayout::new(10.0, -10.0, 10.0, -10.0, 0.1),
+            (workgroup_size.0, workgroup_size.1),          // stage1 workgroup
+            (8, 8),                                        // stage2 workgroup (fixed for now)
+            map_layout::MapLayout::new(10.0, -10.0, 10.0, -10.0, 0.05),  // map layout
+            9,                                             // sigma_spatial
+            0.3,                                           // sigma_range
+            9,                                             // kernel_radius
+            1.0,                                           // min_depth
         )?)
     }
 
