@@ -80,10 +80,10 @@
                 "heightmap_min_x": -10.0,
                 "heightmap_min_y": -10.0,
                 "heightmap_cell_size": 0.05,
-                "bilateral_filter_kernel_radius": 9,
-                "bilateral_filter_sigma_spatial": 9,
-                "bilateral_filter_sigma_range": 0.3,
-                "min_depth": 1.0
+                "bilateral_filter_kernel_radius": 10,
+                "bilateral_filter_sigma_spatial": 10,
+                "bilateral_filter_sigma_range": 0.05,
+                "min_depth": 0.3
             },
             // FIXME: use a custom backrounding implementation instead of going through copper for support, because
             // in resimulation mode the pipeline process will take way too long

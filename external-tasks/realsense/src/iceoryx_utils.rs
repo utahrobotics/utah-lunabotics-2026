@@ -4,7 +4,7 @@ use iceoryx2::{
     prelude::{ServiceName, UnableToDeliverStrategy},
     service::ipc,
 };
-use iceoryx_types::{IceoryxDepthFrame, IceoryxOccupancyGrid, IceoryxPointCloud, ImuMsg, PoseMsg};
+use iceoryx_types::{IceoryxDepthFrame, IceoryxPointCloud, ImuMsg, PoseMsg};
 
 /// Creates a new iceoryx2 node for IPC services
 pub fn create_node() -> iceoryx2::node::Node<ipc::Service> {

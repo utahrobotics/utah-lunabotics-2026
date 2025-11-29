@@ -1,7 +1,6 @@
 #![cfg(any(feature = "production"))]
-
 use bincode::{Decode, Encode};
-use common::{THALASSIC_CELL_COUNT, THALASSIC_HEIGHT, THALASSIC_WIDTH};
+
 use iceoryx2::prelude::ZeroCopySend;
 use nalgebra::Point3;
 use serde::Serialize;
@@ -20,16 +19,6 @@ pub struct PointXYZIR {
 
 #[repr(C)]
 #[derive(Clone, Debug, ZeroCopySend, Encode, Decode, Serialize)]
-#[type_name("IceoryxOccupancyGrid")]
-pub struct IceoryxOccupancyGrid {
-    pub width: u32,
-    pub height: u32,
-    #[serde(serialize_with = "<[_]>::serialize")]
-    pub data: [u32; THALASSIC_CELL_COUNT as usize],
-}
-
-#[repr(C)]
-#[derive(Clone, Debug, ZeroCopySend, Encode, Decode, Serialize)]
 pub struct IceoryxDepthFrame<const SIZE: usize> {
     #[serde(serialize_with = "<[_]>::serialize")]
     pub depths: [u16; SIZE],
@@ -43,16 +32,6 @@ impl<const SIZE: usize> Default for IceoryxDepthFrame<SIZE> {
             depths: [0; SIZE],
             depth_scale: 0.0,
             focal_len: (383.0, 383.0),
-        }
-    }
-}
-
-impl Default for IceoryxOccupancyGrid {
-    fn default() -> Self {
-        Self {
-            width: THALASSIC_WIDTH,
-            height: THALASSIC_HEIGHT,
-            data: [0; THALASSIC_CELL_COUNT as usize],
         }
     }
 }

@@ -2,15 +2,17 @@ use std::collections::VecDeque;
 
 use common::{FromLunabase, LUNABOT_STAGE, LunabotStage, Steering};
 use embedded_common::ActuatorCommand;
-use iceoryx_types::IceoryxOccupancyGrid;
 use simple_motion::StaticNode;
 
-use crate::{ROOT_NODE, tasks::ai::jobs::Job};
+use crate::{
+    ROOT_NODE,
+    tasks::{OccupancyGrid, ai::jobs::Job},
+};
 
 #[derive(Debug)]
 pub struct LunabotBlackboard {
     pub root_node: StaticNode,
-    pub latest_obstacle_map: Option<IceoryxOccupancyGrid>,
+    pub latest_obstacle_map: Option<OccupancyGrid>,
 
     /// stores the last lift actuator message received from lunabase
     pub last_lift: Option<i8>,

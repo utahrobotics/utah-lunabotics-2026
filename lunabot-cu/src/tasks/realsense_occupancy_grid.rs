@@ -1,13 +1,9 @@
-use std::num::NonZeroU32;
-
 use bincode::Encode;
-use common::{THALASSIC_CELL_COUNT, THALASSIC_CELL_SIZE, THALASSIC_HEIGHT, THALASSIC_WIDTH};
 use cu29::cutask::Freezable;
 use cu29::prelude::*;
 
 use iceoryx_types::{IceoryxDepthFrame, ImuMsg};
-use nalgebra::{Vector2, Vector4};
-use rerun::{Color, Points3D};
+use rerun::Points3D;
 use simple_motion::StaticNode;
 use wgsl_pcl::DepthToPclAndHeightPipeline;
 use wgsl_pcl::gpu_types::AlignedMatrix4;
@@ -21,22 +17,28 @@ use crate::tasks::{DEPTH_FRAME_HEIGHT, DEPTH_FRAME_SIZE, DEPTH_FRAME_WIDTH};
 pub struct OccupancyGridTask {
     camera_node: StaticNode,
     depth_projector_pipeline: DepthToPclAndHeightPipeline,
+    layout: MapLayout,
 }
 
-#[derive(Serialize, Encode, bincode::Decode, Clone, Copy, Debug)]
+#[derive(Serialize, Encode, bincode::Decode, Clone, Debug)]
 pub struct OccupancyGrid {
-    pub width: u32,
-    pub height: u32,
-    #[serde(serialize_with = "<[_]>::serialize")]
-    pub height_map: [i32; THALASSIC_CELL_COUNT as usize],
+    pub max_x: f32,
+    pub min_x: f32,
+    pub max_y: f32,
+    pub min_y: f32,
+    pub cell_size: f32,
+    pub height_map: Vec<f32>,
 }
 
 impl Default for OccupancyGrid {
     fn default() -> Self {
         OccupancyGrid {
-            width: 0,
-            height: 0,
-            height_map: [0; THALASSIC_CELL_COUNT as usize],
+            max_x: 0.0,
+            min_x: 0.0,
+            max_y: 0.0,
+            min_y: 0.0,
+            cell_size: 0.0,
+            height_map: Vec::new(),
         }
     }
 }
@@ -48,19 +50,16 @@ impl CuTask for OccupancyGridTask {
     type Output<'m> = output_msg!(OccupancyGrid);
 
     fn start(&mut self, _clock: &RobotClock) -> CuResult<()> {
-        let width = THALASSIC_WIDTH;
-        let height = THALASSIC_HEIGHT;
-
-        let center = (
-            (width as f32 * THALASSIC_CELL_SIZE) / 2.0,
-            (height as f32 * THALASSIC_CELL_SIZE) / 2.0,
+        let center = [
+            (self.layout.max_x + self.layout.min_x) / 2.0,
+            (self.layout.max_y + self.layout.min_y) / 2.0,
             0.0,
-        );
-        let half_size = (
-            (width as f32 * THALASSIC_CELL_SIZE) / 2.0,
-            (height as f32 * THALASSIC_CELL_SIZE) / 2.0,
-            0.01,
-        );
+        ];
+        let half_size = [
+            (self.layout.max_x - self.layout.min_x) / 2.0,
+            (self.layout.max_y - self.layout.min_y) / 2.0,
+            0.1,
+        ];
         if let Some(logger) = RECORDER.get() {
             logger
                 .recorder
@@ -138,18 +137,18 @@ impl CuTask for OccupancyGridTask {
                 ))
             })?
             .clone();
-
+        let layout = MapLayout::new(max_x, min_x, max_y, min_y, cell_size);
         Ok(Self {
             camera_node,
             depth_projector_pipeline: DepthToPclAndHeightPipeline::new(
-                5.0, // max depth meters
+                10.0, // max depth meters
                 (DEPTH_FRAME_WIDTH as u32, DEPTH_FRAME_HEIGHT as u32),
                 focal_length_px,
                 (ppx, ppy),
                 get_device(),
                 (8, 8),
                 (16, 16),
-                MapLayout::new(max_x, min_x, max_y, min_y, cell_size),
+                layout,
                 bilateral_filter_sigma_spatial,
                 bilateral_filter_sigma_range,
                 bilateral_filter_kernel_radius,
@@ -158,12 +157,13 @@ impl CuTask for OccupancyGridTask {
             .map_err(|e| {
                 CuError::new_with_cause("failed to create depth to pcl and height pipeline", &e)
             })?,
+            layout,
         })
     }
 
     fn process<'i, 'o>(
         &mut self,
-        clock: &RobotClock,
+        _clock: &RobotClock,
         input: &Self::Input<'i>,
         output: &mut Self::Output<'o>,
     ) -> CuResult<()> {
@@ -200,7 +200,12 @@ impl CuTask for OccupancyGridTask {
                 .recorder
                 .log(
                     format!("realsense/pcl"),
-                    &Points3D::new(point_cloud.iter().enumerate().map(|(i, p)| [p.x, p.y, p.z])),
+                    &Points3D::new(
+                        point_cloud
+                            .iter()
+                            .enumerate()
+                            .map(|(_i, p)| [p.x, p.y, p.z]),
+                    ),
                 )
                 .unwrap();
         }

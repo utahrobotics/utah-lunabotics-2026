@@ -1,6 +1,5 @@
-use bonsai_bt::Behavior::{self, Action};
 use bonsai_bt::Status::{Failure, Running, Success};
-use bonsai_bt::{BT, Event, RUNNING, Status, UpdateArgs};
+use bonsai_bt::{BT, Event, UpdateArgs};
 use common::{FromLunabase, LUNABOT_STAGE, LunabotStage, Steering};
 use cu29::prelude::*;
 use cu29::{
@@ -8,8 +7,6 @@ use cu29::{
     input_msg,
 };
 use embedded_common::{Actuator, ActuatorCommand};
-
-use std::sync::mpsc::Receiver;
 
 use crate::ROOT_NODE;
 use crate::tasks::OccupancyGrid;
@@ -36,7 +33,7 @@ impl CuTask for LunabotAi {
     where
         Self: Sized,
     {
-        let mut blackboard = LunabotBlackboard::default();
+        let blackboard = LunabotBlackboard::default();
         let behavior = teleop_behavior();
         let mut bt = BT::new(behavior, blackboard);
         let viz = bt.get_graphviz();
