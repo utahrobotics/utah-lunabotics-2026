@@ -52,7 +52,7 @@ impl LunabaseConnection {
                         }
                     }
                     Err(e) => {
-                        eprintln!("Failed to receive message from server: {}", e);
+                        // eprintln!("Failed to receive message from server: {}", e);
                         std::thread::sleep(Duration::from_millis(10));
                     }
                 }

@@ -102,7 +102,6 @@ impl CuSinkTask for Localizer {
                     Quaternion::from_xyzw(pose_msg.rotation.as_vector().cast::<f32>().data.0[0]),
                 ),
             );
-            //self.root_node.set_isometry(pose_msg);
         }
 
         if let Some(imu_measurement) = input.0.payload()
@@ -241,13 +240,15 @@ impl CuSinkTask for Localizer {
 
             {
                 let mut global_variance_lock = self.robot_state.kalman_variances.write();
-                let mut global_variance_view: SMatrixViewMut<f64, 15, 15> = global_variance_lock.as_mut().unwrap().as_view_mut();
+                let mut global_variance_view: SMatrixViewMut<f64, 15, 15> =
+                    global_variance_lock.as_mut().unwrap().as_view_mut();
                 global_variance_view.copy_from(&self.kalman_filter.get_current_covariance());
             }
 
             {
                 let mut global_state_lock = self.robot_state.kalman_state.write();
-                let mut global_state_view: SMatrixViewMut<f64, 15, 1> = global_state_lock.as_mut().unwrap().as_view_mut();
+                let mut global_state_view: SMatrixViewMut<f64, 15, 1> =
+                    global_state_lock.as_mut().unwrap().as_view_mut();
                 global_state_view.copy_from(&self.kalman_filter.get_current_state());
             }
 
