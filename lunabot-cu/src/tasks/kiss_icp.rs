@@ -8,7 +8,6 @@ use cu29::{
 };
 
 use iceoryx_types::IceoryxPointCloud;
-use iceoryx2::prelude::ZeroCopySend;
 use kalman_filter::SimpleVector;
 use nalgebra::{Isometry, Quaternion, Unit};
 use simple_icp::{config::Config, icp_pipeline::IcpPipeline};
@@ -23,16 +22,16 @@ pub struct KissIcp {
     pub frame_accumulation_index: usize,
     pub max_accumulation: usize,
     icp_variance: [f64; 36],
-    reference_offset: Option<Isometry<f64, Unit<Quaternion<f64>>, 3>>
+    reference_offset: Option<Isometry<f64, Unit<Quaternion<f64>>, 3>>,
 }
 
-#[derive(Clone, Copy, Debug, Encode, Decode, Serialize, ZeroCopySend)]
+#[derive(Clone, Copy, Debug, Encode, Decode, Serialize)]
 #[repr(C)]
 pub struct IcpMeasurement {
     pub position: [f64; 3],
     pub orientation: [f64; 3],
     #[serde(serialize_with = "<[_]>::serialize")]
-    pub variance: [f64; 36]
+    pub variance: [f64; 36],
 }
 
 impl Default for IcpMeasurement {
@@ -40,7 +39,7 @@ impl Default for IcpMeasurement {
         Self {
             position: Default::default(),
             orientation: Default::default(),
-            variance: [0.0; 36]
+            variance: [0.0; 36],
         }
     }
 }
@@ -105,14 +104,17 @@ impl CuTask for KissIcp {
         let pipeline = IcpPipeline::new_with_config(config);
 
         let diagonal = SimpleVector::<6>::new(
-            0.05 as f64,   // Position variance
+            0.05 as f64, // Position variance
             0.05 as f64,
             0.05 as f64,
-            0.5 as f64,    // Orientation variance
+            0.5 as f64, // Orientation variance
             0.5 as f64,
             0.5 as f64,
         );
-        let variance: [f64; 36] = kalman_filter::SimpleSquareMatrix::<6>::from_diagonal(&diagonal).as_slice().try_into().expect("Variance matrix in [kiss_icp.rs] was not 6x6");
+        let variance: [f64; 36] = kalman_filter::SimpleSquareMatrix::<6>::from_diagonal(&diagonal)
+            .as_slice()
+            .try_into()
+            .expect("Variance matrix in [kiss_icp.rs] was not 6x6");
 
         Ok(Self {
             pipeline,
@@ -162,29 +164,20 @@ impl CuTask for KissIcp {
             let map_points = self.pipeline.get_last_batch_points();
             let relative_position = self.pipeline.t_origin_current;
 
-
             if let Some(reference_offset) = self.reference_offset {
                 let position = reference_offset * relative_position;
 
                 let trans = position.translation;
-                let rotat = 
-                    position.rotation.axis()
-                        .and_then(|vec| Some(vec.into_inner()))
-                        .unwrap_or(SimpleVector::<3>::zeros())
-                    * position.rotation.angle()
-                ;
+                let rotat = position
+                    .rotation
+                    .axis()
+                    .and_then(|vec| Some(vec.into_inner()))
+                    .unwrap_or(SimpleVector::<3>::zeros())
+                    * position.rotation.angle();
 
                 let actual_message = IcpMeasurement {
-                    position: [
-                        trans.x,
-                        trans.y,
-                        trans.z,
-                    ],
-                    orientation: [
-                        rotat.x,
-                        rotat.y,
-                        rotat.z
-                    ],
+                    position: [trans.x, trans.y, trans.z],
+                    orientation: [rotat.x, rotat.y, rotat.z],
                     variance: self.icp_variance,
                 };
 
@@ -206,7 +199,12 @@ impl CuTask for KissIcp {
                 if total_variance < REFERENCE_VARIANCE_THRESHOLD {
                     // Think about this being substituted into the uses of reference offset
                     self.reference_offset = Some(
-                        ROBOT_STATE.get().unwrap().kinematic_root.get_global_isometry() * relative_position.inverse()
+                        ROBOT_STATE
+                            .get()
+                            .unwrap()
+                            .kinematic_root
+                            .get_global_isometry()
+                            * relative_position.inverse(),
                     );
                 }
             }

@@ -9,7 +9,6 @@ use cu29::{
     CuResult, clock::RobotClock, config::ComponentConfig, cutask::Freezable, input_msg, prelude::*,
 };
 
-use iceoryx2::prelude::ZeroCopySend;
 use kalman_filter::{SimpleSquareMatrix, SimpleVector};
 use ron::de::from_str as ron_from_str;
 use serde::Deserialize;

@@ -21,8 +21,10 @@ pub struct T265Subscriber {
     /// subscribes to pose frames published by the realsense external task (T265)
     #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     pose_subscriber: Subscriber<ipc::Service, PoseMsg, ()>,
+    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     node: StaticNode,
     /// Initial yaw offset captured on first pose to align T265's arbitrary tracking frame with world
+    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     initial_yaw_offset: Option<f32>,
 }
 

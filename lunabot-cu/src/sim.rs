@@ -8,11 +8,14 @@ pub mod utils;
 
 use cu29::prelude::*;
 use cu29_helpers::basic_copper_setup;
+use kalman_filter::SimpleSquareMatrix;
+use kalman_filter::SimpleVector;
 use mujoco_rs::cpp_viewer::MjViewerCpp;
 use mujoco_rs::prelude::*;
 use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, OnceLock};
+use std::sync::Arc;
+use std::sync::{Mutex, OnceLock, RwLock};
 use utils::RobotState;
 use wgsl_pcl::wgsl_setup::{init_gpu_blocking, is_gpu_initialized};
 
@@ -113,8 +116,10 @@ fn main() {
             let robot_chain = ChainBuilder::from(robot_chain).finish_static();
             let _ = ROBOT_STATE.set(RobotState {
                 kinematic_root: robot_chain,
-                kalman_state: Arc::new(SimpleVector::<15>::from_element(0.0)),
-                kalman_variances: Arc::new(SimpleSquareMatrix::<15>::from_diagonal_element(1E64)),
+                kalman_state: Arc::new(RwLock::new(SimpleVector::<15>::from_element(0.0))),
+                kalman_variances: Arc::new(RwLock::new(
+                    SimpleSquareMatrix::<15>::from_diagonal_element(1E64),
+                )),
             });
 
             let mut application = LunabotApplicationBuilder::new()

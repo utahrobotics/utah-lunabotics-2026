@@ -8,6 +8,7 @@ use cu29::{
     output_msg,
 };
 
+use crate::rerun_viz::RECORDER;
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use iceoryx2::node::NodeBuilder;
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
@@ -18,7 +19,6 @@ use iceoryx2::prelude::*;
 use iceoryx2::service::port_factory::publish_subscribe::PortFactory;
 use kalman_filter::SimpleVector;
 use serde::Serialize;
-use crate::rerun_viz::RECORDER;
 
 use crate::ROBOT_STATE;
 use iceoryx_types::ImuMsg;
@@ -41,7 +41,7 @@ pub struct ImuIceoryxReceiver {
     gravity_magnitude: f64,
 }
 
-#[derive(Clone, Copy, Debug, Encode, Decode, Serialize, ZeroCopySend)]
+#[derive(Clone, Copy, Debug, Encode, Decode, Serialize)]
 #[repr(C)]
 pub struct ImuMeasurement {
     pub acceleration: [f64; 3],
@@ -167,12 +167,15 @@ impl CuSrcTask for ImuIceoryxReceiver {
                 imu_raw.quaternion[2] as f64,
                 imu_raw.quaternion[3] as f64,
             ));
-            
-            if let Some(logger) = RECORDER.get()
-            {
+
+            if let Some(logger) = RECORDER.get() {
                 let _ = logger.recorder.log(
                     "imu_raw",
-                    &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(imu_linear_acceleration.x as f32, imu_linear_acceleration.y as f32, imu_linear_acceleration.z as f32)]),
+                    &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(
+                        imu_linear_acceleration.x as f32,
+                        imu_linear_acceleration.y as f32,
+                        imu_linear_acceleration.z as f32,
+                    )]),
                 );
                 //self.root_node.set_isometry(pose_msg);
             }
@@ -221,7 +224,7 @@ impl CuSrcTask for ImuIceoryxReceiver {
 
             // After warmup, subtract the measured gravity magnitude in the z direction
             let actual_message = ImuMeasurement {
-                acceleration: [acc.x, acc.y, acc.z - 9.8],//self.gravity_magnitude],
+                acceleration: [acc.x, acc.y, acc.z - 9.8], //self.gravity_magnitude],
                 angular_velocity: [gyr.x, gyr.y, gyr.z],
                 orientation: [imu_orientation.x, imu_orientation.y, imu_orientation.z],
                 variance: self.imu_variance,
@@ -243,6 +246,21 @@ impl CuSrcTask for ImuIceoryxReceiver {
     type Output<'m> = output_msg!(ImuMsg);
 
     fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
+        let diagonal = SimpleVector::<9>::from_column_slice(&[
+            0.05 as f64, // Acceleration variance
+            0.05 as f64,
+            0.05 as f64,
+            0.005 as f64, // Orientation variance
+            0.005 as f64,
+            0.005 as f64,
+            0.1 * 1E64 as f64, // Angular velocity variance
+            0.1 * 1E64 as f64,
+            0.1 * 1E64 as f64,
+        ]);
+        let variance: [f64; 81] = kalman_filter::SimpleSquareMatrix::<9>::from_diagonal(&diagonal)
+            .as_slice()
+            .try_into()
+            .expect("Variance matrix in [l2_imu.rs] was not 9x9");
         Ok(Self {
             lidar_node: ROBOT_STATE
                 .get()
@@ -251,6 +269,10 @@ impl CuSrcTask for ImuIceoryxReceiver {
                 .clone()
                 .get_node_with_name("l2_front")
                 .unwrap(),
+            imu_variance: variance,
+            warmup_samples: Vec::with_capacity(200), // Collect 200 samples for warmup
+            warmup_complete: false,
+            gravity_magnitude: 9.8, // default, replaced after warmup sequence
         })
     }
 
