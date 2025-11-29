@@ -11,8 +11,7 @@ use crate::{
     map_layout,
     mem_layouts::{BindGroupLayoutBuilder, GpuBuffer},
     shader_pipeline::{
-        ComputePipeline, ComputePipelineBuilder, ComputePipelineChain, ComputePipelineChainBuilder,
-        PipelineStage,
+        ComputePipelineBuilder, ComputePipelineChain, ComputePipelineChainBuilder, PipelineStage,
     },
     wgsl_setup::GpuDevice,
 };
@@ -23,7 +22,7 @@ pub struct DepthToPclAndHeightPipeline {
     depth_scale_buffer: GpuBuffer,
     input_img_buffer: GpuBuffer,
     output_pcl_buffer: GpuBuffer,
-    output_height_map_buffer: GpuBuffer,
+    _output_height_map_buffer: GpuBuffer,
     output_filtered_height_map_buffer: GpuBuffer,
     camera_transform_buffer: GpuBuffer,
     workgroup_size_stage1: (u32, u32, u32),
@@ -238,7 +237,7 @@ impl DepthToPclAndHeightPipeline {
         Ok(Self {
             pipeline: combined_pipeline,
             depth_image_dimensions_px: depth_image_dimensions,
-            output_height_map_buffer: height_map_buffer,
+            _output_height_map_buffer: height_map_buffer,
             input_img_buffer,
             output_pcl_buffer,
             camera_transform_buffer,

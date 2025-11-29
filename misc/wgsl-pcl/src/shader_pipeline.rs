@@ -80,7 +80,7 @@ impl ComputePipeline {
 
             compute_pass.set_pipeline(&self.pipeline);
 
-            for (index, (bind_group_index, _, bind_group)) in self.bind_groups.iter().enumerate() {
+            for (_, (bind_group_index, _, bind_group)) in self.bind_groups.iter().enumerate() {
                 compute_pass.set_bind_group(*bind_group_index as u32, bind_group, &[]);
             }
 
