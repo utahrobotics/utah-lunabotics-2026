@@ -27,28 +27,6 @@ pub static MJ_DATA: OnceLock<Mutex<&'static mut MjData<&'static MjModel>>> = Onc
 #[copper_runtime(config = "copperconfig.ron", sim_mode = true)]
 struct LunabotApplication {}
 
-fn default_callback(step: default::SimStep) -> SimOverride {
-    match step {
-        default::SimStep::UdevMonitor(_) => SimOverride::ExecutedBySim,
-        default::SimStep::CamSide(_) => SimOverride::ExecutedBySim,
-        default::SimStep::CamBack(_) => SimOverride::ExecutedBySim,
-        default::SimStep::CamLaptopFront(_) => SimOverride::ExecutedBySim,
-        default::SimStep::GstConvertBack(_) => SimOverride::ExecutedBySim,
-        default::SimStep::GstConvertSide(_) => SimOverride::ExecutedBySim,
-        default::SimStep::GstConvertLaptopFront(_) => SimOverride::ExecutedBySim,
-        default::SimStep::L2Pointcloud(_) => SimOverride::ExecutedBySim,
-        default::SimStep::L2Imu(_) => SimOverride::ExecutedBySim,
-        default::SimStep::V3Pico(_) => SimOverride::ExecutedBySim,
-        default::SimStep::MotorCtrl(_) => SimOverride::ExecutedBySim,
-        default::SimStep::DetectorCamBack(_) => SimOverride::ExecutedBySim,
-        default::SimStep::DetectorCamSide(_) => SimOverride::ExecutedBySim,
-        default::SimStep::DetectorCamLaptopFront(_) => SimOverride::ExecutedBySim,
-        default::SimStep::RealsenseSubscriber(_) => SimOverride::ExecutedBySim,
-        default::SimStep::T265Subscriber(_) => SimOverride::ExecutedBySim,
-        _ => SimOverride::ExecuteByRuntime,
-    }
-}
-
 fn sim_callback(step: default::SimStep) -> SimOverride {
     // mj model and data should always be set before this function is called
     let model = MJ_MODEL.get().unwrap();
@@ -135,13 +113,13 @@ fn main() {
             let _ = ROOT_NODE.set(robot_chain);
 
             let mut application = LunabotApplicationBuilder::new()
-                .with_sim_callback(&mut default_callback)
+                .with_sim_callback(&mut sim_callback)
                 .with_context(&copper_ctx)
                 .build()
                 .expect("Failed to create application.");
 
             application
-                .start_all_tasks(&mut default_callback)
+                .start_all_tasks(&mut sim_callback)
                 .expect("Failed to start all tasks.");
             let target_duration = std::time::Duration::from_nanos(1_000_000_000 / TARGET_HZ as u64);
             let mut last_time = std::time::Instant::now();
