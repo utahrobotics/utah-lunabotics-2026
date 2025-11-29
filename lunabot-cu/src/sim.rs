@@ -10,10 +10,13 @@ use cu29::prelude::*;
 use cu29_helpers::basic_copper_setup;
 use mujoco_rs::cpp_viewer::MjViewerCpp;
 use mujoco_rs::prelude::*;
+use nalgebra::{Isometry3, Quaternion, Translation3, UnitQuaternion};
 use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use wgsl_pcl::wgsl_setup::{init_gpu_blocking, is_gpu_initialized};
+
+use crate::rerun_viz::{RECORDER, ROBOT_STRUCTURE};
 
 const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 
@@ -63,8 +66,54 @@ fn sim_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::DetectorCamLaptopFront(_) => SimOverride::ExecutedBySim,
         default::SimStep::RealsenseSubscriber(_) => SimOverride::ExecutedBySim,
         default::SimStep::T265Subscriber(_) => SimOverride::ExecutedBySim,
+        default::SimStep::DetectionHandler(_) => SimOverride::ExecutedBySim,
+        default::SimStep::L2KissIcp(_) => SimOverride::ExecuteByRuntime,
+        default::SimStep::OccupancyGridPipeline(_) => SimOverride::ExecuteByRuntime,
+        default::SimStep::Lunabase(_) => SimOverride::ExecuteByRuntime,
+        default::SimStep::NewAi(_) => SimOverride::ExecuteByRuntime,
 
-        _ => SimOverride::ExecuteByRuntime,
+        default::SimStep::Localizer(CuTaskCallbackState::Process(_, _)) => {
+            use std::sync::atomic::{AtomicU64, Ordering};
+            static LAST_LOG_TIME: OnceLock<AtomicU64> = OnceLock::new();
+            let now = std::time::Instant::now();
+            let now_ns = now.elapsed().as_nanos() as u64;
+            let log_interval_ns = 1_000_000_000 / 60;
+            let last_log_time = LAST_LOG_TIME.get_or_init(|| AtomicU64::new(0));
+            if let Some(node) = ROOT_NODE.get()
+                && let Some(lunabot_body) = data.body("simplify_lunabot")
+            {
+                let coords = lunabot_body.view(&data).xpos.to_vec();
+                let quat = lunabot_body.view(&data).xquat.to_vec();
+                if coords.len() != 3 || quat.len() != 4 {
+                    eprintln!("Unexpected pose buffer len");
+                    return SimOverride::ExecutedBySim;
+                }
+                let isometry = Isometry3::from_parts(
+                    Translation3::new(coords[0], coords[1], coords[2]),
+                    UnitQuaternion::from_quaternion(Quaternion::new(
+                        quat[0], quat[2], quat[2], quat[3],
+                    )),
+                );
+                node.set_isometry(isometry);
+                let last = last_log_time.load(Ordering::Relaxed);
+                if now_ns - last > log_interval_ns {
+                    last_log_time.store(now_ns, Ordering::Relaxed);
+                    if let Some(recorder) = RECORDER.get()
+                        && let Err(_e) = recorder.recorder.log(
+                            rerun_viz::ROBOT_STRUCTURE,
+                            &rerun::Transform3D::from_translation_rotation(
+                                isometry.translation.vector.cast::<f32>().data.0[0],
+                                rerun::Quaternion::from_xyzw(
+                                    isometry.rotation.as_vector().cast::<f32>().data.0[0],
+                                ),
+                            ),
+                        )
+                    {}
+                }
+            }
+            SimOverride::ExecuteByRuntime
+        }
+        default::SimStep::Localizer(..) => SimOverride::ExecutedBySim,
     }
 }
 
@@ -99,9 +148,9 @@ fn main() {
             )
             .expect("Failed to setup logger.");
 
-            // rerun_viz::init_rerun(rerun_viz::RerunViz::Viz(rerun_viz::Level::All)).expect(
-            //     "Failed to initialize Rerun. Please check that the rerun binary is in your path.",
-            // );
+            rerun_viz::init_rerun(rerun_viz::RerunViz::Viz(rerun_viz::Level::All)).expect(
+                "Failed to initialize Rerun. Please check that the rerun binary is in your path.",
+            );
 
             let robot_chain = NodeSerde::from_reader(
                 std::fs::File::open("../robot-layout/lunabot.ron")
