@@ -156,21 +156,21 @@ pub fn enumerate_motors(vesc_ids: VescIDs, speed_multiplier: f32) -> &'static Mo
         let mut monitor = match MonitorBuilder::new() {
             Ok(x) => x,
             Err(e) => {
-                error!("Failed to create udev monitor: {e}");
+                eprintln!("Failed to create udev monitor: {e}");
                 return;
             }
         };
         monitor = match monitor.match_subsystem("tty") {
             Ok(x) => x,
             Err(e) => {
-                error!("Failed to set match-subsystem filter: {e}");
+                eprintln!("Failed to set match-subsystem filter: {e}");
                 return;
             }
         };
         let listener = match monitor.listen() {
             Ok(x) => x,
             Err(e) => {
-                error!("Failed to listen for udev events: {e}");
+                eprintln!("Failed to listen for udev events: {e}");
                 return;
             }
         };
@@ -179,25 +179,25 @@ pub fn enumerate_motors(vesc_ids: VescIDs, speed_multiplier: f32) -> &'static Mo
             let udev = match Udev::new() {
                 Ok(x) => x,
                 Err(e) => {
-                    error!("Failed to create udev context: {e}");
+                    eprintln!("Failed to create udev context: {e}");
                     return;
                 }
             };
             match udev::Enumerator::with_udev(udev) {
                 Ok(x) => x,
                 Err(e) => {
-                    error!("Failed to create udev enumerator: {e}");
+                    eprintln!("Failed to create udev enumerator: {e}");
                     return;
                 }
             }
         };
         if let Err(e) = enumerator.match_subsystem("tty") {
-            error!("Failed to set match-subsystem filter: {e}");
+            eprintln!("Failed to set match-subsystem filter: {e}");
         }
         let devices = match enumerator.scan_devices() {
             Ok(x) => x,
             Err(e) => {
-                error!("Failed to scan devices: {e}");
+                eprintln!("Failed to scan devices: {e}");
                 return;
             }
         };
@@ -269,13 +269,17 @@ impl MotorTask {
             {
                 Ok(x) => x,
                 Err(e) => {
-                    error!("Failed to open motor port {path_str}: {e}");
+                    eprintln!("Failed to open motor port {path_str}: {e}");
                     return;
                 }
             };
         }
         if let Err(e) = motor_port.set_exclusive(true) {
-            warning!("Failed to set motor port {path_str} exclusive: {e}");
+            warning!(
+                "Failed to set motor port {} exclusive: {}",
+                &path_str,
+                e.to_string()
+            );
         }
         let mut motor_port = BufStream::new(motor_port);
 
@@ -306,19 +310,19 @@ impl MotorTask {
             let response = match task.block_on() {
                 Ok(resp) => resp,
                 Err(e) => {
-                    error!("Failed to read/write to motor port {path_str}: {e}");
+                    eprintln!("Failed to read/write to motor port {path_str}: {e}");
                     return;
                 }
             };
 
             let Ok(buf) = MinLength::try_from(response.as_slice()) else {
-                error!("Received too short of a message from motor port {path_str}");
+                eprintln!("Received too short of a message from motor port {path_str}");
                 std::thread::sleep(std::time::Duration::from_secs(1));
                 continue;
             };
 
             let Ok(values) = GetValues::parse_response(&buf) else {
-                error!("Received corrupt response from motor port {path_str}");
+                eprintln!("Received corrupt response from motor port {path_str}");
                 std::thread::sleep(std::time::Duration::from_secs(1));
                 continue;
             };
@@ -327,7 +331,7 @@ impl MotorTask {
         }
 
         let Some(&slave_can) = self.vesc_ids.can_ids.get(&master_can_id) else {
-            error!("Found unknown master Can ID {master_can_id}");
+            eprintln!("Found unknown master Can ID {master_can_id}");
             return;
         };
 
@@ -360,19 +364,19 @@ impl MotorTask {
                 let response = match task.block_on() {
                     Ok(resp) => resp,
                     Err(e) => {
-                        error!("Failed to read/write to motor port {path_str}: {e}");
+                        eprintln!("Failed to read/write to motor port {path_str}: {e}");
                         return;
                     }
                 };
 
                 let Ok(buf) = MinLength::try_from(response.as_slice()) else {
-                    error!("Received too short of a message from motor port {path_str}");
+                    eprintln!("Received too short of a message from motor port {path_str}");
                     std::thread::sleep(std::time::Duration::from_secs(1));
                     continue;
                 };
 
                 let Ok(values) = GetValues::parse_response(&buf) else {
-                    error!("Received corrupt response from motor port {path_str}");
+                    eprintln!("Received corrupt response from motor port {path_str}");
                     std::thread::sleep(std::time::Duration::from_secs(1));
                     continue;
                 };
@@ -382,7 +386,7 @@ impl MotorTask {
                     .unwrap()
                     .insert(values.vesc_id, values);
                 if can_id != values.vesc_id {
-                    error!(
+                    eprintln!(
                         "Received can id {} instead of {} from sibling",
                         values.vesc_id, can_id
                     );
@@ -441,19 +445,19 @@ impl MotorTask {
                 let response = match task.block_on() {
                     Ok(resp) => resp,
                     Err(e) => {
-                        error!("Failed to read/write to motor port {path_str}: {e}");
+                        eprintln!("Failed to read/write to motor port {path_str}: {e}");
                         return;
                     }
                 };
 
                 let Ok(buf) = MinLength::try_from(response.as_slice()) else {
-                    error!("Received too short of a message from motor port {path_str}");
+                    eprintln!("Received too short of a message from motor port {path_str}");
                     std::thread::sleep(std::time::Duration::from_secs(1));
                     continue;
                 };
 
                 let Ok(values) = GetValues::parse_response(&buf) else {
-                    error!("Received corrupt response from motor port {path_str}");
+                    eprintln!("Received corrupt response from motor port {path_str}");
                     std::thread::sleep(std::time::Duration::from_secs(1));
                     continue;
                 };
@@ -501,19 +505,19 @@ impl MotorTask {
                     let response = match task.block_on() {
                         Ok(resp) => resp,
                         Err(e) => {
-                            error!("Failed to read/write to motor port {path_str}: {e}");
+                            eprintln!("Failed to read/write to motor port {path_str}: {e}");
                             return;
                         }
                     };
 
                     let Ok(buf) = MinLength::try_from(response.as_slice()) else {
-                        error!("Received too short of a message from motor port {path_str}");
+                        eprintln!("Received too short of a message from motor port {path_str}");
                         std::thread::sleep(std::time::Duration::from_secs(1));
                         continue;
                     };
 
                     let Ok(values) = GetValues::parse_response(&buf) else {
-                        error!("Received corrupt response from motor port {path_str}");
+                        eprintln!("Received corrupt response from motor port {path_str}");
                         std::thread::sleep(std::time::Duration::from_secs(1));
                         continue;
                     };
@@ -555,15 +559,15 @@ impl MotorTask {
             };
 
             if let Err(e) = task.block_on() {
-                error!("Failed to write to motor port: {e}");
+                eprintln!("Failed to write to motor port: {e}");
                 break;
             }
         }
 
         if let Some((slave_can_id, _)) = slave_can {
-            error!("Motors {} and {} closed", master_can_id, slave_can_id);
+            eprintln!("Motors {} and {} closed", master_can_id, slave_can_id);
         } else {
-            error!("Motor {} closed", master_can_id);
+            eprintln!("Motor {} closed", master_can_id);
         }
     }
 }
