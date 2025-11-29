@@ -10,7 +10,7 @@ use iceoryx2::{
     prelude::{LogLevel, ServiceName, set_log_level},
     service::ipc,
 };
-use nalgebra::{Quaternion, UnitQuaternion, Vector3};
+use nalgebra::Vector3;
 
 pub struct T265Subscriber {
     last_seen: u64,
