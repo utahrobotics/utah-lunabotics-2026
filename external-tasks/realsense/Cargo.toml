@@ -16,7 +16,7 @@ fxhash.workspace = true
 parking_lot.workspace = true
 
 # Dependencies from misc crates
-iceoryx-types = { path = "../../misc/iceoryx-types" }
+iceoryx-types = { path = "../../misc/iceoryx-types", features = ["production"] }
 
 crossbeam.workspace = true
 common.workspace = true

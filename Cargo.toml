@@ -3,8 +3,6 @@ resolver = "3"
 members = [
     "misc/simple-motion",
     "misc/tasker",
-    "misc/thalassic",
-    "misc/gputter",
     "misc/iceoryx-types",
     "misc/launcher",
     "misc/vesc-translator",
@@ -15,7 +13,9 @@ members = [
     "misc/copperconfig-validator",
     "external-tasks/realsense",
     "lunabase-lib",
-    "misc/quic", "misc/auto-start",
+    "misc/quic",
+    "misc/auto-start",
+    "misc/wgsl-pcl",
 ]
 exclude = ["misc/usb-reset"]
 # Shared dependencies across workspace members
@@ -60,6 +60,8 @@ bytemuck = { version = "1", features = ["derive", "extern_crate_alloc"] }
 anyhow = "1"
 unfmt = "0.2.2"
 serde = { version = "1", features = ["derive"] }
+thiserror = "2.0.17"
+
 
 tokio-serial = "5.4.5"
 tokio-util = "0.7.16"

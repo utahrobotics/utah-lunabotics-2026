@@ -1,0 +1,13 @@
+[package]
+name = "wgsl-pcl"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow.workspace = true
+pollster = "0.4.0"
+thiserror.workspace = true
+bytemuck.workspace = true
+wgpu = "27.0.1"
+futures = "0.3"
+nalgebra.workspace = true

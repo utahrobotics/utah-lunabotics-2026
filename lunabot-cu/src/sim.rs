@@ -8,13 +8,13 @@ pub mod utils;
 
 use cu29::prelude::*;
 use cu29_helpers::basic_copper_setup;
-use gputter::{init_gputter_blocking, is_gputter_initialized};
 use mujoco_rs::cpp_viewer::MjViewerCpp;
 use mujoco_rs::prelude::*;
 use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
 use utils::RobotState;
+use wgsl_pcl::wgsl_setup::{init_gpu_blocking, is_gpu_initialized};
 
 const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 
@@ -27,28 +27,6 @@ pub static MJ_DATA: OnceLock<Mutex<&'static mut MjData<&'static MjModel>>> = Onc
 
 #[copper_runtime(config = "copperconfig.ron", sim_mode = true)]
 struct LunabotApplication {}
-
-fn default_callback(step: default::SimStep) -> SimOverride {
-    match step {
-        default::SimStep::UdevMonitor(_) => SimOverride::ExecutedBySim,
-        default::SimStep::CamSide(_) => SimOverride::ExecutedBySim,
-        default::SimStep::CamBack(_) => SimOverride::ExecutedBySim,
-        default::SimStep::CamLaptopFront(_) => SimOverride::ExecutedBySim,
-        default::SimStep::GstConvertBack(_) => SimOverride::ExecutedBySim,
-        default::SimStep::GstConvertSide(_) => SimOverride::ExecutedBySim,
-        default::SimStep::GstConvertLaptopFront(_) => SimOverride::ExecutedBySim,
-        default::SimStep::L2Pointcloud(_) => SimOverride::ExecutedBySim,
-        default::SimStep::L2Imu(_) => SimOverride::ExecutedBySim,
-        default::SimStep::V3Pico(_) => SimOverride::ExecutedBySim,
-        default::SimStep::MotorCtrl(_) => SimOverride::ExecutedBySim,
-        default::SimStep::DetectorCamBack(_) => SimOverride::ExecutedBySim,
-        default::SimStep::DetectorCamSide(_) => SimOverride::ExecutedBySim,
-        default::SimStep::DetectorCamLaptopFront(_) => SimOverride::ExecutedBySim,
-        default::SimStep::RealsenseSubscriber(_) => SimOverride::ExecutedBySim,
-        default::SimStep::T265Subscriber(_) => SimOverride::ExecutedBySim,
-        _ => SimOverride::ExecuteByRuntime,
-    }
-}
 
 fn sim_callback(step: default::SimStep) -> SimOverride {
     // mj model and data should always be set before this function is called
@@ -92,10 +70,8 @@ fn sim_callback(step: default::SimStep) -> SimOverride {
 }
 
 fn main() {
-    // usually we init gputter in the realsense occupancy task but
-    // mujoco will steal exclusive access to the egl context so we can just take it first
-    if !is_gputter_initialized() {
-        init_gputter_blocking().expect("failed to init gputter");
+    if is_gpu_initialized() == false {
+        init_gpu_blocking().expect("failed to init gpu");
     }
     std::thread::Builder::new()
         .stack_size(20 * 1000000) // this size will depend on how big the copper list is
@@ -135,20 +111,20 @@ fn main() {
             .expect("Failed to parse robot chain");
 
             let robot_chain = ChainBuilder::from(robot_chain).finish_static();
-            let _ = ROBOT_STATE.set( RobotState {
+            let _ = ROBOT_STATE.set(RobotState {
                 kinematic_root: robot_chain,
                 kalman_state: Arc::new(SimpleVector::<15>::from_element(0.0)),
                 kalman_variances: Arc::new(SimpleSquareMatrix::<15>::from_diagonal_element(1E64)),
             });
 
             let mut application = LunabotApplicationBuilder::new()
-                .with_sim_callback(&mut default_callback)
+                .with_sim_callback(&mut sim_callback)
                 .with_context(&copper_ctx)
                 .build()
                 .expect("Failed to create application.");
 
             application
-                .start_all_tasks(&mut default_callback)
+                .start_all_tasks(&mut sim_callback)
                 .expect("Failed to start all tasks.");
             let target_duration = std::time::Duration::from_nanos(1_000_000_000 / TARGET_HZ as u64);
             let mut last_time = std::time::Instant::now();

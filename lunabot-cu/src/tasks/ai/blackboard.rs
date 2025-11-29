@@ -1,12 +1,17 @@
-use std::{collections::VecDeque, sync::{Arc, RwLock}};
+use std::{
+    collections::VecDeque,
+    sync::{Arc, RwLock},
+};
 
 use common::{FromLunabase, LUNABOT_STAGE, LunabotStage, Steering};
 use embedded_common::ActuatorCommand;
-use iceoryx_types::IceoryxOccupancyGrid;
 use kalman_filter::{SimpleSquareMatrix, SimpleVector};
 use simple_motion::StaticNode;
 
-use crate::{ROBOT_STATE, tasks::ai::jobs::Job};
+use crate::{
+    ROBOT_STATE,
+    tasks::{OccupancyGrid, ai::jobs::Job},
+};
 
 #[derive(Debug)]
 pub struct LunabotBlackboard {
@@ -18,7 +23,7 @@ pub struct LunabotBlackboard {
     pub kalman_variances: Arc<RwLock<SimpleSquareMatrix<15>>>,
 
     /// TODO fill out this comment
-    pub latest_obstacle_map: Option<IceoryxOccupancyGrid>,
+    pub latest_obstacle_map: Option<OccupancyGrid>,
 
     /// stores the last lift actuator message received from lunabase
     pub last_lift: Option<i8>,
@@ -54,9 +59,22 @@ pub struct LunabotBlackboard {
 impl Default for LunabotBlackboard {
     fn default() -> Self {
         Self {
-            kinematic_root: ROBOT_STATE.get().expect("ROBOT_STATE not initialized").kinematic_root, // we should always have the root node, and if not then we might as well abort
-            kalman_state: Arc::clone(&ROBOT_STATE.get().expect("ROBOT_STATE not initialized").kalman_state),
-            kalman_variances: Arc::clone(&ROBOT_STATE.get().expect("ROBOT_STATE not initialized").kalman_variances),
+            kinematic_root: ROBOT_STATE
+                .get()
+                .expect("ROBOT_STATE not initialized")
+                .kinematic_root, // we should always have the root node, and if not then we might as well abort
+            kalman_state: Arc::clone(
+                &ROBOT_STATE
+                    .get()
+                    .expect("ROBOT_STATE not initialized")
+                    .kalman_state,
+            ),
+            kalman_variances: Arc::clone(
+                &ROBOT_STATE
+                    .get()
+                    .expect("ROBOT_STATE not initialized")
+                    .kalman_variances,
+            ),
             // TODO transfer kalman filter state as well
             outgoing_actuator_msg_queue: VecDeque::new(),
             outgoing_steering_msg: Some(Steering::new(0.0, 0.0, 0.0)),
