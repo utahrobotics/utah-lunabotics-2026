@@ -8,12 +8,12 @@ pub mod utils;
 
 use cu29::prelude::*;
 use cu29_helpers::basic_copper_setup;
-use gputter::{init_gputter_blocking, is_gputter_initialized};
 use mujoco_rs::cpp_viewer::MjViewerCpp;
 use mujoco_rs::prelude::*;
 use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, OnceLock};
+use wgsl_pcl::wgsl_setup::{init_gpu_blocking, is_gpu_initialized};
 
 const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 
@@ -91,10 +91,8 @@ fn sim_callback(step: default::SimStep) -> SimOverride {
 }
 
 fn main() {
-    // usually we init gputter in the realsense occupancy task but
-    // mujoco will steal exclusive access to the egl context so we can just take it first
-    if !is_gputter_initialized() {
-        init_gputter_blocking().expect("failed to init gputter");
+    if is_gpu_initialized() == false {
+        init_gpu_blocking().expect("failed to init gpu");
     }
     std::thread::Builder::new()
         .stack_size(20 * 1000000) // this size will depend on how big the copper list is
