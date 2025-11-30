@@ -32,6 +32,16 @@ pub enum BlurFilterOptions {
     Gaussian(GaussianOptions),
 }
 
+pub struct OutlierFilterOptions {
+    pub kernel_radius: u32,
+    pub std_dev_threshold: f32,
+}
+
+pub struct ObstacleExpanderOptions {
+    pub expansion_radius_meters: f32,
+    pub obstacle_gradient_threshold: f32,
+}
+
 pub struct DepthToPclAndHeightPipeline {
     pipeline: ComputePipelineChain,
     depth_image_dimensions_px: (u32, u32),
@@ -41,7 +51,8 @@ pub struct DepthToPclAndHeightPipeline {
     _output_height_map_buffer: GpuBuffer,
     _output_filtered_height_map_buffer: GpuBuffer,
     _output_outlier_filtered_height_map_buffer: GpuBuffer,
-    output_gradient_map_buffer: GpuBuffer,
+    _output_gradient_map_buffer: GpuBuffer,
+    output_expanded_gradient_map_buffer: GpuBuffer,
     camera_transform_buffer: GpuBuffer,
     workgroup_size_stage1: (u32, u32, u32),
     workgroup_size_stage2: (u32, u32, u32),
@@ -49,6 +60,8 @@ pub struct DepthToPclAndHeightPipeline {
 }
 
 impl DepthToPclAndHeightPipeline {
+    /// stage 1 workgroup size is for depth -> pcl + height map
+    /// stage 2 workgroup size is for filtering and gradient mapping
     pub fn new(
         max_depth: f32,
         depth_image_dimensions: (u32, u32),
@@ -59,8 +72,8 @@ impl DepthToPclAndHeightPipeline {
         workgroup_size_stage2: (u32, u32),
         map_layout: map_layout::MapLayout,
         blur_filter_options: BlurFilterOptions,
-        outlier_filter_kernel_radius: u32,
-        outlier_filter_std_dev_threshold: f32,
+        outlier_filter_options: OutlierFilterOptions,
+        obstacle_expander_options: ObstacleExpanderOptions,
         gradient_kernel_radius: u32,
         min_depth: f32,
     ) -> Result<Self, WgslPclError> {
@@ -289,8 +302,11 @@ impl DepthToPclAndHeightPipeline {
                 "MAP_HEIGHT",
                 (map_layout.height_meters() / map_layout.cell_size).ceil() as f64,
             ),
-            ("KERNEL_RADIUS", outlier_filter_kernel_radius as f64),
-            ("OUTLIER_THRESHOLD", outlier_filter_std_dev_threshold as f64),
+            ("KERNEL_RADIUS", outlier_filter_options.kernel_radius as f64),
+            (
+                "OUTLIER_THRESHOLD",
+                outlier_filter_options.std_dev_threshold as f64,
+            ),
         ]);
         let (outlier_filter_layout, outlier_filter_bind_group) = BindGroupLayoutBuilder::new(None)
             .with_entry(
@@ -387,6 +403,77 @@ impl DepthToPclAndHeightPipeline {
             .with_constants(gradient_constants)
             .build()?;
 
+        let obstacle_expander_constants: HashMap<&str, f64> = HashMap::from([
+            (
+                "MAP_WIDTH",
+                (map_layout.width_meters() / map_layout.cell_size).ceil() as f64,
+            ),
+            (
+                "MAP_HEIGHT",
+                (map_layout.height_meters() / map_layout.cell_size).ceil() as f64,
+            ),
+            (
+                "ROBOT_RADIUS_METERS",
+                obstacle_expander_options.expansion_radius_meters as f64,
+            ),
+            ("CELL_SIZE_METERS", map_layout.cell_size as f64),
+        ]);
+
+        let obstacle_expander_output_buffer = GpuBuffer::new_storage_with_data(
+            &device,
+            &vec![
+                f32::MIN;
+                ((map_layout.width_meters() / map_layout.cell_size).ceil() as usize)
+                    * ((map_layout.height_meters() / map_layout.cell_size).ceil() as usize)
+            ],
+            Some("obstacle_expanded_height_map"),
+        );
+        let max_gradient_buffer = GpuBuffer::new_uniform_with_data(
+            &device,
+            &obstacle_expander_options.obstacle_gradient_threshold,
+            Some("max_gradient_buffer"),
+        );
+        let (obstacle_expander_layout, obstacle_expander_bind_group) =
+            BindGroupLayoutBuilder::new(None)
+                .with_entry(
+                    0,
+                    ShaderStages::COMPUTE,
+                    wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: false },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    gradient_map_buffer.as_entire_binding(),
+                )
+                .with_entry(
+                    1,
+                    ShaderStages::COMPUTE,
+                    wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: false },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    obstacle_expander_output_buffer.as_entire_binding(),
+                )
+                .with_entry(
+                    2,
+                    ShaderStages::COMPUTE,
+                    wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    max_gradient_buffer.as_entire_binding(),
+                )
+                .build(&device, "obstacle_expander_bind_group".to_string());
+
+        let obstacle_expander_pipeline = ComputePipelineBuilder::new(device)
+            .with_label("obstacle_expander")
+            .with_shader_module(include_wgsl!("../../shaders/expand_obstacles.wgsl"))
+            .with_bind_group(0, obstacle_expander_layout, obstacle_expander_bind_group)
+            .with_constants(obstacle_expander_constants)
+            .build()?;
+
         let combined_pipeline = ComputePipelineChainBuilder::new()
             .add_stage(PipelineStage::new(
                 pipeline,
@@ -404,6 +491,10 @@ impl DepthToPclAndHeightPipeline {
                 gradient_pipeline,
                 (workgroup_size_stage2.0, workgroup_size_stage2.1, 1),
             ))
+            .add_stage(PipelineStage::new(
+                obstacle_expander_pipeline,
+                (workgroup_size_stage2.0, workgroup_size_stage2.1, 1),
+            ))
             .build()?;
 
         Ok(Self {
@@ -417,7 +508,8 @@ impl DepthToPclAndHeightPipeline {
             map_layout,
             _output_filtered_height_map_buffer: filtered_height_map_buffer,
             _output_outlier_filtered_height_map_buffer: outlier_filtered_height_map_buffer,
-            output_gradient_map_buffer: gradient_map_buffer,
+            _output_gradient_map_buffer: gradient_map_buffer,
+            output_expanded_gradient_map_buffer: obstacle_expander_output_buffer,
             workgroup_size_stage1: (workgroup_size_stage1.0, workgroup_size_stage1.1, 1),
             workgroup_size_stage2: (workgroup_size_stage2.0, workgroup_size_stage2.1, 1),
         })
@@ -463,17 +555,27 @@ impl DepthToPclAndHeightPipeline {
             1,
         );
         let workgroups_gradient = workgroups_filter;
+        let workgroups_obstacle_expander = (
+            ((self.map_layout.width_meters() / self.map_layout.cell_size).ceil() as u32 + 8 - 1)
+                / 8,
+            ((self.map_layout.height_meters() / self.map_layout.cell_size).ceil() as u32 + 8 - 1)
+                / 8,
+            1,
+        );
 
         let workgroups = vec![
             workgroups_pcl,
             workgroups_filter,
             workgroups_outlier_filter,
             workgroups_gradient,
+            workgroups_obstacle_expander,
         ];
 
         self.pipeline.execute_blocking(device, workgroups)?;
         let pcl_data: Vec<AlignedVec4<f32>> = self.output_pcl_buffer.read_data_blocking(device)?;
-        let gradient_data: Vec<f32> = self.output_gradient_map_buffer.read_data_blocking(device)?;
+        let gradient_data: Vec<f32> = self
+            .output_expanded_gradient_map_buffer
+            .read_data_blocking(device)?;
 
         Ok((
             pcl_data
@@ -495,64 +597,5 @@ impl DepthToPclAndHeightPipeline {
             ._output_outlier_filtered_height_map_buffer
             .read_data_blocking(device)?;
         Ok(height_map_data)
-    }
-}
-
-pub struct DepthToPclBenchmarkInput {
-    pub depths: Vec<u16>,
-    pub camera_transform: AlignedMatrix4<f32>,
-    pub depth_scale: f32,
-    pub max_depth: f32,
-    pub depth_image_dimensions: (u32, u32),
-    pub focal_length_px: f32,
-    pub principal_point_px: (f32, f32),
-}
-
-impl BenchmarkableComputePipeline for DepthToPclAndHeightPipeline {
-    type Input = DepthToPclBenchmarkInput;
-    type Output = (Vec<Vector3<f32>>, Vec<f32>);
-
-    fn create_with_workgroup(
-        device: &GpuDevice,
-        workgroup_size: (u32, u32, u32),
-    ) -> anyhow::Result<Self>
-    where
-        Self: Sized,
-    {
-        Ok(Self::new(
-            3.0,                    // max_depth
-            (640, 480),             // dimensions
-            383.0,                  // focal_length
-            (317.44882, 245.91605), // principal point
-            device,
-            (workgroup_size.0, workgroup_size.1), // stage1 workgroup
-            (8, 8),                               // stage2 workgroup (fixed for now)
-            map_layout::MapLayout::new(10.0, -10.0, 10.0, -10.0, 0.05), // map layout
-            BlurFilterOptions::Gaussian(GaussianOptions {
-                kernel_radius: 9,
-                sigma: 3.0,
-            }),
-            2,   // outlier_filter_kernel_radius
-            2.0, // outlier_filter_std_dev_threshold
-            1,   // gradient_kernel_radius
-            2.0, // min_depth
-        )?)
-    }
-
-    fn execute_once(
-        &mut self,
-        device: &GpuDevice,
-        input: &Self::Input,
-    ) -> anyhow::Result<Self::Output> {
-        self.process(
-            &input.depths,
-            device,
-            input.camera_transform,
-            input.depth_scale,
-        )
-    }
-
-    fn operation_count(&self) -> u64 {
-        (self.depth_image_dimensions_px.0 * self.depth_image_dimensions_px.1) as u64
     }
 }

@@ -7,16 +7,21 @@ use cu29::{
     input_msg,
 };
 use embedded_common::{Actuator, ActuatorCommand};
+use rerun::{Points2D, Points3D};
 
 use std::sync::mpsc::Receiver;
 
 use crate::ROBOT_STATE;
+use crate::pathfinding::rrt::find_path;
+use crate::rerun_viz::RECORDER;
 use crate::tasks::OccupancyGrid;
 use crate::tasks::ai::action::LunabotAction;
 use crate::tasks::ai::behaviors::teleop::teleop_behavior;
-use crate::tasks::ai::blackboard::LunabotBlackboard;
+use crate::tasks::ai::blackboard::{self, LunabotBlackboard};
 use crate::tasks::ai::jobs::follow_path_job;
 use crate::utils::nanos_to_secs;
+
+static PATHFINDING_GOAL: [f32; 2] = [3.0, 0.0];
 
 pub struct LunabotAi {
     bt: BT<LunabotAction, LunabotBlackboard>,
@@ -64,11 +69,11 @@ impl CuTask for LunabotAi {
             self.bt.blackboard_mut().update_with_msg(from_lunabase);
         }
 
-        if let Some(_) = input.1.payload() {
-            // info!("got occupancy grid in the ai");
+        if let Some(map) = input.1.payload() {
+            self.bt.blackboard_mut().latest_obstacle_map = Some(map.clone());
         }
 
-        let mut remaining_dt = 0.0;
+        let remaining_dt = 0.0;
         self.bt.tick(&e, &mut |args, blackboard| {
             let status = match *args.action {
                 LunabotAction::SetSteering(steering) => {
@@ -143,7 +148,35 @@ impl CuTask for LunabotAi {
                 LunabotAction::IsInOccupiedCell => todo!(),
                 LunabotAction::IsInFreeCell => todo!(),
                 LunabotAction::IsInUnknownCell => todo!(),
-                LunabotAction::CalculatePath => Success,
+                LunabotAction::CalculatePath => {
+                    if let Some(ref map) = blackboard.latest_obstacle_map {
+                        let translation =
+                            blackboard.kinematic_root.get_global_isometry().translation;
+                        if let Some(path) = find_path(
+                            map,
+                            [translation.x as f32, translation.y as f32],
+                            PATHFINDING_GOAL,
+                            0.1,
+                            0.2,
+                            500,
+                        ) && let Some(rec) = RECORDER.get()
+                        {
+                            let _ = rec.recorder.log(
+                                "ai/calculated_path",
+                                &rerun::Points3D::new(
+                                    path.iter()
+                                        .map(|&(x, y)| [x, y, 0.6])
+                                        .collect::<Vec<[f32; 3]>>(),
+                                ),
+                            );
+                            Success
+                        } else {
+                            Failure
+                        }
+                    } else {
+                        Failure
+                    }
+                }
                 LunabotAction::FollowPath => {
                     if ROBOT_STATE.get().is_none() {
                         eprintln!(

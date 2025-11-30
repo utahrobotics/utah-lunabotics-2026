@@ -2,6 +2,7 @@
 pub mod comms;
 pub mod rerun_viz;
 
+pub mod pathfinding;
 pub mod simple_monitor;
 pub mod tasks;
 pub mod utils;
