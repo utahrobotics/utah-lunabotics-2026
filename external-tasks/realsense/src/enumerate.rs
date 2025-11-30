@@ -46,17 +46,17 @@ pub fn enumerate_depth_cameras(serial_numbers: &[&str]) {
     std::thread::Builder::new()
         .stack_size(16 * 1024 * 1024)
         .spawn(move || loop {
+            let device_hub = match context.create_device_hub() {
+                Ok(x) => x,
+                Err(_e) => {
+                    eprintln!("Failed to create RealSense DeviceHub: {_e}");
+                    return;
+                }
+            };
             let Ok(target_serial) = init_rx.recv() else {
                 break;
             };
             loop {
-                let device_hub = match context.create_device_hub() {
-                    Ok(x) => x,
-                    Err(_e) => {
-                        eprintln!("Failed to create RealSense DeviceHub: {_e}");
-                        return;
-                    }
-                };
                 let device = match device_hub.wait_for_device() {
                     Ok(x) => x,
                     Err(_e) => {
@@ -124,8 +124,7 @@ pub fn enumerate_depth_cameras(serial_numbers: &[&str]) {
                 enable_d455_streams(&mut config);
 
                 // https://gitlab.com/tangram-vision/oss/realsense-rust/-/issues/29
-                drop(device);
-                drop(device_hub);
+
                 let pipeline = match InactivePipeline::try_from(&context) {
                     Ok(x) => x,
                     Err(e) => {
