@@ -30,10 +30,8 @@ pub fn find_path(
         if let Some(valid_cell) =
             flood_fill_escape(map, start, max_acceptable_gradient, num_max_try)
         {
-            println!("escape path found: {:?}", valid_cell);
             initial_path.push(valid_cell);
         } else {
-            eprintln!("no escape path found");
             return None;
         }
     }
