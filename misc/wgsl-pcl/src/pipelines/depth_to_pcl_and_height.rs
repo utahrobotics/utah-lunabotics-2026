@@ -23,7 +23,8 @@ pub struct DepthToPclAndHeightPipeline {
     input_img_buffer: GpuBuffer,
     output_pcl_buffer: GpuBuffer,
     _output_height_map_buffer: GpuBuffer,
-    output_filtered_height_map_buffer: GpuBuffer,
+    _output_filtered_height_map_buffer: GpuBuffer,
+    output_outlier_filtered_height_map_buffer: GpuBuffer,
     camera_transform_buffer: GpuBuffer,
     workgroup_size_stage1: (u32, u32, u32),
     workgroup_size_stage2: (u32, u32, u32),
@@ -43,6 +44,8 @@ impl DepthToPclAndHeightPipeline {
         bilateral_filter_sigma_spatial: u32,
         bilateral_filter_sigma_range: f32,
         bilateral_filter_kernel_radius: u32,
+        outlier_filter_kernel_radius: u32,
+        outlier_filter_std_dev_threshold: f32,
         min_depth: f32,
     ) -> Result<Self, WgslPclError> {
         // Create buffers for depth -> pcl -> height map shader
@@ -223,6 +226,59 @@ impl DepthToPclAndHeightPipeline {
             .with_bind_group(0, filter_layout, filter_bind_group)
             .with_constants(filter_constants)
             .build()?;
+
+        let outlier_filtered_height_map_buffer = GpuBuffer::new_storage_with_data(
+            &device,
+            &vec![
+                f32::MIN;
+                ((map_layout.width_meters() / map_layout.cell_size).ceil() as usize)
+                    * ((map_layout.height_meters() / map_layout.cell_size).ceil() as usize)
+            ],
+            Some("outlier_filtered_height_map"),
+        );
+
+        let outlier_filter_constants: HashMap<&str, f64> = HashMap::from([
+            (
+                "MAP_WIDTH",
+                (map_layout.width_meters() / map_layout.cell_size).ceil() as f64,
+            ),
+            (
+                "MAP_HEIGHT",
+                (map_layout.height_meters() / map_layout.cell_size).ceil() as f64,
+            ),
+            ("KERNEL_RADIUS", outlier_filter_kernel_radius as f64),
+            ("OUTLIER_THRESHOLD", outlier_filter_std_dev_threshold as f64),
+        ]);
+        let (outlier_filter_layout, outlier_filter_bind_group) = BindGroupLayoutBuilder::new(None)
+            .with_entry(
+                0,
+                ShaderStages::COMPUTE,
+                wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                filtered_height_map_buffer.as_entire_binding(),
+            )
+            .with_entry(
+                1,
+                ShaderStages::COMPUTE,
+                wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                outlier_filtered_height_map_buffer.as_entire_binding(),
+            )
+            .build(&device, "outlier_filter_bind_group".to_string());
+
+        let outlier_filter_pipeline = ComputePipelineBuilder::new(device)
+            .with_label("outlier_filter")
+            .with_shader_module(include_wgsl!("../../shaders/outlier_removal.wgsl"))
+            .with_bind_group(0, outlier_filter_layout, outlier_filter_bind_group)
+            .with_constants(outlier_filter_constants)
+            .build()?;
+
         let combined_pipeline = ComputePipelineChainBuilder::new()
             .add_stage(PipelineStage::new(
                 pipeline,
@@ -231,6 +287,10 @@ impl DepthToPclAndHeightPipeline {
             .add_stage(PipelineStage::new(
                 filter_pipeline,
                 (workgroup_size_stage2.0, workgroup_size_stage2.1, 1),
+            ))
+            .add_stage(PipelineStage::new(
+                outlier_filter_pipeline,
+                (workgroup_size_stage2.0, workgroup_size_stage2.1, 1), // these workgroups will be replaced at runtime
             ))
             .build()?;
 
@@ -243,7 +303,8 @@ impl DepthToPclAndHeightPipeline {
             camera_transform_buffer,
             depth_scale_buffer,
             map_layout,
-            output_filtered_height_map_buffer: filtered_height_map_buffer,
+            _output_filtered_height_map_buffer: filtered_height_map_buffer,
+            output_outlier_filtered_height_map_buffer: outlier_filtered_height_map_buffer,
             workgroup_size_stage1: (workgroup_size_stage1.0, workgroup_size_stage1.1, 1),
             workgroup_size_stage2: (workgroup_size_stage2.0, workgroup_size_stage2.1, 1),
         })
@@ -281,11 +342,18 @@ impl DepthToPclAndHeightPipeline {
                 / self.workgroup_size_stage2.1,
             1,
         );
-        let workgroups = vec![workgroups_pcl, workgroups_filter];
+        let workgroups_outlier_filter = (
+            ((self.map_layout.width_meters() / self.map_layout.cell_size).ceil() as u32 + 8 - 1)
+                / 8,
+            ((self.map_layout.height_meters() / self.map_layout.cell_size).ceil() as u32 + 8 - 1)
+                / 8,
+            1,
+        );
+        let workgroups = vec![workgroups_pcl, workgroups_filter, workgroups_outlier_filter];
         self.pipeline.execute_blocking(device, workgroups)?;
         let pcl_data: Vec<AlignedVec4<f32>> = self.output_pcl_buffer.read_data_blocking(device)?;
         let heightmap_data: Vec<f32> = self
-            .output_filtered_height_map_buffer
+            .output_outlier_filtered_height_map_buffer
             .read_data_blocking(device)?;
 
         Ok((
@@ -337,7 +405,9 @@ impl BenchmarkableComputePipeline for DepthToPclAndHeightPipeline {
             9,                                    // sigma_spatial
             0.3,                                  // sigma_range
             9,                                    // kernel_radius
-            1.0,                                  // min_depth
+            2,
+            2.0, // outlier_filter_kernel_radius
+            2.0, // min_depth
         )?)
     }
 

@@ -15,11 +15,8 @@ use cu29::{
 };
 use embedded_common::FromPicoV3;
 
-use nalgebra::Const;
 use nalgebra::SMatrixViewMut;
 use nalgebra::{Isometry3, Vector3};
-use rerun::Quaternion;
-use simple_motion::StaticNode;
 
 use crate::ROBOT_STATE;
 
@@ -99,7 +96,9 @@ impl CuSinkTask for Localizer {
                 "t265",
                 &rerun::Transform3D::from_translation_rotation(
                     pose_msg.translation.vector.data.0[0],
-                    Quaternion::from_xyzw(pose_msg.rotation.as_vector().cast::<f32>().data.0[0]),
+                    rerun::Quaternion::from_xyzw(
+                        pose_msg.rotation.as_vector().cast::<f32>().data.0[0],
+                    ),
                 ),
             );
         }
