@@ -1,7 +1,10 @@
 // Uses a conditional mean filter to remove outliers on a height map
 // Only replaces values that are statistical outliers, preserving detail
-@group(0) @binding(0) var<storage, read_write> height_map: array<f32>;
-@group(0) @binding(1) var<storage, read_write> filtered_height_map: array<f32>;
+
+@group(0) @binding(0) var<storage, read_write> bilateral_filtered_height_map: array<f32>;
+@group(0) @binding(1) var<storage, read_write> output_filtered_height_map: array<f32>;
+@group(0) @binding(2) var<storage, read_write> original_height_map: array<f32>;
+
 override MAP_WIDTH: u32;
 override MAP_HEIGHT: u32;
 override KERNEL_RADIUS: u32 = 2;
@@ -27,10 +30,10 @@ fn depth(
         return;
     }
     
-    let center_value = height_map[center_index];
+    let center_value = bilateral_filtered_height_map[center_index];
     
     if center_value == -3.40282347e+38 {
-        filtered_height_map[center_index] = center_value;
+        output_filtered_height_map[center_index] = center_value;
         return;
     }
     
@@ -48,7 +51,7 @@ fn depth(
             let index = xy_to_index(x_coord, y_coord);
             
             if index >= 0 {
-                let value = height_map[index];
+                let value = bilateral_filtered_height_map[index];
                 if value != -3.40282347e+38 {
                     values[count] = value;
                     sum += value;
@@ -71,12 +74,14 @@ fn depth(
         let deviation = abs(center_value - mean);
         
         if deviation > OUTLIER_THRESHOLD * std_dev { // reject value
-            filtered_height_map[center_index] = -3.40282347e+38;
+            output_filtered_height_map[center_index] = -3.40282347e+38;
+            // mark the cell in the original file to be re mapped
+            original_height_map[center_index] = -3.40282347e+38;
         } else {
-            filtered_height_map[center_index] = center_value;
+            output_filtered_height_map[center_index] = center_value;
         }
     } else {
-        filtered_height_map[center_index] = center_value;
+        output_filtered_height_map[center_index] = center_value;
     }
 }
 

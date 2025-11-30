@@ -43,8 +43,8 @@
             id:"realsense_subscriber",
             type: "crate::tasks::sources::RealsenseSubscriber",
             config: {
-                // "serial_num": "044422250424",
-                "serial_num": "311322302990",
+                "serial_num": "044422250424",
+                // "serial_num": "311322302990",
                 "camera_node": "upper_depth_camera"
             },
             logging: (
@@ -80,15 +80,24 @@
                 "heightmap_max_y": 10.0,
                 "heightmap_min_x": -10.0,
                 "heightmap_min_y": -10.0,
-                "heightmap_cell_size": 0.05,
-                "bilateral_filter_kernel_radius": 10,
-                "bilateral_filter_sigma_spatial": 10,
-                "bilateral_filter_sigma_range": 0.05,
-                "min_depth": 0.3
+                "heightmap_cell_size": 0.025,
+                "bilateral_filter_kernel_radius": 15,
+                "bilateral_filter_sigma_spatial": 15,
+                "bilateral_filter_sigma_range": 0.01,
+                "gradient_filter_kernel_radius": 2,
+                "gaussian_blur_kernel_radius": 2,
+                "outlier_filter_kernel_radius": 5,
+                "outlier_filter_std_dev_threshold": 2.5,
+                "use_bilateral_filter": false,
+                "min_depth": 0.3,
+                "max_depth": 3.0,
             },
             // FIXME: use a custom backrounding implementation instead of going through copper for support, because
             // in resimulation mode the pipeline process will take way too long
-            background: true,
+            background: false,
+            logging: (
+                enabled: false,
+            )
         ),
         // registers point clouds into a global map, and estimates the isometry of the lidar node.
         // the isometry is relative to the robots starting position, not actual global coordinates

@@ -16,6 +16,22 @@ use crate::{
     wgsl_setup::GpuDevice,
 };
 
+pub struct BilateralOptions {
+    pub sigma_spatial: u32,
+    pub sigma_range: f32,
+    pub kernel_radius: u32,
+}
+
+pub struct GaussianOptions {
+    pub kernel_radius: u32,
+    pub sigma: f32,
+}
+
+pub enum BlurFilterOptions {
+    Bilateral(BilateralOptions),
+    Gaussian(GaussianOptions),
+}
+
 pub struct DepthToPclAndHeightPipeline {
     pipeline: ComputePipelineChain,
     depth_image_dimensions_px: (u32, u32),
@@ -24,7 +40,8 @@ pub struct DepthToPclAndHeightPipeline {
     output_pcl_buffer: GpuBuffer,
     _output_height_map_buffer: GpuBuffer,
     _output_filtered_height_map_buffer: GpuBuffer,
-    output_outlier_filtered_height_map_buffer: GpuBuffer,
+    _output_outlier_filtered_height_map_buffer: GpuBuffer,
+    output_gradient_map_buffer: GpuBuffer,
     camera_transform_buffer: GpuBuffer,
     workgroup_size_stage1: (u32, u32, u32),
     workgroup_size_stage2: (u32, u32, u32),
@@ -41,11 +58,10 @@ impl DepthToPclAndHeightPipeline {
         workgroup_size_stage1: (u32, u32),
         workgroup_size_stage2: (u32, u32),
         map_layout: map_layout::MapLayout,
-        bilateral_filter_sigma_spatial: u32,
-        bilateral_filter_sigma_range: f32,
-        bilateral_filter_kernel_radius: u32,
+        blur_filter_options: BlurFilterOptions,
         outlier_filter_kernel_radius: u32,
         outlier_filter_std_dev_threshold: f32,
+        gradient_kernel_radius: u32,
         min_depth: f32,
     ) -> Result<Self, WgslPclError> {
         // Create buffers for depth -> pcl -> height map shader
@@ -169,7 +185,7 @@ impl DepthToPclAndHeightPipeline {
             .with_label("depth_to_pcl_pipeline")
             .build()?;
 
-        // Create buffers and pipeline for bilateral filter
+        // Create buffers and pipeline for blur filter (bilateral or gaussian)
         let filtered_height_map_buffer = GpuBuffer::new_storage_with_data(
             &device,
             &vec![
@@ -180,7 +196,7 @@ impl DepthToPclAndHeightPipeline {
             Some("filtered_height_map"),
         );
 
-        // define layout and bind groups for bilateral filter shader
+        // define layout and bind groups for blur filter shader
         let (filter_layout, filter_bind_group) = BindGroupLayoutBuilder::new(None)
             .with_entry(
                 0,
@@ -204,29 +220,56 @@ impl DepthToPclAndHeightPipeline {
             )
             .build(&device, "height_map_filter_bind_group".to_string());
 
-        let filter_constants: HashMap<&str, f64> = HashMap::from([
-            (
-                "MAP_WIDTH",
-                (map_layout.width_meters() / map_layout.cell_size).ceil() as f64,
-            ),
-            (
-                "MAP_HEIGHT",
-                (map_layout.height_meters() / map_layout.cell_size).ceil() as f64,
-            ),
-            ("SIGMA_SPATIAL", bilateral_filter_sigma_spatial as f64),
-            ("SIGMA_RANGE", bilateral_filter_sigma_range as f64),
-            ("KERNEL_RADIUS", bilateral_filter_kernel_radius as f64),
-            ("WORKGROUP_X", workgroup_size_stage2.0 as f64),
-            ("WORKGROUP_Y", workgroup_size_stage2.1 as f64),
-        ]);
+        // Choose shader and constants based on filter type
+        let (filter_shader, filter_constants) = match blur_filter_options {
+            BlurFilterOptions::Bilateral(opts) => {
+                let constants = HashMap::from([
+                    (
+                        "MAP_WIDTH",
+                        (map_layout.width_meters() / map_layout.cell_size).ceil() as f64,
+                    ),
+                    (
+                        "MAP_HEIGHT",
+                        (map_layout.height_meters() / map_layout.cell_size).ceil() as f64,
+                    ),
+                    ("SIGMA_SPATIAL", opts.sigma_spatial as f64),
+                    ("SIGMA_RANGE", opts.sigma_range as f64),
+                    ("KERNEL_RADIUS", opts.kernel_radius as f64),
+                    ("WORKGROUP_X", workgroup_size_stage2.0 as f64),
+                    ("WORKGROUP_Y", workgroup_size_stage2.1 as f64),
+                ]);
+                (
+                    include_wgsl!("../../shaders/bilateral_filter.wgsl"),
+                    constants,
+                )
+            }
+            BlurFilterOptions::Gaussian(opts) => {
+                let constants = HashMap::from([
+                    (
+                        "MAP_WIDTH",
+                        (map_layout.width_meters() / map_layout.cell_size).ceil() as f64,
+                    ),
+                    (
+                        "MAP_HEIGHT",
+                        (map_layout.height_meters() / map_layout.cell_size).ceil() as f64,
+                    ),
+                    ("SIGMA", opts.sigma as f64),
+                    ("KERNEL_RADIUS", opts.kernel_radius as f64),
+                    ("WORKGROUP_X", workgroup_size_stage2.0 as f64),
+                    ("WORKGROUP_Y", workgroup_size_stage2.1 as f64),
+                ]);
+                (include_wgsl!("../../shaders/gaussian_blur.wgsl"), constants)
+            }
+        };
 
         let filter_pipeline = ComputePipelineBuilder::new(device)
-            .with_label("bilateral_filter")
-            .with_shader_module(include_wgsl!("../../shaders/bilateral_filter.wgsl"))
+            .with_label("blur_filter")
+            .with_shader_module(filter_shader)
             .with_bind_group(0, filter_layout, filter_bind_group)
             .with_constants(filter_constants)
             .build()?;
 
+        // Outlier filter
         let outlier_filtered_height_map_buffer = GpuBuffer::new_storage_with_data(
             &device,
             &vec![
@@ -270,6 +313,16 @@ impl DepthToPclAndHeightPipeline {
                 },
                 outlier_filtered_height_map_buffer.as_entire_binding(),
             )
+            .with_entry(
+                2,
+                ShaderStages::COMPUTE,
+                wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                height_map_buffer.as_entire_binding(),
+            )
             .build(&device, "outlier_filter_bind_group".to_string());
 
         let outlier_filter_pipeline = ComputePipelineBuilder::new(device)
@@ -277,6 +330,61 @@ impl DepthToPclAndHeightPipeline {
             .with_shader_module(include_wgsl!("../../shaders/outlier_removal.wgsl"))
             .with_bind_group(0, outlier_filter_layout, outlier_filter_bind_group)
             .with_constants(outlier_filter_constants)
+            .build()?;
+
+        // Gradient mapper
+        let gradient_map_buffer = GpuBuffer::new_storage_with_data(
+            &device,
+            &vec![
+                0.0f32;
+                ((map_layout.width_meters() / map_layout.cell_size).ceil() as usize)
+                    * ((map_layout.height_meters() / map_layout.cell_size).ceil() as usize)
+            ],
+            Some("gradient_map"),
+        );
+
+        let gradient_constants: HashMap<&str, f64> = HashMap::from([
+            (
+                "MAP_WIDTH",
+                (map_layout.width_meters() / map_layout.cell_size).ceil() as f64,
+            ),
+            (
+                "MAP_HEIGHT",
+                (map_layout.height_meters() / map_layout.cell_size).ceil() as f64,
+            ),
+            ("KERNEL_RADIUS", gradient_kernel_radius as f64),
+            ("WORKGROUP_X", workgroup_size_stage2.0 as f64),
+            ("WORKGROUP_Y", workgroup_size_stage2.1 as f64),
+        ]);
+
+        let (gradient_layout, gradient_bind_group) = BindGroupLayoutBuilder::new(None)
+            .with_entry(
+                0,
+                ShaderStages::COMPUTE,
+                wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                outlier_filtered_height_map_buffer.as_entire_binding(),
+            )
+            .with_entry(
+                1,
+                ShaderStages::COMPUTE,
+                wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: false },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                gradient_map_buffer.as_entire_binding(),
+            )
+            .build(&device, "gradient_bind_group".to_string());
+
+        let gradient_pipeline = ComputePipelineBuilder::new(device)
+            .with_label("gradient_mapper")
+            .with_shader_module(include_wgsl!("../../shaders/height_map_to_gradients.wgsl"))
+            .with_bind_group(0, gradient_layout, gradient_bind_group)
+            .with_constants(gradient_constants)
             .build()?;
 
         let combined_pipeline = ComputePipelineChainBuilder::new()
@@ -290,7 +398,11 @@ impl DepthToPclAndHeightPipeline {
             ))
             .add_stage(PipelineStage::new(
                 outlier_filter_pipeline,
-                (workgroup_size_stage2.0, workgroup_size_stage2.1, 1), // these workgroups will be replaced at runtime
+                (workgroup_size_stage2.0, workgroup_size_stage2.1, 1),
+            ))
+            .add_stage(PipelineStage::new(
+                gradient_pipeline,
+                (workgroup_size_stage2.0, workgroup_size_stage2.1, 1),
             ))
             .build()?;
 
@@ -304,13 +416,14 @@ impl DepthToPclAndHeightPipeline {
             depth_scale_buffer,
             map_layout,
             _output_filtered_height_map_buffer: filtered_height_map_buffer,
-            output_outlier_filtered_height_map_buffer: outlier_filtered_height_map_buffer,
+            _output_outlier_filtered_height_map_buffer: outlier_filtered_height_map_buffer,
+            output_gradient_map_buffer: gradient_map_buffer,
             workgroup_size_stage1: (workgroup_size_stage1.0, workgroup_size_stage1.1, 1),
             workgroup_size_stage2: (workgroup_size_stage2.0, workgroup_size_stage2.1, 1),
         })
     }
 
-    /// returns (point_cloud, height_map)
+    /// returns (point_cloud, gradient_map)
     pub fn process(
         &mut self,
         depths: &[u16],
@@ -349,12 +462,18 @@ impl DepthToPclAndHeightPipeline {
                 / 8,
             1,
         );
-        let workgroups = vec![workgroups_pcl, workgroups_filter, workgroups_outlier_filter];
+        let workgroups_gradient = workgroups_filter;
+
+        let workgroups = vec![
+            workgroups_pcl,
+            workgroups_filter,
+            workgroups_outlier_filter,
+            workgroups_gradient,
+        ];
+
         self.pipeline.execute_blocking(device, workgroups)?;
         let pcl_data: Vec<AlignedVec4<f32>> = self.output_pcl_buffer.read_data_blocking(device)?;
-        let heightmap_data: Vec<f32> = self
-            .output_outlier_filtered_height_map_buffer
-            .read_data_blocking(device)?;
+        let gradient_data: Vec<f32> = self.output_gradient_map_buffer.read_data_blocking(device)?;
 
         Ok((
             pcl_data
@@ -367,8 +486,15 @@ impl DepthToPclAndHeightPipeline {
                     }
                 })
                 .collect(),
-            heightmap_data,
+            gradient_data,
         ))
+    }
+
+    pub fn get_height_map(&self, device: &GpuDevice) -> anyhow::Result<Vec<f32>> {
+        let height_map_data: Vec<f32> = self
+            ._output_outlier_filtered_height_map_buffer
+            .read_data_blocking(device)?;
+        Ok(height_map_data)
     }
 }
 
@@ -402,11 +528,13 @@ impl BenchmarkableComputePipeline for DepthToPclAndHeightPipeline {
             (workgroup_size.0, workgroup_size.1), // stage1 workgroup
             (8, 8),                               // stage2 workgroup (fixed for now)
             map_layout::MapLayout::new(10.0, -10.0, 10.0, -10.0, 0.05), // map layout
-            9,                                    // sigma_spatial
-            0.3,                                  // sigma_range
-            9,                                    // kernel_radius
-            2,
-            2.0, // outlier_filter_kernel_radius
+            BlurFilterOptions::Gaussian(GaussianOptions {
+                kernel_radius: 9,
+                sigma: 3.0,
+            }),
+            2,   // outlier_filter_kernel_radius
+            2.0, // outlier_filter_std_dev_threshold
+            1,   // gradient_kernel_radius
             2.0, // min_depth
         )?)
     }

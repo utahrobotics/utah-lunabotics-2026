@@ -3,6 +3,9 @@ use cu29::cutask::Freezable;
 use cu29::prelude::*;
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use std::sync::{Arc, Mutex};
+use wgsl_pcl::pipelines::depth_to_pcl_and_height::{
+    BilateralOptions, BlurFilterOptions, GaussianOptions,
+};
 
 use iceoryx_types::{IceoryxDepthFrame, ImuMsg};
 use rerun::Points3D;
@@ -140,9 +143,26 @@ impl CuTask for OccupancyGridTask {
             .and_then(|c| c.get::<f64>("outlier_filter_std_dev_threshold"))
             .unwrap_or(2.0) as f32;
 
+        let gradient_filter_kernel_radius = config
+            .and_then(|c| c.get::<u64>("gradient_filter_kernel_radius"))
+            .unwrap_or(2) as u32;
+
+        let gaussian_blur_kernel_radius = config
+            .and_then(|c| c.get::<u64>("gaussian_blur_kernel_radius"))
+            .unwrap_or(5) as u32;
+
         let min_depth = config
             .and_then(|c| c.get::<f64>("min_depth"))
             .unwrap_or(0.3) as f32;
+
+        let max_depth = config
+            .and_then(|c| c.get::<f64>("max_depth"))
+            .unwrap_or(3.0) as f32;
+
+        // use bilateral by default, fall back on gaussian
+        let use_bilateral = config
+            .and_then(|c| c.get::<bool>("use_bilateral_filter"))
+            .unwrap_or(true);
 
         let camera_node = ROBOT_STATE
             .get()
@@ -160,9 +180,22 @@ impl CuTask for OccupancyGridTask {
             .clone();
         let layout = MapLayout::new(max_x, min_x, max_y, min_y, cell_size);
 
+        let blur_filter_options = if use_bilateral {
+            BlurFilterOptions::Bilateral(BilateralOptions {
+                kernel_radius: bilateral_filter_kernel_radius,
+                sigma_spatial: bilateral_filter_sigma_spatial,
+                sigma_range: bilateral_filter_sigma_range,
+            })
+        } else {
+            BlurFilterOptions::Gaussian(GaussianOptions {
+                kernel_radius: gaussian_blur_kernel_radius,
+                sigma: bilateral_filter_sigma_spatial as f32,
+            })
+        };
+
         let pipeline = Arc::new(Mutex::new(
             DepthToPclAndHeightPipeline::new(
-                3.0,
+                max_depth,
                 (DEPTH_FRAME_WIDTH as u32, DEPTH_FRAME_HEIGHT as u32),
                 focal_length_px,
                 (ppx, ppy),
@@ -170,11 +203,10 @@ impl CuTask for OccupancyGridTask {
                 (8, 8),
                 (16, 16),
                 layout,
-                bilateral_filter_sigma_spatial,
-                bilateral_filter_sigma_range,
-                bilateral_filter_kernel_radius,
+                blur_filter_options,
                 outlier_filter_kernel_radius,
                 outlier_filter_std_dev_threshold,
+                gradient_filter_kernel_radius,
                 min_depth,
             )
             .map_err(|e| {
@@ -319,7 +351,6 @@ impl CuTask for OccupancyGridTask {
                                 }
                             }
                         }
-
                         let _ = logger.recorder.log(
                             "realsense/height_map",
                             &Points3D::new(heightmap_points).with_colors(heightmap_colors),
