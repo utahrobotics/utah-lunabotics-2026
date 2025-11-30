@@ -58,6 +58,9 @@ clear-simlogs:
 clear-logs:
 	rm lunabot-cu/logs/*
 
+clear-iceoryx2:
+	rm -r /tmp/iceoryx2; rm -r /dev/shm/iox2_*; rm -rf /dev/shm/*iceoryx*
+
 validate-config:
 	cargo run --release -p copperconfig-validator -- -c lunabot-cu/copperconfig.ron
 

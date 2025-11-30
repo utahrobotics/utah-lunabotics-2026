@@ -1,4 +1,4 @@
-use crate::ROOT_NODE;
+use crate::ROBOT_STATE;
 use crate::rerun_viz::{Level, RECORDER};
 use cu29::cutask::CuMsg;
 use cu29::{
@@ -59,9 +59,10 @@ impl CuSrcTask for PointCloudIceoryxReceiver {
             node,
             service: None,
             subscriber: None,
-            l2_node: ROOT_NODE
+            l2_node: ROBOT_STATE
                 .get()
                 .unwrap()
+                .kinematic_root
                 .get_node_with_name("l2_front")
                 .unwrap()
                 .clone(),
@@ -155,9 +156,10 @@ impl CuSrcTask for PointCloudIceoryxReceiver {
 
     fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
         Ok(Self {
-            l2_node: ROOT_NODE
+            l2_node: ROBOT_STATE
                 .get()
                 .unwrap()
+                .kinematic_root
                 .get_node_with_name("l2_front")
                 .unwrap()
                 .clone(),

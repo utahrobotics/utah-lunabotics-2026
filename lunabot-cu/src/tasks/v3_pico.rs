@@ -316,7 +316,9 @@ mod prod_impl {
 
     /// install this binary from misc/usb-reset
     fn powercycle_ioctl() -> Result<(), std::io::Error> {
-        let _ = std::process::Command::new("usb-reset").spawn()?;
+        let _ = std::process::Command::new("usb-reset")
+            .arg("v3pico")
+            .spawn()?;
         std::thread::sleep(Duration::from_secs_f32(0.02));
         Ok(())
     }

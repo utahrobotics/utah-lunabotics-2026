@@ -1273,6 +1273,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "csv"
+version = "1.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "acdc4883a9c96732e4733212c01447ebd805833b7275a73ca3ee080fd77afdaf"
+dependencies = [
+ "csv-core",
+ "itoa",
+ "ryu",
+ "serde",
+]
+
+[[package]]
+name = "csv-core"
+version = "0.1.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d02f3b0da4c6504f86e9cd789d8dbafab48c2321be74e9987593de5a894d93d"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "ctrlc"
 version = "3.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3275,6 +3296,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "kalman_filter"
+version = "0.1.0"
+dependencies = [
+ "csv",
+ "nalgebra",
+ "serde",
+]
+
+[[package]]
 name = "khronos-egl"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3416,6 +3446,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "libusb1-sys"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "da050ade7ac4ff1ba5379af847a10a10a8e284181e060105bf8d86960ce9ce0f"
+dependencies = [
+ "cc",
+ "libc",
+ "pkg-config",
+ "vcpkg",
+]
+
+[[package]]
 name = "linked-hash-map"
 version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3533,6 +3575,7 @@ dependencies = [
  "gstreamer-app",
  "iceoryx-types",
  "iceoryx2",
+ "kalman_filter",
  "launcher",
  "mio",
  "mujoco-rs",
@@ -5479,6 +5522,7 @@ dependencies = [
  "parking_lot",
  "realsense-rust",
  "serde",
+ "t265-rs",
 ]
 
 [[package]]
@@ -5662,6 +5706,16 @@ dependencies = [
  "serde",
  "serde_derive",
  "unicode-ident",
+]
+
+[[package]]
+name = "rusb"
+version = "0.9.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ab9f9ff05b63a786553a4c02943b74b34a988448671001e9a27e2f0565cc05a4"
+dependencies = [
+ "libc",
+ "libusb1-sys",
 ]
 
 [[package]]
@@ -6230,6 +6284,17 @@ dependencies = [
  "pkg-config",
  "toml 0.9.8",
  "version-compare",
+]
+
+[[package]]
+name = "t265-rs"
+version = "0.1.0"
+source = "git+https://github.com/utahrobotics/t265-rs.git#ba7a9cc51fcf19179da9c6c6e25d6d001e5b851b"
+dependencies = [
+ "bytemuck",
+ "rusb",
+ "sha1",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -6912,6 +6977,12 @@ dependencies = [
  "serde",
  "wasm-bindgen",
 ]
+
+[[package]]
+name = "vcpkg"
+version = "0.2.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
 
 [[package]]
 name = "venial"

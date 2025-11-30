@@ -12,16 +12,19 @@ pub mod utils;
 
 use cu29::prelude::*;
 use cu29_helpers::basic_copper_setup;
+use kalman_filter::{SimpleSquareMatrix, SimpleVector};
 use launcher::ProcessCommand;
 use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock, RwLock};
 use std::thread::sleep;
 use std::time::Duration;
 
+use utils::RobotState;
+
 const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 
-pub static ROOT_NODE: OnceLock<StaticNode> = OnceLock::new();
+pub static ROBOT_STATE: OnceLock<RobotState> = OnceLock::new();
 
 #[copper_runtime(config = "copperconfig.ron")]
 struct LunabotApplication {}
@@ -44,7 +47,7 @@ fn main() {
 
     // rerun_viz::init_rerun(rerun_viz::RerunViz::Grpc(
     //     rerun_viz::Level::All,
-    //     "192.168.0.108".to_string(),
+    //     "127.0.0.1".to_string(),
     // ))
     // .expect("Failed to initialize rerun viz.");
     rerun_viz::init_rerun(rerun_viz::RerunViz::Viz(rerun_viz::Level::All))
@@ -58,7 +61,13 @@ fn main() {
     .expect("Failed to parse robot chain");
 
     let robot_chain = ChainBuilder::from(robot_chain).finish_static();
-    let _ = ROOT_NODE.set(robot_chain);
+    let _ = ROBOT_STATE.set(RobotState {
+        kinematic_root: robot_chain,
+        kalman_state: Arc::new(RwLock::new(SimpleVector::<15>::from_element(0.0))),
+        kalman_variances: Arc::new(RwLock::new(
+            SimpleSquareMatrix::<15>::from_diagonal_element(1E64),
+        )),
+    });
 
     let mut application = LunabotApplicationBuilder::new()
         .with_context(&copper_ctx)

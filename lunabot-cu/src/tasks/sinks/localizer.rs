@@ -1,34 +1,36 @@
-use std::collections::HashMap;
+use std::f64::consts::PI;
 
+use crate::rerun_viz;
+use crate::rerun_viz::RECORDER;
+use crate::tasks::AprilTagMeasurement;
+use crate::tasks::IcpMeasurement;
+use crate::tasks::ImuMeasurement;
+use crate::utils::RobotState;
 use cu_spatial_payloads::EncodableIsometry;
 use cu29::{
     CuError,
-    clock::Instant,
+    clock::{CuTime, Instant},
     cutask::{CuMsg, CuSinkTask, Freezable},
     input_msg,
 };
 use embedded_common::FromPicoV3;
-use iceoryx_types::{ImuMsg, PoseMsg};
 
-use nalgebra::{Isometry3, UnitQuaternion, UnitVector3, Vector3};
-use rerun::{Arrows3D, Quaternion, Transform3D};
-use simple_motion::StaticNode;
+use nalgebra::SMatrixViewMut;
+use nalgebra::{Isometry3, Vector3};
 
-use crate::{
-    ROOT_NODE,
-    rerun_viz::{self, RECORDER},
-    utils::{lerp, lerp_value, swing_twist_decomposition},
-};
+use crate::ROBOT_STATE;
 
-const ACCELEROMETER_LERP_SPEED: f64 = 150.0;
-const LOCALIZATION_DELTA: f64 = 1.0 / 60.0;
+use kalman_filter::*;
+
+/// Represents the variance assigned to values that are completely unknown. Should be extremely large.
+const UNKNOWN_PRIOR_VARIANCE: f64 = 1e64;
 
 pub struct Localizer {
-    root_node: StaticNode,
+    robot_state: RobotState,
     last_rerun_log: Instant,
-    kiss_icp_correction: Option<Isometry3<f64>>,
-    last_icp_reading: Option<(Isometry3<f64>, u64)>,
-    last_imu_orientation: Option<(OrientationComponents, u64)>,
+    /// Stores all information of kalman filter, including past values, and update logic.
+    kalman_filter: KalmanFilter<15>,
+    most_recent_update: CuTime,
 }
 
 impl Freezable for Localizer {}
@@ -36,24 +38,29 @@ impl Freezable for Localizer {}
 impl CuSinkTask for Localizer {
     // IMU from l2, apriltag detections
     type Input<'m> = input_msg!('m,
-        ImuMsg, // l2 imu
-        EncodableIsometry, // l2 kiss icp
-        PoseMsg,
+        ImuMeasurement, // l2 imu
+        IcpMeasurement, // l2 kiss icp
         FromPicoV3,
-        Box<HashMap<String, EncodableIsometry>> // apriltag detections
+        Vec<AprilTagMeasurement>, // apriltag detections
+        EncodableIsometry // reading from the t265, estimation of the robots isometry
     );
 
     fn new(_config: Option<&cu29::prelude::ComponentConfig>) -> cu29::CuResult<Self>
     where
         Self: Sized,
     {
-        if let Some(root_node) = ROOT_NODE.get() {
+        let kalman_filter = KalmanFilter::new(
+            SimpleVector::from_element(0.0),
+            SimpleSquareMatrix::from_diagonal_element(100.0),
+            Self::evolution_function,
+        );
+
+        if let Some(robot_state) = ROBOT_STATE.get() {
             return Ok(Self {
-                root_node: root_node.clone(),
+                robot_state: robot_state.clone(),
                 last_rerun_log: Instant::now(),
-                kiss_icp_correction: None,
-                last_icp_reading: None,
-                last_imu_orientation: None,
+                kalman_filter,
+                most_recent_update: CuTime::default(),
             });
         } else {
             return Err(CuError::new_with_cause(
@@ -63,334 +70,382 @@ impl CuSinkTask for Localizer {
         }
     }
 
+    fn start(&mut self, _clock: &cu29::prelude::RobotClock) -> cu29::CuResult<()> {
+        if let Some(logger) = RECORDER.get() {
+            let _ = logger.recorder.log_static(
+                format!("t265/xyz"),
+                &rerun::Arrows3D::from_vectors([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+                    .with_colors([[255, 0, 0], [0, 255, 0], [0, 0, 255]])
+                    .with_labels(vec!["x", "y", "z"]),
+            );
+        }
+
+        Ok(())
+    }
+
     fn process<'i>(
         &mut self,
         clock: &cu29::prelude::RobotClock,
         input: &Self::Input<'i>,
     ) -> cu29::CuResult<()> {
-        if let Some(pose) = input.2.payload() {
-            RECORDER
-                .get()
-                .unwrap()
-                .recorder
-                .log(
-                    "t265",
-                    &Arrows3D::from_vectors(vec![
-                        [1.0, 0.0, 0.0],
-                        [0.0, 1.0, 0.0],
-                        [0.0, 0.0, 1.0],
-                    ])
-                    .with_colors([[255, 0, 0], [0, 255, 0], [0, 0, 255]])
-                    .with_labels(vec!["x", "y", "z"]),
-                )
-                .unwrap();
-            RECORDER
-                .get()
-                .unwrap()
-                .recorder
-                .log(
-                    "t265",
-                    &Transform3D::from_translation_rotation(
-                        pose.position,
-                        Quaternion::from_xyzw(pose.quaternion),
-                    ),
-                )
-                .unwrap();
-        }
-        let imu_components = if let Some(imu_raw) = input.0.payload() {
-            let acceleration = Vector3::new(
-                imu_raw.linear_acceleration[0] as f64,
-                imu_raw.linear_acceleration[1] as f64,
-                imu_raw.linear_acceleration[2] as f64,
-            );
-            let iso = self.compute_imu_swing_twist(acceleration);
-            self.last_imu_orientation = iso.clone().map(|iso| (iso, clock.now().as_nanos()));
-            iso
-        } else {
-            None
-        };
-
-        let apriltag_components = if let Some(estimated_camera_isometries) = input.4.payload() {
-            self.compute_apriltag_swing_twist(estimated_camera_isometries)
-        } else {
-            None
-        };
-
-        let fused_isometry = self.fuse_sensor_data(&imu_components, &apriltag_components);
-        // if icp and apriltag readings are within 1 ms then calculate the icp correction
-        if let Some(fused_isometry) = fused_isometry
-            && apriltag_components.is_some()
-            && let Some(icp) = self.last_icp_reading
-            && (clock.now().as_nanos() - icp.1) < 50_000_000
+        if let Some(pose_msg) = input.4.payload()
+            && let Some(logger) = RECORDER.get()
+            && let Some(pose_msg) = pose_msg.to_na()
         {
-            let correction = Self::transformation_between(icp.0, fused_isometry);
-            if let Some(rec) = RECORDER.get() {
-                rec.recorder
-                    .log(
-                        "kiss_icp",
-                        &rerun::Transform3D::from_translation_rotation(
-                            correction.translation.vector.cast::<f32>().data.0[0],
-                            rerun::Quaternion::from_xyzw(
-                                correction.rotation.as_vector().cast::<f32>().data.0[0],
-                            ),
-                        ),
-                    )
-                    .unwrap();
-            }
-            self.kiss_icp_correction = Some(correction);
-        }
+            // FIXME: remove this set isometry once kalman filter is fully tested and done
 
-        // compute final isometry, take swing from imu always (if last reading is < 1ms ago) and twist from corrected icp, as well as translation from corrected icp.
-        let final_isometry = if let Some(kiss_icp) = input.1.payload() {
-            let kiss_icp_iso: Isometry3<f64> = kiss_icp.to_na().unwrap_or(Isometry3::identity());
-            self.last_icp_reading = Some((kiss_icp_iso, clock.now().as_nanos()));
-
-            let corrected_icp = if let Some(correction) = self.kiss_icp_correction {
-                correction * kiss_icp_iso
-            } else {
-                kiss_icp_iso
-            };
-
-            if let Some((imu_components, imu_time)) = &self.last_imu_orientation {
-                if clock.now().as_nanos() - imu_time < 50_000_000 {
-                    let down_axis = -Vector3::z_axis();
-                    let (_icp_swing, icp_twist) =
-                        swing_twist_decomposition(&corrected_icp.rotation, &down_axis);
-                    let combined_rotation = imu_components.swing * icp_twist;
-
-                    Some(Isometry3::from_parts(
-                        corrected_icp.translation,
-                        combined_rotation,
-                    ))
-                } else {
-                    Some(corrected_icp)
-                }
-            } else {
-                Some(corrected_icp)
-            }
-        } else {
-            fused_isometry
-        };
-
-        if let Some(iso) = final_isometry {
-            self.root_node.set_isometry(iso);
-        }
-
-        if self.last_rerun_log.elapsed().as_nanos() > 16_666_667 {
-            let isometry = self.root_node.get_global_isometry();
-
-            self.last_rerun_log = Instant::now();
-            if let Some(recorder) = rerun_viz::RECORDER.get() {
-                if let Err(e) = recorder.recorder.log(
-                    rerun_viz::ROBOT_STRUCTURE,
-                    &rerun::Transform3D::from_translation_rotation(
-                        isometry.translation.vector.cast::<f32>().data.0[0],
-                        rerun::Quaternion::from_xyzw(
-                            isometry.rotation.as_vector().cast::<f32>().data.0[0],
-                        ),
+            if let Err(e) = logger.recorder.log(
+                rerun_viz::ROBOT_STRUCTURE,
+                &rerun::Transform3D::from_translation_rotation(
+                    pose_msg.translation.vector.cast::<f32>().data.0[0],
+                    rerun::Quaternion::from_xyzw(
+                        pose_msg.rotation.as_vector().cast::<f32>().data.0[0],
                     ),
-                ) {
-                    return Err(CuError::new_with_cause(
-                        &format!("Failed to log robot transform: {e}"),
-                        std::io::Error::new(std::io::ErrorKind::Other, "Rerun logging failed"),
-                    ));
-                }
-                let isometry = self
-                    .root_node
-                    .get_node_with_name("l2_front")
-                    .unwrap()
-                    .get_global_isometry();
-                recorder
-                    .recorder
-                    .log_static(
-                        "l2_node",
-                        &rerun::Arrows3D::from_vectors([
-                            [0.2, 0.0, 0.0],
-                            [0.0, 0.2, 0.0],
-                            [0.0, 0.0, 0.2],
-                        ])
-                        .with_colors([[255, 0, 0], [0, 255, 0], [0, 0, 255]])
-                        .with_labels(vec!["x", "y", "z"]),
-                    )
-                    .unwrap();
-                recorder
-                    .recorder
-                    .log(
-                        "l2_node",
-                        &rerun::Transform3D::from_translation_rotation(
-                            isometry.translation.vector.cast::<f32>().data.0[0],
-                            rerun::Quaternion::from_xyzw(
-                                isometry.rotation.as_vector().cast::<f32>().data.0[0],
-                            ),
-                        ),
-                    )
-                    .unwrap();
+                ),
+            ) {
+                return Err(CuError::new_with_cause(
+                    &format!("Failed to log robot transform: {e}"),
+                    std::io::Error::new(std::io::ErrorKind::Other, "Rerun logging failed"),
+                ));
+            };
+            ROBOT_STATE
+                .get()
+                .unwrap()
+                .kinematic_root
+                .set_isometry(pose_msg);
+        }
+        // FIXME: remove this early return once kalman filter is fully tested and done
+        return Ok(());
+
+        if let Some(imu_measurement) = input.0.payload()
+            && let Some(logger) = RECORDER.get()
+        {
+            let _ = logger.recorder.log(
+                "imu_corercted",
+                &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(
+                    imu_measurement.acceleration[0] as f32,
+                    imu_measurement.acceleration[1] as f32,
+                    imu_measurement.acceleration[2] as f32,
+                )]),
+            );
+            //self.root_node.set_isometry(pose_msg);
+        }
+
+        // Step filter forward in time
+        let dt: f64 = ((clock.now() - self.most_recent_update).as_nanos() as f64) / 1e9;
+        self.most_recent_update = clock.now();
+        self.kalman_filter.step_time(dt);
+
+        // Apply all data
+        if let Some(imu_measurement) = input.0.payload() {
+            // Assemble measurement
+            let mut state: SimpleVector<15> = SimpleVector::zeros();
+            state
+                .fixed_rows_mut::<3>(6)
+                .copy_from_slice(&imu_measurement.acceleration);
+            state
+                .fixed_rows_mut::<3>(9)
+                .copy_from_slice(&imu_measurement.orientation);
+            state
+                .fixed_rows_mut::<3>(12)
+                .copy_from_slice(&imu_measurement.angular_velocity);
+
+            let mut covariance_matrix: SimpleSquareMatrix<15> =
+                SimpleSquareMatrix::from_diagonal_element(UNKNOWN_PRIOR_VARIANCE);
+            let measurement_matrix = array_to_matrix_9x9(&imu_measurement.variance);
+
+            covariance_matrix
+                .view_mut((6, 6), (9, 9))
+                .copy_from(&measurement_matrix.view((0, 0), (9, 9)));
+
+            self.kalman_filter
+                .apply_measurement(&state, &covariance_matrix);
+        }
+
+        if let Some(icp_measurement) = input.1.payload() {
+            // Assemble measurement
+            let mut state: SimpleVector<15> = SimpleVector::zeros();
+            state
+                .fixed_rows_mut::<3>(0)
+                .copy_from_slice(&icp_measurement.position);
+            state
+                .fixed_rows_mut::<3>(9)
+                .copy_from_slice(&icp_measurement.orientation);
+
+            let mut covariance_matrix: SimpleSquareMatrix<15> =
+                SimpleSquareMatrix::from_diagonal_element(UNKNOWN_PRIOR_VARIANCE);
+            let measurement_matrix = array_to_matrix_6x6(&icp_measurement.variance);
+
+            covariance_matrix
+                .view_mut((0, 0), (3, 3))
+                .copy_from(&measurement_matrix.view((0, 0), (3, 3)));
+            covariance_matrix
+                .view_mut((0, 9), (3, 3))
+                .copy_from(&measurement_matrix.view((0, 3), (3, 3)));
+            covariance_matrix
+                .view_mut((9, 0), (3, 3))
+                .copy_from(&measurement_matrix.view((3, 0), (3, 3)));
+            covariance_matrix
+                .view_mut((9, 9), (3, 3))
+                .copy_from(&measurement_matrix.view((3, 3), (3, 3)));
+
+            self.kalman_filter
+                .apply_measurement(&state, &covariance_matrix);
+        }
+
+        if let Some(tags) = input.3.payload() {
+            for tag in tags {
+                let estimated_isometry_of_observer =
+                    tag.estimated_isometry
+                        .to_na()
+                        .ok_or(CuError::new_with_cause(
+                            "Invalid Isometry",
+                            std::io::Error::other("Invalid encoded isometry"),
+                        ))?;
+                let mut state: SimpleVector<15> = SimpleVector::zeros();
+                state
+                    .fixed_rows_mut::<3>(0)
+                    .copy_from(&estimated_isometry_of_observer.translation.vector);
+                state
+                    .fixed_rows_mut::<3>(9)
+                    .copy_from(&estimated_isometry_of_observer.rotation.scaled_axis());
+
+                let mut covariance_matrix: SimpleSquareMatrix<15> =
+                    SimpleSquareMatrix::from_diagonal_element(UNKNOWN_PRIOR_VARIANCE);
+                let measurement_matrix = array_to_matrix_6x6(&tag.variance);
+
+                covariance_matrix
+                    .view_mut((0, 0), (3, 3))
+                    .copy_from(&measurement_matrix.view((0, 0), (3, 3)));
+                covariance_matrix
+                    .view_mut((0, 9), (3, 3))
+                    .copy_from(&measurement_matrix.view((0, 3), (3, 3)));
+                covariance_matrix
+                    .view_mut((9, 0), (3, 3))
+                    .copy_from(&measurement_matrix.view((3, 0), (3, 3)));
+                covariance_matrix
+                    .view_mut((9, 9), (3, 3))
+                    .copy_from(&measurement_matrix.view((3, 3), (3, 3)));
+
+                self.kalman_filter
+                    .apply_measurement(&state, &covariance_matrix);
             }
+        }
+
+        // Log and update chain at 60 Hz
+        if let Some(logger) = RECORDER.get()
+            && self.last_rerun_log.elapsed().as_millis() > 1000 / 60
+        {
+            self.last_rerun_log = Instant::now();
+
+            //   Push data to rest of robot
+            // Convert to isometry for the kinematics object
+            let current_state = self.kalman_filter.get_current_state();
+            let mut iso_vector = SimpleVector::<6>::from_element(0.0);
+            iso_vector[(0, 0)] = current_state[(0, 0)];
+            iso_vector[(1, 0)] = current_state[(1, 0)];
+            iso_vector[(2, 0)] = current_state[(2, 0)];
+            iso_vector[(3, 0)] = current_state[(9, 0)];
+            iso_vector[(4, 0)] = current_state[(10, 0)];
+            iso_vector[(5, 0)] = current_state[(11, 0)];
+            let current_iso = vec_to_iso(iso_vector);
+            self.robot_state.kinematic_root.set_isometry(current_iso);
+
+            {
+                let mut global_variance_lock = self.robot_state.kalman_variances.write();
+                let mut global_variance_view: SMatrixViewMut<f64, 15, 15> =
+                    global_variance_lock.as_mut().unwrap().as_view_mut();
+                global_variance_view.copy_from(&self.kalman_filter.get_current_covariance());
+            }
+
+            {
+                let mut global_state_lock = self.robot_state.kalman_state.write();
+                let mut global_state_view: SMatrixViewMut<f64, 15, 1> =
+                    global_state_lock.as_mut().unwrap().as_view_mut();
+                global_state_view.copy_from(&self.kalman_filter.get_current_state());
+            }
+
+            //   Log data to rerun
+            // Variance
+            let _ = logger.recorder.log(
+                "kalman_state/state",
+                &rerun::Tensor::new(self.kalman_filter.get_current_covariance().data.as_slice()),
+            );
+
+            // State
+            let _ = logger.recorder.log(
+                "kalman_state/position",
+                &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(
+                    current_state[0] as f32,
+                    current_state[1] as f32,
+                    current_state[2] as f32,
+                )]),
+            );
+            let _ = logger.recorder.log(
+                "kalman_state/velocity",
+                &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(
+                    current_state[3] as f32,
+                    current_state[4] as f32,
+                    current_state[5] as f32,
+                )]),
+            );
+            let _ = logger.recorder.log(
+                "kalman_state/acceleration",
+                &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(
+                    current_state[6] as f32,
+                    current_state[7] as f32,
+                    current_state[8] as f32,
+                )]),
+            );
+            let _ = logger.recorder.log(
+                "kalman_state/orientation",
+                &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(
+                    current_state[9] as f32,
+                    current_state[10] as f32,
+                    current_state[11] as f32,
+                )]),
+            );
+            let _ = logger.recorder.log(
+                "kalman_state/angular_velocity",
+                &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(
+                    current_state[12] as f32,
+                    current_state[13] as f32,
+                    current_state[14] as f32,
+                )]),
+            );
+
+            // Robot position
+            if let Err(e) = logger.recorder.log(
+                rerun_viz::ROBOT_STRUCTURE,
+                &rerun::Transform3D::from_translation_rotation(
+                    current_iso.translation.vector.cast::<f32>().data.0[0],
+                    rerun::Quaternion::from_xyzw(
+                        current_iso.rotation.as_vector().cast::<f32>().data.0[0],
+                    ),
+                ),
+            ) {
+                return Err(CuError::new_with_cause(
+                    &format!("Failed to log robot transform: {e}"),
+                    std::io::Error::new(std::io::ErrorKind::Other, "Rerun logging failed"),
+                ));
+            };
+            // TODO add proper logging and display for other state components
         }
 
         Ok(())
     }
 }
 
-#[derive(Debug, Clone)]
-struct OrientationComponents {
-    swing: UnitQuaternion<f64>,
-    twist: UnitQuaternion<f64>,
-    full_rotation: UnitQuaternion<f64>,
-    translation: Vector3<f64>,
+fn vec_to_iso(vec: SimpleVector<6>) -> Isometry3<f64> {
+    let translation: Vector3<f64> = Vector3::<f64>::new(vec.x, vec.y, vec.z);
+
+    let rotation: Vector3<f64> = Vector3::<f64>::new(vec.w, vec.a, vec.b);
+
+    Isometry3::<f64>::new(translation, rotation)
+}
+
+#[allow(unused)]
+fn iso_to_vec(iso: Isometry3<f64>) -> SimpleVector<6> {
+    let rotation_vector = iso.rotation.scaled_axis();
+    SimpleVector::<6>::new(
+        iso.translation.x,
+        iso.translation.y,
+        iso.translation.z,
+        rotation_vector.x,
+        rotation_vector.y,
+        rotation_vector.z,
+    )
+}
+
+fn array_to_matrix_9x9(array: &[f64; 81]) -> SimpleSquareMatrix<9> {
+    SimpleSquareMatrix::<9>::from_row_slice(array)
+}
+
+fn array_to_matrix_6x6(array: &[f64; 36]) -> SimpleSquareMatrix<6> {
+    SimpleSquareMatrix::<6>::from_row_slice(array)
 }
 
 impl Localizer {
-    /// Compute swing-twist components from IMU data
-    /// Returns swing (pitch/roll from gravity) and twist (unreliable yaw)
-    fn compute_imu_swing_twist(&self, acceleration: Vector3<f64>) -> Option<OrientationComponents> {
-        let mut isometry = self.root_node.get_global_isometry();
-        let down_axis = Vector3::z_axis();
+    /// The evolution function used by the kalman filter. Steps the
+    /// state and variance forward by a given timestep in seconds, and
+    /// returns the result. Does not use any external data.
+    ///
+    /// Predictions for state and variance use simple laws of motion.
+    fn evolution_function(
+        prev_state: SimpleVector<15>,
+        prev_variance: SimpleSquareMatrix<15>,
+        dt: f64,
+    ) -> (SimpleVector<15>, SimpleSquareMatrix<15>) {
+        // State:
+        let mut result_state: SimpleVector<15> = SimpleVector::from_element(0.0);
 
-        if acceleration.x.is_finite() && acceleration.y.is_finite() && acceleration.z.is_finite() {
-            let acceleration_world =
-                UnitVector3::new_normalize(isometry.transform_vector(&acceleration));
+        // Decompose prev state
+        let prev_position = prev_state.view((0, 0), (3, 1));
+        let prev_velocity = prev_state.view((3, 0), (3, 1));
+        let prev_acceleration = prev_state.view((6, 0), (3, 1));
+        let prev_orientation = prev_state.view((9, 0), (3, 1));
+        let prev_angular_velocity = prev_state.view((12, 0), (3, 1));
 
-            let angle = down_axis.angle(&acceleration_world)
-                * lerp_value(LOCALIZATION_DELTA, ACCELEROMETER_LERP_SPEED);
+        // Translational
+        result_state
+            .fixed_rows_mut::<3>(0)
+            .copy_from(&(prev_position + prev_velocity * dt + 0.5 * prev_acceleration * dt * dt));
 
-            if angle > 0.001 {
-                let cross = UnitVector3::new_normalize(down_axis.cross(&acceleration_world));
-                isometry.append_rotation_wrt_center_mut(&UnitQuaternion::from_axis_angle(
-                    &cross, -angle,
-                ));
-            }
+        result_state
+            .fixed_rows_mut::<3>(3)
+            .copy_from(&(prev_velocity + prev_acceleration * dt));
 
-            let (swing, twist) = swing_twist_decomposition(&isometry.rotation, &down_axis);
+        result_state
+            .fixed_rows_mut::<3>(6)
+            .copy_from(&prev_acceleration);
 
-            Some(OrientationComponents {
-                swing,
-                twist,
-                full_rotation: isometry.rotation,
-                translation: isometry.translation.vector,
-            })
-        } else {
-            None
+        // Angular
+        let mut temp_result_orientation = prev_orientation + prev_angular_velocity * dt;
+        if temp_result_orientation.magnitude_squared() > PI * PI {
+            temp_result_orientation -= temp_result_orientation.normalize() * -2.0 * PI;
         }
-    }
+        result_state
+            .fixed_rows_mut::<3>(9)
+            .copy_from(&temp_result_orientation);
 
-    /// Compute swing-twist components from AprilTag data
-    fn compute_apriltag_swing_twist(
-        &self,
-        camera_transforms: &Box<HashMap<String, EncodableIsometry>>,
-    ) -> Option<OrientationComponents> {
-        let mut isometry = Isometry3::identity();
-        let mut all_observer_isometries = Vec::new();
+        result_state
+            .fixed_rows_mut::<3>(12)
+            .copy_from(&prev_angular_velocity);
 
-        for (camera_id, transform) in camera_transforms.iter() {
-            if let Some(camera_node) = self.root_node.get_node_with_name(camera_id) {
-                let mut camera_isometry = camera_node.get_isometry_from_base();
-                camera_isometry.inverse_mut();
+        // Variances:
+        let mut result_variance = prev_variance;
 
-                let camera_observer_iso: Isometry3<f64> = transform.to_na()?;
-                let robot_frame_observer_iso = camera_observer_iso * camera_isometry;
+        // Formula: x = x + v*dt => o_x^2 = o_x^2 + o_v^2 * dt^2
+        // Translational
+        //   s_v += s_a * dt^2
+        let calculated_velocity_variance =
+            result_variance.view((3, 3), (3, 3)) + result_variance.view((6, 6), (3, 3)) * dt * dt;
+        result_variance
+            .view_mut((3, 3), (3, 3))
+            .copy_from(&calculated_velocity_variance);
+        //   s_x += s_v * dt^2
+        let calculated_position_variance =
+            result_variance.view((0, 0), (3, 3)) + result_variance.view((3, 3), (3, 3)) * dt * dt;
+        result_variance
+            .view_mut((0, 0), (3, 3))
+            .copy_from(&calculated_position_variance);
 
-                all_observer_isometries.push(robot_frame_observer_iso);
-            } else {
-                eprintln!("camera node: {} not found", camera_id);
-                return None;
-            }
-        }
+        // Angular
+        //   s_theta += s_o * dt^2
+        let calculated_orientation_variance =
+            result_variance.view((9, 9), (3, 3)) + result_variance.view((12, 12), (3, 3)) * dt * dt;
+        result_variance
+            .view_mut((9, 9), (3, 3))
+            .copy_from(&calculated_orientation_variance);
 
-        if !all_observer_isometries.is_empty() {
-            let combined_observer_iso = if all_observer_isometries.len() == 1 {
-                all_observer_isometries[0]
-            } else {
-                let mut sum_translation = Vector3::zeros();
-                for iso in &all_observer_isometries {
-                    sum_translation += iso.translation.vector;
-                }
-                let mean_translation = sum_translation / all_observer_isometries.len() as f64;
-
-                // TODO: make this an actual avg
-                let mean_rotation = all_observer_isometries[0].rotation;
-
-                Isometry3::from_parts(mean_translation.into(), mean_rotation)
-            };
-
-            let down_axis = Vector3::z_axis();
-
-            isometry.translation = combined_observer_iso.translation;
-
-            // Decompose the AprilTag rotation
-            let (swing, twist) =
-                swing_twist_decomposition(&combined_observer_iso.rotation, &down_axis);
-
-            Some(OrientationComponents {
-                swing,
-                twist,
-                full_rotation: combined_observer_iso.rotation,
-                translation: isometry.translation.vector,
-            })
-        } else {
-            None
-        }
-    }
-
-    /// Fuse IMU and AprilTag sensor data using swing-twist decomposition
-    /// Takes swing (pitch/roll) from IMU and twist (yaw) from AprilTags
-    fn fuse_sensor_data(
-        &mut self,
-        imu_components: &Option<OrientationComponents>,
-        apriltag_components: &Option<OrientationComponents>,
-    ) -> Option<Isometry3<f64>> {
-        match (imu_components, apriltag_components) {
-            (Some(imu), Some(apriltag)) => {
-                let fused_rotation = imu.swing * apriltag.twist;
-
-                if fused_rotation.w.is_finite()
-                    && fused_rotation.i.is_finite()
-                    && fused_rotation.j.is_finite()
-                    && fused_rotation.k.is_finite()
-                {
-                    let current_rotation = self.root_node.get_global_isometry().rotation;
-                    let dot_product = current_rotation.coords.dot(&fused_rotation.coords);
-
-                    let target_quat = if dot_product < 0.0 {
-                        UnitQuaternion::new_normalize(-fused_rotation.into_inner())
-                    } else {
-                        fused_rotation
-                    };
-
-                    let interpolated_rotation = UnitQuaternion::new_normalize(lerp(
-                        current_rotation.into_inner(),
-                        target_quat.into_inner(),
-                        LOCALIZATION_DELTA,
-                        ACCELEROMETER_LERP_SPEED,
-                    ));
-
-                    Some(Isometry3::from_parts(
-                        apriltag.translation.into(),
-                        interpolated_rotation,
-                    ))
-                } else {
-                    Some(Isometry3::from_parts(
-                        apriltag.translation.into(),
-                        apriltag.full_rotation,
-                    ))
-                }
-            }
-            (Some(imu), None) => Some(Isometry3::from_parts(
-                imu.translation.into(),
-                imu.full_rotation,
-            )),
-            (None, Some(apriltag)) => Some(Isometry3::from_parts(
-                apriltag.translation.into(),
-                apriltag.full_rotation,
-            )),
-            (None, None) => None,
-        }
+        (result_state, result_variance)
     }
 
     /// Returns the transformation needed to transform src to dst.
     /// Used to find the correction between where kiss_icp thinks the robot
     /// is relative to where the algorithm started mapping, to where the robot
     /// actually is in world coords
+    #[allow(unused)]
     fn transformation_between(relative: Isometry3<f64>, actual: Isometry3<f64>) -> Isometry3<f64> {
         actual * relative.inverse()
     }

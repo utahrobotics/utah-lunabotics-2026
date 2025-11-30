@@ -1,6 +1,8 @@
 use bincode::Encode;
 use cu29::cutask::Freezable;
 use cu29::prelude::*;
+use rayon::{ThreadPool, ThreadPoolBuilder};
+use std::sync::{Arc, Mutex};
 
 use iceoryx_types::{IceoryxDepthFrame, ImuMsg};
 use rerun::Points3D;
@@ -10,14 +12,24 @@ use wgsl_pcl::gpu_types::AlignedMatrix4;
 use wgsl_pcl::map_layout::MapLayout;
 use wgsl_pcl::wgsl_setup::{get_device, init_gpu_blocking, is_gpu_initialized};
 
-use crate::ROOT_NODE;
+use crate::ROBOT_STATE;
 use crate::rerun_viz::RECORDER;
 use crate::tasks::{DEPTH_FRAME_HEIGHT, DEPTH_FRAME_SIZE, DEPTH_FRAME_WIDTH};
 
+struct ProcessRequest {
+    depths: Vec<u16>,
+    depth_scale: f32,
+    transform: AlignedMatrix4<f32>,
+}
+
 pub struct OccupancyGridTask {
     camera_node: StaticNode,
-    depth_projector_pipeline: DepthToPclAndHeightPipeline,
+    depth_projector_pipeline: Arc<Mutex<DepthToPclAndHeightPipeline>>,
     layout: MapLayout,
+    output_buffer: Arc<Mutex<Option<OccupancyGrid>>>,
+    /// technically an atomic would be enough but I dont trust my knowledge of atomic ordering enough to dare use them
+    processing: Arc<Mutex<bool>>,
+    thread_pool: Arc<ThreadPool>,
 }
 
 #[derive(Serialize, Encode, bincode::Decode, Clone, Debug)]
@@ -121,14 +133,23 @@ impl CuTask for OccupancyGridTask {
         let bilateral_filter_sigma_range = config
             .and_then(|c| c.get::<f64>("bilateral_filter_sigma_range"))
             .unwrap_or(0.1) as f32;
+        let outlier_filter_kernel_radius = config
+            .and_then(|c| c.get::<u64>("outlier_filter_kernel_radius"))
+            .unwrap_or(2) as u32;
+        let outlier_filter_std_dev_threshold = config
+            .and_then(|c| c.get::<f64>("outlier_filter_std_dev_threshold"))
+            .unwrap_or(2.0) as f32;
 
         let min_depth = config
             .and_then(|c| c.get::<f64>("min_depth"))
             .unwrap_or(0.3) as f32;
 
-        let camera_node = ROOT_NODE
+        let camera_node = ROBOT_STATE
             .get()
-            .ok_or_else(|| CuError::from("RealSensePointCloudReceiver: ROOT_NODE not initialized"))?
+            .ok_or_else(|| {
+                CuError::from("RealSensePointCloudReceiver: ROBOT_STATE not initialized")
+            })?
+            .kinematic_root
             .get_node_with_name(&camera_name)
             .ok_or_else(|| {
                 CuError::from(format!(
@@ -138,10 +159,10 @@ impl CuTask for OccupancyGridTask {
             })?
             .clone();
         let layout = MapLayout::new(max_x, min_x, max_y, min_y, cell_size);
-        Ok(Self {
-            camera_node,
-            depth_projector_pipeline: DepthToPclAndHeightPipeline::new(
-                10.0, // max depth meters
+
+        let pipeline = Arc::new(Mutex::new(
+            DepthToPclAndHeightPipeline::new(
+                3.0,
                 (DEPTH_FRAME_WIDTH as u32, DEPTH_FRAME_HEIGHT as u32),
                 focal_length_px,
                 (ppx, ppy),
@@ -152,12 +173,29 @@ impl CuTask for OccupancyGridTask {
                 bilateral_filter_sigma_spatial,
                 bilateral_filter_sigma_range,
                 bilateral_filter_kernel_radius,
+                outlier_filter_kernel_radius,
+                outlier_filter_std_dev_threshold,
                 min_depth,
             )
             .map_err(|e| {
                 CuError::new_with_cause("failed to create depth to pcl and height pipeline", &e)
             })?,
+        ));
+
+        let thread_pool = Arc::new(
+            ThreadPoolBuilder::new()
+                .num_threads(1)
+                .build()
+                .map_err(|e| CuError::new_with_cause("failed to create thread pool", e))?,
+        );
+
+        Ok(Self {
+            camera_node,
+            depth_projector_pipeline: pipeline,
             layout,
+            output_buffer: Arc::new(Mutex::new(None)),
+            processing: Arc::new(Mutex::new(false)),
+            thread_pool,
         })
     }
 
@@ -167,95 +205,152 @@ impl CuTask for OccupancyGridTask {
         input: &Self::Input<'i>,
         output: &mut Self::Output<'o>,
     ) -> CuResult<()> {
+        let start = std::time::Instant::now();
+        // First, check if we have a result ready and grab it
+        {
+            let mut output_buf = self.output_buffer.lock().unwrap();
+            if let Some(grid) = output_buf.take() {
+                output.set_payload(grid);
+            } else {
+                output.clear_payload();
+            }
+        }
+        let duration = start.elapsed();
+        if duration.as_millis() > 3 {
+            eprintln!(
+                "OccupancyGridTask: output retrieval took {} ms",
+                duration.as_millis()
+            );
+        }
+
+        let start = std::time::Instant::now();
+        // are we currently processing?
+        let mut processing = self.processing.lock().unwrap();
+        if *processing {
+            return Ok(());
+        }
+
+        // Get input data
         let Some(input_msg) = input.payload() else {
-            output.clear_payload();
             return Ok(());
         };
 
         let Some(ref depth_frame) = input_msg.0 else {
-            output.clear_payload();
             return Ok(());
         };
 
-        // TODO: utilize imu messages from the realsense here for more accurate pitch information
+        // Mark as processing and spawn the work
+        *processing = true;
 
-        let depth_camera_transform: AlignedMatrix4<f32> = self
-            .camera_node
-            .get_global_isometry()
-            .to_homogeneous()
-            .cast::<f32>()
-            .into();
-        let (point_cloud, height_map) = self
-            .depth_projector_pipeline
-            .process(
-                &depth_frame.depths,
-                get_device(),
-                depth_camera_transform,
-                depth_frame.depth_scale,
-            )
-            .map_err(|e| CuError::new_with_cause("failed to process depth frame", &*e))?;
+        let request = ProcessRequest {
+            depths: depth_frame.depths.to_vec(),
+            depth_scale: depth_frame.depth_scale,
+            transform: self
+                .camera_node
+                .get_global_isometry()
+                .to_homogeneous()
+                .cast::<f32>()
+                .into(),
+        };
 
-        if let Some(logger) = RECORDER.get() {
-            let _ = logger
-                .recorder
-                .log(
-                    format!("realsense/pcl"),
-                    &Points3D::new(
-                        point_cloud
-                            .iter()
-                            .enumerate()
-                            .map(|(_i, p)| [p.x, p.y, p.z]),
-                    ),
-                )
-                .unwrap();
+        let pipeline = Arc::clone(&self.depth_projector_pipeline);
+        let output_buffer = Arc::clone(&self.output_buffer);
+        let processing_flag = Arc::clone(&self.processing);
+        let layout = self.layout.clone();
+
+        let duration = start.elapsed();
+        if duration.as_millis() > 3 {
+            eprintln!(
+                "OccupancyGridTask: pre-spawn processing took {} ms",
+                duration.as_millis()
+            );
         }
-        if let Some(logger) = RECORDER.get() {
-            let mut heightmap_points = Vec::new();
-            let mut heightmap_colors = Vec::new();
-            let map_layout = &self.depth_projector_pipeline.map_layout;
 
-            // Calculate grid dimensions
-            let width = map_layout.max_x - map_layout.min_x;
-            let height = map_layout.max_y - map_layout.min_y;
-            let cells_x = (width / map_layout.cell_size).ceil() as usize;
-            let cells_y = (height / map_layout.cell_size).ceil() as usize;
+        let start = std::time::Instant::now();
+        self.thread_pool.spawn_fifo(move || {
+            let result = {
+                let mut pipeline_guard = pipeline.lock().unwrap();
+                pipeline_guard.process(
+                    &request.depths,
+                    get_device(),
+                    request.transform,
+                    request.depth_scale,
+                )
+            };
 
-            // Convert height map to 3D points
-            for cell_y in 0..cells_y {
-                for cell_x in 0..cells_x {
-                    let idx = cell_x + cell_y * cells_x;
+            match result {
+                Ok((point_cloud, height_map)) => {
+                    if let Some(logger) = RECORDER.get() {
+                        let _ = logger.recorder.log(
+                            "realsense/pcl",
+                            &Points3D::new(point_cloud.iter().map(|p| [p.x, p.y, p.z])),
+                        );
 
-                    if idx < height_map.len() {
-                        let z = height_map[idx];
-                        if z == f32::MIN {
-                            continue;
+                        let mut heightmap_points = Vec::new();
+                        let mut heightmap_colors = Vec::new();
+
+                        let width = layout.max_x - layout.min_x;
+                        let height = layout.max_y - layout.min_y;
+                        let cells_x = (width / layout.cell_size).ceil() as usize;
+                        let cells_y = (height / layout.cell_size).ceil() as usize;
+
+                        for cell_y in 0..cells_y {
+                            for cell_x in 0..cells_x {
+                                let idx = cell_x + cell_y * cells_x;
+
+                                if idx < height_map.len() {
+                                    let z = height_map[idx];
+                                    if z == f32::MIN {
+                                        continue;
+                                    }
+
+                                    let x = layout.min_x + (cell_x as f32 + 0.5) * layout.cell_size;
+                                    let y = layout.min_y + (cell_y as f32 + 0.5) * layout.cell_size;
+
+                                    heightmap_points.push([x, y, z]);
+
+                                    let normalized = ((z + 1.0) / 4.0).clamp(0.0, 1.0);
+                                    let color = [
+                                        (normalized * 255.0) as u8,
+                                        50,
+                                        ((1.0 - normalized) * 255.0) as u8,
+                                    ];
+                                    heightmap_colors.push(color);
+                                }
+                            }
                         }
 
-                        // Calculate the center of this cell
-                        let x = map_layout.min_x + (cell_x as f32 + 0.5) * map_layout.cell_size;
-                        let y = map_layout.min_y + (cell_y as f32 + 0.5) * map_layout.cell_size;
-
-                        heightmap_points.push([x, y, z]);
-
-                        // Color by height (gradient from blue to red)
-                        let normalized_height = (z - -10.0) / (10.0 - -10.0);
-                        let color = [
-                            (normalized_height * 255.0) as u8,
-                            128,
-                            ((1.0 - normalized_height) * 255.0) as u8,
-                        ];
-                        heightmap_colors.push(color);
+                        let _ = logger.recorder.log(
+                            "realsense/height_map",
+                            &Points3D::new(heightmap_points).with_colors(heightmap_colors),
+                        );
                     }
+
+                    let grid = OccupancyGrid {
+                        max_x: layout.max_x,
+                        min_x: layout.min_x,
+                        max_y: layout.max_y,
+                        min_y: layout.min_y,
+                        cell_size: layout.cell_size,
+                        height_map,
+                    };
+
+                    let mut output_buf = output_buffer.lock().unwrap();
+                    *output_buf = Some(grid);
+                }
+                Err(e) => {
+                    eprintln!("GPU processing error: {:?}", e);
                 }
             }
-            println!("Logging height map with {} points", heightmap_points.len());
-            let _ = logger
-                .recorder
-                .log(
-                    format!("realsense/height_map"),
-                    &Points3D::new(heightmap_points).with_colors(heightmap_colors),
-                )
-                .unwrap();
+
+            *processing_flag.lock().unwrap() = false;
+        });
+        let duration = start.elapsed();
+        if duration.as_millis() > 3 {
+            eprintln!(
+                "OccupancyGridTask: spawn processing took {} ms",
+                duration.as_millis()
+            );
         }
 
         Ok(())

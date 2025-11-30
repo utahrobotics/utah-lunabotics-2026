@@ -8,7 +8,9 @@ use cu29::{
 };
 use embedded_common::{Actuator, ActuatorCommand};
 
-use crate::ROOT_NODE;
+use std::sync::mpsc::Receiver;
+
+use crate::ROBOT_STATE;
 use crate::tasks::OccupancyGrid;
 use crate::tasks::ai::action::LunabotAction;
 use crate::tasks::ai::behaviors::teleop::teleop_behavior;
@@ -143,9 +145,9 @@ impl CuTask for LunabotAi {
                 LunabotAction::IsInUnknownCell => todo!(),
                 LunabotAction::CalculatePath => Success,
                 LunabotAction::FollowPath => {
-                    if ROOT_NODE.get().is_none() {
+                    if ROBOT_STATE.get().is_none() {
                         eprintln!(
-                            "Cannot start follow path job because ROOT_NODE is not initialized"
+                            "Cannot start follow path job because ROBOT_STATE is not initialized"
                         );
                         Failure
                     } else if let Some(ref mut path_follower) = blackboard.path_follower {
@@ -161,7 +163,7 @@ impl CuTask for LunabotAi {
                     } else {
                         println!("Starting new follow path job");
                         let mut follower_job =
-                            follow_path_job(5.0, *ROOT_NODE.get().unwrap(), vec![]);
+                            follow_path_job(5.0, ROBOT_STATE.get().unwrap().kinematic_root, vec![]);
                         let job_initial_status = follower_job.get_status();
                         blackboard.path_follower = Some(follower_job);
                         println!(

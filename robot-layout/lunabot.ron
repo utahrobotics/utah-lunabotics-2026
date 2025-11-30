@@ -3,9 +3,16 @@
     "free_euler": [0.0, 0.0, 0.0], 
     "children": [
         {
+            "name": Some("T265_right"),
+            "origin": [0.0,0.0,0.0],
+            "euler": [180.0,0.0,90.0],
+
+        },
+        {
             "name": Some("l2_front"),
             "origin": [0.50, 0.0, 0.50],
-            "euler":  [0.0, 61., 175.0],
+            // "euler":  [0.0, 61., 175.0],
+            "euler": [0,0,0],
             // dont question my decision to add this field
             "euler_order": ["pitch","yaw","roll"]
         },
@@ -22,7 +29,7 @@
         {
             "name": Some("cam_laptop_front"),
             "origin": [0.2, 0.0, 0.0],
-            "euler": [0.0, 0.0, 180.0]
+            "euler": [0.0, 0.0, 0.0]
         },
         {
             "name": Some("cam_side"),

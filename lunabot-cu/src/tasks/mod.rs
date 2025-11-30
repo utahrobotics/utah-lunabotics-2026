@@ -8,7 +8,7 @@ pub mod sinks;
 pub mod sources;
 pub mod v3_pico;
 
-pub use april_detection_handler::AprilDetectionHandler;
+pub use april_detection_handler::*;
 pub use auto_gstreamer::*;
 pub use gst_to_image::GstToImage;
 pub use kiss_icp::*;

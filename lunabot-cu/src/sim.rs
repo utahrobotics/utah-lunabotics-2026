@@ -8,19 +8,23 @@ pub mod utils;
 
 use cu29::prelude::*;
 use cu29_helpers::basic_copper_setup;
+use kalman_filter::SimpleSquareMatrix;
+use kalman_filter::SimpleVector;
 use mujoco_rs::cpp_viewer::MjViewerCpp;
 use mujoco_rs::prelude::*;
 use nalgebra::{Isometry3, Quaternion, Translation3, UnitQuaternion};
 use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, OnceLock};
+use std::sync::Arc;
+use std::sync::{Mutex, OnceLock, RwLock};
+use utils::RobotState;
 use wgsl_pcl::wgsl_setup::{init_gpu_blocking, is_gpu_initialized};
 
 use crate::rerun_viz::{RECORDER, ROBOT_STRUCTURE};
 
 const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 
-pub static ROOT_NODE: OnceLock<StaticNode> = OnceLock::new();
+pub static ROBOT_STATE: OnceLock<RobotState> = OnceLock::new();
 
 pub static TARGET_HZ: usize = 1000; // MUST BE THE SAME AS THE TARGET HZ IN COPPERCONFIG.RON
 
@@ -71,15 +75,21 @@ fn sim_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::OccupancyGridPipeline(_) => SimOverride::ExecuteByRuntime,
         default::SimStep::Lunabase(_) => SimOverride::ExecuteByRuntime,
         default::SimStep::NewAi(_) => SimOverride::ExecuteByRuntime,
-
         default::SimStep::Localizer(CuTaskCallbackState::Process(_, _)) => {
             use std::sync::atomic::{AtomicU64, Ordering};
+            use std::time::SystemTime;
+
             static LAST_LOG_TIME: OnceLock<AtomicU64> = OnceLock::new();
-            let now = std::time::Instant::now();
-            let now_ns = now.elapsed().as_nanos() as u64;
-            let log_interval_ns = 1_000_000_000 / 60;
+
+            let now_ns = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos() as u64;
+
+            let log_interval_ns = 1_000_000_000 / 60; // log at 60 Hz
             let last_log_time = LAST_LOG_TIME.get_or_init(|| AtomicU64::new(0));
-            if let Some(node) = ROOT_NODE.get()
+
+            if let Some(state) = ROBOT_STATE.get()
                 && let Some(lunabot_body) = data.body("simplify_lunabot")
             {
                 let coords = lunabot_body.view(&data).xpos.to_vec();
@@ -94,12 +104,14 @@ fn sim_callback(step: default::SimStep) -> SimOverride {
                         quat[0], quat[2], quat[2], quat[3],
                     )),
                 );
-                node.set_isometry(isometry);
+                state.kinematic_root.set_isometry(isometry);
+
                 let last = last_log_time.load(Ordering::Relaxed);
                 if now_ns - last > log_interval_ns {
                     last_log_time.store(now_ns, Ordering::Relaxed);
+                    println!("logging robot pose");
                     if let Some(recorder) = RECORDER.get()
-                        && let Err(_e) = recorder.recorder.log(
+                        && let Err(e) = recorder.recorder.log(
                             rerun_viz::ROBOT_STRUCTURE,
                             &rerun::Transform3D::from_translation_rotation(
                                 isometry.translation.vector.cast::<f32>().data.0[0],
@@ -108,10 +120,12 @@ fn sim_callback(step: default::SimStep) -> SimOverride {
                                 ),
                             ),
                         )
-                    {}
+                    {
+                        eprintln!("Failed to log robot pose: {}", e);
+                    }
                 }
             }
-            SimOverride::ExecuteByRuntime
+            SimOverride::ExecutedBySim
         }
         default::SimStep::Localizer(..) => SimOverride::ExecutedBySim,
     }
@@ -159,7 +173,13 @@ fn main() {
             .expect("Failed to parse robot chain");
 
             let robot_chain = ChainBuilder::from(robot_chain).finish_static();
-            let _ = ROOT_NODE.set(robot_chain);
+            let _ = ROBOT_STATE.set(RobotState {
+                kinematic_root: robot_chain,
+                kalman_state: Arc::new(RwLock::new(SimpleVector::<15>::from_element(0.0))),
+                kalman_variances: Arc::new(RwLock::new(
+                    SimpleSquareMatrix::<15>::from_diagonal_element(1E64),
+                )),
+            });
 
             let mut application = LunabotApplicationBuilder::new()
                 .with_sim_callback(&mut sim_callback)

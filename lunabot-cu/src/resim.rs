@@ -11,15 +11,17 @@ use cu29::prelude::*;
 use cu29_export::copperlists_reader;
 use cu29_helpers::basic_copper_setup;
 use embedded_common::{ActuatorCommand, FromPicoV3};
+use kalman_filter::{SimpleSquareMatrix, SimpleVector};
 use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock, RwLock};
+use utils::RobotState;
 
 const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 
-pub static ROOT_NODE: OnceLock<StaticNode> = OnceLock::new();
+pub static ROBOT_STATE: OnceLock<RobotState> = OnceLock::new();
 
-pub static TARGET_HZ: usize = 100000; // MUST BE THE SAME AS THE TARGET HZ IN COPPERCONFIG.RON
+pub static TARGET_HZ: usize = 1000000; // MUST BE THE SAME AS THE TARGET HZ IN COPPERCONFIG.RON
 
 #[copper_runtime(config = "copperconfig.ron", sim_mode = true)]
 struct LunabotApplication {}
@@ -78,7 +80,6 @@ fn run_one_copperlist(
             default::SimStep::GstConvertBack(..) => SimOverride::ExecutedBySim,
             default::SimStep::GstConvertSide(..) => SimOverride::ExecutedBySim,
             default::SimStep::GstConvertLaptopFront(..) => SimOverride::ExecutedBySim,
-            default::SimStep::T265Subscriber(_) => SimOverride::ExecutedBySim,
 
             default::SimStep::L2Pointcloud(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_l_2_pointcloud_output().clone();
@@ -126,6 +127,11 @@ fn run_one_copperlist(
             }
             default::SimStep::RealsenseSubscriber(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_realsense_subscriber_output().clone();
+                output.tov = robot_clock.now().into();
+                SimOverride::ExecutedBySim
+            }
+            default::SimStep::T265Subscriber(CuTaskCallbackState::Process(_, output)) => {
+                *output = msgs.get_t_265_subscriber_output().clone();
                 output.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
@@ -188,7 +194,13 @@ fn main() {
             .expect("Failed to parse robot chain");
 
             let robot_chain = ChainBuilder::from(robot_chain).finish_static();
-            let _ = ROOT_NODE.set(robot_chain);
+            let _ = ROBOT_STATE.set(RobotState {
+                kinematic_root: robot_chain,
+                kalman_state: Arc::new(RwLock::new(SimpleVector::<15>::from_element(0.0))),
+                kalman_variances: Arc::new(RwLock::new(
+                    SimpleSquareMatrix::<15>::from_diagonal_element(1E64),
+                )),
+            });
 
             let mut application = LunabotApplicationBuilder::new()
                 .with_sim_callback(&mut default_callback)

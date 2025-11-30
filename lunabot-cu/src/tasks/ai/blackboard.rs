@@ -1,17 +1,28 @@
-use std::collections::VecDeque;
+use std::{
+    collections::VecDeque,
+    sync::{Arc, RwLock},
+};
 
 use common::{FromLunabase, LUNABOT_STAGE, LunabotStage, Steering};
 use embedded_common::ActuatorCommand;
+use kalman_filter::{SimpleSquareMatrix, SimpleVector};
 use simple_motion::StaticNode;
 
 use crate::{
-    ROOT_NODE,
+    ROBOT_STATE,
     tasks::{OccupancyGrid, ai::jobs::Job},
 };
 
 #[derive(Debug)]
 pub struct LunabotBlackboard {
-    pub root_node: StaticNode,
+    /// Keeps track of the position of all parts of the robot
+    pub kinematic_root: StaticNode,
+    /// Represents the robot's overall state (position, velocity, acceleration, orientation, angular velocity)
+    pub kalman_state: Arc<RwLock<SimpleVector<15>>>,
+    /// Stores the covariance matrix of the robot's overall state
+    pub kalman_variances: Arc<RwLock<SimpleSquareMatrix<15>>>,
+
+    /// TODO fill out this comment
     pub latest_obstacle_map: Option<OccupancyGrid>,
 
     /// stores the last lift actuator message received from lunabase
@@ -48,7 +59,23 @@ pub struct LunabotBlackboard {
 impl Default for LunabotBlackboard {
     fn default() -> Self {
         Self {
-            root_node: *ROOT_NODE.get().expect("ROOT_NODE not initialized"), // we should always have the root node, and if not then we might as well abort
+            kinematic_root: ROBOT_STATE
+                .get()
+                .expect("ROBOT_STATE not initialized")
+                .kinematic_root, // we should always have the root node, and if not then we might as well abort
+            kalman_state: Arc::clone(
+                &ROBOT_STATE
+                    .get()
+                    .expect("ROBOT_STATE not initialized")
+                    .kalman_state,
+            ),
+            kalman_variances: Arc::clone(
+                &ROBOT_STATE
+                    .get()
+                    .expect("ROBOT_STATE not initialized")
+                    .kalman_variances,
+            ),
+            // TODO transfer kalman filter state as well
             outgoing_actuator_msg_queue: VecDeque::new(),
             outgoing_steering_msg: Some(Steering::new(0.0, 0.0, 0.0)),
             // when the user clicks continue mission for the first time, we move to manual

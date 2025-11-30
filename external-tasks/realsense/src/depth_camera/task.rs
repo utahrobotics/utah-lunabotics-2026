@@ -1,4 +1,5 @@
 use std::{
+    process::Command,
     sync::mpsc::{Receiver, Sender},
     time::Duration,
 };
@@ -52,7 +53,6 @@ impl DepthCameraTask {
     /// reads in depth frames and publishes them on realsense/serial_num/depths
     fn start_stream(&mut self, mut pipeline: ActivePipeline) {
         let mut depth_format = None;
-        let mut has_pose = false;
         let mut has_depth = false;
 
         for stream in pipeline.profile().streams() {
@@ -60,11 +60,6 @@ impl DepthCameraTask {
                 Rs2Format::Z16 => {
                     has_depth = true;
                     true
-                }
-                Rs2Format::_6Dof => {
-                    println!("6dof format, will publish pose frames for {}", self.serial);
-                    has_pose = true;
-                    continue;
                 }
                 _format => {
                     continue;
@@ -113,25 +108,15 @@ impl DepthCameraTask {
             None
         };
         let imu_publisher = create_imu_frame_publisher(&node, self.serial);
-        // optional pose publisher (created only if we detected a 6DoF stream)
-        let mut pose_publisher: Option<Publisher<ipc::Service, PoseMsg, ()>> = None;
-        if has_pose {
-            pose_publisher = Some(create_pose_frame_publisher(&node, self.serial));
-        }
 
         if has_depth {
             if let Some(df) = depth_format {
                 println!("RealSense Camera {} opened with (fx, fy) = ({:.0}, {:.0}), (width, height) = ({:.0}, {:.0})",
                       self.serial, df.fx(), df.fy(), df.width(), df.height());
             }
-        } else if has_pose {
-            println!(
-                "RealSense Camera {} opened as pose-only (6DoF)",
-                self.serial
-            );
         } else {
             eprintln!(
-                "RealSense Camera {} opened with no depth or pose streams detected",
+                "RealSense Camera {} opened with no depth detected",
                 self.serial
             );
         }
@@ -145,7 +130,7 @@ impl DepthCameraTask {
                         self.serial
                     );
                     if matches!(e, FrameWaitError::DidTimeoutBeforeFrameArrival) {
-                        todo!(" do something here to reset the device")
+                        let _ = Command::new("usb-reset").arg("depth").spawn();
                         // device.hardware_reset();
                     }
                     break;
@@ -160,21 +145,6 @@ impl DepthCameraTask {
                     linear_acceleration: *accel,
                 }) {
                     eprintln!("Failed to publish imu msg: {e}");
-                }
-            }
-
-            // publish to realsense/<serial>/pose
-            for frame in frames.frames_of_type::<frame::PoseFrame>() {
-                let position = frame.translation();
-                let quaternion = frame.rotation();
-
-                if let Some(pub_ref) = &pose_publisher {
-                    if let Err(e) = pub_ref.send_copy(PoseMsg {
-                        position,
-                        quaternion,
-                    }) {
-                        eprintln!("Failed to publish pose msg: {e}");
-                    }
                 }
             }
 
