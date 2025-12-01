@@ -126,9 +126,9 @@ impl LunabotAction {
                         map,
                         [translation.x as f32, translation.y as f32],
                         PATHFINDING_GOAL,
-                        0.1,
-                        0.01,
-                        5000,
+                        0.3,
+                        map.cell_size,
+                        500,
                     ) && let Some(rec) = RECORDER.get()
                     {
                         let _ = rec.recorder.log(

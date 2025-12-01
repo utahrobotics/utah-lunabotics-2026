@@ -4,8 +4,8 @@ use cu29::prelude::*;
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use std::sync::{Arc, Mutex};
 use wgsl_pcl::pipelines::depth_to_pcl_and_height::{
-    BilateralOptions, BlurFilterOptions, GaussianOptions, ObstacleExpanderOptions,
-    OutlierFilterOptions,
+    BilateralOptions, BlurFilterOptions, ClearAffectedCellsOptions, GaussianOptions,
+    ObstacleExpanderOptions, OutlierFilterOptions,
 };
 
 use iceoryx_types::{IceoryxDepthFrame, ImuMsg};
@@ -281,10 +281,27 @@ impl CuTask for OccupancyGridTask {
             .and_then(|c| c.get::<f64>("robot_radius_meters"))
             .unwrap_or(0.3) as f32;
 
+        let obstacle_gradient_threshold = config
+            .and_then(|c| c.get::<f64>("obstacle_gradient_threshold"))
+            .unwrap_or(0.2) as f32;
+
         // use bilateral by default, fall back on gaussian
         let use_bilateral = config
             .and_then(|c| c.get::<bool>("use_bilateral_filter"))
             .unwrap_or(true);
+        let clear_affected_cells_enabled = config
+            .and_then(|c| c.get::<bool>("clear_affected_cells"))
+            .unwrap_or(true);
+        let min_distance_to_clear = config
+            .and_then(|c| c.get::<f64>("min_distance_to_clear"))
+            .unwrap_or(0.8) as f32;
+        let clear_affected_cells = if clear_affected_cells_enabled {
+            Some(ClearAffectedCellsOptions {
+                min_distance_to_clear: min_distance_to_clear,
+            })
+        } else {
+            None
+        };
 
         let camera_node = ROBOT_STATE
             .get()
@@ -317,7 +334,7 @@ impl CuTask for OccupancyGridTask {
 
         let obstacle_expander_options = ObstacleExpanderOptions {
             expansion_radius_meters: robot_radius_meters,
-            obstacle_gradient_threshold: 0.2,
+            obstacle_gradient_threshold: obstacle_gradient_threshold,
         };
         let outlier_filter_options = OutlierFilterOptions {
             kernel_radius: outlier_filter_kernel_radius,
@@ -339,6 +356,7 @@ impl CuTask for OccupancyGridTask {
                 obstacle_expander_options,
                 gradient_filter_kernel_radius,
                 min_depth,
+                clear_affected_cells,
             )
             .map_err(|e| {
                 CuError::new_with_cause("failed to create depth to pcl and height pipeline", &e)

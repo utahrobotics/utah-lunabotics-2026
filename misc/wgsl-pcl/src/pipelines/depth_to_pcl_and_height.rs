@@ -42,6 +42,14 @@ pub struct ObstacleExpanderOptions {
     pub obstacle_gradient_threshold: f32,
 }
 
+/// When enabled, only cells that will be affected by the new frame are cleared
+#[derive(Clone, Copy)]
+pub struct ClearAffectedCellsOptions {
+    // sometimes only clearing cells further away is desired
+    // this minimizes unnecessary clearing of nearby cells that are likely to be updated again
+    pub min_distance_to_clear: f32,
+}
+
 pub struct DepthToPclAndHeightPipeline {
     pipeline: ComputePipelineChain,
     depth_image_dimensions_px: (u32, u32),
@@ -57,6 +65,8 @@ pub struct DepthToPclAndHeightPipeline {
     workgroup_size_stage1: (u32, u32, u32),
     workgroup_size_stage2: (u32, u32, u32),
     pub map_layout: map_layout::MapLayout,
+    /// Whether the clear affected cells stage is enabled
+    clear_affected_cells_enabled: bool,
 }
 
 impl DepthToPclAndHeightPipeline {
@@ -76,6 +86,7 @@ impl DepthToPclAndHeightPipeline {
         obstacle_expander_options: ObstacleExpanderOptions,
         gradient_kernel_radius: u32,
         min_depth: f32,
+        clear_affected_cells: Option<ClearAffectedCellsOptions>,
     ) -> Result<Self, WgslPclError> {
         // Create buffers for depth -> pcl -> height map shader
         let input_img_buffer = GpuBuffer::new_storage(
@@ -108,6 +119,93 @@ impl DepthToPclAndHeightPipeline {
             ],
             Some("height_map"),
         );
+
+        // Create clear affected cells pipeline if enabled
+        let clear_stage = if let Some(clear_options) = clear_affected_cells {
+            let clear_constants: HashMap<&str, f64> = HashMap::from([
+                ("IMAGE_WIDTH", depth_image_dimensions.0 as f64),
+                ("IMAGE_HEIGHT", depth_image_dimensions.1 as f64),
+                ("FOCAL_LENGTH_PX", focal_length_px as f64),
+                ("PRINCIPAL_POINT_PX_X", principal_point_px.0 as f64),
+                ("PRINCIPAL_POINT_PX_Y", principal_point_px.1 as f64),
+                ("MAX_DEPTH", max_depth as f64),
+                ("MIN_DEPTH", min_depth as f64),
+                ("WORKGROUP_X", workgroup_size_stage1.0 as f64),
+                ("WORKGROUP_Y", workgroup_size_stage1.1 as f64),
+                (
+                    "MIN_DISTANCE_TO_CLEAR",
+                    clear_options.min_distance_to_clear as f64,
+                ),
+            ]);
+
+            let (clear_layout_0, clear_bind_group_0) = BindGroupLayoutBuilder::new(None)
+                .with_entry(
+                    0,
+                    ShaderStages::COMPUTE,
+                    wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: true },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    input_img_buffer.as_entire_binding(),
+                )
+                .with_entry(
+                    1,
+                    ShaderStages::COMPUTE,
+                    wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Storage { read_only: false },
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    height_map_buffer.as_entire_binding(),
+                )
+                .build(&device, "clear_affected_bind_group_0".to_string());
+
+            let (clear_layout_1, clear_bind_group_1) = BindGroupLayoutBuilder::new(None)
+                .with_entry(
+                    0,
+                    ShaderStages::COMPUTE,
+                    wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    camera_transform_buffer.as_entire_binding(),
+                )
+                .with_entry(
+                    1,
+                    ShaderStages::COMPUTE,
+                    wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    depth_scale_buffer.as_entire_binding(),
+                )
+                .with_entry(
+                    2,
+                    ShaderStages::COMPUTE,
+                    wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    map_layout_buffer.as_entire_binding(),
+                )
+                .build(&device, "clear_affected_bind_group_1".to_string());
+
+            let clear_pipeline = ComputePipelineBuilder::new(device)
+                .with_constants(clear_constants)
+                .with_bind_group(0, clear_layout_0, clear_bind_group_0)
+                .with_bind_group(1, clear_layout_1, clear_bind_group_1)
+                .with_shader_module(include_wgsl!("../../shaders/clear_affected_cells.wgsl"))
+                .with_label("clear_affected_cells_pipeline")
+                .build()?;
+
+            Some(clear_pipeline)
+        } else {
+            None
+        };
 
         // define layout and bind groups for depth -> pcl -> height map shader
         let (layout_1, bind_group_1) = BindGroupLayoutBuilder::new(None)
@@ -177,7 +275,6 @@ impl DepthToPclAndHeightPipeline {
             )
             .build(&device, "depth_to_pcl_bind_group".to_string());
 
-        // overridable constants for depth -> pcl -> height map shader
         let constants: HashMap<&str, f64> = HashMap::from([
             ("IMAGE_WIDTH", depth_image_dimensions.0 as f64),
             ("IMAGE_HEIGHT", depth_image_dimensions.1 as f64),
@@ -464,7 +561,17 @@ impl DepthToPclAndHeightPipeline {
             .with_constants(obstacle_expander_constants)
             .build()?;
 
-        let combined_pipeline = ComputePipelineChainBuilder::new()
+        let mut chain_builder = ComputePipelineChainBuilder::new();
+
+        // Add clear stage first if enabled
+        if let Some(clear_pipeline) = clear_stage {
+            chain_builder = chain_builder.add_stage(PipelineStage::new(
+                clear_pipeline,
+                (workgroup_size_stage1.0, workgroup_size_stage1.1, 1),
+            ));
+        }
+
+        let combined_pipeline = chain_builder
             .add_stage(PipelineStage::new(
                 pipeline,
                 (workgroup_size_stage1.0, workgroup_size_stage1.1, 1),
@@ -502,6 +609,7 @@ impl DepthToPclAndHeightPipeline {
             output_expanded_gradient_map_buffer: obstacle_expander_output_buffer,
             workgroup_size_stage1: (workgroup_size_stage1.0, workgroup_size_stage1.1, 1),
             workgroup_size_stage2: (workgroup_size_stage2.0, workgroup_size_stage2.1, 1),
+            clear_affected_cells_enabled: clear_affected_cells.is_some(),
         })
     }
 
@@ -553,13 +661,24 @@ impl DepthToPclAndHeightPipeline {
             1,
         );
 
-        let workgroups = vec![
-            workgroups_pcl,
-            workgroups_outlier_filter,
-            workgroups_filter,
-            workgroups_gradient,
-            workgroups_obstacle_expander,
-        ];
+        let workgroups = if self.clear_affected_cells_enabled {
+            vec![
+                workgroups_pcl, // clear stage uses same workgroups as pcl
+                workgroups_pcl,
+                workgroups_outlier_filter,
+                workgroups_filter,
+                workgroups_gradient,
+                workgroups_obstacle_expander,
+            ]
+        } else {
+            vec![
+                workgroups_pcl,
+                workgroups_outlier_filter,
+                workgroups_filter,
+                workgroups_gradient,
+                workgroups_obstacle_expander,
+            ]
+        };
 
         self.pipeline.execute_blocking(device, workgroups)?;
         let pcl_data: Vec<AlignedVec4<f32>> = self.output_pcl_buffer.read_data_blocking(device)?;

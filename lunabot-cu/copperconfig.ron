@@ -84,21 +84,26 @@
                 "bilateral_filter_kernel_radius": 15,
                 "bilateral_filter_sigma_spatial": 15,
                 "bilateral_filter_sigma_range": 0.05,
-                "gradient_filter_kernel_radius": 2,
-                "gaussian_blur_kernel_radius": 4,
+                "gradient_filter_kernel_radius": 3,
+                "gaussian_blur_kernel_radius": 1,
                 "gaussian_sigma_spatial": 3.0,
-                "outlier_filter_kernel_radius": 5,
-                "outlier_filter_std_dev_threshold": 2.0,
+                "outlier_filter_kernel_radius": 3,
+                // outlier removal works best when the clear affected cells is enabled
+                // this is because it allows the outlier cells to be re mapped on the next frame
+                "outlier_filter_std_dev_threshold": 3.5,
                 "use_bilateral_filter": false,
                 "robot_radius_meters": 0.1,
                 "min_depth": 0.2,
                 "max_depth": 3.0,
+                "clear_affected_cells": true,
+                "min_distance_to_clear": 2.0,
+                // this is the gradient threshold for the obstacle expander
+                // if the gradient is greater than this value, the cell is considered an obstacle
+                "obstacle_gradient_threshold": 0.3,
             },
-            // FIXME: use a custom backrounding implementation instead of going through copper for support, because
-            // in resimulation mode the pipeline process will take way too long
             background: false,
             logging: (
-                enabled: false,
+                enabled: true,
             )
         ),
         // registers point clouds into a global map, and estimates the isometry of the lidar node.

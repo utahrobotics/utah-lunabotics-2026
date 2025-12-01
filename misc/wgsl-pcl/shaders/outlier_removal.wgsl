@@ -11,6 +11,8 @@ override KERNEL_RADIUS: u32 = 2;
 // How many standard deviations away before we consider it an outlier
 // Higher values = more conservative filtering (2.0-3.0 is typical)
 override OUTLIER_THRESHOLD: f32 = 2.5;
+const CLEAR_VALUE: u32 = 0xFF7FFFFF; // bitcast of f32::MIN
+
 
 @compute
 @workgroup_size(8, 8, 1)
@@ -75,8 +77,6 @@ fn depth(
         
         if deviation > OUTLIER_THRESHOLD * std_dev { // reject value
             output_filtered_height_map[center_index] = -3.40282347e+38;
-            // mark the cell in the original file to be re mapped
-            input_height_map[center_index] = -3.40282347e+38;
         } else {
             output_filtered_height_map[center_index] = center_value;
         }
