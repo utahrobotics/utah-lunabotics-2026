@@ -1,6 +1,7 @@
 use bonsai_bt::Status::{self, *};
 use common::{LUNABOT_STAGE, LunabotStage, Steering};
 use embedded_common::{Actuator, ActuatorCommand};
+use rerun::Vec3D;
 
 use crate::{
     ROBOT_STATE,
@@ -127,16 +128,16 @@ impl LunabotAction {
                         PATHFINDING_GOAL,
                         0.1,
                         0.01,
-                        500,
+                        5000,
                     ) && let Some(rec) = RECORDER.get()
                     {
                         let _ = rec.recorder.log(
                             "ai/calculated_path",
-                            &rerun::Points3D::new(
-                                path.iter()
-                                    .map(|&(x, y)| [x, y, 0.6])
-                                    .collect::<Vec<[f32; 3]>>(),
-                            ),
+                            &rerun::LineStrips3D::new(&[path
+                                .iter()
+                                .map(|p| Vec3D::new(p.0 as f32, p.1 as f32, 1.0))
+                                .collect::<Vec<_>>()])
+                            .with_colors(vec![rerun::Color::from_rgb(0, 200, 0)]),
                         );
                         Success
                     } else {
