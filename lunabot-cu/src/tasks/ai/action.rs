@@ -127,8 +127,9 @@ impl LunabotAction {
                         [translation.x as f32, translation.y as f32],
                         PATHFINDING_GOAL,
                         0.3,
-                        map.cell_size,
-                        500,
+                        map.cell_size * 2.,
+                        // FIXME: tune this parameter
+                        100,
                     ) && let Some(rec) = RECORDER.get()
                     {
                         let _ = rec.recorder.log(

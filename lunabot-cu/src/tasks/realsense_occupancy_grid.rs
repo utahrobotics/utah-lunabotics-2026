@@ -3,10 +3,8 @@ use cu29::cutask::Freezable;
 use cu29::prelude::*;
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use std::sync::{Arc, Mutex};
-use wgsl_pcl::pipelines::depth_to_pcl_and_height::{
-    BilateralOptions, BlurFilterOptions, ClearAffectedCellsOptions, GaussianOptions,
-    ObstacleExpanderOptions, OutlierFilterOptions,
-};
+use wgsl_pcl::pipelines::depth_to_obstacle::{ClearAffectedCellsOptions, ObstacleExpanderOptions};
+use wgsl_pcl::pipelines::filters::*;
 
 use iceoryx_types::{IceoryxDepthFrame, ImuMsg};
 use rerun::Points3D;

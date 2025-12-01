@@ -10,32 +10,18 @@ use crate::{
     gpu_types::{AlignedMatrix4, AlignedVec4, GpuType},
     map_layout,
     mem_layouts::{BindGroupLayoutBuilder, GpuBuffer},
+    pipelines::{
+        filters::{
+            BlurFilterOptions, OutlierFilterOptions, new_blur_pipeline,
+            new_outlier_removal_pipeline,
+        },
+        gradient::new_gradient_pipeline,
+    },
     shader_pipeline::{
         ComputePipelineBuilder, ComputePipelineChain, ComputePipelineChainBuilder, PipelineStage,
     },
     wgsl_setup::GpuDevice,
 };
-
-pub struct BilateralOptions {
-    pub sigma_spatial: u32,
-    pub sigma_range: f32,
-    pub kernel_radius: u32,
-}
-
-pub struct GaussianOptions {
-    pub kernel_radius: u32,
-    pub sigma: f32,
-}
-
-pub enum BlurFilterOptions {
-    Bilateral(BilateralOptions),
-    Gaussian(GaussianOptions),
-}
-
-pub struct OutlierFilterOptions {
-    pub kernel_radius: u32,
-    pub std_dev_threshold: f32,
-}
 
 pub struct ObstacleExpanderOptions {
     pub expansion_radius_meters: f32,
@@ -295,200 +281,29 @@ impl DepthToPclAndHeightPipeline {
             .with_label("depth_to_pcl_pipeline")
             .build()?;
 
-        // Outlier filter
-        let outlier_filtered_height_map_buffer = GpuBuffer::new_storage_with_data(
-            &device,
-            &vec![
-                f32::MIN;
-                ((map_layout.width_meters() / map_layout.cell_size).ceil() as usize)
-                    * ((map_layout.height_meters() / map_layout.cell_size).ceil() as usize)
-            ],
-            Some("outlier_filtered_height_map"),
-        );
+        let (outlier_filtered_height_map_buffer, outlier_filter_pipeline) =
+            new_outlier_removal_pipeline(
+                device,
+                map_layout,
+                outlier_filter_options,
+                &height_map_buffer,
+            )?;
 
-        let outlier_filter_constants: HashMap<&str, f64> = HashMap::from([
-            (
-                "MAP_WIDTH",
-                (map_layout.width_meters() / map_layout.cell_size).ceil() as f64,
-            ),
-            (
-                "MAP_HEIGHT",
-                (map_layout.height_meters() / map_layout.cell_size).ceil() as f64,
-            ),
-            ("KERNEL_RADIUS", outlier_filter_options.kernel_radius as f64),
-            (
-                "OUTLIER_THRESHOLD",
-                outlier_filter_options.std_dev_threshold as f64,
-            ),
-        ]);
-        let (outlier_filter_layout, outlier_filter_bind_group) = BindGroupLayoutBuilder::new(None)
-            .with_entry(
-                0,
-                ShaderStages::COMPUTE,
-                wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                height_map_buffer.as_entire_binding(),
-            )
-            .with_entry(
-                1,
-                ShaderStages::COMPUTE,
-                wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                outlier_filtered_height_map_buffer.as_entire_binding(),
-            )
-            .build(&device, "outlier_filter_bind_group".to_string());
+        let (blur_filtered_height_map_buffer, filter_pipeline) = new_blur_pipeline(
+            device,
+            workgroup_size_stage2,
+            map_layout,
+            blur_filter_options,
+            &outlier_filtered_height_map_buffer,
+        )?;
 
-        let outlier_filter_pipeline = ComputePipelineBuilder::new(device)
-            .with_label("outlier_filter")
-            .with_shader_module(include_wgsl!("../../shaders/outlier_removal.wgsl"))
-            .with_bind_group(0, outlier_filter_layout, outlier_filter_bind_group)
-            .with_constants(outlier_filter_constants)
-            .build()?;
-
-        // Create buffers and pipeline for blur filter (bilateral or gaussian)
-        let blur_filtered_height_map_buffer = GpuBuffer::new_storage_with_data(
-            &device,
-            &vec![
-                f32::MIN;
-                ((map_layout.width_meters() / map_layout.cell_size).ceil() as usize)
-                    * ((map_layout.height_meters() / map_layout.cell_size).ceil() as usize)
-            ],
-            Some("filtered_height_map"),
-        );
-
-        // define layout and bind groups for blur filter shader
-        let (filter_layout, filter_bind_group) = BindGroupLayoutBuilder::new(None)
-            .with_entry(
-                0,
-                ShaderStages::COMPUTE,
-                wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                outlier_filtered_height_map_buffer.as_entire_binding(),
-            )
-            .with_entry(
-                1,
-                ShaderStages::COMPUTE,
-                wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                blur_filtered_height_map_buffer.as_entire_binding(),
-            )
-            .build(&device, "height_map_filter_bind_group".to_string());
-
-        // Choose shader and constants based on filter type
-        let (filter_shader, filter_constants) = match blur_filter_options {
-            BlurFilterOptions::Bilateral(opts) => {
-                let constants = HashMap::from([
-                    (
-                        "MAP_WIDTH",
-                        (map_layout.width_meters() / map_layout.cell_size).ceil() as f64,
-                    ),
-                    (
-                        "MAP_HEIGHT",
-                        (map_layout.height_meters() / map_layout.cell_size).ceil() as f64,
-                    ),
-                    ("SIGMA_SPATIAL", opts.sigma_spatial as f64),
-                    ("SIGMA_RANGE", opts.sigma_range as f64),
-                    ("KERNEL_RADIUS", opts.kernel_radius as f64),
-                    ("WORKGROUP_X", workgroup_size_stage2.0 as f64),
-                    ("WORKGROUP_Y", workgroup_size_stage2.1 as f64),
-                ]);
-                (
-                    include_wgsl!("../../shaders/bilateral_filter.wgsl"),
-                    constants,
-                )
-            }
-            BlurFilterOptions::Gaussian(opts) => {
-                let constants = HashMap::from([
-                    (
-                        "MAP_WIDTH",
-                        (map_layout.width_meters() / map_layout.cell_size).ceil() as f64,
-                    ),
-                    (
-                        "MAP_HEIGHT",
-                        (map_layout.height_meters() / map_layout.cell_size).ceil() as f64,
-                    ),
-                    ("SIGMA", opts.sigma as f64),
-                    ("KERNEL_RADIUS", opts.kernel_radius as f64),
-                    ("WORKGROUP_X", workgroup_size_stage2.0 as f64),
-                    ("WORKGROUP_Y", workgroup_size_stage2.1 as f64),
-                ]);
-                (include_wgsl!("../../shaders/gaussian_blur.wgsl"), constants)
-            }
-        };
-
-        let filter_pipeline = ComputePipelineBuilder::new(device)
-            .with_label("blur_filter")
-            .with_shader_module(filter_shader)
-            .with_bind_group(0, filter_layout, filter_bind_group)
-            .with_constants(filter_constants)
-            .build()?;
-
-        // Gradient mapper
-        let gradient_map_buffer = GpuBuffer::new_storage_with_data(
-            &device,
-            &vec![
-                0.0f32;
-                ((map_layout.width_meters() / map_layout.cell_size).ceil() as usize)
-                    * ((map_layout.height_meters() / map_layout.cell_size).ceil() as usize)
-            ],
-            Some("gradient_map"),
-        );
-
-        let gradient_constants: HashMap<&str, f64> = HashMap::from([
-            (
-                "MAP_WIDTH",
-                (map_layout.width_meters() / map_layout.cell_size).ceil() as f64,
-            ),
-            (
-                "MAP_HEIGHT",
-                (map_layout.height_meters() / map_layout.cell_size).ceil() as f64,
-            ),
-            ("KERNEL_RADIUS", gradient_kernel_radius as f64),
-            ("WORKGROUP_X", workgroup_size_stage2.0 as f64),
-            ("WORKGROUP_Y", workgroup_size_stage2.1 as f64),
-        ]);
-
-        let (gradient_layout, gradient_bind_group) = BindGroupLayoutBuilder::new(None)
-            .with_entry(
-                0,
-                ShaderStages::COMPUTE,
-                wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                blur_filtered_height_map_buffer.as_entire_binding(),
-            )
-            .with_entry(
-                1,
-                ShaderStages::COMPUTE,
-                wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Storage { read_only: false },
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                gradient_map_buffer.as_entire_binding(),
-            )
-            .build(&device, "gradient_bind_group".to_string());
-
-        let gradient_pipeline = ComputePipelineBuilder::new(device)
-            .with_label("gradient_mapper")
-            .with_shader_module(include_wgsl!("../../shaders/height_map_to_gradients.wgsl"))
-            .with_bind_group(0, gradient_layout, gradient_bind_group)
-            .with_constants(gradient_constants)
-            .build()?;
+        let (gradient_map_buffer, gradient_pipeline) = new_gradient_pipeline(
+            device,
+            workgroup_size_stage2,
+            map_layout,
+            gradient_kernel_radius,
+            &blur_filtered_height_map_buffer,
+        )?;
 
         let obstacle_expander_constants: HashMap<&str, f64> = HashMap::from([
             (

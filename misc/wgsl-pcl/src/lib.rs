@@ -8,4 +8,4 @@ pub mod size;
 pub mod wgsl_setup;
 
 pub mod pipelines;
-pub use pipelines::depth_to_pcl_and_height::DepthToPclAndHeightPipeline;
+pub use pipelines::depth_to_obstacle::DepthToPclAndHeightPipeline;
