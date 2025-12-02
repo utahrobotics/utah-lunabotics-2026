@@ -9,12 +9,13 @@ use cu29::{
 
 use iceoryx_types::IceoryxPointCloud;
 use kalman_filter::SimpleVector;
-use nalgebra::{Isometry, Quaternion, Unit};
+use nalgebra::Isometry3;
 use simple_icp::{config::Config, icp_pipeline::IcpPipeline};
 
 use crate::{ROBOT_STATE, rerun_viz::RECORDER};
 
 const REFERENCE_VARIANCE_THRESHOLD: f64 = 1.0;
+const POSE_COLLECTION_INTERVAL: std::time::Duration = std::time::Duration::from_millis(5);
 
 pub struct KissIcp {
     pipeline: simple_icp::icp_pipeline::IcpPipeline,
@@ -22,7 +23,9 @@ pub struct KissIcp {
     pub frame_accumulation_index: usize,
     pub max_accumulation: usize,
     icp_variance: [f64; 36],
-    reference_offset: Option<Isometry<f64, Unit<Quaternion<f64>>, 3>>,
+    reference_offset: Option<Isometry3<f64>>,
+    pub timestamped_poses: Vec<(std::time::Instant, Isometry3<f64>)>,
+    pub last_pose_collection_time: std::time::Instant,
 }
 
 #[derive(Clone, Copy, Debug, Encode, Decode, Serialize)]
@@ -91,6 +94,14 @@ impl CuTask for KissIcp {
 
         let max_point_age = config.and_then(|c| c.get::<f64>("max_point_age_seconds"));
 
+        let max_angle_between_poses = config
+            .and_then(|c| c.get::<f64>("max_angle_between_poses"))
+            .unwrap_or(0.10472); // 6 degrees in radians
+
+        let max_distance_between_poses = config
+            .and_then(|c| c.get::<f64>("max_distance_between_poses"))
+            .unwrap_or(0.05); // 1 meter
+
         let config = Config {
             voxel_size,
             max_range,
@@ -103,6 +114,8 @@ impl CuTask for KissIcp {
             max_num_threads,
             deskew: enable_deskewing,
             max_point_age_seconds: max_point_age,
+            max_angle_between_poses,
+            max_distance_between_poses,
         };
         let pipeline = IcpPipeline::new_with_config(config);
 
@@ -126,10 +139,22 @@ impl CuTask for KissIcp {
             frame_accumulation_index: 0,
             icp_variance: variance,
             reference_offset: None,
+            timestamped_poses: Vec::new(),
+            last_pose_collection_time: std::time::Instant::now(),
         })
     }
 
     fn preprocess(&mut self, _clock: &RobotClock) -> CuResult<()> {
+        if let Some(state) = ROBOT_STATE.get() {
+            let current_time = std::time::Instant::now();
+            if current_time.duration_since(self.last_pose_collection_time)
+                >= POSE_COLLECTION_INTERVAL
+            {
+                let pose = state.kinematic_root.get_global_isometry();
+                self.timestamped_poses.push((current_time, pose));
+                self.last_pose_collection_time = current_time;
+            }
+        }
         Ok(())
     }
 
@@ -150,6 +175,7 @@ impl CuTask for KissIcp {
                 let y = point.y;
                 let z = point.z;
                 let intensity = point.intensity;
+
                 let icp_point = simple_icp::point3d::Point3d {
                     x,
                     y,
@@ -168,7 +194,11 @@ impl CuTask for KissIcp {
                 output.clear_payload();
                 return Ok(());
             }
-            self.pipeline.process_frame(&self.accumulated_frames, 200.0);
+            self.pipeline.process_frame(
+                &mut self.accumulated_frames,
+                200.0,
+                &self.timestamped_poses,
+            );
 
             let map_points = self.pipeline.get_last_batch_points();
             let relative_position = self.pipeline.t_origin_current;
@@ -220,6 +250,7 @@ impl CuTask for KissIcp {
 
             self.log_accumulated_map(map_points)?;
             self.accumulated_frames.clear();
+            self.timestamped_poses.clear();
             self.frame_accumulation_index = 0;
         } else {
             output.clear_payload();

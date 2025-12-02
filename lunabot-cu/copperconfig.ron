@@ -122,8 +122,12 @@
                 "max_num_threads": 10,
                 "convergence_criterion": 0.0001,
                 "max_num_iterations": 500,
-                "max_accumulation": 10,
+                "max_accumulation": 15,
                 "max_point_age_seconds": 30.0,
+
+                // max distances between poses used to deskew. if any pose is too far apart, we skip deskewing
+                "max_angle_between_poses": 0.10472, // 6 degrees in radians
+                "max_distance_between_poses": 0.05, // 1 meter
             },
             logging: (
                 enabled: false
