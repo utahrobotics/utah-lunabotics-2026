@@ -1,24 +1,16 @@
-use bonsai_bt::Status::{Failure, Running, Success};
 use bonsai_bt::{BT, Event, UpdateArgs};
-use common::{FromLunabase, LUNABOT_STAGE, LunabotStage, Steering};
+use common::{FromLunabase, Steering};
 use cu29::prelude::*;
 use cu29::{
     cutask::{CuTask, Freezable},
     input_msg,
 };
-use embedded_common::{Actuator, ActuatorCommand};
-use rerun::{Points2D, Points3D};
+use embedded_common::ActuatorCommand;
 
-use std::sync::mpsc::Receiver;
-
-use crate::ROBOT_STATE;
-use crate::pathfinding::rrt::find_path;
-use crate::rerun_viz::RECORDER;
 use crate::tasks::OccupancyGrid;
 use crate::tasks::ai::action::LunabotAction;
 use crate::tasks::ai::behaviors::teleop::teleop_behavior;
-use crate::tasks::ai::blackboard::{self, LunabotBlackboard};
-use crate::tasks::ai::jobs::follow_path_job;
+use crate::tasks::ai::blackboard::LunabotBlackboard;
 use crate::utils::nanos_to_secs;
 
 pub struct LunabotAi {
@@ -71,7 +63,6 @@ impl CuTask for LunabotAi {
             self.bt.blackboard_mut().latest_obstacle_map = Some(map.clone());
         }
 
-        let remaining_dt = 0.0;
         self.bt
             .tick(&e, &mut |args, blackboard| args.action.handle(blackboard));
         self.last_tick_nanos = clock.now().into();

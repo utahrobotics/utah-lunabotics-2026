@@ -129,7 +129,7 @@ impl LunabotAction {
                         0.3,
                         map.cell_size * 2.,
                         // FIXME: tune this parameter
-                        100,
+                        1000,
                     ) && let Some(rec) = RECORDER.get()
                     {
                         let _ = rec.recorder.log(

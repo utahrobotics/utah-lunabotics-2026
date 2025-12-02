@@ -25,7 +25,7 @@ using namespace iox2;
 
 constexpr iox::units::Duration CYCLE_TIME = iox::units::Duration::fromMilliseconds(10);
 
-constexpr int ACCUMULATION_COUNT = 2;
+constexpr int ACCUMULATION_COUNT = 1;
 constexpr time_t WARMUP_DURATION_SECONDS = 3;
 constexpr bool ACCUMULATE_FRAMES = true;
 
@@ -201,7 +201,6 @@ int main()
                 std::copy(std::begin(imu_raw.quaternion), std::end(imu_raw.quaternion), std::begin(msg.quaternion));
                 std::copy(std::begin(imu_raw.angular_velocity), std::end(imu_raw.angular_velocity), std::begin(msg.angular_velocity));
                 std::copy(std::begin(imu_raw.linear_acceleration), std::end(imu_raw.linear_acceleration), std::begin(msg.linear_acceleration));
-
                 auto sample = imu_publisher.loan_uninit().expect("imu loan");
                 auto initialized = sample.write_payload(msg);
                 send(std::move(initialized)).expect("imu send");
