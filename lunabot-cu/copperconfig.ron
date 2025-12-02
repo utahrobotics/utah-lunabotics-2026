@@ -112,9 +112,9 @@
             id:"l2_kiss_icp",
             type:"crate::tasks::KissIcp",
             config:{
-                "voxel_size": .5,
+                "voxel_size": .6,
                 "max_range": 10.0,
-                "min_range": 0.0,
+                "min_range": 1.5,
                 "max_points_per_voxel": 50,
                 "initial_threshold": 2.0,
                 "min_motion_th": 0.2,
@@ -122,7 +122,8 @@
                 "max_num_threads": 10,
                 "convergence_criterion": 0.0001,
                 "max_num_iterations": 500,
-                "max_accumulation": 10
+                "max_accumulation": 10,
+                "max_point_age_seconds": 30.0,
             },
             logging: (
                 enabled: false

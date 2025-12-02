@@ -6127,7 +6127,7 @@ dependencies = [
 [[package]]
 name = "simple-icp"
 version = "0.2.0"
-source = "git+https://github.com/utahrobotics/simple-icp.git#f3cf12314efae4097eaf8c7ecd8e18e711c9477b"
+source = "git+https://github.com/utahrobotics/simple-icp.git#6d8e381e34b2c357117ab01775bb0017f8813517"
 dependencies = [
  "nalgebra",
  "serde",

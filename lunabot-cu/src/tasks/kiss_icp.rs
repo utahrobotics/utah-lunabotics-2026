@@ -89,6 +89,8 @@ impl CuTask for KissIcp {
             .and_then(|c| c.get::<i32>("max_accumulation"))
             .unwrap_or(2) as usize;
 
+        let max_point_age = config.and_then(|c| c.get::<f64>("max_point_age_seconds"));
+
         let config = Config {
             voxel_size,
             max_range,
@@ -100,6 +102,7 @@ impl CuTask for KissIcp {
             convergence_criterion,
             max_num_threads,
             deskew: enable_deskewing,
+            max_point_age_seconds: max_point_age,
         };
         let pipeline = IcpPipeline::new_with_config(config);
 
@@ -147,7 +150,13 @@ impl CuTask for KissIcp {
                 let y = point.y;
                 let z = point.z;
                 let intensity = point.intensity;
-                let icp_point = simple_icp::point3d::Point3d { x, y, z, intensity };
+                let icp_point = simple_icp::point3d::Point3d {
+                    x,
+                    y,
+                    z,
+                    intensity,
+                    global_timestamp: std::time::Instant::now(),
+                };
                 self.accumulated_frames.push(icp_point);
                 if self.frame_accumulation_index == self.max_accumulation {
                     should_process = true;
