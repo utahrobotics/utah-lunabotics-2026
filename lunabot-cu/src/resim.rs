@@ -2,6 +2,7 @@
 pub mod comms;
 pub mod rerun_viz;
 
+pub mod bridges;
 pub mod pathfinding;
 pub mod simple_monitor;
 pub mod tasks;
@@ -44,7 +45,6 @@ fn default_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::DetectorCamSide(_) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamLaptopFront(_) => SimOverride::ExecutedBySim,
         default::SimStep::RealsenseSubscriber(_) => SimOverride::ExecutedBySim,
-        default::SimStep::Lunabase(_) => SimOverride::ExecutedBySim,
         default::SimStep::T265Subscriber(_) => SimOverride::ExecutedBySim,
         _ => SimOverride::ExecuteByRuntime,
     }
@@ -57,7 +57,7 @@ fn run_one_copperlist(
 ) {
     let msgs = &copper_list.msgs;
     let now = msgs
-        .get_lunabase_output()
+        .get_t_265_subscriber_output()
         .metadata()
         .process_time()
         .start
@@ -137,14 +137,21 @@ fn run_one_copperlist(
                 SimOverride::ExecutedBySim
             }
             default::SimStep::RealsenseSubscriber(..) => SimOverride::ExecutedBySim,
-            default::SimStep::Lunabase(CuTaskCallbackState::Process(_, output)) => {
-                *output = msgs.get_lunabase_output().clone();
+
+            default::SimStep::DetectorCamLaptopFront(..) => SimOverride::ExecutedBySim,
+
+            default::SimStep::LunabaseBridgeRxFromLunabaseRx(CuTaskCallbackState::Process(
+                _,
+                output,
+            )) => {
+                *output = msgs
+                    .get_lunabase_bridge_rx_from_lunabase_rx_output()
+                    .clone();
+
                 output.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
-            default::SimStep::Lunabase(..) => SimOverride::ExecutedBySim,
-            default::SimStep::DetectorCamLaptopFront(..) => SimOverride::ExecutedBySim,
-
+            default::SimStep::LunabaseBridgeRxFromLunabaseRx(..) => SimOverride::ExecutedBySim,
             // May want to temporarily add override for obstacle map recv until lidar simulation works
             _ => SimOverride::ExecuteByRuntime,
         }

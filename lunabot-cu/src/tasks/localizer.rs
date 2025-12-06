@@ -6,7 +6,10 @@ use crate::tasks::AprilTagMeasurement;
 use crate::tasks::IcpMeasurement;
 use crate::tasks::ImuMeasurement;
 use crate::utils::RobotState;
+use common::FromLunabot;
 use cu_spatial_payloads::EncodableIsometry;
+use cu29::cutask::CuTask;
+use cu29::output_msg;
 use cu29::{
     CuError,
     clock::{CuTime, Instant},
@@ -27,7 +30,7 @@ const UNKNOWN_PRIOR_VARIANCE: f64 = 1e64;
 
 pub struct Localizer {
     robot_state: RobotState,
-    last_rerun_log: Instant,
+    last_rerun_log: std::time::Instant,
     /// Stores all information of kalman filter, including past values, and update logic.
     kalman_filter: KalmanFilter<15>,
     most_recent_update: CuTime,
@@ -35,7 +38,7 @@ pub struct Localizer {
 
 impl Freezable for Localizer {}
 
-impl CuSinkTask for Localizer {
+impl CuTask for Localizer {
     // IMU from l2, apriltag detections
     type Input<'m> = input_msg!('m,
         ImuMeasurement, // l2 imu
@@ -44,6 +47,8 @@ impl CuSinkTask for Localizer {
         Vec<AprilTagMeasurement>, // apriltag detections
         EncodableIsometry // reading from the t265, estimation of the robots isometry
     );
+
+    type Output<'m> = output_msg!(FromLunabot);
 
     fn new(_config: Option<&cu29::prelude::ComponentConfig>) -> cu29::CuResult<Self>
     where
@@ -58,7 +63,7 @@ impl CuSinkTask for Localizer {
         if let Some(robot_state) = ROBOT_STATE.get() {
             return Ok(Self {
                 robot_state: robot_state.clone(),
-                last_rerun_log: Instant::now(),
+                last_rerun_log: std::time::Instant::now(),
                 kalman_filter,
                 most_recent_update: CuTime::default(),
             });
@@ -87,6 +92,7 @@ impl CuSinkTask for Localizer {
         &mut self,
         clock: &cu29::prelude::RobotClock,
         input: &Self::Input<'i>,
+        output: &mut Self::Output<'i>,
     ) -> cu29::CuResult<()> {
         if let Some(pose_msg) = input.4.payload()
             && let Some(logger) = RECORDER.get()
@@ -113,6 +119,11 @@ impl CuSinkTask for Localizer {
                 .unwrap()
                 .kinematic_root
                 .set_isometry(pose_msg);
+
+            output.set_payload(FromLunabot::RobotIsometry {
+                origin: pose_msg.translation.vector.cast::<f32>().data.0[0],
+                quat: pose_msg.rotation.as_vector().cast::<f32>().data.0[0],
+            });
         }
         // FIXME: remove this early return once kalman filter is fully tested and done
         return Ok(());
@@ -236,7 +247,7 @@ impl CuSinkTask for Localizer {
         if let Some(logger) = RECORDER.get()
             && self.last_rerun_log.elapsed().as_millis() > 1000 / 60
         {
-            self.last_rerun_log = Instant::now();
+            self.last_rerun_log = std::time::Instant::now();
 
             //   Push data to rest of robot
             // Convert to isometry for the kinematics object

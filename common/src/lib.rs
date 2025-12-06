@@ -1,6 +1,6 @@
 #![feature(f16)]
 use bytemuck::{Pod, Zeroable};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 mod constants;
 pub mod ports;
 pub use constants::*;
@@ -255,7 +255,16 @@ impl FromLunabase {
     }
 }
 
-#[derive(Debug, bitcode::Encode, bitcode::Decode, Clone, bincode::Encode, bincode::Decode)]
+#[derive(
+    Debug,
+    bitcode::Encode,
+    bitcode::Decode,
+    Clone,
+    bincode::Encode,
+    bincode::Decode,
+    Serialize,
+    Deserialize,
+)]
 pub enum FromLunabot {
     /// Reports the robots pose
     RobotIsometry {
@@ -268,4 +277,10 @@ pub enum FromLunabot {
         bucket: f32,
     },
     ErroredTasks(HashMap<String, String>),
+}
+
+impl Default for FromLunabot {
+    fn default() -> Self {
+        Self::ErroredTasks(HashMap::new())
+    }
 }

@@ -2,11 +2,13 @@
 pub mod comms;
 pub mod rerun_viz;
 
+pub mod bridges;
 pub mod pathfinding;
 pub mod simple_monitor;
 pub mod tasks;
 pub mod utils;
 
+use common::FromLunabot;
 use cu29::prelude::*;
 use cu29_helpers::basic_copper_setup;
 use kalman_filter::SimpleSquareMatrix;
@@ -74,9 +76,8 @@ fn sim_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::DetectionHandler(_) => SimOverride::ExecutedBySim,
         default::SimStep::L2KissIcp(_) => SimOverride::ExecuteByRuntime,
         default::SimStep::OccupancyGridPipeline(_) => SimOverride::ExecuteByRuntime,
-        default::SimStep::Lunabase(_) => SimOverride::ExecuteByRuntime,
         default::SimStep::NewAi(_) => SimOverride::ExecuteByRuntime,
-        default::SimStep::Localizer(CuTaskCallbackState::Process(_, _)) => {
+        default::SimStep::Localizer(CuTaskCallbackState::Process(_, output)) => {
             use std::sync::atomic::{AtomicU64, Ordering};
             use std::time::SystemTime;
 
@@ -106,11 +107,14 @@ fn sim_callback(step: default::SimStep) -> SimOverride {
                     )),
                 );
                 state.kinematic_root.set_isometry(isometry);
+                output.set_payload(FromLunabot::RobotIsometry {
+                    origin: isometry.translation.vector.cast::<f32>().data.0[0],
+                    quat: isometry.rotation.as_vector().cast::<f32>().data.0[0],
+                });
 
                 let last = last_log_time.load(Ordering::Relaxed);
                 if now_ns - last > log_interval_ns {
                     last_log_time.store(now_ns, Ordering::Relaxed);
-                    println!("logging robot pose");
                     if let Some(recorder) = RECORDER.get()
                         && let Err(e) = recorder.recorder.log(
                             rerun_viz::ROBOT_STRUCTURE,
@@ -129,6 +133,10 @@ fn sim_callback(step: default::SimStep) -> SimOverride {
             SimOverride::ExecutedBySim
         }
         default::SimStep::Localizer(..) => SimOverride::ExecutedBySim,
+        default::SimStep::LunabaseBridgeRxFromLunabaseRx(_) => SimOverride::ExecuteByRuntime,
+        default::SimStep::LunabaseBridgeTxToLunabase(_) => SimOverride::ExecuteByRuntime,
+
+        default::SimStep::__Phantom(_) => SimOverride::ExecutedBySim,
     }
 }
 
@@ -208,7 +216,7 @@ fn main() {
                     std::thread::sleep(target_duration - elapsed);
                 }
                 // we don't need to sync and render at TARGET_HZ, only step the simulation
-                if counter == 10 {
+                if counter == 20 {
                     viewer.sync();
                     viewer.render(true);
                     counter = 0;
@@ -251,7 +259,7 @@ fn set_up_mujoco() -> (
     }));
     let mut timestep = 1.0 / (TARGET_HZ as f64);
     // speed up the simulation by a little
-    timestep *= 1.6;
+    // timestep *= 1.6;
     model.opt_mut().timestep = timestep;
 
     model.opt_mut().disableflags |= MjtDisableBit::mjDSBL_NATIVECCD as i32;
