@@ -31,6 +31,8 @@ struct LunabaseConnection {
 
     errored_tasks: Arc<Mutex<HashMap<String, String>>>,
     current_weight: f64,
+    global_position: Arc<Mutex<[f32; 3]>>,
+    orientation: Arc<Mutex<[f32; 3]>>,
 }
 
 #[godot_api]
@@ -45,6 +47,8 @@ impl INode for LunabaseConnection {
             last_packet_time: Instant::now(),
             current_stage: LunabotStage::SoftStop,
             current_weight: 1250.0,
+            global_position: Arc::new(Mutex::new([0.0; 3])),
+            orientation: Arc::new(Mutex::new([0.0; 3])),
         }
     }
 
@@ -100,11 +104,20 @@ impl LunabaseConnection {
                 Ok(client) => {
                     let cleint_c = client.clone();
                     let errored_tasks = self.errored_tasks.clone();
+                    let global_position = self.global_position.clone();
+                    let orientation = self.orientation.clone();
                     let recv_thread = std::thread::spawn(move || {
                         loop {
                             match cleint_c.recv() {
                                 Ok(msg) => match msg {
-                                    FromLunabot::RobotIsometry { .. } => {}
+                                    FromLunabot::RobotIsometry { origin, quat } => {
+                                        if let Ok(mut pos) = global_position.lock() {
+                                            *pos = origin;
+                                        }
+                                        if let Ok(mut rotation) = orientation.lock() {
+                                            *rotation = quat;
+                                        }
+                                    }
                                     FromLunabot::ArmAngles { .. } => {}
                                     FromLunabot::ErroredTasks(hash_map) => {
                                         if let Ok(mut guard) = errored_tasks.lock() {
@@ -258,7 +271,7 @@ impl LunabaseConnection {
     }
 
     #[func]
-    fn set_speed(&mut self, weight: f64) -> f64{
+    fn set_speed(&mut self, weight: f64) -> f64 {
         self.current_weight = weight;
         if let Some(ref client) = self.client {
             match client.send(FromLunabase::Steering(Steering::new(
@@ -274,9 +287,36 @@ impl LunabaseConnection {
         } else {
             godot_warn!("Cannot send steering: not connected");
         }
-        
-        self.current_weight
 
+        self.current_weight
     }
-    
+    #[func]
+    fn get_orientation(&mut self) -> PackedFloat32Array {
+        let mut values_sent = PackedFloat32Array::new();
+        if let Ok(orientation_values) = self.orientation.lock() {
+            values_sent.clear();
+            values_sent.push(orientation_values[0]);
+            values_sent.push(orientation_values[1]);
+            values_sent.push(orientation_values[2]);
+           
+        }
+        
+       
+        values_sent
+    }
+    #[func]
+    fn get_location(&mut self) -> PackedFloat32Array {
+        let mut values_sent = PackedFloat32Array::new();
+        if let Ok(position) = self.global_position.lock() {
+            values_sent.clear();
+            values_sent.push(position[0]);
+            values_sent.push(position[1]);
+            values_sent.push(position[2]);
+           
+        }
+        
+        
+        values_sent
+       
+    }
 }

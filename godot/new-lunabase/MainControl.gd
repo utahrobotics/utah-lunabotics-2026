@@ -12,7 +12,7 @@ extends Control
 @onready var errored_tasks_label: Label = $VBoxContainer/CenterContainer/HBoxContainer/ErroredTasksPanel/MarginContainer/ScrollContainer/VBox/ErroredTasksLabel
 @onready var speed_label: Label = $VBoxContainer/TopPanel/SpeedLabel
 @onready var speed_slider: HSlider = $SpeedMultiplierSlider
-
+@onready var location_label: Label = $LocationLabel
 var command_recorder: CommandRecorder
 
 #Speed Slider
@@ -20,7 +20,10 @@ var command_recorder: CommandRecorder
 var set_weight:= SetSpeedMultiplier.new()
 var weight: float
 
+#location label
 
+var get_location:= GetLocation.new()
+var location: PackedFloat32Array
 
 
 # Should match the LunabotStage enum in the Rust extension
@@ -82,7 +85,9 @@ func _process(delta: float) -> void:
 			stage_label.text = "Stage: Autonomy"
 			stage_label.modulate = Color.CYAN
 	
-	
+	#location 
+	var location = connection.get_location()
+	location_label.text = "location: " + str(location)
 
 	
 	
@@ -97,6 +102,8 @@ func _process(delta: float) -> void:
 			var error_msg: String = errored_tasks[task_name]
 			error_text += task_name + ":\n  " + error_msg + "\n\n"
 		errored_tasks_label.text = error_text.strip_edges()
+		
+	
 
 
 func _on_stage_changed(stage: int) -> void:

@@ -177,4 +177,12 @@ position = Vector2(66.40618, 588.619)
 scale = Vector2(0.087393455, 0.07955249)
 texture = ExtResource("3_w6ul0")
 
+[node name="LocationLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 11.0
+offset_top = 33.0
+offset_right = 176.0
+offset_bottom = 78.0
+text = "Location: Unkown"
+
 [connection signal="value_changed" from="SpeedMultiplierSlider" to="." method="_on_speed_multiplier_slider_value_changed"]
