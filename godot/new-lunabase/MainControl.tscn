@@ -179,10 +179,18 @@ texture = ExtResource("3_w6ul0")
 
 [node name="LocationLabel" type="Label" parent="."]
 layout_mode = 0
-offset_left = 11.0
-offset_top = 33.0
-offset_right = 176.0
-offset_bottom = 78.0
+offset_left = 443.0
+offset_top = 516.0
+offset_right = 608.0
+offset_bottom = 561.0
 text = "Location: Unkown"
+
+[node name="OrientationLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 444.0
+offset_top = 535.0
+offset_right = 603.0
+offset_bottom = 586.0
+text = "Orientation:Unkown"
 
 [connection signal="value_changed" from="SpeedMultiplierSlider" to="." method="_on_speed_multiplier_slider_value_changed"]

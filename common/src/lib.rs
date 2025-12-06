@@ -269,7 +269,7 @@ pub enum FromLunabot {
     /// Reports the robots pose
     RobotIsometry {
         origin: [f32; 3],
-        quat: [f32; 3],
+        quat: [f32; 4],
     },
     /// Angle in degrees of the hinge and bucket
     ArmAngles {

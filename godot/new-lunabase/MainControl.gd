@@ -13,6 +13,8 @@ extends Control
 @onready var speed_label: Label = $VBoxContainer/TopPanel/SpeedLabel
 @onready var speed_slider: HSlider = $SpeedMultiplierSlider
 @onready var location_label: Label = $LocationLabel
+@onready var orientation_label: Label = $OrientationLabel
+
 var command_recorder: CommandRecorder
 
 #Speed Slider
@@ -85,11 +87,13 @@ func _process(delta: float) -> void:
 			stage_label.text = "Stage: Autonomy"
 			stage_label.modulate = Color.CYAN
 	
-	#location 
+	#location  maybe temporary 
 	var location = connection.get_location()
-	location_label.text = "location: " + str(location)
-
+	location_label.text = "location: [%.2f, %.2f, %.2f]" % [location[0], location[1], location[2]]
 	
+	var orientation = connection.get_orientation()
+	orientation_label.text = "orientation: [%.2f, %.2f, %.2f, %.2f]" % [orientation[0], orientation[1], orientation[2], orientation[3]
+]
 	
 	
 	# Update errored tasks

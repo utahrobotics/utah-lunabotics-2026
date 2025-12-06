@@ -32,7 +32,7 @@ struct LunabaseConnection {
     errored_tasks: Arc<Mutex<HashMap<String, String>>>,
     current_weight: f64,
     global_position: Arc<Mutex<[f32; 3]>>,
-    orientation: Arc<Mutex<[f32; 3]>>,
+    orientation: Arc<Mutex<[f32; 4]>>,
 }
 
 #[godot_api]
@@ -48,7 +48,7 @@ impl INode for LunabaseConnection {
             current_stage: LunabotStage::SoftStop,
             current_weight: 1250.0,
             global_position: Arc::new(Mutex::new([0.0; 3])),
-            orientation: Arc::new(Mutex::new([0.0; 3])),
+            orientation: Arc::new(Mutex::new([0.0; 4])),
         }
     }
 
@@ -298,6 +298,7 @@ impl LunabaseConnection {
             values_sent.push(orientation_values[0]);
             values_sent.push(orientation_values[1]);
             values_sent.push(orientation_values[2]);
+            values_sent.push(orientation_values[3]);
            
         }
         

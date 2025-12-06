@@ -171,9 +171,9 @@ fn main() {
             )
             .expect("Failed to setup logger.");
 
-            rerun_viz::init_rerun(rerun_viz::RerunViz::Viz(rerun_viz::Level::All)).expect(
-                "Failed to initialize Rerun. Please check that the rerun binary is in your path.",
-            );
+          //  rerun_viz::init_rerun(rerun_viz::RerunViz::Viz(rerun_viz::Level::All)).expect(
+            ///    "Failed to initialize Rerun. Please check that the rerun binary is in your path.",
+            //);
 
             let robot_chain = NodeSerde::from_reader(
                 std::fs::File::open("../robot-layout/lunabot.ron")

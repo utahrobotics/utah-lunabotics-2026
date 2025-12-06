@@ -1,5 +1,6 @@
 use std::{collections::VecDeque, time::Duration};
 
+use crate::ROBOT_STATE;
 #[cfg(not(feature = "resim"))]
 use crate::comms::LunabaseConnection;
 use common::{FromLunabase, FromLunabot};
@@ -142,11 +143,32 @@ impl CuBridge for Lunabase {
             if let Some(lunabot_msg) = (payload as &dyn std::any::Any).downcast_ref::<FromLunabot>()
             {
                 // you will probably want to rate limit how often the iso gets sent over for bandwidth reasons
+
+                use core::f32;
                 if let Err(e) = self.connection.try_send(lunabot_msg.clone()) {
                     eprintln!("Failed to send message to Lunabase: {}", e);
                 }
-            } else {
-                eprintln!("Payload is not FromLunabot type");
+                let isometries = ROBOT_STATE
+                    .get()
+                    .unwrap()
+                    .kinematic_root
+                    .get_global_isometry();
+                let position = isometries.translation.vector.cast::<f32>().data.0[0];
+
+                
+
+                let orientation = isometries.rotation.as_vector().cast::<f32>().data.0[0];
+
+               
+
+                if let Err(e) = self.connection.try_send(FromLunabot::RobotIsometry {
+                    origin: (position),
+                    quat: (orientation),
+                }) {
+                    eprintln!("cannot send isometries to lunabase: {}", e);
+                }
+
+               
             }
         }
 
