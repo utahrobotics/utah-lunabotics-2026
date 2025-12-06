@@ -10,10 +10,11 @@
         },
         {
             "name": Some("l2_front"),
-            "origin": [0.50, 0.0, 0.50],
-            // "euler":  [0.0, 61., 175.0],
-            "euler": [0,0,0],
+            // "origin": [0.50, 0.0, 0.50],
+            "euler":  [0.0, 0., 165.0],
+            // "euler": [0,0,0],
             // dont question my decision to add this field
+            // this field determines the orders the angles are applied in
             "euler_order": ["pitch","yaw","roll"]
         },
         {

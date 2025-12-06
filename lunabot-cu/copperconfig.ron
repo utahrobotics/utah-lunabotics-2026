@@ -112,17 +112,22 @@
             id:"l2_kiss_icp",
             type:"crate::tasks::KissIcp",
             config:{
-                "voxel_size": .5,
+                "voxel_size": .6,
                 "max_range": 10.0,
-                "min_range": 0.0,
-                "max_points_per_voxel": 20,
+                "min_range": 1.5,
+                "max_points_per_voxel": 50,
                 "initial_threshold": 2.0,
                 "min_motion_th": 0.2,
                 "enable_deskewing": true,
                 "max_num_threads": 10,
                 "convergence_criterion": 0.0001,
                 "max_num_iterations": 500,
-                "max_accumulation": 3
+                "max_accumulation": 15,
+                "max_point_age_seconds": 30.0,
+
+                // max distances between poses used to deskew. if any pose is too far apart, we skip deskewing
+                "max_angle_between_poses": 0.10472, // 6 degrees in radians
+                "max_distance_between_poses": 0.05, // 1 meter
             },
             logging: (
                 enabled: false
@@ -132,18 +137,12 @@
         // fuses information from IMUs, Apriltags, and ICP algos providing one global robot position.
         // position is logged to rerun at 60 hz
         (
-            id:"localizer", type:"crate::tasks::sinks::Localizer",
+            id:"localizer", type:"crate::tasks::Localizer",
             config:{},
             // task does not get stubbed out in sim mode
             run_in_sim: true,
         ),
-        // receives messages from the lunabase over UDP
-        (
-            id:"lunabase", type:"crate::tasks::sources::Lunabase", config:{
-                "max_pong_delay_ms": 500,
-            },
-            run_in_sim: true,
-        ),
+
         // receives messages from the ai_source and tells the motors to move accordingly
         (
             id:"motor_ctrl", type:"crate::tasks::sinks::MotorController", config:{
@@ -178,18 +177,34 @@
         )
     ],
     cnx:[
-        (src:"l2_imu",                  dst:"localizer",               msg:"crate::tasks::sources::ImuMeasurement"),
-        (src:"l2_pointcloud",           dst:"l2_kiss_icp",             msg:"iceoryx_types::IceoryxPointCloud"),
-        (src:"l2_kiss_icp",             dst:"localizer",               msg:"crate::tasks::IcpMeasurement"),
-        (src:"lunabase",                dst:"new_ai",                  msg:"Option<common::FromLunabase>"),
+        (src:"l2_imu",                        dst:"localizer",               msg:"crate::tasks::sources::ImuMeasurement"),
+        (src:"l2_pointcloud",                 dst:"l2_kiss_icp",             msg:"iceoryx_types::IceoryxPointCloud"),
+        (src:"l2_kiss_icp",                   dst:"localizer",               msg:"crate::tasks::IcpMeasurement"),
+        (src:"lunabase_bridge/from_lunabase_rx", dst:"new_ai",                  msg:"common::FromLunabase"),
+        (src:"localizer",                    dst:"lunabase_bridge/to_lunabase", msg:"common::FromLunabot"),
         // copper doesn't support multiple outputs on a single task so for now we just put them in a tuple and ignore one side
-        (src:"realsense_subscriber",    dst:"occupancy_grid_pipeline", msg:"(Option<iceoryx_types::IceoryxDepthFrame<307200>>, Option<iceoryx_types::ImuMsg>)"),
-        (src:"occupancy_grid_pipeline", dst:"new_ai",                  msg:"crate::tasks::OccupancyGrid"),
-        (src:"new_ai",                  dst:"motor_ctrl",              msg:"(Option<common::Steering>, Option<embedded_common::ActuatorCommand>)"),
-        (src:"new_ai",                  dst:"v3_pico",                 msg:"(Option<common::Steering>, Option<embedded_common::ActuatorCommand>)"),
-        (src:"v3_pico",                 dst:"localizer",               msg:"embedded_common::FromPicoV3"),
-        (src:"detection_handler",       dst: "localizer",              msg:"Vec<crate::tasks::AprilTagMeasurement>"),
-        (src:"t265_subscriber",         dst:"localizer",               msg:"cu_spatial_payloads::EncodableIsometry"),
+        (src:"realsense_subscriber",          dst:"occupancy_grid_pipeline", msg:"(Option<iceoryx_types::IceoryxDepthFrame<307200>>, Option<iceoryx_types::ImuMsg>)"),
+        (src:"occupancy_grid_pipeline",       dst:"new_ai",                  msg:"crate::tasks::OccupancyGrid"),
+        (src:"new_ai",                        dst:"motor_ctrl",              msg:"(Option<common::Steering>, Option<embedded_common::ActuatorCommand>)"),
+        (src:"new_ai",                        dst:"v3_pico",                 msg:"(Option<common::Steering>, Option<embedded_common::ActuatorCommand>)"),
+        (src:"v3_pico",                       dst:"localizer",               msg:"embedded_common::FromPicoV3"),
+        (src:"detection_handler",             dst: "localizer",              msg:"Vec<crate::tasks::AprilTagMeasurement>"),
+        (src:"t265_subscriber",               dst:"localizer",               msg:"cu_spatial_payloads::EncodableIsometry"),
+    ],
+    
+    bridges: [
+        (
+            id: "lunabase_bridge",
+            type: "crate::bridges::lunabase_bridge::Lunabase",
+            config: {
+                "max_pong_delay_ms": 500,
+            },
+            run_in_sim: true,
+            channels: [
+                Rx ( id: "from_lunabase_rx" ),
+                Tx ( id: "to_lunabase" ),
+            ],
+        ),
     ],
     
     includes:[
