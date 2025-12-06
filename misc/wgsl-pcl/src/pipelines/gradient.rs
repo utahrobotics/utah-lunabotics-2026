@@ -37,6 +37,7 @@ pub fn new_gradient_pipeline(
         ("KERNEL_RADIUS", gradient_kernel_radius as f64),
         ("WORKGROUP_X", workgroup_size_stage2.0 as f64),
         ("WORKGROUP_Y", workgroup_size_stage2.1 as f64),
+        ("CELL_SIZE", map_layout.cell_size as f64),
     ]);
     let (gradient_layout, gradient_bind_group) = BindGroupLayoutBuilder::new(None)
         .with_entry(

@@ -1,92 +1,103 @@
-// Converts a height map to a gradient magnitude map
-// if the value in the height map is f32 min, then we will know that the cell is considered to be unknown.
 @group(0) @binding(0) var<storage, read_write> height_map: array<f32>;
 @group(0) @binding(1) var<storage, read_write> gradient_map: array<f32>;
 
 override MAP_WIDTH: u32;
 override MAP_HEIGHT: u32;
+
 override WORKGROUP_X: u32 = 8;
 override WORKGROUP_Y: u32 = 8;
-// kernel radius for gradient calculation (typically 1-3)
+
 override KERNEL_RADIUS: u32 = 1;
 
-@compute
-@workgroup_size(WORKGROUP_X, WORKGROUP_Y, 1)
-fn gradient(
-    @builtin(global_invocation_id) global_invocation_id : vec3u,
-    @builtin(local_invocation_id) local_id: vec3u
-) {
-    let x = global_invocation_id.x;
-    let y = global_invocation_id.y;
-    
-    if x >= MAP_WIDTH || y >= MAP_HEIGHT {
-        return;
-    }
-    
-    let center_index = xy_to_index(i32(x), i32(y));
-    if center_index < 0 {
-        return;
-    }
-    
-    let center_value = height_map[center_index];
-    
-    if center_value == -3.40282347e+38 {
-        gradient_map[center_index] = -3.40282347e+38;
-        return;
-    }
-    
-    var grad_x = 0.0;
-    var grad_y = 0.0;
-    var valid_samples = 0;
-    
-    let radius = i32(KERNEL_RADIUS);
+override CELL_SIZE: f32 = 1.0; 
 
-    // sobel operator based
-    
-    for (var dy = -radius; dy <= radius; dy++) {
-        let left_index = xy_to_index(i32(x) - radius, i32(y) + dy);
-        let right_index = xy_to_index(i32(x) + radius, i32(y) + dy);
-        
-        if left_index >= 0 && right_index >= 0 {
-            let left_val = height_map[left_index];
-            let right_val = height_map[right_index];
-            
-            if left_val != -3.40282347e+38 && right_val != -3.40282347e+38 {
-                let weight = 1.0 / (1.0 + f32(abs(dy)));
-                grad_x += (right_val - left_val) * weight;
-                valid_samples += 1;
-            }
-        }
-    }
-    
-    for (var dx = -radius; dx <= radius; dx++) {
-        let top_index = xy_to_index(i32(x) + dx, i32(y) - radius);
-        let bottom_index = xy_to_index(i32(x) + dx, i32(y) + radius);
-        
-        if top_index >= 0 && bottom_index >= 0 {
-            let top_val = height_map[top_index];
-            let bottom_val = height_map[bottom_index];
-            
-            if top_val != -3.40282347e+38 && bottom_val != -3.40282347e+38 {
-                let weight = 1.0 / (1.0 + f32(abs(dx)));
-                grad_y += (bottom_val - top_val) * weight;
-                valid_samples += 1;
-            }
-        }
-    }
-    
-    if valid_samples > 0 {
-        let gradient_magnitude = sqrt(grad_x * grad_x + grad_y * grad_y);
-        gradient_map[center_index] = gradient_magnitude;
-    } else {
-        gradient_map[center_index] = -3.40282347e+38;
-    }
-}
+const UNKNOWN_VALUE: f32 = -3.40282347e+38; 
 
-// will return -1 if out of bounds
 fn xy_to_index(x: i32, y: i32) -> i32 {
     if x < 0 || y < 0 || x >= i32(MAP_WIDTH) || y >= i32(MAP_HEIGHT) {
         return -1;
     }
     return x + y * i32(MAP_WIDTH);
+}
+
+@compute
+@workgroup_size(WORKGROUP_X, WORKGROUP_Y, 1)
+fn gradient(
+    @builtin(global_invocation_id) global_invocation_id : vec3u
+) {
+    let x = i32(global_invocation_id.x);
+    let y = i32(global_invocation_id.y);
+    
+    if u32(x) >= MAP_WIDTH || u32(y) >= MAP_HEIGHT {
+        return;
+    }
+    
+    let center_index = xy_to_index(x, y);
+
+    let center_value = height_map[center_index];
+    
+    if center_value == UNKNOWN_VALUE {
+        gradient_map[center_index] = UNKNOWN_VALUE;
+        return;
+    }
+    
+    var grad_x_sum = 0.0;
+    var grad_y_sum = 0.0;
+    var total_weight_x = 0.0;
+    var total_weight_y = 0.0;
+    
+    let radius = i32(KERNEL_RADIUS);
+    let run_distance = f32(radius * 2) * CELL_SIZE;
+    
+    for (var dy = -radius; dy <= radius; dy++) {
+        let left_index = xy_to_index(x - radius, y + dy);
+        let right_index = xy_to_index(x + radius, y + dy);
+        
+        if left_index >= 0 && right_index >= 0 {
+            let left_val = height_map[u32(left_index)];
+            let right_val = height_map[u32(right_index)];
+            
+            if left_val != UNKNOWN_VALUE && right_val != UNKNOWN_VALUE {
+                let weight = 1.0 / (1.0 + f32(abs(dy)));
+                
+                grad_x_sum += (right_val - left_val) * weight;
+                total_weight_x += weight;
+            }
+        }
+    }
+    
+    for (var dx = -radius; dx <= radius; dx++) {
+        let top_index = xy_to_index(x + dx, y - radius);
+        let bottom_index = xy_to_index(x + dx, y + radius);
+        
+        if top_index >= 0 && bottom_index >= 0 {
+            let top_val = height_map[u32(top_index)];
+            let bottom_val = height_map[u32(bottom_index)];
+            
+            if top_val != UNKNOWN_VALUE && bottom_val != UNKNOWN_VALUE {
+                let weight = 1.0 / (1.0 + f32(abs(dx)));
+                
+                grad_y_sum += (bottom_val - top_val) * weight;
+                total_weight_y += weight;
+            }
+        }
+    }
+    
+    var final_slope_x = 0.0;
+    var final_slope_y = 0.0;
+    
+    if total_weight_x > 0.0 {
+        final_slope_x = (grad_x_sum / total_weight_x) / run_distance;
+    }
+
+    if total_weight_y > 0.0 {
+        final_slope_y = (grad_y_sum / total_weight_y) / run_distance;
+    }
+
+    if total_weight_x > 0.0 || total_weight_y > 0.0 {
+        let gradient_magnitude = sqrt(final_slope_x * final_slope_x + final_slope_y * final_slope_y);
+        gradient_map[center_index] = gradient_magnitude;
+    } else {
+        gradient_map[center_index] = UNKNOWN_VALUE;
+    }
 }

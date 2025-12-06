@@ -43,7 +43,7 @@ pub struct DepthToPclAndHeightPipeline {
     input_img_buffer: GpuBuffer,
     output_pcl_buffer: GpuBuffer,
     _output_height_map_buffer: GpuBuffer,
-    _output_filtered_height_map_buffer: GpuBuffer,
+    output_filtered_height_map_buffer: GpuBuffer,
     _output_outlier_filtered_height_map_buffer: GpuBuffer,
     _output_gradient_map_buffer: GpuBuffer,
     output_expanded_gradient_map_buffer: GpuBuffer,
@@ -418,7 +418,7 @@ impl DepthToPclAndHeightPipeline {
             camera_transform_buffer,
             depth_scale_buffer,
             map_layout,
-            _output_filtered_height_map_buffer: blur_filtered_height_map_buffer,
+            output_filtered_height_map_buffer: blur_filtered_height_map_buffer,
             _output_outlier_filtered_height_map_buffer: outlier_filtered_height_map_buffer,
             _output_gradient_map_buffer: gradient_map_buffer,
             output_expanded_gradient_map_buffer: obstacle_expander_output_buffer,
@@ -519,6 +519,13 @@ impl DepthToPclAndHeightPipeline {
     pub fn get_height_map(&self, device: &GpuDevice) -> anyhow::Result<Vec<f32>> {
         let height_map_data: Vec<f32> = self
             ._output_outlier_filtered_height_map_buffer
+            .read_data_blocking(device)?;
+        Ok(height_map_data)
+    }
+
+    pub fn get_blur_filtered_height_map(&self, device: &GpuDevice) -> anyhow::Result<Vec<f32>> {
+        let height_map_data: Vec<f32> = self
+            .output_filtered_height_map_buffer
             .read_data_blocking(device)?;
         Ok(height_map_data)
     }

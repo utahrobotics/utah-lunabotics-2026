@@ -85,7 +85,7 @@
                 "bilateral_filter_sigma_spatial": 15,
                 "bilateral_filter_sigma_range": 0.05,
                 "gradient_filter_kernel_radius": 3,
-                "gaussian_blur_kernel_radius": 2,
+                "gaussian_blur_kernel_radius": 3,
                 "gaussian_sigma_spatial": 3.0,
                 "outlier_filter_kernel_radius": 3,
                 // outlier removal works best when the clear affected cells is enabled
@@ -99,7 +99,7 @@
                 "min_distance_to_clear": 2.0,
                 // this is the gradient threshold for the obstacle expander
                 // if the gradient is greater than this value, the cell is considered an obstacle
-                "obstacle_gradient_threshold": 0.5,
+                "obstacle_gradient_threshold": 1.0,
             },
             background: false,
             logging: (
