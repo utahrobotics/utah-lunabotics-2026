@@ -1,13 +1,13 @@
 <mujoco model="simplify_lunabot">
   <tendon>
     <!-- Lift cylinder: distance from chassis pivot to lift arm attachment -->
-    <spatial name="lift_cylinder_length" limited="true" range="0.4 0.9" width="0.03">
+    <spatial name="lift_cylinder_length" limited="true" range="-3.5 1.0" width="0.03">
       <site site="lift_actuator_base" />
       <site site="lift_arm_actuator_attach" />
     </spatial>
 
     <!-- Bucket cylinder: distance from lift arm pivot to bucket attachment -->
-    <spatial name="bucket_cylinder_length" limited="true" range="0.3 0.8" width="0.03">
+    <spatial name="bucket_cylinder_length" limited="true" range="-3.0 3.0" width="0.03">
       <site site="bucket_actuator_base" />
       <site site="bucket_actuator_attach_point" />
     </spatial>
@@ -89,7 +89,7 @@
 
   <worldbody>
     <body name="simplify_lunabot" pos="1 1 0.4" euler="0 0 0 ">
-      <inertial mass="80" pos="0.5 -0.20 0.09" diaginertia="1 1 1" />
+      <inertial mass="90" pos="0.4 -0.20 0.09" diaginertia="1 1 1" />
       <joint type="free" />
       <geom material="DefaultMaterialLunabot" mesh="simplify_lunabot" class="visual" />
       <site name="lift_actuator_base" pos="0.39 -0.22 0.04" />
@@ -178,8 +178,6 @@
       <!-- Front Left Wheel -->
       <body name="wheel_fl" pos="0 0 0" childclass="wheel">
         <joint name="motor_fl" type="hinge" axis="0 1 0" pos="0.816 0.065 -0.061" damping="1.0" />
-        <geom mesh="simplify_lunabot_collision_9"
-          rgba="0.33586594497754674 0.15326019554498593 0.10107899229814699 1" class="collision" />
         <geom mesh="simplify_lunabot_collision_49"
           rgba="0.33235850499632424 0.9628016473757951 0.19257379026254906 1" class="collision" />
         <geom mesh="simplify_lunabot_collision_57"
@@ -192,12 +190,22 @@
           rgba="0.5032677555718568 0.8330626847866702 0.031756877985209986 1" class="collision" />
         <geom mesh="simplify_lunabot_collision_66"
           rgba="0.02962883136581629 0.09423004062893314 0.49455560390789555 1" class="collision" />
+        <geom mesh="simplify_lunabot_collision_30"
+          rgba="0.22309323261088632 0.34635745394338924 0.6695929426732357 1" class="collision" />
+        <geom mesh="simplify_lunabot_collision_43"
+          rgba="0.6317567735305459 0.1970909370185837 0.6403437217111201 1" class="collision" />
+        <geom mesh="simplify_lunabot_collision_33"
+          rgba="0.35293659549321044 0.8719782069285942 0.4682792183902704 1" class="collision" />
+        <geom mesh="simplify_lunabot_collision_40"
+          rgba="0.2563612638759757 0.6402601143349566 0.9350317498887921 1" class="collision" />
       </body>
 
       <!-- Front Right Wheel -->
       <body name="wheel_fr" pos="0 0 0" childclass="wheel">
 
         <joint name="motor_fr" type="hinge" axis="0 1 0" pos="0.824 -0.472 -0.055" damping="1.0" />
+        <geom mesh="simplify_lunabot_collision_9"
+          rgba="0.33586594497754674 0.15326019554498593 0.10107899229814699 1" class="collision" />
         <geom mesh="simplify_lunabot_collision_10"
           rgba="0.938059979477167 0.13908969296886464 0.8597639578100418 1" class="collision" />
         <geom mesh="simplify_lunabot_collision_20"
@@ -228,6 +236,14 @@
           rgba="0.3779928845079503 0.7899386750461714 0.7847121833349764 1" class="collision" />
         <geom mesh="simplify_lunabot_collision_50"
           rgba="0.20250081557099708 0.1662726910990251 0.7764609287363726 1" class="collision" />
+        <geom mesh="simplify_lunabot_collision_28"
+          rgba="0.5132157883953471 0.12854859002074737 0.20692638926751128 1" class="collision" />
+        <geom mesh="simplify_lunabot_collision_21"
+          rgba="0.5622918008957221 0.36851003064817645 0.8478675485308487 1" class="collision" />
+        <geom mesh="simplify_lunabot_collision_39"
+          rgba="0.554356567537488 0.015156663153638728 0.31478038118841345 1" class="collision" />
+
+
       </body>
 
       <!-- Back Right Wheel -->
@@ -262,34 +278,22 @@
         rgba="0.2568370426563964 0.1450357872214001 0.17053813248853078 1" class="collision" />
 
 
-      <geom mesh="simplify_lunabot_collision_21"
-        rgba="0.5622918008957221 0.36851003064817645 0.8478675485308487 1" class="collision" />
       <geom mesh="simplify_lunabot_collision_22"
         rgba="0.6800497019606259 0.5717265446930845 0.9820367061445245 1" class="collision" />
       <geom mesh="simplify_lunabot_collision_23"
         rgba="0.15432565323659453 0.7759200236361088 0.5795111373890002 1" class="collision" />
 
 
-      <geom mesh="simplify_lunabot_collision_28"
-        rgba="0.5132157883953471 0.12854859002074737 0.20692638926751128 1" class="collision" />
       <geom mesh="simplify_lunabot_collision_29"
         rgba="0.16169386780696038 0.2758271382244136 0.7292309151916815 1" class="collision" />
-      <geom mesh="simplify_lunabot_collision_30"
-        rgba="0.22309323261088632 0.34635745394338924 0.6695929426732357 1" class="collision" />
+
       <geom mesh="simplify_lunabot_collision_31"
         rgba="0.3786073761211408 0.30601754957663374 0.8547322016584269 1" class="collision" />
-      <geom mesh="simplify_lunabot_collision_33"
-        rgba="0.35293659549321044 0.8719782069285942 0.4682792183902704 1" class="collision" />
+
       <geom mesh="simplify_lunabot_collision_35"
         rgba="0.7230553670616044 0.8747947716305344 0.9803724559359 1" class="collision" />
 
-      <geom mesh="simplify_lunabot_collision_39"
-        rgba="0.554356567537488 0.015156663153638728 0.31478038118841345 1" class="collision" />
-      <geom mesh="simplify_lunabot_collision_40"
-        rgba="0.2563612638759757 0.6402601143349566 0.9350317498887921 1" class="collision" />
 
-      <geom mesh="simplify_lunabot_collision_43"
-        rgba="0.6317567735305459 0.1970909370185837 0.6403437217111201 1" class="collision" />
       <geom mesh="simplify_lunabot_collision_48"
         rgba="0.08647336373254277 0.35594839018383906 0.050027765680988656 1" class="collision" />
 
@@ -366,7 +370,7 @@
       kp="50000"
       kv="5000"
       ctrllimited="true"
-      ctrlrange="-2.0 3.0" />
+      ctrlrange="-3.0 3.0" />
   </actuator>
 
 </mujoco>
