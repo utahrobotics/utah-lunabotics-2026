@@ -76,26 +76,86 @@
   </asset>
 
   <worldbody>
-    <body name="simplify_lunabot" pos="1 1 0.4" euler = "0 0 0 ">
+    <body name="simplify_lunabot" pos="1 1 0.4" euler="0 0 0 ">
       <inertial mass="80" pos="0.5 -0.20 0" diaginertia="1 1 1" />
       <joint type="free" />
       <geom material="DefaultMaterialLunabot" mesh="simplify_lunabot" class="visual" />
-      <geom mesh="simplify_lunabot_collision_0"
-        rgba="0.18854816059541724 0.5994212665208022 0.2845419190857421 1" class="collision" />
-      <geom mesh="simplify_lunabot_collision_1"
-        rgba="0.590257182431078 0.9707219232216904 0.2983399085952382 1" class="collision" />
+
+      <body name="lift_arm">
+        <joint name="lift_hinge" type="hinge" axis="0 1 0" pos="0.0 -0.20 0.10" damping="0.0" />
+        <site name="lift_arm_actuator_attach" pos="0.717 -0.218 0.643" />
+        <geom mesh="simplify_lunabot_collision_0"
+          rgba="0.18854816059541724 0.5994212665208022 0.2845419190857421 1" class="collision" />
+        <geom mesh="simplify_lunabot_collision_12"
+          rgba="0.18801011894205621 0.9822959081579171 0.2211594589934961 1" class="collision" />
+        <geom mesh="simplify_lunabot_collision_38"
+          rgba="0.5331635093016527 0.551195594202999 0.48544779493400214 1" class="collision" />
+        <geom mesh="simplify_lunabot_collision_15"
+          rgba="0.4053999155795406 0.8168676789159607 0.2767772307902332 1" class="collision" />
+        <geom mesh="simplify_lunabot_collision_26"
+          rgba="0.6216894156975338 0.7264941888547717 0.2987171048828081 1" class="collision" />
+        <geom mesh="simplify_lunabot_collision_4"
+          rgba="0.00019560773463367376 0.6401100653984785 0.002785762825774585 1" class="collision" />
+        <geom mesh="simplify_lunabot_collision_24"
+          rgba="0.6806086190851804 0.09349165447783192 0.6510955400314298 1" class="collision" />
+
+        <geom mesh="simplify_lunabot_collision_11"
+          rgba="0.12650626662696018 0.4108748012142658 0.303746937176527 1" class="collision" />
+        <geom mesh="simplify_lunabot_collision_18"
+          rgba="0.3147989508338276 0.7306647105105786 0.9947324617247881 1" class="collision" />
+
+        <body name="bucket">
+          <joint name="bucket_hinge" type="hinge" axis="0 1 0" pos="1.06 -0.19 0.273" damping="0.0" />
+          <site name="bucket_actuator_attach_point"
+            pos="1.14 -0.17 0.42" />
+          <geom mesh="simplify_lunabot_collision_3"
+            rgba="0.5570960267355564 0.1200614981584579 0.12822893014915882 1" class="collision" />
+          <geom mesh="simplify_lunabot_collision_54"
+            rgba="0.7444374222931457 0.8836775223616697 0.5385017446189235 1" class="collision" />
+          <geom mesh="simplify_lunabot_collision_41"
+            rgba="0.6248245134570954 0.35428583108932643 0.14337727473556505 1" class="collision" />
+          <geom mesh="simplify_lunabot_collision_6"
+            rgba="0.12410309636687289 0.9005786762302743 0.7718767575492888 1" class="collision" />
+          <geom mesh="simplify_lunabot_collision_53"
+            rgba="0.24355392682267551 0.30094006011835583 0.8819515337477009 1" class="collision" />
+          <geom mesh="simplify_lunabot_collision_13"
+            rgba="0.385970217108371 0.5795695155398202 0.6513386298995848 1" class="collision" />
+        </body>
+
+        <body name="bucket_actuator">
+
+          <joint name="bucked_actuator_to_lift_hinge" type="hinge" axis="0 1 0"
+            pos="0.52 -0.15 0.41"
+            damping="0.0" />
+          <site name="bucket_actuator_tip"
+            pos="1.14 -0.17 0.42" />
+
+          <geom mesh="simplify_lunabot_collision_27"
+            rgba="0.5075547676384833 0.04494837088228931 0.019956006427548023 1" class="collision" />
+          <geom mesh="simplify_lunabot_collision_7"
+            rgba="0.19514810438640628 0.2507788095475564 0.6777446620031505 1" class="collision" />
+        </body>
+      </body>
+
+      <body name="lift_actuator">
+        <site name="lift_actuator_tip" pos="0.717 -0.218 0.643" />
+
+        <joint name="lift_actuator_to_body" type="hinge" axis="0 1 0"
+          pos="0.39 -0.22 0.04"
+          damping="0.0" />
+        <geom mesh="simplify_lunabot_collision_1"
+          rgba="0.590257182431078 0.9707219232216904 0.2983399085952382 1" class="collision" />
+        <geom mesh="simplify_lunabot_collision_19"
+          rgba="0.8435884095734515 0.675657698978867 0.2119562059984893 1" class="collision" />
+      </body>
+
       <geom mesh="simplify_lunabot_collision_2"
         rgba="0.30576491837789666 0.09515304116236245 0.3139195158179322 1" class="collision" />
-      <geom mesh="simplify_lunabot_collision_3"
-        rgba="0.5570960267355564 0.1200614981584579 0.12822893014915882 1" class="collision" />
-      <geom mesh="simplify_lunabot_collision_4"
-        rgba="0.00019560773463367376 0.6401100653984785 0.002785762825774585 1" class="collision" />
+
       <geom mesh="simplify_lunabot_collision_5"
         rgba="0.4503293148115458 0.6667647183140814 0.5597912485339376 1" class="collision" />
-      <geom mesh="simplify_lunabot_collision_6"
-        rgba="0.12410309636687289 0.9005786762302743 0.7718767575492888 1" class="collision" />
-      <geom mesh="simplify_lunabot_collision_7"
-        rgba="0.19514810438640628 0.2507788095475564 0.6777446620031505 1" class="collision" />
+
+
       <geom mesh="simplify_lunabot_collision_8"
         rgba="0.6344520669514044 0.6568292713681868 0.13106244560321956 1" class="collision" />
 
@@ -155,7 +215,7 @@
       </body>
 
       <!-- Back Right Wheel -->
-      <body name="wheel_br" pos="0 0 0"  childclass="wheel">
+      <body name="wheel_br" pos="0 0 0" childclass="wheel">
 
         <joint name="motor_br" type="hinge" axis="0 1 0" pos="0.157 -0.466 -0.065" damping="1.0" />
         <geom mesh="simplify_lunabot_collision_17"
@@ -178,34 +238,22 @@
           rgba="0.7004268218709944 0.3173781599228316 0.6125496175791986 1" class="collision" />
       </body>
 
-      <geom mesh="simplify_lunabot_collision_11"
-        rgba="0.12650626662696018 0.4108748012142658 0.303746937176527 1" class="collision" />
-      <geom mesh="simplify_lunabot_collision_12"
-        rgba="0.18801011894205621 0.9822959081579171 0.2211594589934961 1" class="collision" />
-      <geom mesh="simplify_lunabot_collision_13"
-        rgba="0.385970217108371 0.5795695155398202 0.6513386298995848 1" class="collision" />
+
       <geom mesh="simplify_lunabot_collision_14"
         rgba="0.07197469583400595 0.33378902799013455 0.1921296266787884 1" class="collision" />
-      <geom mesh="simplify_lunabot_collision_15"
-        rgba="0.4053999155795406 0.8168676789159607 0.2767772307902332 1" class="collision" />
+
       <geom mesh="simplify_lunabot_collision_16"
         rgba="0.2568370426563964 0.1450357872214001 0.17053813248853078 1" class="collision" />
-      <geom mesh="simplify_lunabot_collision_18"
-        rgba="0.3147989508338276 0.7306647105105786 0.9947324617247881 1" class="collision" />
-      <geom mesh="simplify_lunabot_collision_19"
-        rgba="0.8435884095734515 0.675657698978867 0.2119562059984893 1" class="collision" />
+
+
       <geom mesh="simplify_lunabot_collision_21"
         rgba="0.5622918008957221 0.36851003064817645 0.8478675485308487 1" class="collision" />
       <geom mesh="simplify_lunabot_collision_22"
         rgba="0.6800497019606259 0.5717265446930845 0.9820367061445245 1" class="collision" />
       <geom mesh="simplify_lunabot_collision_23"
         rgba="0.15432565323659453 0.7759200236361088 0.5795111373890002 1" class="collision" />
-      <geom mesh="simplify_lunabot_collision_24"
-        rgba="0.6806086190851804 0.09349165447783192 0.6510955400314298 1" class="collision" />
-      <geom mesh="simplify_lunabot_collision_26"
-        rgba="0.6216894156975338 0.7264941888547717 0.2987171048828081 1" class="collision" />
-      <geom mesh="simplify_lunabot_collision_27"
-        rgba="0.5075547676384833 0.04494837088228931 0.019956006427548023 1" class="collision" />
+
+
       <geom mesh="simplify_lunabot_collision_28"
         rgba="0.5132157883953471 0.12854859002074737 0.20692638926751128 1" class="collision" />
       <geom mesh="simplify_lunabot_collision_29"
@@ -218,22 +266,18 @@
         rgba="0.35293659549321044 0.8719782069285942 0.4682792183902704 1" class="collision" />
       <geom mesh="simplify_lunabot_collision_35"
         rgba="0.7230553670616044 0.8747947716305344 0.9803724559359 1" class="collision" />
-      <geom mesh="simplify_lunabot_collision_38"
-        rgba="0.5331635093016527 0.551195594202999 0.48544779493400214 1" class="collision" />
+
       <geom mesh="simplify_lunabot_collision_39"
         rgba="0.554356567537488 0.015156663153638728 0.31478038118841345 1" class="collision" />
       <geom mesh="simplify_lunabot_collision_40"
         rgba="0.2563612638759757 0.6402601143349566 0.9350317498887921 1" class="collision" />
-      <geom mesh="simplify_lunabot_collision_41"
-        rgba="0.6248245134570954 0.35428583108932643 0.14337727473556505 1" class="collision" />
+
       <geom mesh="simplify_lunabot_collision_43"
         rgba="0.6317567735305459 0.1970909370185837 0.6403437217111201 1" class="collision" />
       <geom mesh="simplify_lunabot_collision_48"
         rgba="0.08647336373254277 0.35594839018383906 0.050027765680988656 1" class="collision" />
-      <geom mesh="simplify_lunabot_collision_53"
-        rgba="0.24355392682267551 0.30094006011835583 0.8819515337477009 1" class="collision" />
-      <geom mesh="simplify_lunabot_collision_54"
-        rgba="0.7444374222931457 0.8836775223616697 0.5385017446189235 1" class="collision" />
+
+
       <geom mesh="simplify_lunabot_collision_58"
         rgba="0.08488140241012465 0.34682218026049194 0.8361392981416821 1" class="collision" />
       <geom mesh="simplify_lunabot_collision_60"
@@ -244,8 +288,16 @@
         rgba="0.23498010517229106 0.4707940170404168 0.42072024685700504 1" class="collision" />
       <geom mesh="simplify_lunabot_collision_69"
         rgba="0.9013961705691316 0.6758704046652588 0.9204316164110201 1" class="collision" />
-     </body>
+    </body>
   </worldbody>
+
+  <equality>
+    <connect name="bucket_to_actuator" site1="bucket_actuator_attach_point"
+      site2="bucket_actuator_tip" />
+    <connect name="lift_actuator_to_lift" site1="lift_arm_actuator_attach"
+      site2="lift_actuator_tip" />
+
+  </equality>
 
   <contact>
     <!-- wheels should not collide with chassis -->
@@ -261,13 +313,31 @@
     <exclude body1="wheel_fr" body2="wheel_bl" />
     <exclude body1="wheel_fr" body2="wheel_br" />
     <exclude body1="wheel_bl" body2="wheel_br" />
+
+    <!-- lift arms should not collide with chassis or wheels-->
+    <exclude body1="lift_arm" body2="simplify_lunabot" />
+    <exclude body1="lift_arm" body2="wheel_fl" />
+    <exclude body1="lift_arm" body2="wheel_fr" />
+    <exclude body1="lift_arm" body2="wheel_br" />
+    <exclude body1="lift_arm" body2="wheel_bl" />
+    <exclude body1="bucket_actuator" body2="simplify_lunabot" />
+
+    <exclude body1="lift_actuator" body2="simplify_lunabot" />
+    <exclude body1="lift_actuator" body2="bucket_actuator" />
+    <exclude body1="lift_actuator" body2="lift_arm" />
+
+
   </contact>
 
   <actuator>
-    <velocity ctrllimited="true" ctrlrange="-100 1000" name="motor_fl" joint="motor_fl" gear="5" kv="1" />
-    <velocity ctrllimited="true" ctrlrange="-100 1000" name="motor_fr" joint="motor_fr" gear="5" kv="1" />
-    <velocity ctrllimited="true" ctrlrange="-100 1000" name="motor_bl" joint="motor_bl" gear="5" kv="1" />
-    <velocity ctrllimited="true" ctrlrange="-100 1000" name="motor_br" joint="motor_br" gear="5" kv="1" />
+    <velocity ctrllimited="true" ctrlrange="-100 1000" name="motor_fl" joint="motor_fl" gear="5"
+      kv="1" />
+    <velocity ctrllimited="true" ctrlrange="-100 1000" name="motor_fr" joint="motor_fr" gear="5"
+      kv="1" />
+    <velocity ctrllimited="true" ctrlrange="-100 1000" name="motor_bl" joint="motor_bl" gear="5"
+      kv="1" />
+    <velocity ctrllimited="true" ctrlrange="-100 1000" name="motor_br" joint="motor_br" gear="5"
+      kv="1" />
   </actuator>
 
 </mujoco>
