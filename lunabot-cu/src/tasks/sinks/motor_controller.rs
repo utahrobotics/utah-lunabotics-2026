@@ -7,6 +7,8 @@ use cu29::{
 };
 
 use common::Steering;
+#[cfg(any(not(target_os = "linux"), feature = "resim", feature = "sim"))]
+use embedded_common::ActuatorCommand;
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use embedded_common::ActuatorCommand;
 
@@ -17,7 +19,7 @@ use crate::motors::{MotorRef, VescIDs, VescPair, enumerate_motors};
 
 pub struct MotorController {
     motor_ref: &'static MotorRef,
-    prev_speed_multi: f32,/*  */
+    prev_speed_multi: f32, /*  */
 }
 
 impl Freezable for MotorController {}
@@ -76,11 +78,10 @@ impl CuSinkTask for MotorController {
         Ok(())
     }
 
-
     fn process(&mut self, _clock: &RobotClock, input: &Self::Input<'_>) -> CuResult<()> {
         if let Some(payload) = input.payload() {
             if let Some(steering) = &payload.0 {
-                let new_weight:f32 = steering.get_weight() as f32;
+                let new_weight: f32 = steering.get_weight() as f32;
                 if (new_weight - self.prev_speed_multi).abs() > 0.0001 {
                     self.prev_speed_multi = new_weight;
                     self.motor_ref.set_speed_multiplier(new_weight);
@@ -111,10 +112,9 @@ impl CuSinkTask for MotorController {
 pub struct MotorController;
 
 #[cfg(any(not(target_os = "linux"), feature = "resim", feature = "sim"))]
-#[cfg(any(not(target_os = "linux"), feature = "resim", feature = "sim"))]
 
 impl CuSinkTask for MotorController {
-    type Input<'m> = input_msg!((Option<Steering>, Option<[u8; 5]>));
+    type Input<'m> = input_msg!((Option<Steering>, Option<ActuatorCommand>));
     fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
         Ok(Self {})
     }
