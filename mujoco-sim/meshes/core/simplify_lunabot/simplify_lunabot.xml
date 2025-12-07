@@ -1,5 +1,17 @@
 <mujoco model="simplify_lunabot">
+  <tendon>
+    <!-- Lift cylinder: distance from chassis pivot to lift arm attachment -->
+    <spatial name="lift_cylinder_length" limited="true" range="0.4 0.9" width="0.03">
+      <site site="lift_actuator_base" />
+      <site site="lift_arm_actuator_attach" />
+    </spatial>
 
+    <!-- Bucket cylinder: distance from lift arm pivot to bucket attachment -->
+    <spatial name="bucket_cylinder_length" limited="true" range="0.3 0.8" width="0.03">
+      <site site="bucket_actuator_base" />
+      <site site="bucket_actuator_attach_point" />
+    </spatial>
+  </tendon>
   <asset>
     <material name="DefaultMaterialLunabot" specular="0.5" shininess="0.5" rgba="1 1 1 1.0" />
     <mesh file="simplify_lunabot.obj" />
@@ -77,13 +89,15 @@
 
   <worldbody>
     <body name="simplify_lunabot" pos="1 1 0.4" euler="0 0 0 ">
-      <inertial mass="80" pos="0.5 -0.20 0" diaginertia="1 1 1" />
+      <inertial mass="80" pos="0.5 -0.20 0.09" diaginertia="1 1 1" />
       <joint type="free" />
       <geom material="DefaultMaterialLunabot" mesh="simplify_lunabot" class="visual" />
+      <site name="lift_actuator_base" pos="0.39 -0.22 0.04" />
 
       <body name="lift_arm">
         <joint name="lift_hinge" type="hinge" axis="0 1 0" pos="0.0 -0.20 0.10" damping="0.0" />
         <site name="lift_arm_actuator_attach" pos="0.717 -0.218 0.643" />
+        <site name="bucket_actuator_base" pos="0.52 -0.15 0.41" />
         <geom mesh="simplify_lunabot_collision_0"
           rgba="0.18854816059541724 0.5994212665208022 0.2845419190857421 1" class="collision" />
         <geom mesh="simplify_lunabot_collision_12"
@@ -123,6 +137,7 @@
         </body>
 
         <body name="bucket_actuator">
+          <inertial mass="20" pos="0.56 -0.21 0.26" diaginertia="1 1 1" />
 
           <joint name="bucked_actuator_to_lift_hinge" type="hinge" axis="0 1 0"
             pos="0.52 -0.15 0.41"
@@ -130,23 +145,24 @@
           <site name="bucket_actuator_tip"
             pos="1.14 -0.17 0.42" />
 
-          <geom mesh="simplify_lunabot_collision_27"
+          <!-- <geom mesh="simplify_lunabot_collision_27"
             rgba="0.5075547676384833 0.04494837088228931 0.019956006427548023 1" class="collision" />
           <geom mesh="simplify_lunabot_collision_7"
-            rgba="0.19514810438640628 0.2507788095475564 0.6777446620031505 1" class="collision" />
+            rgba="0.19514810438640628 0.2507788095475564 0.6777446620031505 1" class="collision" /> -->
         </body>
       </body>
 
       <body name="lift_actuator">
         <site name="lift_actuator_tip" pos="0.717 -0.218 0.643" />
+        <inertial mass="20" pos="0.909 -0.14 0.406" diaginertia="1 1 1" />
 
         <joint name="lift_actuator_to_body" type="hinge" axis="0 1 0"
           pos="0.39 -0.22 0.04"
           damping="0.0" />
-        <geom mesh="simplify_lunabot_collision_1"
+        <!-- <geom mesh="simplify_lunabot_collision_1"
           rgba="0.590257182431078 0.9707219232216904 0.2983399085952382 1" class="collision" />
         <geom mesh="simplify_lunabot_collision_19"
-          rgba="0.8435884095734515 0.675657698978867 0.2119562059984893 1" class="collision" />
+          rgba="0.8435884095734515 0.675657698978867 0.2119562059984893 1" class="collision" /> -->
       </body>
 
       <geom mesh="simplify_lunabot_collision_2"
@@ -338,6 +354,19 @@
       kv="1" />
     <velocity ctrllimited="true" ctrlrange="-100 1000" name="motor_br" joint="motor_br" gear="5"
       kv="1" />
+    <!-- Lift cylinder - controls extension distance -->
+    <position name="lift_cylinder" tendon="lift_cylinder_length"
+      kp="50000"
+      kv="5000"
+      ctrllimited="true"
+      ctrlrange="-3.5 1.0" />
+
+    <!-- Bucket cylinder - controls extension distance -->
+    <position name="bucket_cylinder" tendon="bucket_cylinder_length"
+      kp="50000"
+      kv="5000"
+      ctrllimited="true"
+      ctrlrange="-2.0 3.0" />
   </actuator>
 
 </mujoco>
