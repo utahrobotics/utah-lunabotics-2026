@@ -5,7 +5,6 @@ use nalgebra::Vector3;
 use wgpu::{ShaderStages, include_wgsl};
 
 use crate::{
-    benchmark::BenchmarkableComputePipeline,
     errors::WgslPclError,
     gpu_types::{AlignedMatrix4, AlignedVec4, GpuType},
     map_layout,
@@ -42,10 +41,10 @@ pub struct DepthToPclAndHeightPipeline {
     depth_scale_buffer: GpuBuffer,
     input_img_buffer: GpuBuffer,
     output_pcl_buffer: GpuBuffer,
-    _output_height_map_buffer: GpuBuffer,
-    output_filtered_height_map_buffer: GpuBuffer,
-    _output_outlier_filtered_height_map_buffer: GpuBuffer,
-    _output_gradient_map_buffer: GpuBuffer,
+    output_height_map_buffer: GpuBuffer,
+    blur_filtered_height_map_buffer: GpuBuffer,
+    output_outlier_filtered_height_map_buffer: GpuBuffer,
+    output_gradient_map_buffer: GpuBuffer,
     output_expanded_gradient_map_buffer: GpuBuffer,
     camera_transform_buffer: GpuBuffer,
     workgroup_size_stage1: (u32, u32, u32),
@@ -412,15 +411,15 @@ impl DepthToPclAndHeightPipeline {
         Ok(Self {
             pipeline: combined_pipeline,
             depth_image_dimensions_px: depth_image_dimensions,
-            _output_height_map_buffer: height_map_buffer,
+            output_height_map_buffer: height_map_buffer,
             input_img_buffer,
             output_pcl_buffer,
             camera_transform_buffer,
             depth_scale_buffer,
             map_layout,
-            output_filtered_height_map_buffer: blur_filtered_height_map_buffer,
-            _output_outlier_filtered_height_map_buffer: outlier_filtered_height_map_buffer,
-            _output_gradient_map_buffer: gradient_map_buffer,
+            blur_filtered_height_map_buffer,
+            output_outlier_filtered_height_map_buffer: outlier_filtered_height_map_buffer,
+            output_gradient_map_buffer: gradient_map_buffer,
             output_expanded_gradient_map_buffer: obstacle_expander_output_buffer,
             workgroup_size_stage1: (workgroup_size_stage1.0, workgroup_size_stage1.1, 1),
             workgroup_size_stage2: (workgroup_size_stage2.0, workgroup_size_stage2.1, 1),
@@ -516,16 +515,16 @@ impl DepthToPclAndHeightPipeline {
         ))
     }
 
-    pub fn get_height_map(&self, device: &GpuDevice) -> anyhow::Result<Vec<f32>> {
+    pub fn get_outlier_filtered_height_map(&self, device: &GpuDevice) -> anyhow::Result<Vec<f32>> {
         let height_map_data: Vec<f32> = self
-            ._output_outlier_filtered_height_map_buffer
+            .output_outlier_filtered_height_map_buffer
             .read_data_blocking(device)?;
         Ok(height_map_data)
     }
 
     pub fn get_blur_filtered_height_map(&self, device: &GpuDevice) -> anyhow::Result<Vec<f32>> {
         let height_map_data: Vec<f32> = self
-            .output_filtered_height_map_buffer
+            .blur_filtered_height_map_buffer
             .read_data_blocking(device)?;
         Ok(height_map_data)
     }
@@ -535,5 +534,16 @@ impl DepthToPclAndHeightPipeline {
             .output_expanded_gradient_map_buffer
             .read_data_blocking(device)?;
         Ok(height_map_data)
+    }
+
+    pub fn get_raw_height_map(&self, device: &GpuDevice) -> anyhow::Result<Vec<f32>> {
+        let height_map_data: Vec<f32> = self.output_height_map_buffer.read_data_blocking(device)?;
+        Ok(height_map_data)
+    }
+
+    pub fn get_gradient_map(&self, device: &GpuDevice) -> anyhow::Result<Vec<f32>> {
+        let gradient_map_data: Vec<f32> =
+            self.output_gradient_map_buffer.read_data_blocking(device)?;
+        Ok(gradient_map_data)
     }
 }
