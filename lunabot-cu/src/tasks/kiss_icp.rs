@@ -15,7 +15,7 @@ use simple_icp::{config::Config, icp_pipeline::IcpPipeline};
 use crate::{ROBOT_STATE, rerun_viz::RECORDER};
 
 const REFERENCE_VARIANCE_THRESHOLD: f64 = 1.0;
-const POSE_COLLECTION_INTERVAL: std::time::Duration = std::time::Duration::from_millis(5);
+const POSE_COLLECTION_INTERVAL: std::time::Duration = std::time::Duration::from_millis(1);
 
 pub struct KissIcp {
     pipeline: simple_icp::icp_pipeline::IcpPipeline,
@@ -144,6 +144,19 @@ impl CuTask for KissIcp {
         })
     }
 
+    fn start(&mut self, _clock: &RobotClock) -> CuResult<()> {
+        if let Some(recorder) = RECORDER.get() {
+            let _ = recorder.recorder.log_static(
+                format!("kiss_icp/local/xyz"),
+                &rerun::Arrows3D::from_vectors([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+                    .with_colors([[255, 0, 0], [0, 255, 0], [0, 0, 255]])
+                    .with_labels(vec!["x", "y", "z"]),
+            );
+        }
+
+        Ok(())
+    }
+
     fn preprocess(&mut self, _clock: &RobotClock) -> CuResult<()> {
         if let Some(state) = ROBOT_STATE.get() {
             let current_time = std::time::Instant::now();
@@ -194,11 +207,26 @@ impl CuTask for KissIcp {
                 output.clear_payload();
                 return Ok(());
             }
-            self.pipeline.process_frame(
-                &mut self.accumulated_frames,
-                200.0,
-                &self.timestamped_poses,
-            );
+            self.pipeline
+                .process_frame(&mut self.accumulated_frames, 0.0, &self.timestamped_poses);
+
+            if let Some(recorder) = RECORDER.get() {
+                let _ = recorder.recorder.log(
+                    format!("kiss_icp/local"),
+                    &rerun::Transform3D::from_translation_rotation(
+                        self.pipeline.t_origin_current.translation.vector.data.0[0],
+                        rerun::Quaternion::from_xyzw(
+                            self.pipeline
+                                .t_origin_current
+                                .cast::<f32>()
+                                .rotation
+                                .coords
+                                .data
+                                .0[0],
+                        ),
+                    ),
+                );
+            }
 
             let map_points = self.pipeline.get_last_batch_points();
             let relative_position = self.pipeline.t_origin_current;
@@ -249,6 +277,7 @@ impl CuTask for KissIcp {
             }
 
             self.log_accumulated_map(map_points)?;
+
             self.accumulated_frames.clear();
             self.timestamped_poses.clear();
             self.frame_accumulation_index = 0;

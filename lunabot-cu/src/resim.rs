@@ -14,6 +14,7 @@ use cu29_export::copperlists_reader;
 use cu29_helpers::basic_copper_setup;
 use embedded_common::{ActuatorCommand, FromPicoV3};
 use kalman_filter::{SimpleSquareMatrix, SimpleVector};
+use rerun_viz::{Level, RECORDER};
 use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock, RwLock};
@@ -85,6 +86,25 @@ fn run_one_copperlist(
             default::SimStep::L2Pointcloud(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_l_2_pointcloud_output().clone();
                 output.tov = robot_clock.now().into();
+                if let Some(sample) = output.payload() {
+                    let mut positions = Vec::new();
+                    let mut colors = Vec::new();
+                    for point in sample.points.iter() {
+                        positions.push([point.x as f32, point.y as f32, point.z as f32]);
+                        colors.push([0, 255, 0]);
+                    }
+                    if RECORDER.get().is_some() && RECORDER.get().unwrap().level == Level::All {
+                        if let Err(e) = RECORDER.get().unwrap().recorder.log(
+                            format!("kiss_icp/local/cloud"),
+                            &rerun::Points3D::new(positions)
+                                .with_colors(colors)
+                                .with_radii([0.02f32]),
+                        ) {
+                            warning!("Failed to log accumulated map to Rerun: {}", e.to_string());
+                        }
+                    }
+                }
+
                 SimOverride::ExecutedBySim
             }
             default::SimStep::L2Pointcloud(..) => SimOverride::ExecutedBySim,
