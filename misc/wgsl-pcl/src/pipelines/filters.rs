@@ -29,6 +29,7 @@ pub enum BlurFilterOptions {
 pub struct OutlierFilterOptions {
     pub kernel_radius: u32,
     pub std_dev_threshold: f32,
+    pub max_unknown_neighbors_ratio: f32,
 }
 
 /// returns the output buffer for the map after outlier removal and the compute pipeline
@@ -60,6 +61,10 @@ pub fn new_outlier_removal_pipeline(
         (
             "OUTLIER_THRESHOLD",
             outlier_filter_options.std_dev_threshold as f64,
+        ),
+        (
+            "MAX_UNKNOWN_NEIGHBORS_RATIO",
+            outlier_filter_options.max_unknown_neighbors_ratio as f64,
         ),
     ]);
     let (outlier_filter_layout, outlier_filter_bind_group) = BindGroupLayoutBuilder::new(None)

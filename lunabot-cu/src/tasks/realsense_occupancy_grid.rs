@@ -255,6 +255,10 @@ impl CuTask for OccupancyGridTask {
             .and_then(|c| c.get::<f64>("outlier_filter_std_dev_threshold"))
             .unwrap_or(2.0) as f32;
 
+        let outlier_filter_max_unknown_neighbors_ratio = config
+            .and_then(|c| c.get::<f64>("outlier_filter_max_unknown_neighbors_ratio "))
+            .unwrap_or(0.5) as f32;
+
         let gradient_filter_kernel_radius = config
             .and_then(|c| c.get::<u64>("gradient_filter_kernel_radius"))
             .unwrap_or(2) as u32;
@@ -332,11 +336,12 @@ impl CuTask for OccupancyGridTask {
 
         let obstacle_expander_options = ObstacleExpanderOptions {
             expansion_radius_meters: robot_radius_meters,
-            obstacle_gradient_threshold: obstacle_gradient_threshold,
+            obstacle_gradient_threshold,
         };
         let outlier_filter_options = OutlierFilterOptions {
             kernel_radius: outlier_filter_kernel_radius,
             std_dev_threshold: outlier_filter_std_dev_threshold,
+            max_unknown_neighbors_ratio: outlier_filter_max_unknown_neighbors_ratio,
         };
 
         let pipeline = Arc::new(Mutex::new(
