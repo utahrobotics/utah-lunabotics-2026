@@ -82,21 +82,21 @@
                 "heightmap_min_y": -10.0,
                 "heightmap_cell_size": 0.025,
                 "bilateral_filter_kernel_radius": 15,
-                "bilateral_filter_sigma_spatial": 15,
+                "bilateral_filter_sigma_spatial":0.6,
                 "bilateral_filter_sigma_range": 0.05,
-                "gradient_filter_kernel_radius": 3,
-                "gaussian_blur_kernel_radius": 3,
-                "gaussian_sigma_spatial": 3.0,
-                "outlier_filter_kernel_radius": 3,
+                "gradient_filter_kernel_radius": 4,
+                "gaussian_blur_kernel_radius": 4,
+                "gaussian_sigma_spatial": 0.5,
+                "outlier_filter_kernel_radius": 4,
                 // outlier removal works best when the clear affected cells is enabled
                 // this is because it allows the outlier cells to be re mapped on the next frame
                 "outlier_filter_std_dev_threshold": 3.5,
-                "use_bilateral_filter": false,
+                "use_bilateral_filter": true,
                 "robot_radius_meters": 0.1,
                 "min_depth": 0.2,
-                "max_depth": 3.0,
+                "max_depth": 2.5,
                 "clear_affected_cells": true,
-                "min_distance_to_clear": 2.0,
+                "min_distance_to_clear": 1.5,
                 // this is the gradient threshold for the obstacle expander
                 // if the gradient is greater than this value, the cell is considered an obstacle
                 "obstacle_gradient_threshold": 1.0,
@@ -128,6 +128,8 @@
                 // max distances between poses used to deskew. if any pose is too far apart, we skip deskewing
                 "max_angle_between_poses": 0.10472, // 6 degrees in radians
                 "max_distance_between_poses": 0.05, // 1 meter
+                // time between poses collected for deskewing
+                "time_between_pose_collections_ms": 2,
             },
             logging: (
                 enabled: false

@@ -7,7 +7,7 @@ use wgsl_pcl::pipelines::depth_to_obstacle::{ClearAffectedCellsOptions, Obstacle
 use wgsl_pcl::pipelines::filters::*;
 
 use iceoryx_types::{IceoryxDepthFrame, ImuMsg};
-use rerun::Points3D;
+use rerun::{ImageFormat, Points3D};
 use simple_motion::StaticNode;
 use wgsl_pcl::DepthToPclAndHeightPipeline;
 use wgsl_pcl::gpu_types::AlignedMatrix4;
@@ -243,8 +243,8 @@ impl CuTask for OccupancyGridTask {
             .and_then(|c| c.get::<u64>("bilateral_filter_kernel_radius"))
             .unwrap_or(5) as u32;
         let bilateral_filter_sigma_spatial = config
-            .and_then(|c| c.get::<u64>("bilateral_filter_sigma_spatial"))
-            .unwrap_or(6) as u32;
+            .and_then(|c| c.get::<f64>("bilateral_filter_sigma_spatial"))
+            .unwrap_or(0.7) as f32;
         let bilateral_filter_sigma_range = config
             .and_then(|c| c.get::<f64>("bilateral_filter_sigma_range"))
             .unwrap_or(0.1) as f32;
@@ -442,48 +442,163 @@ impl CuTask for OccupancyGridTask {
             match result {
                 Ok((point_cloud, height_map)) => {
                     if let Some(logger) = RECORDER.get() {
+                        // Log the raw depth image
+                        let depth_bytes: &[u8] = unsafe {
+                            std::slice::from_raw_parts(
+                                request.depths.as_ptr() as *const u8,
+                                request.depths.len() * std::mem::size_of::<u16>(),
+                            )
+                        };
+                        // let _ = logger.recorder.log(
+                        //     "realsense/depth_image",
+                        //     &rerun::DepthImage::new(
+                        //         depth_bytes,
+                        //         ImageFormat::depth(
+                        //             [DEPTH_FRAME_WIDTH as u32, DEPTH_FRAME_HEIGHT as u32],
+                        //             rerun::ChannelDatatype::U16,
+                        //         ),
+                        //     )
+                        //     .with_meter(1.0 / request.depth_scale)
+                        //     .with_depth_range([0.0, 2.0 / request.depth_scale as f64]),
+                        // );
+
+                        let pipeline_guard = pipeline.lock().unwrap();
+
+                        // same dimensions as height map
+                        let raw_height_map =
+                            pipeline_guard.get_raw_height_map(get_device()).unwrap();
+                        let raw_gradient_map =
+                            pipeline_guard.get_gradient_map(get_device()).unwrap();
+                        let blur_filtered_height_map = pipeline_guard
+                            .get_blur_filtered_height_map(get_device())
+                            .unwrap();
                         let _ = logger.recorder.log(
                             "realsense/pcl",
                             &Points3D::new(point_cloud.iter().map(|p| [p.x, p.y, p.z])),
                         );
-
-                        let mut heightmap_points = Vec::new();
-                        let mut heightmap_colors = Vec::new();
 
                         let width = layout.max_x - layout.min_x;
                         let height = layout.max_y - layout.min_y;
                         let cells_x = (width / layout.cell_size).ceil() as usize;
                         let cells_y = (height / layout.cell_size).ceil() as usize;
 
+                        // Create obstacle map as 2D image (RGB)
+                        let mut obstacle_image_data = vec![0u8; cells_x * cells_y * 3];
                         for cell_y in 0..cells_y {
                             for cell_x in 0..cells_x {
                                 let idx = cell_x + cell_y * cells_x;
 
                                 if idx < height_map.len() {
                                     let z = height_map[idx];
+                                    let pixel_idx = idx * 3;
+
                                     if z == f32::MIN {
-                                        continue;
+                                        // Black for invalid cells
+                                        obstacle_image_data[pixel_idx] = 0;
+                                        obstacle_image_data[pixel_idx + 1] = 0;
+                                        obstacle_image_data[pixel_idx + 2] = 0;
+                                    } else {
+                                        let normalized = ((z + 1.0) / 4.0).clamp(0.0, 1.0);
+                                        obstacle_image_data[pixel_idx] = (normalized * 255.0) as u8;
+                                        obstacle_image_data[pixel_idx + 1] = 50;
+                                        obstacle_image_data[pixel_idx + 2] =
+                                            ((1.0 - normalized) * 255.0) as u8;
                                     }
-
-                                    let x = layout.min_x + (cell_x as f32 + 0.5) * layout.cell_size;
-                                    let y = layout.min_y + (cell_y as f32 + 0.5) * layout.cell_size;
-
-                                    heightmap_points.push([x, y, z]);
-
-                                    let normalized = ((z + 1.0) / 4.0).clamp(0.0, 1.0);
-                                    let color = [
-                                        (normalized * 255.0) as u8,
-                                        50,
-                                        ((1.0 - normalized) * 255.0) as u8,
-                                    ];
-                                    heightmap_colors.push(color);
                                 }
                             }
                         }
 
                         let _ = logger.recorder.log(
-                            "realsense/height_map",
-                            &Points3D::new(heightmap_points).with_colors(heightmap_colors),
+                            "realsense/obstacle_map",
+                            &rerun::Image::new(
+                                obstacle_image_data,
+                                ImageFormat::rgb8([cells_x as u32, cells_y as u32]),
+                            ),
+                        );
+
+                        // Log raw height map
+                        let mut raw_height_points = Vec::new();
+                        let mut raw_height_colors = Vec::new();
+                        for cell_y in 0..cells_y {
+                            for cell_x in 0..cells_x {
+                                let idx = cell_x + cell_y * cells_x;
+                                if idx < raw_height_map.len() {
+                                    let z = raw_height_map[idx];
+                                    if z == f32::MIN {
+                                        continue;
+                                    }
+                                    let x = layout.min_x + (cell_x as f32 + 0.5) * layout.cell_size;
+                                    let y = layout.min_y + (cell_y as f32 + 0.5) * layout.cell_size;
+                                    raw_height_points.push([x, y, z]);
+                                    let normalized = ((z + 1.0) / 4.0).clamp(0.0, 1.0);
+                                    raw_height_colors.push([
+                                        (normalized * 255.0) as u8,
+                                        100,
+                                        ((1.0 - normalized) * 255.0) as u8,
+                                    ]);
+                                }
+                            }
+                        }
+                        let _ = logger.recorder.log(
+                            "realsense/raw_height_map",
+                            &Points3D::new(raw_height_points).with_colors(raw_height_colors),
+                        );
+
+                        // Log gradient map
+                        let mut gradient_points = Vec::new();
+                        let mut gradient_colors = Vec::new();
+                        for cell_y in 0..cells_y {
+                            for cell_x in 0..cells_x {
+                                let idx = cell_x + cell_y * cells_x;
+                                if idx < raw_gradient_map.len() {
+                                    let gradient = raw_gradient_map[idx];
+                                    if gradient == f32::MIN {
+                                        continue;
+                                    }
+                                    let x = layout.min_x + (cell_x as f32 + 0.5) * layout.cell_size;
+                                    let y = layout.min_y + (cell_y as f32 + 0.5) * layout.cell_size;
+                                    // Use gradient value as z for visualization
+                                    gradient_points.push([x, y, gradient * 2.0]);
+                                    let normalized = (gradient * 2.0).clamp(0.0, 1.0);
+                                    gradient_colors.push([
+                                        (normalized * 255.0) as u8,
+                                        0,
+                                        ((1.0 - normalized) * 255.0) as u8,
+                                    ]);
+                                }
+                            }
+                        }
+                        let _ = logger.recorder.log(
+                            "realsense/gradient_map",
+                            &Points3D::new(gradient_points).with_colors(gradient_colors),
+                        );
+
+                        // Log blur filtered height map
+                        let mut blur_height_points = Vec::new();
+                        let mut blur_height_colors = Vec::new();
+                        for cell_y in 0..cells_y {
+                            for cell_x in 0..cells_x {
+                                let idx = cell_x + cell_y * cells_x;
+                                if idx < blur_filtered_height_map.len() {
+                                    let z = blur_filtered_height_map[idx];
+                                    if z == f32::MIN {
+                                        continue;
+                                    }
+                                    let x = layout.min_x + (cell_x as f32 + 0.5) * layout.cell_size;
+                                    let y = layout.min_y + (cell_y as f32 + 0.5) * layout.cell_size;
+                                    blur_height_points.push([x, y, z]);
+                                    let normalized = ((z + 1.0) / 4.0).clamp(0.0, 1.0);
+                                    blur_height_colors.push([
+                                        (normalized * 255.0) as u8,
+                                        150,
+                                        ((1.0 - normalized) * 255.0) as u8,
+                                    ]);
+                                }
+                            }
+                        }
+                        let _ = logger.recorder.log(
+                            "realsense/blur_filtered_height_map",
+                            &Points3D::new(blur_height_points).with_colors(blur_height_colors),
                         );
                     }
 

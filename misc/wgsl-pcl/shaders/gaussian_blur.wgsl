@@ -11,6 +11,7 @@ override WORKGROUP_Y: u32 = 8;
 override KERNEL_RADIUS: u32 = 4;
 // sigma controls the spread of the Gaussian
 override SIGMA: f32 = 3.0;
+override CELL_SIZE: f32 = 0.1;
 
 @compute
 @workgroup_size(WORKGROUP_X, WORKGROUP_Y, 1)
@@ -58,8 +59,8 @@ fn depth(
                     continue;
                 }
                 
-                let dx = f32(x_coord - i32(x));
-                let dy = f32(y_coord - i32(y));
+                let dx = f32(x_coord - i32(x)) * CELL_SIZE;
+                let dy = f32(y_coord - i32(y)) * CELL_SIZE;
                 let spatial_dist = sqrt(dx * dx + dy * dy);
                 
                 // Simple Gaussian weight based only on spatial distance

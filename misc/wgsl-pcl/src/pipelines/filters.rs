@@ -11,7 +11,7 @@ use crate::{
 };
 
 pub struct BilateralOptions {
-    pub sigma_spatial: u32,
+    pub sigma_spatial: f32,
     pub sigma_range: f32,
     pub kernel_radius: u32,
 }
@@ -148,6 +148,7 @@ pub fn new_blur_pipeline(
                 ("KERNEL_RADIUS", opts.kernel_radius as f64),
                 ("WORKGROUP_X", workgroup_size_stage2.0 as f64),
                 ("WORKGROUP_Y", workgroup_size_stage2.1 as f64),
+                ("CELL_SIZE", map_layout.cell_size as f64),
             ]);
             (
                 include_wgsl!("../../shaders/bilateral_filter.wgsl"),
@@ -165,6 +166,7 @@ pub fn new_blur_pipeline(
                     (map_layout.height_meters() / map_layout.cell_size).ceil() as f64,
                 ),
                 ("SIGMA", opts.sigma as f64),
+                ("CELL_SIZE", map_layout.cell_size as f64),
                 ("KERNEL_RADIUS", opts.kernel_radius as f64),
                 ("WORKGROUP_X", workgroup_size_stage2.0 as f64),
                 ("WORKGROUP_Y", workgroup_size_stage2.1 as f64),

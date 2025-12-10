@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use bincode::{Decode, Encode};
 use cu29::{
     CuResult,
@@ -15,7 +17,6 @@ use simple_icp::{config::Config, icp_pipeline::IcpPipeline};
 use crate::{ROBOT_STATE, rerun_viz::RECORDER};
 
 const REFERENCE_VARIANCE_THRESHOLD: f64 = 1.0;
-const POSE_COLLECTION_INTERVAL: std::time::Duration = std::time::Duration::from_millis(1);
 
 pub struct KissIcp {
     pipeline: simple_icp::icp_pipeline::IcpPipeline,
@@ -26,6 +27,7 @@ pub struct KissIcp {
     reference_offset: Option<Isometry3<f64>>,
     pub timestamped_poses: Vec<(std::time::Instant, Isometry3<f64>)>,
     pub last_pose_collection_time: std::time::Instant,
+    pub time_between_pose_collections: Duration,
 }
 
 #[derive(Clone, Copy, Debug, Encode, Decode, Serialize)]
@@ -100,7 +102,12 @@ impl CuTask for KissIcp {
 
         let max_distance_between_poses = config
             .and_then(|c| c.get::<f64>("max_distance_between_poses"))
-            .unwrap_or(0.05); // 1 meter
+            .unwrap_or(0.05);
+
+        // time betwene poses collected for deskewing
+        let time_between_pose_collections = config
+            .and_then(|c| c.get::<u32>("time_between_pose_collections_ms"))
+            .unwrap_or(2);
 
         let config = Config {
             voxel_size,
@@ -141,6 +148,9 @@ impl CuTask for KissIcp {
             reference_offset: None,
             timestamped_poses: Vec::new(),
             last_pose_collection_time: std::time::Instant::now(),
+            time_between_pose_collections: Duration::from_millis(
+                time_between_pose_collections as u64,
+            ),
         })
     }
 
@@ -161,7 +171,7 @@ impl CuTask for KissIcp {
         if let Some(state) = ROBOT_STATE.get() {
             let current_time = std::time::Instant::now();
             if current_time.duration_since(self.last_pose_collection_time)
-                >= POSE_COLLECTION_INTERVAL
+                >= self.time_between_pose_collections
             {
                 let pose = state.kinematic_root.get_global_isometry();
                 self.timestamped_poses.push((current_time, pose));

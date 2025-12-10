@@ -8,9 +8,11 @@ override WORKGROUP_X: u32 = 8;
 override WORKGROUP_Y: u32 = 8;
 // kernel radius includes the center pixel in the kernel
 override KERNEL_RADIUS: u32 = 4;
-// sigma spatial in this case is actually the distance between pixels.
-override SIGMA_SPATIAL: u32 = 3;
+
+override SIGMA_SPATIAL: f32 = 0.1;
 override SIGMA_RANGE: f32 = 0.2;
+override CELL_SIZE: f32 = 0.1;
+
 
 @compute
 @workgroup_size(WORKGROUP_X, WORKGROUP_Y, 1)
@@ -58,8 +60,8 @@ fn depth(
                     continue;
                 }
                 
-                let dx = f32(x_coord - i32(x));
-                let dy = f32(y_coord - i32(y));
+                let dx = f32(x_coord - i32(x)) * CELL_SIZE;
+                let dy = f32(y_coord - i32(y)) * CELL_SIZE;
                 let spatial_dist = sqrt(dx * dx + dy * dy);
                 
                 let range_dist = abs(neighbor_value - center_value);
