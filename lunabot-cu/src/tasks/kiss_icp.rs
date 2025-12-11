@@ -28,6 +28,7 @@ pub struct KissIcp {
     pub timestamped_poses: Vec<(std::time::Instant, Isometry3<f64>)>,
     pub last_pose_collection_time: std::time::Instant,
     pub time_between_pose_collections: Duration,
+    pub min_reflectivity: f32,
 }
 
 #[derive(Clone, Copy, Debug, Encode, Decode, Serialize)]
@@ -62,6 +63,10 @@ impl CuTask for KissIcp {
         let voxel_size = config
             .and_then(|c| c.get::<f64>("voxel_size"))
             .unwrap_or(0.5) as f32;
+
+        let min_reflectivity = config
+            .and_then(|c| c.get::<f64>("min_reflectivity"))
+            .unwrap_or(150.) as f32;
         let max_range = config
             .and_then(|c| c.get::<f64>("max_range"))
             .unwrap_or(100.0) as f32;
@@ -151,6 +156,7 @@ impl CuTask for KissIcp {
             time_between_pose_collections: Duration::from_millis(
                 time_between_pose_collections as u64,
             ),
+            min_reflectivity,
         })
     }
 
@@ -217,8 +223,11 @@ impl CuTask for KissIcp {
                 output.clear_payload();
                 return Ok(());
             }
-            self.pipeline
-                .process_frame(&mut self.accumulated_frames, 0.0, &self.timestamped_poses);
+            self.pipeline.process_frame(
+                &mut self.accumulated_frames,
+                self.min_reflectivity,
+                &self.timestamped_poses,
+            );
 
             if let Some(recorder) = RECORDER.get() {
                 let _ = recorder.recorder.log(
