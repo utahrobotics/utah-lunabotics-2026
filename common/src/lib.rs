@@ -276,6 +276,10 @@ pub enum FromLunabot {
         hinge: f32,
         bucket: f32,
     },
+    RobotMotion {
+        velocity:[f32;3],
+        acceleration: [f32;3],
+    },
     ErroredTasks(HashMap<String, String>),
 }
 
