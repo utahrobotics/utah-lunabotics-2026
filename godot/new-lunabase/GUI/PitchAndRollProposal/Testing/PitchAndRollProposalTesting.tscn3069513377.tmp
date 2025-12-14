@@ -1,0 +1,52 @@
+[gd_scene load_steps=7 format=3 uid="uid://bktkc6ibjikek"]
+
+[ext_resource type="PackedScene" uid="uid://dhg4sb4ifrvh8" path="res://GUI/PitchAndRollProposal/FlightSim/UIAttitude/UIAttitude.tscn" id="1_qx84t"]
+[ext_resource type="Script" uid="uid://duscmfvqjbvso" path="res://GUI/PitchAndRollProposal/Testing/pitch_and_roll_tester.gd" id="1_y38og"]
+[ext_resource type="Script" uid="uid://s3dmmm01g2sc" path="res://GUI/PitchAndRollProposal/Testing/pitch_and_roll_controller.gd" id="2_pew64"]
+[ext_resource type="Script" uid="uid://dq0r8quxwfhj1" path="res://GUI/PitchAndRollProposal/Testing/PitchAndRollTest_object_to_rotate.gd" id="2_rgoof"]
+
+[sub_resource type="BoxMesh" id="BoxMesh_qx84t"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_qx84t"]
+albedo_color = Color(0, 1, 1, 1)
+
+[node name="PitchAndRollProposalTesting" type="Node3D"]
+
+[node name="PitchAndRollTester" type="Node" parent="."]
+script = ExtResource("1_y38og")
+
+[node name="PitchAndRollController" type="Node" parent="." node_paths=PackedStringArray("actor")]
+script = ExtResource("2_pew64")
+actor = NodePath("../ObjectToRotate")
+
+[node name="ObjectToRotate" type="MeshInstance3D" parent="."]
+mesh = SubResource("BoxMesh_qx84t")
+script = ExtResource("2_rgoof")
+
+[node name="MeshInstance3D2" type="MeshInstance3D" parent="ObjectToRotate"]
+transform = Transform3D(0.47812104, 0, 0, 0, 0.3393647, 0, 0, 0, 0.6488075, 0, 0, 0.614439)
+mesh = SubResource("BoxMesh_qx84t")
+skeleton = NodePath("../..")
+surface_material_override/0 = SubResource("StandardMaterial3D_qx84t")
+
+[node name="Camera3D" type="Camera3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 5.5108657)
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+
+[node name="Control" type="Control" parent="CanvasLayer"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="UIAttitude" parent="CanvasLayer/Control" instance=ExtResource("1_qx84t")]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -216.0
+offset_right = 0.0
+grow_horizontal = 0

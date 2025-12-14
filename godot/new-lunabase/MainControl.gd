@@ -14,7 +14,7 @@ extends Control
 @onready var speed_slider: HSlider = $SpeedMultiplierSlider
 @onready var location_label: Label = $LocationLabel
 @onready var orientation_label: Label = $OrientationLabel
-
+@onready var PitchAndRollGUI: Control = $VBoxContainer/CenterContainer/UIAttitude
 var command_recorder: CommandRecorder
 
 #Speed Slider
@@ -49,6 +49,7 @@ func _ready() -> void:
 	
 	speed_label.text = "SpeedMultiplier set to " + str(new_weight)
 	
+	PitchAndRollGUI.set_conn(connection)
 	
 
 
@@ -86,6 +87,9 @@ func _process(delta: float) -> void:
 		LunabotStage.AUTONOMY:
 			stage_label.text = "Stage: Autonomy"
 			stage_label.modulate = Color.CYAN
+			
+	
+	
 	
 	#location  maybe temporary 
 	var location = connection.get_location()
