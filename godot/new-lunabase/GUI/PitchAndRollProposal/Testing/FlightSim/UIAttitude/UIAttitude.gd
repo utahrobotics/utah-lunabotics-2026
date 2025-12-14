@@ -35,7 +35,9 @@ func update_interface(values: PackedFloat32Array):
 
 	var roll  = atan2(2*(w*x + y*z), 1 - 2*(x*x + y*y))
 	var pitch = asin(clamp(2*(w*y - z*x), -1.0, 1.0))
-	var yaw   = atan2(2*(w*z + x*y), 1 - 2*(y*y + z*z))
+	#might include later implementing rotation to left indicator later cuz it was wonky af
+	
+	#var yaw   = atan2(2*(w*z + x*y), 1 - 2*(y*y + z*z))
 
 
 	
@@ -47,4 +49,4 @@ func update_interface(values: PackedFloat32Array):
 
 	$Panel/Horizon/InnerPanel/CenterRef/Ground.position.y = pitch_norm * max_pixels
 	
-	$Panel/Compass/InnerPanel/CenterRef.rotation = -roll
+	$Panel/Compass/InnerPanel/CenterRef.rotation = roll
