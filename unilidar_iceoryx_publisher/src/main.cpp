@@ -141,7 +141,7 @@ int main()
     const unsigned short local_port = 6201;      // Target PC receive port
     const std::string local_ip = "192.168.1.2";  // PC NIC IP (must match NIC config)
 
-    const uint16_t cloud_scan_num = 8;
+    const uint16_t cloud_scan_num = 16;
     const bool use_system_timestamp = true;
     const float range_min = 0.0f;
     const float range_max = 100.0f;

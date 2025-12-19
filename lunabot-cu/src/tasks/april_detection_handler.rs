@@ -9,7 +9,7 @@ use cu29::{
     CuResult, clock::RobotClock, config::ComponentConfig, cutask::Freezable, input_msg, prelude::*,
 };
 
-use kalman_filter::{SimpleSquareMatrix, SimpleVector};
+use nalgebra::{SMatrix, SVector};
 use ron::de::from_str as ron_from_str;
 use serde::Deserialize;
 use std::fs;
@@ -156,18 +156,18 @@ impl CuTask for AprilDetectionHandler {
 
 
                     // Translational
-                    let position_state: SimpleVector<3> = isometry.translation.vector;
+                    let position_state: SVector<f64, 3> = isometry.translation.vector;
 
                     // Make covariance matrix. The eigenvalues associated with eigenvectors of 
                     // a covarience matrix describe its variance in the directions of those eigenvectors.
                     // So, a matrix is constructed from orthogonal eigenvectors, and chosen eigenvalues
                     // This is done with the technique found here (https://math.stackexchange.com/questions/1261462/how-to-reconstruct-a-symmetric-matrix-given-the-eigenvalues-and-eigenvectors)
-                    let lateral_vector_1 = position_state.cross(&SimpleVector::<3>::new(0.0, 0.0, 1.0));
+                    let lateral_vector_1 = position_state.cross(&SVector::<f64, 3>::new(0.0, 0.0, 1.0));
                     let lateral_vector_2 = position_state.cross(&lateral_vector_1);
 
-                    let translational_eigenvector_matrix = SimpleSquareMatrix::<3>::from_columns(&[position_state, lateral_vector_1, lateral_vector_2]);
+                    let translational_eigenvector_matrix = SMatrix::<f64, 3, 3>::from_columns(&[position_state, lateral_vector_1, lateral_vector_2]);
 
-                    let translational_eigenvalue_matrix = SimpleSquareMatrix::<3>::from_diagonal(&SimpleVector::<3>::new(
+                    let translational_eigenvalue_matrix = SMatrix::<f64, 3, 3>::from_diagonal(&SVector::<f64, 3>::new(
                         DEPTH_VARIENCE_MODIFIER, 
                         LATERAL_VARIANCE_MODIFIER, 
                         LATERAL_VARIANCE_MODIFIER
@@ -183,11 +183,11 @@ impl CuTask for AprilDetectionHandler {
                     let orientation_state = 
                         isometry.rotation.axis()
                             .and_then(|vec| Some(vec.into_inner()))
-                            .unwrap_or(SimpleVector::<3>::zeros())
+                            .unwrap_or(SVector::<f64, 3>::zeros())
                         * isometry.rotation.angle()
                     ;
 
-                    let orientation_base_covarience_matrix = SimpleSquareMatrix::from_diagonal(&SimpleVector::<3>::new(
+                    let orientation_base_covarience_matrix = SMatrix::<f64, 3, 3>::from_diagonal(&SVector::<f64, 3>::new(
                         ANGULAR_VARIANCE_MODIFIER,
                         ANGULAR_VARIANCE_MODIFIER,
                         ANGULAR_VARIANCE_MODIFIER

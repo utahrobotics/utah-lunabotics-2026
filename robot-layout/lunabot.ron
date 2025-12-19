@@ -4,13 +4,13 @@
     "children": [
         {
             "name": Some("T265_right"),
-            "origin": [0.0,0.0,0.0],
+            "origin": [0.10,0.20,0.0],
             "euler": [180.0,0.0,90.0],
 
         },
         {
             "name": Some("l2_front"),
-            // "origin": [0.50, 0.0, 0.50],
+            "origin": [0.80, 0.0, 0.45],
             "euler":  [0.0, 0., 165.0],
             // "euler": [0,0,0],
             // dont question my decision to add this field
@@ -29,8 +29,8 @@
         },
         {
             "name": Some("cam_laptop_front"),
-            "origin": [0.2, 0.0, 0.0],
-            "euler": [0.0, 0.0, 0.0]
+            "origin": [-0.2, 0.0, 0.3],
+            "euler": [0.0, 0.0, 180.0]
         },
         {
             "name": Some("cam_side"),

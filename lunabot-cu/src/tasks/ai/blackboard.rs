@@ -5,7 +5,7 @@ use std::{
 
 use common::{FromLunabase, LUNABOT_STAGE, LunabotStage, Steering};
 use embedded_common::ActuatorCommand;
-use kalman_filter::{SimpleSquareMatrix, SimpleVector};
+use nalgebra::{SMatrix, SVector};
 use simple_motion::StaticNode;
 
 use crate::{
@@ -18,9 +18,9 @@ pub struct LunabotBlackboard {
     /// Keeps track of the position of all parts of the robot
     pub kinematic_root: StaticNode,
     /// Represents the robot's overall state (position, velocity, acceleration, orientation, angular velocity)
-    pub kalman_state: Arc<RwLock<SimpleVector<15>>>,
+    pub kalman_state: Arc<RwLock<Option<SVector<f64, 15>>>>,
     /// Stores the covariance matrix of the robot's overall state
-    pub kalman_variances: Arc<RwLock<SimpleSquareMatrix<15>>>,
+    pub kalman_variances: Arc<RwLock<Option<SMatrix<f64, 15, 15>>>>,
 
     /// TODO fill out this comment
     pub latest_obstacle_map: Option<OccupancyGrid>,

@@ -3333,6 +3333,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "kfilter"
+version = "0.4.0"
+source = "git+https://github.com/utahrobotics/kfilter.git#1de33c135918116cf5f5efd555e6fb3ef2ecd182"
+dependencies = [
+ "nalgebra",
+]
+
+[[package]]
 name = "khronos-egl"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3580,7 +3588,7 @@ dependencies = [
  "gstreamer-app",
  "iceoryx-types",
  "iceoryx2",
- "kalman_filter",
+ "kfilter",
  "launcher",
  "mio",
  "mujoco-rs",
