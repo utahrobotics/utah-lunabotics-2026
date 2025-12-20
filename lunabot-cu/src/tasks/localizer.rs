@@ -1,4 +1,4 @@
-//! Localizer module for multi-sensor fusion using Kalman filtering.
+//! Localizer module for multi-sensor fusion using Multiplicative EKF (MEKF).
 //!
 //! This module fuses pose estimates from multiple sensors:
 //! - **Kiss ICP**: ~5 Hz, accurate but relative to start frame
@@ -7,11 +7,22 @@
 //!
 //! # Approach
 //!
-//! We use the kfilter library with a 12-state Extended Kalman Filter:
+//! We use a **Multiplicative Extended Kalman Filter (MEKF)** with a 12-state error vector:
 //! - Position [x, y, z]
 //! - Linear velocity [vx, vy, vz]  
-//! - Orientation (axis-angle) [rx, ry, rz]
+//! - Orientation ERROR [δθx, δθy, δθz] — small rotation from reference quaternion
 //! - Angular velocity [wx, wy, wz]
+//!
+//! The **reference quaternion** is stored separately and updated after each filter cycle.
+//! This avoids the singularity at ±π that occurs with axis-angle representations.
+//!
+//! ## MEKF Operation
+//!
+//! 1. **Predict**: Propagate reference quaternion with angular velocity, error state gets process noise
+//! 2. **Update**: Apply measurements as errors relative to reference quaternion
+//! 3. **Reset**: Compose error onto reference quaternion, reset error state to zero
+//!
+//! This keeps the orientation error small (near zero), completely avoiding the π singularity.
 //!
 //! ## Handling Relative vs Global Frames
 //!
@@ -62,8 +73,11 @@ use embedded_common::FromPicoV3;
 use kfilter::kalman::{EKF, KalmanFilter, KalmanPredictInput, KalmanUpdate};
 use kfilter::measurement::LinearMeasurement;
 use kfilter::system::StepReturn;
+use kfilter::system::System;
 use nalgebra::UnitQuaternion;
 use nalgebra::{Isometry3, SMatrix, SVector, Vector3, Vector6};
+use rerun::Scalars;
+use rerun::components::Scalar;
 
 use crate::ROBOT_STATE;
 
@@ -73,7 +87,8 @@ use crate::ROBOT_STATE;
 
 // Higher values = Less trust in the motion model, more responsive to measurements
 // Lower values = More trust in the motion model, smoother but slower to correct
-/// State dimension: position(3) + velocity(3) + orientation(3) + angular_velocity(3)
+/// State dimension: position(3) + velocity(3) + orientation_error(3) + angular_velocity(3)
+/// Note: orientation_error is a small rotation vector relative to reference_quaternion
 const STATE_DIM: usize = 12;
 
 /// Input dimension: just dt
@@ -98,10 +113,10 @@ const PROCESS_NOISE_ORIENTATION: f64 = 0.4;
 const PROCESS_NOISE_ANGULAR_VEL: f64 = 0.4;
 
 /// T265 velocity measurement variance (T265 is precise for short-term motion)
-const T265_VELOCITY_VARIANCE: f64 = 0.5;
+const T265_VELOCITY_VARIANCE: f64 = 0.1;
 
 /// T265 angular velocity measurement variance
-const T265_ANGULAR_VELOCITY_VARIANCE: f64 = 0.5;
+const T265_ANGULAR_VELOCITY_VARIANCE: f64 = 0.1;
 
 /// IMU linear acceleration measurement variance (IMU is noisy but high frequency)
 const IMU_LINEAR_ACCELERATION_VARIANCE: f64 = 0.1;
@@ -135,15 +150,21 @@ type VelocityMeasurement = LinearMeasurement<f64, STATE_DIM, VEL_MEAS_DIM>;
 // Helper Functions
 // ============================================================================
 
-/// EKF step function: constant velocity motion model
+/// MEKF step function: constant velocity motion model for ERROR state
 ///
-/// State: [x, y, z, vx, vy, vz, rx, ry, rz, wx, wy, wz]
+/// State: [x, y, z, vx, vy, vz, δθx, δθy, δθz, wx, wy, wz]
 /// Input: [dt]
+///
+/// In MEKF, the orientation error state (δθ) represents the small rotation
+/// from the reference quaternion to the true orientation. During prediction:
+/// - The reference quaternion is propagated externally with angular velocity
+/// - The error state stays at zero (it's reset after each update)
+/// - Only process noise is added to the error covariance
 ///
 /// Transition:
 /// - position += velocity * dt
 /// - velocity stays constant
-/// - orientation += angular_velocity * dt (with wrapping)
+/// - orientation_error stays constant (near zero, propagated via reference quaternion)
 /// - angular_velocity stays constant
 
 fn step_function(state: StateVec, input: InputVec) -> StepReturn<f64, STATE_DIM> {
@@ -151,7 +172,7 @@ fn step_function(state: StateVec, input: InputVec) -> StepReturn<f64, STATE_DIM>
 
     let position = state.fixed_rows::<3>(0);
     let velocity = state.fixed_rows::<3>(3);
-    let orientation = state.fixed_rows::<3>(6);
+    let orientation_error = state.fixed_rows::<3>(6);
     let angular_velocity = state.fixed_rows::<3>(9);
 
     let mut new_state = StateVec::zeros();
@@ -164,33 +185,51 @@ fn step_function(state: StateVec, input: InputVec) -> StepReturn<f64, STATE_DIM>
     // Velocity stays constant
     new_state.fixed_rows_mut::<3>(3).copy_from(&velocity);
 
-    // Orientation update with PROPER normalization
-    let raw_new_orientation = Vector3::new(
-        orientation[0] + angular_velocity[0] * dt,
-        orientation[1] + angular_velocity[1] * dt,
-        orientation[2] + angular_velocity[2] * dt,
-    );
-    // Normalize to prevent unbounded growth and keep representation consistent
-    let normalized_orientation = normalize_axis_angle(raw_new_orientation);
+    // Orientation error: In MEKF, the error state is reset to zero after each update,
+    // and the reference quaternion handles the actual rotation propagation.
+    // Here we just pass through the current error (which should be near zero).
     new_state
         .fixed_rows_mut::<3>(6)
-        .copy_from(&normalized_orientation);
+        .copy_from(&orientation_error);
 
     // Angular velocity stays constant
     new_state
         .fixed_rows_mut::<3>(9)
         .copy_from(&angular_velocity);
 
-    // Jacobian (unchanged)
+    // Jacobian for error-state formulation
+    // The error dynamics are: α̇ = -[ω̂×]α (plus noise)
+    // where [ω×] is the skew-symmetric cross-product matrix
     let mut jacobian = SMatrix::<f64, STATE_DIM, STATE_DIM>::identity();
+    
+    // Position depends on velocity
     jacobian[(0, 3)] = dt;
     jacobian[(1, 4)] = dt;
     jacobian[(2, 5)] = dt;
-    jacobian[(6, 9)] = dt;
-    jacobian[(7, 10)] = dt;
-    jacobian[(8, 11)] = dt;
+    
+    // Orientation error dynamics: α̇ = -[ω̂×]α
+    // This is the skew-symmetric matrix of angular velocity
+    // [ω×] = [  0  -ωz   ωy ]
+    //        [ ωz   0   -ωx ]
+    //        [-ωy  ωx    0  ]
+    // So ∂α̇/∂α = -[ω×], and discretized: I + (-[ω×]) * dt
+    let wx = angular_velocity[0];
+    let wy = angular_velocity[1];
+    let wz = angular_velocity[2];
+    
+    // Row 6 (δθx): affected by -(-wz*δθy + wy*δθz) = wz*δθy - wy*δθz
+    jacobian[(6, 7)] = wz * dt;   // ∂(δθx)/∂(δθy)
+    jacobian[(6, 8)] = -wy * dt;  // ∂(δθx)/∂(δθz)
+    
+    // Row 7 (δθy): affected by -( wz*δθx - wx*δθz) = -wz*δθx + wx*δθz  
+    jacobian[(7, 6)] = -wz * dt;  // ∂(δθy)/∂(δθx)
+    jacobian[(7, 8)] = wx * dt;   // ∂(δθy)/∂(δθz)
+    
+    // Row 8 (δθz): affected by -(-wy*δθx + wx*δθy) = wy*δθx - wx*δθy
+    jacobian[(8, 6)] = wy * dt;   // ∂(δθz)/∂(δθx)
+    jacobian[(8, 7)] = -wx * dt;  // ∂(δθz)/∂(δθy)
 
-    // Process covariance (unchanged)
+    // Process covariance
     let mut covariance = SMatrix::<f64, STATE_DIM, STATE_DIM>::zeros();
     for i in 0..3 {
         covariance[(i, i)] = PROCESS_NOISE_POSITION * dt * dt;
@@ -199,6 +238,7 @@ fn step_function(state: StateVec, input: InputVec) -> StepReturn<f64, STATE_DIM>
         covariance[(i, i)] = PROCESS_NOISE_VELOCITY * dt;
     }
     for i in 6..9 {
+        // Orientation error grows with angular velocity uncertainty
         covariance[(i, i)] = PROCESS_NOISE_ORIENTATION * dt * dt;
     }
     for i in 9..12 {
@@ -212,61 +252,28 @@ fn step_function(state: StateVec, input: InputVec) -> StepReturn<f64, STATE_DIM>
     }
 }
 
-/// Compute the shortest-path rotation from one orientation to another.
-/// Returns the axis-angle vector representing the rotation that takes `from` to `to`.
-fn orientation_difference(from: &Vector3<f64>, to: &Vector3<f64>) -> Vector3<f64> {
-    let from_q = UnitQuaternion::from_scaled_axis(*from);
-    let to_q = UnitQuaternion::from_scaled_axis(*to);
-
-    // Compute: delta such that from * delta = to
-    // Therefore: delta = from.inverse() * to
-    let delta = from_q.inverse() * to_q;
-
-    // scaled_axis() returns the axis-angle, which is guaranteed to be
-    // the shortest path (magnitude in [0, π])
+/// Compute the rotation error from reference quaternion to measured quaternion.
+/// Returns a small rotation vector (axis-angle) representing: ref * error = measured
+/// Therefore: error = ref.inverse() * measured
+///
+/// This is the core of MEKF: we always compute errors relative to the reference,
+/// keeping the error small and avoiding the π singularity.
+fn quaternion_error(
+    reference: &UnitQuaternion<f64>,
+    measured: &UnitQuaternion<f64>,
+) -> Vector3<f64> {
+    let delta = reference.inverse() * measured;
+    // scaled_axis() returns the axis-angle vector with magnitude in [0, π]
     delta.scaled_axis()
 }
 
-/// Normalize axis-angle to keep magnitude in [0, π] with consistent axis direction.
-/// This prevents the magnitude from growing unboundedly during prediction.
-fn normalize_axis_angle(v: Vector3<f64>) -> Vector3<f64> {
-    let mag = v.magnitude();
-    if mag < 1e-10 {
-        return Vector3::zeros();
-    }
-
-    // Use quaternion round-trip to get canonical representation
-    let q = UnitQuaternion::from_scaled_axis(v);
-    q.scaled_axis()
-}
-
-/// Adjust a pose measurement so that its orientation component will produce
-/// the correct (shortest-path) innovation when subtracted from the state.
+/// Compose a small rotation error onto a reference quaternion.
+/// Returns: reference * error_rotation
 ///
-/// The Kalman filter computes innovation as (z - H*x). For orientation,
-/// we need to ensure this gives the shortest angular path, not a 350° spin.
-fn adjust_pose_for_orientation_continuity(
-    raw_pose: &Vector6<f64>,
-    current_state: &StateVec,
-) -> Vector6<f64> {
-    let meas_orient = Vector3::new(raw_pose[3], raw_pose[4], raw_pose[5]);
-    let state_orient = Vector3::new(current_state[6], current_state[7], current_state[8]);
-
-    // Get the proper (shortest-path) orientation difference
-    let orient_diff = orientation_difference(&state_orient, &meas_orient);
-
-    // Adjust measurement so that: adjusted - state = orient_diff
-    // Therefore: adjusted = state + orient_diff
-    let adjusted_orient = state_orient + orient_diff;
-
-    Vector6::new(
-        raw_pose[0],
-        raw_pose[1],
-        raw_pose[2],
-        adjusted_orient[0],
-        adjusted_orient[1],
-        adjusted_orient[2],
-    )
+/// Used after filter updates to fold the estimated error into the reference.
+fn compose_error(reference: &UnitQuaternion<f64>, error: &Vector3<f64>) -> UnitQuaternion<f64> {
+    let error_quat = UnitQuaternion::from_scaled_axis(*error);
+    reference * error_quat
 }
 
 /// Create observation matrix H for pose measurements (position + orientation)
@@ -299,24 +306,13 @@ fn velocity_observation_matrix() -> SMatrix<f64, VEL_MEAS_DIM, STATE_DIM> {
     h
 }
 
-/// Convert an Isometry3 to a 6D pose vector [x, y, z, rx, ry, rz]
-fn isometry_to_pose_vec(iso: &Isometry3<f64>) -> Vector6<f64> {
-    let rot = iso.rotation.scaled_axis();
-    Vector6::new(
-        iso.translation.x,
-        iso.translation.y,
-        iso.translation.z,
-        rot.x,
-        rot.y,
-        rot.z,
-    )
-}
-
-/// Convert state vector to Isometry3
-fn state_to_isometry(state: &StateVec) -> Isometry3<f64> {
+/// Convert state vector and reference quaternion to Isometry3.
+/// The full orientation is: reference_quaternion * error_rotation
+fn state_to_isometry(state: &StateVec, reference_quat: &UnitQuaternion<f64>) -> Isometry3<f64> {
     let translation = Vector3::new(state[0], state[1], state[2]);
-    let rotation = Vector3::new(state[6], state[7], state[8]);
-    Isometry3::new(translation, rotation)
+    let error = Vector3::new(state[6], state[7], state[8]);
+    let full_rotation = compose_error(reference_quat, &error);
+    Isometry3::from_parts(translation.into(), full_rotation)
 }
 
 /// Compute the transformation that maps `from` frame to `to` frame
@@ -333,10 +329,16 @@ pub struct Localizer {
     robot_state: RobotState,
     last_rerun_log: std::time::Instant,
 
-    /// Extended Kalman Filter with 12 states, 1 input (dt)
+    /// Extended Kalman Filter with 12 error states, 1 input (dt)
+    /// State: [pos, vel, orientation_error, angular_vel]
     ekf: EKF<f64, STATE_DIM, INPUT_DIM>,
 
-    /// Measurement model for pose (position + orientation)
+    /// Reference quaternion for MEKF — the "linearization point" for orientation.
+    /// The true orientation is: reference_quaternion * error_rotation
+    /// Updated after each filter cycle by composing the error and resetting.
+    reference_quaternion: UnitQuaternion<f64>,
+
+    /// Measurement model for pose (position + orientation error)
     pose_measurement: PoseMeasurement,
 
     /// Measurement model for velocity (linear + angular)
@@ -368,6 +370,74 @@ pub struct Localizer {
 
     /// Whether we've received our first global reference (AprilTag)
     has_global_reference: bool,
+}
+
+impl Localizer {
+    /// Reset the orientation error state by composing it onto the reference quaternion.
+    /// This is called after each filter update to keep the error small.
+    fn reset_orientation_error(&mut self) {
+        let state = self.ekf.state();
+        let error = Vector3::new(state[6], state[7], state[8]);
+
+        // Compose error onto reference quaternion
+        self.reference_quaternion = compose_error(&self.reference_quaternion, &error);
+
+        // Reset error state to zero
+        let state_mut = self.ekf.system.state_mut();
+        state_mut[6] = 0.0;
+        state_mut[7] = 0.0;
+        state_mut[8] = 0.0;
+    }
+
+    /// Propagate the reference quaternion forward in time using angular velocity.
+    /// Called during the predict step.
+    fn propagate_reference_quaternion(&mut self, dt: f64) {
+        let state = self.ekf.state();
+        let angular_vel = Vector3::new(state[9], state[10], state[11]);
+
+        // Integrate angular velocity: q_new = q * exp(ω * dt / 2)
+        // Using scaled_axis which expects the full rotation angle
+        let delta_rotation = UnitQuaternion::from_scaled_axis(angular_vel * dt);
+        self.reference_quaternion = self.reference_quaternion * delta_rotation;
+    }
+
+    /// Create a pose measurement vector for MEKF.
+    /// Position is absolute, orientation is the ERROR relative to reference quaternion.
+    fn create_pose_measurement(&self, measured_pose: &Isometry3<f64>) -> Vector6<f64> {
+        let orient_error = quaternion_error(&self.reference_quaternion, &measured_pose.rotation);
+        Vector6::new(
+            measured_pose.translation.x,
+            measured_pose.translation.y,
+            measured_pose.translation.z,
+            orient_error.x,
+            orient_error.y,
+            orient_error.z,
+        )
+    }
+
+    /// Log the orientation error magnitude BEFORE reset (for debugging MEKF).
+    /// This shows the actual correction being applied.
+    fn log_error_before_reset(&self, source: &str) {
+        if let Some(logger) = RECORDER.get() {
+            let state = self.ekf.state();
+            let error = Vector3::new(state[6], state[7], state[8]);
+            let error_mag = error.magnitude();
+            let error_deg = error_mag * 180.0 / PI;
+            
+            let _ = logger.recorder.log(
+                "debug/error_before_reset",
+                &Scalars::new([error_mag as f32]),
+            );
+            let _ = logger.recorder.log(
+                "debug/error_before_reset_deg",
+                &Scalars::new([error_deg as f32]),
+            );
+            let _ = logger.recorder.log(
+                "debug/error_source",
+                &rerun::TextLog::new(format!("{}: {:.4} rad ({:.2}°)", source, error_mag, error_deg)),
+            );
+        }
+    }
 }
 
 impl Freezable for Localizer {}
@@ -426,6 +496,7 @@ impl CuTask for Localizer {
                 robot_state: robot_state.clone(),
                 last_rerun_log: std::time::Instant::now(),
                 ekf,
+                reference_quaternion: UnitQuaternion::identity(),
                 pose_measurement,
                 t265_velocity_measurement,
                 imu_velocity_measurement: VelocityMeasurement::new(
@@ -478,6 +549,10 @@ impl CuTask for Localizer {
         self.most_recent_update = now;
 
         if dt > 0.0 && dt < 1.0 {
+            // MEKF: Propagate reference quaternion with angular velocity
+            self.propagate_reference_quaternion(dt);
+
+            // Predict error state (error stays near zero, covariance grows)
             let input_vec = InputVec::new(dt);
             if let Err(e) = self.ekf.predict(input_vec) {
                 eprintln!("EKF predict failed: {:?}", e);
@@ -523,11 +598,8 @@ impl CuTask for Localizer {
                         println!("ICP-to-global offset updated from AprilTag");
                     }
 
-                    // Apply AprilTag as high-confidence pose measurement
-                    let pose_vec = isometry_to_pose_vec(&global_pose);
-
-                    let pose_vec =
-                        adjust_pose_for_orientation_continuity(&pose_vec, self.ekf.state());
+                    // MEKF: Compute pose measurement with orientation error relative to reference
+                    let pose_vec = self.create_pose_measurement(&global_pose);
 
                     // Extract covariance from AprilTag measurement
                     let mut pose_r =
@@ -545,6 +617,12 @@ impl CuTask for Localizer {
                     if let Err(e) = self.ekf.update(&self.pose_measurement) {
                         eprintln!("EKF update with AprilTag failed: {:?}", e);
                     }
+
+                    // Log error BEFORE reset (for debugging)
+                    self.log_error_before_reset("AprilTag");
+
+                    // MEKF: Reset orientation error after update
+                    self.reset_orientation_error();
 
                     if let Some(logger) = RECORDER.get() {
                         let _ = logger.recorder.log(
@@ -604,11 +682,8 @@ impl CuTask for Localizer {
                     );
                 }
 
-                // Apply as pose measurement
-                let pose_vec = adjust_pose_for_orientation_continuity(
-                    &isometry_to_pose_vec(&global_icp_pose),
-                    self.ekf.state(),
-                );
+                // MEKF: Compute pose measurement with orientation error relative to reference
+                let pose_vec = self.create_pose_measurement(&global_icp_pose);
 
                 // Extract covariance from ICP measurement
                 let mut pose_r =
@@ -627,6 +702,12 @@ impl CuTask for Localizer {
                 if let Err(e) = self.ekf.update(&self.pose_measurement) {
                     eprintln!("EKF update with ICP failed: {:?}", e);
                 }
+
+                // Log error BEFORE reset (for debugging)
+                self.log_error_before_reset("ICP");
+
+                // MEKF: Reset orientation error after update
+                self.reset_orientation_error();
             }
         }
 
@@ -705,6 +786,12 @@ impl CuTask for Localizer {
                             if let Err(e) = self.ekf.update(&self.t265_velocity_measurement) {
                                 eprintln!("EKF update with T265 velocity failed: {:?}", e);
                             }
+
+                            // Log error BEFORE reset (for debugging)
+                            self.log_error_before_reset("T265");
+
+                            // MEKF: Reset orientation error after update
+                            self.reset_orientation_error();
                         } else {
                             // Log rejected velocity for debugging
                             eprintln!(
@@ -744,7 +831,8 @@ impl CuTask for Localizer {
             self.last_rerun_log = std::time::Instant::now();
 
             let state = self.ekf.state();
-            let current_iso = state_to_isometry(state);
+            // MEKF: Get full isometry using reference quaternion + error
+            let current_iso = state_to_isometry(state, &self.reference_quaternion);
 
             // Update shared robot state
             self.robot_state.kinematic_root.set_isometry(current_iso);
@@ -797,9 +885,10 @@ impl CuTask for Localizer {
                         global_state[(3 + i, 0)] = state[3 + i];
                     }
                     // Acceleration (6:9) - we don't track this, leave as zero
-                    // Orientation (9:12 in old format, 6:9 in ours)
+                    // Orientation (9:12 in old format) - use FULL orientation from reference quaternion
+                    let full_orient = self.reference_quaternion.scaled_axis();
                     for i in 0..3 {
-                        global_state[(9 + i, 0)] = state[6 + i];
+                        global_state[(9 + i, 0)] = full_orient[i];
                     }
                     // Angular velocity (12:15 in old format, 9:12 in ours)
                     for i in 0..3 {
@@ -810,6 +899,36 @@ impl CuTask for Localizer {
 
             // Log to rerun
             if let Some(logger) = RECORDER.get() {
+
+                let state = self.ekf.state();
+                let cov = self.ekf.covariance();
+
+                // MEKF: Log orientation ERROR magnitude (should stay small, near zero!)
+                let error_mag = Vector3::new(state[6], state[7], state[8]).magnitude();
+                let _ = logger.recorder.log(
+                    "debug/orientation_error_magnitude",
+                    &Scalars::new([error_mag as f32]),
+                );
+
+                let _ = logger.recorder.log(
+                    "debug/orientation_covariance",
+                    &Scalars::new([cov[(6, 6)] as f32]),
+                );
+
+                // Log FULL orientation as Euler angles (from reference quaternion)
+                let euler = self.reference_quaternion.euler_angles();
+                let _ = logger.recorder.log(
+                    "debug/euler_roll",
+                    &Scalars::new([euler.0 as f32 * 180.0 / PI as f32]),
+                );
+                let _ = logger.recorder.log(
+                    "debug/euler_pitch",
+                    &Scalars::new([euler.1 as f32 * 180.0 / PI as f32]),
+                );
+                let _ = logger.recorder.log(
+                    "debug/euler_yaw",
+                    &Scalars::new([euler.2 as f32 * 180.0 / PI as f32]),
+                );
                 let _ = logger.recorder.log(
                     "kalman_state/covariance",
                     &rerun::Tensor::new(self.ekf.covariance().data.as_slice()),
@@ -833,12 +952,14 @@ impl CuTask for Localizer {
                     )]),
                 );
 
+                // Log FULL orientation (from reference quaternion, not error state)
+                let full_orient = self.reference_quaternion.scaled_axis();
                 let _ = logger.recorder.log(
                     "kalman_state/orientation",
                     &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(
-                        state[6] as f32,
-                        state[7] as f32,
-                        state[8] as f32,
+                        full_orient[0] as f32,
+                        full_orient[1] as f32,
+                        full_orient[2] as f32,
                     )]),
                 );
 
