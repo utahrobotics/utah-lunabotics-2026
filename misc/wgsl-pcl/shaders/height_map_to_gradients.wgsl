@@ -1,8 +1,8 @@
-@group(0) @binding(0) var<storage, read_write> height_map: array<f32>;
-@group(0) @binding(1) var<storage, read_write> gradient_map: array<f32>;
+@group(0) @binding(0) var<uniform> map_width: u32;
+@group(0) @binding(1) var<uniform> map_height: u32;
 
-override MAP_WIDTH: u32;
-override MAP_HEIGHT: u32;
+@group(1) @binding(0) var<storage, read_write> height_map: array<f32>;
+@group(1) @binding(1) var<storage, read_write> gradient_map: array<f32>;
 
 override WORKGROUP_X: u32 = 8;
 override WORKGROUP_Y: u32 = 8;
@@ -14,10 +14,10 @@ override CELL_SIZE: f32 = 1.0;
 const UNKNOWN_VALUE: f32 = -3.40282347e+38; 
 
 fn xy_to_index(x: i32, y: i32) -> i32 {
-    if x < 0 || y < 0 || x >= i32(MAP_WIDTH) || y >= i32(MAP_HEIGHT) {
+    if x < 0 || y < 0 || x >= i32(map_width) || y >= i32(map_height) {
         return -1;
     }
-    return x + y * i32(MAP_WIDTH);
+    return x + y * i32(map_width);
 }
 
 @compute
@@ -28,7 +28,7 @@ fn gradient(
     let x = i32(global_invocation_id.x);
     let y = i32(global_invocation_id.y);
     
-    if u32(x) >= MAP_WIDTH || u32(y) >= MAP_HEIGHT {
+    if u32(x) >= map_width || u32(y) >= map_height {
         return;
     }
     

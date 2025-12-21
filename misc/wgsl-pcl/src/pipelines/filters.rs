@@ -38,6 +38,8 @@ pub fn new_outlier_removal_pipeline(
     map_layout: map_layout::MapLayout,
     outlier_filter_options: OutlierFilterOptions,
     input_height_map_buffer: &GpuBuffer,
+    height_map_width_buffer: &GpuBuffer,
+    height_map_height_buffer: &GpuBuffer,
 ) -> Result<(GpuBuffer, crate::shader_pipeline::ComputePipeline), WgslPclError> {
     let outlier_filtered_height_map_buffer = GpuBuffer::new_storage_with_data(
         &device,
@@ -49,14 +51,6 @@ pub fn new_outlier_removal_pipeline(
         Some("outlier_filtered_height_map"),
     );
     let outlier_filter_constants: HashMap<&str, f64> = HashMap::from([
-        (
-            "MAP_WIDTH",
-            (map_layout.width_meters() / map_layout.cell_size).ceil() as f64,
-        ),
-        (
-            "MAP_HEIGHT",
-            (map_layout.height_meters() / map_layout.cell_size).ceil() as f64,
-        ),
         ("KERNEL_RADIUS", outlier_filter_options.kernel_radius as f64),
         (
             "OUTLIER_THRESHOLD",
@@ -67,6 +61,30 @@ pub fn new_outlier_removal_pipeline(
             outlier_filter_options.max_unknown_neighbors_ratio as f64,
         ),
     ]);
+
+    let (map_settings_layout, map_settings_bind_group) = BindGroupLayoutBuilder::new(None)
+        .with_entry(
+            0,
+            ShaderStages::COMPUTE,
+            wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform,
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            height_map_width_buffer.as_entire_binding(),
+        )
+        .with_entry(
+            1,
+            ShaderStages::COMPUTE,
+            wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform,
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            height_map_height_buffer.as_entire_binding(),
+        )
+        .build(&device, "map_settings_bind_group".to_string());
+    // height map bind group
     let (outlier_filter_layout, outlier_filter_bind_group) = BindGroupLayoutBuilder::new(None)
         .with_entry(
             0,
@@ -92,7 +110,8 @@ pub fn new_outlier_removal_pipeline(
     let outlier_filter_pipeline = ComputePipelineBuilder::new(device)
         .with_label("outlier_filter")
         .with_shader_module(include_wgsl!("../../shaders/outlier_removal.wgsl"))
-        .with_bind_group(0, outlier_filter_layout, outlier_filter_bind_group)
+        .with_bind_group(0, map_settings_layout, map_settings_bind_group)
+        .with_bind_group(1, outlier_filter_layout, outlier_filter_bind_group)
         .with_constants(outlier_filter_constants)
         .build()?;
     Ok((outlier_filtered_height_map_buffer, outlier_filter_pipeline))
@@ -105,6 +124,8 @@ pub fn new_blur_pipeline(
     map_layout: map_layout::MapLayout,
     blur_filter_options: BlurFilterOptions,
     input_height_map_buffer: &GpuBuffer,
+    height_map_width_buffer: &GpuBuffer,
+    height_map_height_buffer: &GpuBuffer,
 ) -> Result<(GpuBuffer, crate::shader_pipeline::ComputePipeline), WgslPclError> {
     let blur_filtered_height_map_buffer = GpuBuffer::new_storage_with_data(
         &device,
@@ -115,6 +136,29 @@ pub fn new_blur_pipeline(
         ],
         Some("filtered_height_map"),
     );
+
+    let (map_settings_layout, map_settings_bind_group) = BindGroupLayoutBuilder::new(None)
+        .with_entry(
+            0,
+            ShaderStages::COMPUTE,
+            wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform,
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            height_map_width_buffer.as_entire_binding(),
+        )
+        .with_entry(
+            1,
+            ShaderStages::COMPUTE,
+            wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform,
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            height_map_height_buffer.as_entire_binding(),
+        )
+        .build(&device, "map_settings_bind_group".to_string());
     let (filter_layout, filter_bind_group) = BindGroupLayoutBuilder::new(None)
         .with_entry(
             0,
@@ -140,14 +184,6 @@ pub fn new_blur_pipeline(
     let (filter_shader, filter_constants) = match blur_filter_options {
         BlurFilterOptions::Bilateral(opts) => {
             let constants = HashMap::from([
-                (
-                    "MAP_WIDTH",
-                    (map_layout.width_meters() / map_layout.cell_size).ceil() as f64,
-                ),
-                (
-                    "MAP_HEIGHT",
-                    (map_layout.height_meters() / map_layout.cell_size).ceil() as f64,
-                ),
                 ("SIGMA_SPATIAL", opts.sigma_spatial as f64),
                 ("SIGMA_RANGE", opts.sigma_range as f64),
                 ("KERNEL_RADIUS", opts.kernel_radius as f64),
@@ -162,14 +198,6 @@ pub fn new_blur_pipeline(
         }
         BlurFilterOptions::Gaussian(opts) => {
             let constants = HashMap::from([
-                (
-                    "MAP_WIDTH",
-                    (map_layout.width_meters() / map_layout.cell_size).ceil() as f64,
-                ),
-                (
-                    "MAP_HEIGHT",
-                    (map_layout.height_meters() / map_layout.cell_size).ceil() as f64,
-                ),
                 ("SIGMA", opts.sigma as f64),
                 ("CELL_SIZE", map_layout.cell_size as f64),
                 ("KERNEL_RADIUS", opts.kernel_radius as f64),
@@ -182,7 +210,8 @@ pub fn new_blur_pipeline(
     let filter_pipeline = ComputePipelineBuilder::new(device)
         .with_label("blur_filter")
         .with_shader_module(filter_shader)
-        .with_bind_group(0, filter_layout, filter_bind_group)
+        .with_bind_group(0, map_settings_layout, map_settings_bind_group)
+        .with_bind_group(1, filter_layout, filter_bind_group)
         .with_constants(filter_constants)
         .build()?;
     Ok((blur_filtered_height_map_buffer, filter_pipeline))

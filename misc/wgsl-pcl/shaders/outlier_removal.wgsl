@@ -1,12 +1,14 @@
 // Uses a conditional mean filter to remove outliers on a height map
 // Only replaces values that are statistical outliers, preserving detail
 
-@group(0) @binding(0) var<storage, read_write> input_height_map: array<f32>;
-@group(0) @binding(1) var<storage, read_write> output_filtered_height_map: array<f32>;
+@group(0) @binding(0) var<uniform> map_width: u32;
+@group(0) @binding(1) var<uniform> map_height: u32;
+
+@group(1) @binding(0) var<storage, read_write> input_height_map: array<f32>;
+@group(1) @binding(1) var<storage, read_write> output_filtered_height_map: array<f32>;
 // @group(0) @binding(2) var<storage, read_write> original_height_map: array<f32>;
 
-override MAP_WIDTH: u32;
-override MAP_HEIGHT: u32;
+
 override KERNEL_RADIUS: u32 = 2;
 // How many standard deviations away before we consider it an outlier
 // Higher values = more conservative filtering (2.0-3.0 is typical)
@@ -26,7 +28,7 @@ fn depth(
     let x = global_invocation_id.x;
     let y = global_invocation_id.y;
     
-    if x >= MAP_WIDTH || y >= MAP_HEIGHT {
+    if x >= map_width || y >= map_height {
         return;
     }
     
@@ -104,8 +106,8 @@ fn depth(
 }
 
 fn xy_to_index(x: i32, y: i32) -> i32 {
-    if x < 0 || y < 0 || x >= i32(MAP_WIDTH) || y >= i32(MAP_HEIGHT) {
+    if x < 0 || y < 0 || x >= i32(map_width) || y >= i32(map_height) {
         return -1;
     }
-    return x + y * i32(MAP_WIDTH);
+    return x + y * i32(map_width);
 }
