@@ -516,4 +516,16 @@ impl DepthToPclAndHeightPipeline {
             self.output_gradient_map_buffer.read_data_blocking(device)?;
         Ok(gradient_map_data)
     }
+
+    pub fn set_map_layout(&mut self, device: &GpuDevice, map_layout: map_layout::MapLayout) {
+        self.map_layout = map_layout;
+        self.map_layout_buffer
+            .write_data(device, &map_layout.to_bytes(), 0);
+        let width = (map_layout.width_meters() / map_layout.cell_size).ceil() as u32;
+        let height = (map_layout.height_meters() / map_layout.cell_size).ceil() as u32;
+        self.map_width_buffer
+            .write_data(device, &width.to_bytes(), 0);
+        self.map_height_buffer
+            .write_data(device, &height.to_bytes(), 0);
+    }
 }
