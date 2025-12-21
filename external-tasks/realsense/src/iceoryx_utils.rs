@@ -1,10 +1,5 @@
-use iceoryx2::{
-    node::NodeBuilder,
-    port::{publisher::Publisher, subscriber::Subscriber},
-    prelude::{ServiceName, UnableToDeliverStrategy},
-    service::ipc,
-};
-use iceoryx_types::{IceoryxDepthFrame, IceoryxPointCloud, ImuMsg, PoseMsg};
+use iceoryx2::{node::NodeBuilder, port::publisher::Publisher, prelude::ServiceName, service::ipc};
+use iceoryx_types::{IceoryxDepthFrame, ImuMsg, PoseMsg};
 
 /// Creates a new iceoryx2 node for IPC services
 pub fn create_node() -> iceoryx2::node::Node<ipc::Service> {

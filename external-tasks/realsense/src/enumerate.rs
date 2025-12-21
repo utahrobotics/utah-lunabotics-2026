@@ -2,11 +2,10 @@ use crate::depth_camera::DepthCameraTask;
 use fxhash::FxHashMap;
 use realsense_rust::{
     config::{Config, ConfigurationError},
-    device::{self, Device},
-    kind::{Rs2CameraInfo, Rs2Format, Rs2ProductLine, Rs2StreamKind},
+    kind::{Rs2CameraInfo, Rs2Format, Rs2StreamKind},
     pipeline::{ActivePipeline, InactivePipeline},
 };
-use std::{collections::HashSet, sync::mpsc::SyncSender, thread, time::Duration};
+use std::sync::mpsc::SyncSender;
 
 /// waits for a realsense to be plugged in and then starts a depth camera task that will publish depth frames
 pub fn enumerate_depth_cameras(serial_numbers: &[&str]) {
@@ -117,11 +116,11 @@ pub fn enumerate_depth_cameras(serial_numbers: &[&str]) {
                     eprintln!("Failed to disable all streams: {}", e);
                     continue;
                 }
-                let Some(prod_line) = device.info(Rs2CameraInfo::ProductLine) else {
+                let Some(_prod_line) = device.info(Rs2CameraInfo::ProductLine) else {
                     continue;
                 };
 
-                enable_d455_streams(&mut config);
+                let _ = enable_d455_streams(&mut config);
 
                 // https://gitlab.com/tangram-vision/oss/realsense-rust/-/issues/29
 
