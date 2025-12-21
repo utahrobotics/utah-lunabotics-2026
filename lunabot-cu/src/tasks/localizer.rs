@@ -51,12 +51,14 @@
 //! ICP not contributing enough          Decrease ICP variance in kiss_icp.rs
 
 use std::f64::consts::PI;
+use std::sync::OnceLock;
 
 use crate::rerun_viz;
 use crate::rerun_viz::RECORDER;
 use crate::tasks::AprilTagMeasurement;
 use crate::tasks::IcpMeasurement;
 use crate::tasks::ImuMeasurement;
+use crate::tasks::T265Msg;
 use crate::utils::RobotState;
 use common::FromLunabot;
 use cu_spatial_payloads::EncodableIsometry;
@@ -77,7 +79,6 @@ use kfilter::system::System;
 use nalgebra::UnitQuaternion;
 use nalgebra::{Isometry3, SMatrix, SVector, Vector3, Vector6};
 use rerun::Scalars;
-use rerun::components::Scalar;
 
 use crate::ROBOT_STATE;
 
@@ -101,31 +102,16 @@ const POSE_MEAS_DIM: usize = 6;
 const VEL_MEAS_DIM: usize = 6;
 
 /// Process noise for position (grows with time)
-const PROCESS_NOISE_POSITION: f64 = 0.4;
+static PROCESS_NOISE_POSITION: OnceLock<f64> = OnceLock::new();
 
 /// Process noise for velocity
-const PROCESS_NOISE_VELOCITY: f64 = 0.4;
+static PROCESS_NOISE_VELOCITY: OnceLock<f64> = OnceLock::new();
 
 /// Process noise for orientation
-const PROCESS_NOISE_ORIENTATION: f64 = 0.4;
+static PROCESS_NOISE_ORIENTATION: OnceLock<f64> = OnceLock::new();
 
 /// Process noise for angular velocity
-const PROCESS_NOISE_ANGULAR_VEL: f64 = 0.4;
-
-/// T265 velocity measurement variance (T265 is precise for short-term motion)
-const T265_VELOCITY_VARIANCE: f64 = 0.1;
-
-/// T265 angular velocity measurement variance
-const T265_ANGULAR_VELOCITY_VARIANCE: f64 = 0.1;
-
-/// IMU linear acceleration measurement variance (IMU is noisy but high frequency)
-const IMU_LINEAR_ACCELERATION_VARIANCE: f64 = 0.1;
-
-/// IMU angular velocity measurement variance
-const IMU_ANGULAR_VELOCITY_VARIANCE: f64 = 0.1;
-
-/// Initial covariance for unknown states
-const INITIAL_COVARIANCE: f64 = 100.0;
+static PROCESS_NOISE_ANGULAR_VEL: OnceLock<f64> = OnceLock::new();
 
 // ============================================================================
 // Type Aliases
@@ -168,6 +154,14 @@ type VelocityMeasurement = LinearMeasurement<f64, STATE_DIM, VEL_MEAS_DIM>;
 /// - angular_velocity stays constant
 
 fn step_function(state: StateVec, input: InputVec) -> StepReturn<f64, STATE_DIM> {
+    if PROCESS_NOISE_POSITION.get().is_none() {
+        eprintln!("Process noise constants not initialized");
+        return StepReturn {
+            state,
+            jacobian: SMatrix::<f64, STATE_DIM, STATE_DIM>::identity(),
+            covariance: SMatrix::<f64, STATE_DIM, STATE_DIM>::zeros(),
+        };
+    }
     let dt = input[0];
 
     let position = state.fixed_rows::<3>(0);
@@ -201,12 +195,12 @@ fn step_function(state: StateVec, input: InputVec) -> StepReturn<f64, STATE_DIM>
     // The error dynamics are: α̇ = -[ω̂×]α (plus noise)
     // where [ω×] is the skew-symmetric cross-product matrix
     let mut jacobian = SMatrix::<f64, STATE_DIM, STATE_DIM>::identity();
-    
+
     // Position depends on velocity
     jacobian[(0, 3)] = dt;
     jacobian[(1, 4)] = dt;
     jacobian[(2, 5)] = dt;
-    
+
     // Orientation error dynamics: α̇ = -[ω̂×]α
     // This is the skew-symmetric matrix of angular velocity
     // [ω×] = [  0  -ωz   ωy ]
@@ -216,33 +210,33 @@ fn step_function(state: StateVec, input: InputVec) -> StepReturn<f64, STATE_DIM>
     let wx = angular_velocity[0];
     let wy = angular_velocity[1];
     let wz = angular_velocity[2];
-    
+
     // Row 6 (δθx): affected by -(-wz*δθy + wy*δθz) = wz*δθy - wy*δθz
-    jacobian[(6, 7)] = wz * dt;   // ∂(δθx)/∂(δθy)
-    jacobian[(6, 8)] = -wy * dt;  // ∂(δθx)/∂(δθz)
-    
-    // Row 7 (δθy): affected by -( wz*δθx - wx*δθz) = -wz*δθx + wx*δθz  
-    jacobian[(7, 6)] = -wz * dt;  // ∂(δθy)/∂(δθx)
-    jacobian[(7, 8)] = wx * dt;   // ∂(δθy)/∂(δθz)
-    
+    jacobian[(6, 7)] = wz * dt; // ∂(δθx)/∂(δθy)
+    jacobian[(6, 8)] = -wy * dt; // ∂(δθx)/∂(δθz)
+
+    // Row 7 (δθy): affected by -( wz*δθx - wx*δθz) = -wz*δθx + wx*δθz
+    jacobian[(7, 6)] = -wz * dt; // ∂(δθy)/∂(δθx)
+    jacobian[(7, 8)] = wx * dt; // ∂(δθy)/∂(δθz)
+
     // Row 8 (δθz): affected by -(-wy*δθx + wx*δθy) = wy*δθx - wx*δθy
-    jacobian[(8, 6)] = wy * dt;   // ∂(δθz)/∂(δθx)
-    jacobian[(8, 7)] = -wx * dt;  // ∂(δθz)/∂(δθy)
+    jacobian[(8, 6)] = wy * dt; // ∂(δθz)/∂(δθx)
+    jacobian[(8, 7)] = -wx * dt; // ∂(δθz)/∂(δθy)
 
     // Process covariance
     let mut covariance = SMatrix::<f64, STATE_DIM, STATE_DIM>::zeros();
     for i in 0..3 {
-        covariance[(i, i)] = PROCESS_NOISE_POSITION * dt * dt;
+        covariance[(i, i)] = *PROCESS_NOISE_POSITION.get().unwrap() * dt * dt;
     }
     for i in 3..6 {
-        covariance[(i, i)] = PROCESS_NOISE_VELOCITY * dt;
+        covariance[(i, i)] = *PROCESS_NOISE_VELOCITY.get().unwrap() * dt;
     }
     for i in 6..9 {
         // Orientation error grows with angular velocity uncertainty
-        covariance[(i, i)] = PROCESS_NOISE_ORIENTATION * dt * dt;
+        covariance[(i, i)] = *PROCESS_NOISE_ORIENTATION.get().unwrap() * dt * dt;
     }
     for i in 9..12 {
-        covariance[(i, i)] = PROCESS_NOISE_ANGULAR_VEL * dt;
+        covariance[(i, i)] = *PROCESS_NOISE_ANGULAR_VEL.get().unwrap() * dt;
     }
 
     StepReturn {
@@ -344,9 +338,6 @@ pub struct Localizer {
     /// Measurement model for velocity (linear + angular)
     t265_velocity_measurement: VelocityMeasurement,
 
-    /// Measurement model for velocity from IMU (linear acceleration + angular velocity)
-    imu_velocity_measurement: VelocityMeasurement,
-
     /// Time of most recent update
     most_recent_update: CuTime,
 
@@ -423,7 +414,7 @@ impl Localizer {
             let error = Vector3::new(state[6], state[7], state[8]);
             let error_mag = error.magnitude();
             let error_deg = error_mag * 180.0 / PI;
-            
+
             let _ = logger.recorder.log(
                 "debug/error_before_reset",
                 &Scalars::new([error_mag as f32]),
@@ -434,7 +425,10 @@ impl Localizer {
             );
             let _ = logger.recorder.log(
                 "debug/error_source",
-                &rerun::TextLog::new(format!("{}: {:.4} rad ({:.2}°)", source, error_mag, error_deg)),
+                &rerun::TextLog::new(format!(
+                    "{}: {:.4} rad ({:.2}°)",
+                    source, error_mag, error_deg
+                )),
             );
         }
     }
@@ -448,20 +442,59 @@ impl CuTask for Localizer {
         IcpMeasurement,           // Kiss ICP pose
         FromPicoV3,               // Ignored for now
         Vec<AprilTagMeasurement>, // AprilTag detections - global reference
-        EncodableIsometry         // T265 pose - for velocity extraction
+        T265Msg         // T265 pose - for velocity extraction
     );
 
     type Output<'m> = output_msg!(FromLunabot);
 
-    fn new(_config: Option<&cu29::prelude::ComponentConfig>) -> cu29::CuResult<Self>
+    fn new(config: Option<&cu29::prelude::ComponentConfig>) -> cu29::CuResult<Self>
     where
         Self: Sized,
     {
+        // load up values from config
+        let process_noise_position = config
+            .unwrap()
+            .get::<f64>("process_noise_position")
+            .expect("please supply process noise position");
+
+        let process_noise_velocity = config
+            .unwrap()
+            .get::<f64>("process_noise_velocity")
+            .expect("please supply process noise velocity");
+        let process_noise_orientation = config
+            .unwrap()
+            .get::<f64>("process_noise_orientation")
+            .expect("please supply process noise orientation");
+
+        let process_noise_angular_vel = config
+            .unwrap()
+            .get::<f64>("process_noise_angular_velocity")
+            .expect("please supply process noise angular velocity");
+
+        let initial_covariance = config
+            .unwrap()
+            .get::<f64>("initial_covariance")
+            .expect("please supply initial covariance");
+        PROCESS_NOISE_POSITION
+            .set(process_noise_position)
+            .map_err(|e| CuError::new_with_cause("process noise position already set", e))?;
+        PROCESS_NOISE_VELOCITY
+            .set(process_noise_velocity)
+            .map_err(|e| CuError::new_with_cause("process noise velocity already set", e))?;
+        PROCESS_NOISE_ORIENTATION
+            .set(process_noise_orientation)
+            .map_err(|e| CuError::new_with_cause("process noise orientation already set", e))?;
+        PROCESS_NOISE_ANGULAR_VEL
+            .set(process_noise_angular_vel)
+            .map_err(|e| {
+                CuError::new_with_cause("process noise angular velocity already set", e)
+            })?;
+
         // Initial state: all zeros
         let initial_state = StateVec::zeros();
 
         // Initial covariance: high uncertainty
-        let initial_covariance = CovMat::from_diagonal_element(INITIAL_COVARIANCE);
+        let initial_covariance = CovMat::from_diagonal_element(initial_covariance);
 
         // Create EKF with our step function
         let ekf = EKF::new_ekf_with_input(step_function, initial_state, initial_covariance);
@@ -473,23 +506,9 @@ impl CuTask for Localizer {
 
         // Create velocity measurement model with T265 noise
         let vel_h = velocity_observation_matrix();
-        let mut vel_r = SMatrix::<f64, VEL_MEAS_DIM, VEL_MEAS_DIM>::identity();
-        for i in 0..3 {
-            vel_r[(i, i)] = T265_VELOCITY_VARIANCE;
-        }
-        for i in 3..6 {
-            vel_r[(i, i)] = T265_ANGULAR_VELOCITY_VARIANCE;
-        }
-        let t265_velocity_measurement = VelocityMeasurement::new(vel_h, vel_r, Vector6::zeros());
+        let vel_r = SMatrix::<f64, VEL_MEAS_DIM, VEL_MEAS_DIM>::identity();
 
-        let imu_vel_h = velocity_observation_matrix();
-        let mut imu_vel_r = SMatrix::<f64, VEL_MEAS_DIM, VEL_MEAS_DIM>::identity();
-        for i in 0..3 {
-            imu_vel_r[(i, i)] = IMU_LINEAR_ACCELERATION_VARIANCE;
-        }
-        for i in 3..6 {
-            imu_vel_r[(i, i)] = IMU_ANGULAR_VELOCITY_VARIANCE;
-        }
+        let t265_velocity_measurement = VelocityMeasurement::new(vel_h, vel_r, Vector6::zeros());
 
         if let Some(robot_state) = ROBOT_STATE.get() {
             Ok(Self {
@@ -499,11 +518,7 @@ impl CuTask for Localizer {
                 reference_quaternion: UnitQuaternion::identity(),
                 pose_measurement,
                 t265_velocity_measurement,
-                imu_velocity_measurement: VelocityMeasurement::new(
-                    imu_vel_h,
-                    imu_vel_r,
-                    Vector6::zeros(),
-                ),
+
                 most_recent_update: CuTime::default(),
                 icp_to_global: None,
                 t265_to_icp: Isometry3::identity(),
@@ -601,7 +616,7 @@ impl CuTask for Localizer {
                     // MEKF: Compute pose measurement with orientation error relative to reference
                     let pose_vec = self.create_pose_measurement(&global_pose);
 
-                    // Extract covariance from AprilTag measurement
+                    // Extract variance from AprilTag measurement
                     let mut pose_r =
                         SMatrix::<f64, POSE_MEAS_DIM, POSE_MEAS_DIM>::from_row_slice(&tag.variance);
 
@@ -685,7 +700,7 @@ impl CuTask for Localizer {
                 // MEKF: Compute pose measurement with orientation error relative to reference
                 let pose_vec = self.create_pose_measurement(&global_icp_pose);
 
-                // Extract covariance from ICP measurement
+                // Extract variance from ICP measurement
                 let mut pose_r =
                     SMatrix::<f64, POSE_MEAS_DIM, POSE_MEAS_DIM>::from_row_slice(&icp_msg.variance);
 
@@ -714,7 +729,7 @@ impl CuTask for Localizer {
         // Step 4: Process T265 - extract velocities from pose deltas IN GLOBAL FRAME
         // Step 4: Process T265 - extract velocities from pose deltas IN GLOBAL FRAME
         if let Some(t265_msg) = input.4.payload() {
-            if let Some(current_t265_raw) = t265_msg.to_na() {
+            if let Some(current_t265_raw) = t265_msg.pose.to_na() {
                 // Visualize raw T265
                 if let Some(logger) = RECORDER.get() {
                     let _ = logger.recorder.log(
@@ -782,6 +797,15 @@ impl CuTask for Localizer {
                             );
 
                             self.t265_velocity_measurement.z = vel_vec;
+
+                            // extract variance from T265 message
+                            let velocity_variance = t265_msg.velocity_variance;
+                            let angular_velocity_variance = t265_msg.angular_velocity_variance;
+                            let mut vel_r = SMatrix::<f64, VEL_MEAS_DIM, VEL_MEAS_DIM>::zeros();
+                            for i in 0..3 {
+                                vel_r[(i, i)] = velocity_variance;
+                                vel_r[(3 + i, 3 + i)] = angular_velocity_variance;
+                            }
 
                             if let Err(e) = self.ekf.update(&self.t265_velocity_measurement) {
                                 eprintln!("EKF update with T265 velocity failed: {:?}", e);
@@ -899,7 +923,6 @@ impl CuTask for Localizer {
 
             // Log to rerun
             if let Some(logger) = RECORDER.get() {
-
                 let state = self.ekf.state();
                 let cov = self.ekf.covariance();
 

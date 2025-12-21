@@ -109,6 +109,14 @@ impl CuTask for KissIcp {
             .and_then(|c| c.get::<u32>("time_between_pose_collections_ms"))
             .unwrap_or(2);
 
+        let position_variance = config
+            .and_then(|c| c.get::<f64>("position_variance"))
+            .unwrap_or(0.10472);
+
+        let orientation_variance = config
+            .and_then(|c| c.get::<f64>("orientation_variance"))
+            .unwrap_or(0.001);
+
         let config = Config {
             voxel_size,
             max_range,
@@ -127,9 +135,12 @@ impl CuTask for KissIcp {
         let pipeline = IcpPipeline::new_with_config(config);
 
         let diagonal = SVector::<f64, 6>::new(
-            0.5 as f64, // Position variance
-            0.5 as f64, 0.5 as f64, 0.5 as f64, // Orientation variance
-            0.5 as f64, 0.5 as f64,
+            position_variance,
+            position_variance,
+            position_variance,
+            orientation_variance,
+            orientation_variance,
+            orientation_variance,
         );
         let variance: [f64; 36] = SMatrix::<f64, 6, 6>::from_diagonal(&diagonal)
             .as_slice()

@@ -3335,7 +3335,7 @@ dependencies = [
 [[package]]
 name = "kfilter"
 version = "0.4.0"
-source = "git+https://github.com/utahrobotics/kfilter.git#1de33c135918116cf5f5efd555e6fb3ef2ecd182"
+source = "git+https://github.com/utahrobotics/kfilter.git#d3b54f9136f9a79824a019fa08c0c35444225bc4"
 dependencies = [
  "nalgebra",
 ]

@@ -59,7 +59,9 @@
             config: {
                 "serial_num": "929122111514",
                 "camera_node": "upper_depth_camera_t265",
-                "node": "T265_right"
+                "node": "T265_right",
+                "t265_velocity_variance": 1.0,
+                "t265_angular_velocity_variance": 1.0,
             },
             logging: (
                 enabled: true
@@ -92,11 +94,11 @@
                 // this is because it allows the outlier cells to be re mapped on the next frame
                 "outlier_filter_std_dev_threshold": 3.5,
                 "outlier_filter_max_unknown_neighbors_ratio": 0.3,
-                "use_bilateral_filter": true,
+                "use_bilateral_filter": false,
                 "robot_radius_meters": 0.1,
                 "min_depth": 0.2,
                 "max_depth": 2.5,
-                "clear_affected_cells": true,
+                "clear_affected_cells": false,
                 "min_distance_to_clear": 1.5,
                 // this is the gradient threshold for the obstacle expander
                 // if the gradient is greater than this value, the cell is considered an obstacle
@@ -104,7 +106,7 @@
             },
             background: false,
             logging: (
-                enabled: true,
+                enabled: false,
             )
         ),
         // registers point clouds into a global map, and estimates the isometry of the lidar node.
@@ -132,6 +134,10 @@
                 "max_distance_between_poses": 0.05,
                 // time between poses collected for deskewing
                 "time_between_pose_collections_ms": 2,
+
+                // kalman filtering parameters
+                "icp_position_variance": 0.6,
+                "icp_orientation_variance": 0.001,
             },
             logging: (
                 enabled: false
@@ -142,7 +148,14 @@
         // position is logged to rerun at 60 hz
         (
             id:"localizer", type:"crate::tasks::Localizer",
-            config:{},
+            config:{
+                "process_noise_position": 0.5,
+                "process_noise_velocity": 0.5,
+                "process_noise_orientation": 0.5,
+                "process_noise_angular_velocity": 0.5,
+
+                "initial_covariance": 100.0,
+            },
             // task does not get stubbed out in sim mode
             run_in_sim: true,
         ),
@@ -193,7 +206,7 @@
         (src:"new_ai",                        dst:"v3_pico",                 msg:"(Option<common::Steering>, Option<embedded_common::ActuatorCommand>)"),
         (src:"v3_pico",                       dst:"localizer",               msg:"embedded_common::FromPicoV3"),
         (src:"detection_handler",             dst: "localizer",              msg:"Vec<crate::tasks::AprilTagMeasurement>"),
-        (src:"t265_subscriber",               dst:"localizer",               msg:"cu_spatial_payloads::EncodableIsometry"),
+        (src:"t265_subscriber",               dst:"localizer",               msg:"crate::tasks::sources::T265Msg"),
     ],
     
     bridges: [

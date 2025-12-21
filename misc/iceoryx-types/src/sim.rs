@@ -122,6 +122,20 @@ pub struct PoseMsg {
     pub position: [f32; 3],
     /// orientation quaternion (w, x, y, z)
     pub quaternion: [f32; 4],
+    pub confidence: T265Confidence,
+}
+
+#[derive(Clone, Copy, Debug, Encode, Decode, Serialize)]
+#[repr(C)]
+pub enum T265Confidence {
+    Low,
+    Medium,
+    High,
+}
+impl Default for T265Confidence {
+    fn default() -> Self {
+        T265Confidence::Low
+    }
 }
 
 // -----------------------------------------------------------------------------
