@@ -473,7 +473,6 @@ impl CuTask for Localizer {
             let _ = logger.recorder.log_static("localizer/t265_raw", &axes);
             let _ = logger.recorder.log_static("localizer/icp_raw", &axes);
             let _ = logger.recorder.log_static("localizer/icp_global", &axes);
-            let _ = logger.recorder.log_static("localizer/estimated", &axes);
         }
         Ok(())
     }

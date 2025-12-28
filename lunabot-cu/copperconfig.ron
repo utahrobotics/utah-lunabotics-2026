@@ -97,12 +97,16 @@
                 "use_bilateral_filter": false,
                 "robot_radius_meters": 0.1,
                 "min_depth": 0.2,
-                "max_depth": 2.5,
+                "max_depth": 2.0,
                 "clear_affected_cells": false,
                 "min_distance_to_clear": 1.5,
                 // this is the gradient threshold for the obstacle expander
                 // if the gradient is greater than this value, the cell is considered an obstacle
                 "obstacle_gradient_threshold": 1.0,
+
+                // parameters for when to reset the local map
+                "max_distance_traveled_before_reset": 1.5,
+                "max_rotation_radians_before_reset": 3.0,
             },
             background: false,
             logging: (
@@ -191,6 +195,10 @@
         (
             id: "detection_handler",
             type: "crate::tasks::AprilDetectionHandler",
+            config: {
+                // all tags > max_distance away will be ignored
+                "max_distance": 1.0
+            }
         )
     ],
     cnx:[
@@ -232,13 +240,13 @@
             path:"camera_configs/camera_template_gstreamer.ron",
             params:{
                 "id":"back",
-                "port":"pci-0000:34:00.4-usb-0:2.4:1.0",
-                "fx":689.93,
-                "fy":689.93,
-                "cx":320.84,
-                "cy":240.819,
-                "width":640,
-                "height":480,
+                "port":"pci-0000:00:14.0-usb-0:5.3:1.0",
+                "fx":667.0,
+                "fy":667.0,
+                "cx":960.84,
+                "cy":600.819,
+                "width":1920,
+                "height":1200,
                 "udp_host":"192.168.0.108",
                 "udp_port":5004,
             },
@@ -248,12 +256,12 @@
             params:{
                 "id":"side",
                 "port":"pci-0000:00:14.0-usb-0:1:1.0",
-                "fx":689.93,
-                "fy":689.93,
-                "cx":320.84,
-                "cy":240.819,
-                "width":640,
-                "height":480,
+                "fx":667.0,
+                "fy":667.0,
+                "cx":960.84,
+                "cy":600.819,
+                "width":1920,
+                "height":1200,
                 "udp_host":"127.0.0.1",
                 "udp_port":5003,
             },

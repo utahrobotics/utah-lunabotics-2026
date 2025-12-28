@@ -96,6 +96,7 @@ fn load_known_apriltag_isometries() -> CuResult<HashMap<usize, Isometry3<f64>>> 
 #[derive(Default)]
 pub struct AprilDetectionHandler {
     known_tags: HashMap<usize, Isometry3<f64>>,
+    max_distance: f64
 }
 
 #[derive(Clone, Copy, Debug, Encode, Decode, Serialize)]
@@ -128,9 +129,11 @@ impl CuTask for AprilDetectionHandler {
     // camera_id, estimated isometry of camera
     type Output<'m> = output_msg!(Vec<AprilTagMeasurement>);
 
-    fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
+    fn new(config: Option<&ComponentConfig>) -> CuResult<Self> {
         let known_tags = load_known_apriltag_isometries()?;
-        Ok(Self { known_tags })
+        let max_distance = config.expect("provide a config for apriltag handler").get("max_distance").unwrap_or(1.0);
+
+        Ok(Self { known_tags, max_distance })
     }
 
     fn process(
@@ -153,6 +156,10 @@ impl CuTask for AprilDetectionHandler {
                         eprintln!("tag observed by unknown camera. (make sure the camera node is correct and defined in the chain");
                         continue;
                     };
+                    if observation.tag_local_isometry.translation.vector.magnitude() > self.max_distance {
+                        println!("ignored > max distance");
+                        continue;
+                    }
 
 
                     // Translational

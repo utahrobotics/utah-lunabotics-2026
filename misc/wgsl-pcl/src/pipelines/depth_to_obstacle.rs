@@ -42,7 +42,6 @@ pub struct DepthToPclAndHeightPipeline {
     depth_scale_buffer: GpuBuffer,
     input_img_buffer: GpuBuffer,
     output_pcl_buffer: GpuBuffer,
-    output_height_map_buffer: GpuBuffer,
     blur_filtered_height_map_buffer: GpuBuffer,
     output_outlier_filtered_height_map_buffer: GpuBuffer,
     output_gradient_map_buffer: GpuBuffer,
@@ -54,6 +53,8 @@ pub struct DepthToPclAndHeightPipeline {
     map_layout_buffer: GpuBuffer,
     map_height_buffer: GpuBuffer,
     map_width_buffer: GpuBuffer,
+    height_map_buffer: GpuBuffer,
+
     /// Whether the clear affected cells stage is enabled
     clear_affected_cells_enabled: bool,
 }
@@ -79,28 +80,28 @@ impl DepthToPclAndHeightPipeline {
     ) -> Result<Self, WgslPclError> {
         // Create buffers for depth -> pcl -> height map shader
         let input_img_buffer = GpuBuffer::new_storage(
-            &device,
+            device,
             ((depth_image_dimensions.0 * depth_image_dimensions.1) * size_of::<u16>() as u32)
                 as u64,
             Some("input_img_buffer"),
         );
         let output_pcl_buffer = GpuBuffer::new_storage(
-            &device,
+            device,
             ((depth_image_dimensions.0 * depth_image_dimensions.1)
                 * size_of::<AlignedVec4<f32>>() as u32) as u64,
             Some("output_pcl_buffer"),
         );
         let camera_transform_buffer = GpuBuffer::new_uniform(
-            &device,
+            device,
             size_of::<AlignedMatrix4<f32>>() as u64,
             Some("camera_transform_buffer"),
         );
         let depth_scale_buffer =
-            GpuBuffer::new_uniform(&device, size_of::<f32>() as u64, Some("depth_scale_buffer"));
+            GpuBuffer::new_uniform(device, size_of::<f32>() as u64, Some("depth_scale_buffer"));
         let map_layout_buffer =
-            GpuBuffer::new_uniform_with_data(&device, &map_layout, Some("map_layout_buffer"));
+            GpuBuffer::new_uniform_with_data(device, &map_layout, Some("map_layout_buffer"));
         let height_map_buffer = GpuBuffer::new_storage_with_data(
-            &device,
+            device,
             &vec![
                 f32::MIN;
                 ((map_layout.width_meters() / map_layout.cell_size).ceil() as usize)
@@ -148,7 +149,7 @@ impl DepthToPclAndHeightPipeline {
                     },
                     height_map_buffer.as_entire_binding(),
                 )
-                .build(&device, "clear_affected_bind_group_0".to_string());
+                .build(device, "clear_affected_bind_group_0".to_string());
 
             let (clear_map_layout_transforms_layout, clear_map_layout_transforms_bindgrp) =
                 BindGroupLayoutBuilder::new(None)
@@ -182,7 +183,7 @@ impl DepthToPclAndHeightPipeline {
                         },
                         map_layout_buffer.as_entire_binding(),
                     )
-                    .build(&device, "clear_affected_bind_group_1".to_string());
+                    .build(device, "clear_affected_bind_group_1".to_string());
 
             let clear_pipeline = ComputePipelineBuilder::new(device)
                 .with_constants(clear_constants)
@@ -233,7 +234,7 @@ impl DepthToPclAndHeightPipeline {
                 },
                 height_map_buffer.as_entire_binding(),
             )
-            .build(&device, "bind_group_0".to_string());
+            .build(device, "bind_group_0".to_string());
 
         // define layout and bind groups for camera transform and depth scale
         let (transforms_map_layout, transforms_map_layout_bindgrp) =
@@ -268,7 +269,7 @@ impl DepthToPclAndHeightPipeline {
                     },
                     map_layout_buffer.as_entire_binding(),
                 )
-                .build(&device, "depth_to_pcl_bind_group".to_string());
+                .build(device, "depth_to_pcl_bind_group".to_string());
 
         let constants: HashMap<&str, f64> = HashMap::from([
             ("IMAGE_WIDTH", depth_image_dimensions.0 as f64),
@@ -291,14 +292,14 @@ impl DepthToPclAndHeightPipeline {
             .build()?;
 
         let map_height_buffer = GpuBuffer::new_uniform_with_data(
-            &device,
+            device,
             &((map_layout.height_meters() / map_layout.cell_size).ceil() as u32),
-            Some("map_layout_buffer"),
+            Some("map_height_buffer"),
         );
         let map_width_buffer = GpuBuffer::new_uniform_with_data(
-            &device,
+            device,
             &((map_layout.width_meters() / map_layout.cell_size).ceil() as u32),
-            Some("map_layout_buffer"),
+            Some("map_width_buffer"),
         );
 
         let (outlier_filtered_height_map_buffer, outlier_filter_pipeline) =
@@ -377,7 +378,7 @@ impl DepthToPclAndHeightPipeline {
         Ok(Self {
             pipeline: combined_pipeline,
             depth_image_dimensions_px: depth_image_dimensions,
-            output_height_map_buffer: height_map_buffer,
+            height_map_buffer,
             input_img_buffer,
             output_pcl_buffer,
             camera_transform_buffer,
@@ -507,7 +508,7 @@ impl DepthToPclAndHeightPipeline {
     }
 
     pub fn get_raw_height_map(&self, device: &GpuDevice) -> anyhow::Result<Vec<f32>> {
-        let height_map_data: Vec<f32> = self.output_height_map_buffer.read_data_blocking(device)?;
+        let height_map_data: Vec<f32> = self.height_map_buffer.read_data_blocking(device)?;
         Ok(height_map_data)
     }
 
@@ -517,15 +518,11 @@ impl DepthToPclAndHeightPipeline {
         Ok(gradient_map_data)
     }
 
-    pub fn set_map_layout(&mut self, device: &GpuDevice, map_layout: map_layout::MapLayout) {
-        self.map_layout = map_layout;
-        self.map_layout_buffer
-            .write_data(device, &map_layout.to_bytes(), 0);
+    pub fn clear_map(&mut self, device: &GpuDevice) {
+        let map_layout = self.map_layout;
         let width = (map_layout.width_meters() / map_layout.cell_size).ceil() as u32;
         let height = (map_layout.height_meters() / map_layout.cell_size).ceil() as u32;
-        self.map_width_buffer
-            .write_data(device, &width.to_bytes(), 0);
-        self.map_height_buffer
-            .write_data(device, &height.to_bytes(), 0);
+        let empty_map = vec![f32::MIN; (width * height) as usize];
+        self.height_map_buffer.write_data(device, &empty_map, 0);
     }
 }
