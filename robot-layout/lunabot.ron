@@ -20,7 +20,7 @@
         {
             "name": Some("upper_depth_camera"),
             "origin": [0.80, 0.0, 0.35],
-            "euler": [0.0, 20.0, 0.0]
+            "euler": [0.0, 34.0, 0.0]
         },
         {
             "name": Some("upper_depth_camera_t265"),
@@ -34,8 +34,8 @@
         },
         {
             "name": Some("cam_side"),
-            "origin": [-0.231, 0.0, -0.055],
-            "euler": [0.0, 0.0, 0.0]
+            "origin": [0.20, 0.2, 0.0],
+            "euler": [0.0, 0.0, 90.0]
         },
         {
             "name": Some("low_right_camera"),
@@ -44,7 +44,7 @@
         },
         {
             "name": Some("cam_back"),
-            "origin": [0.0, 0.0, 0.475],
+            "origin": [-0.36, 0.0, 0.0],
             "euler": [0.0, 0.0, 180.0]
         },
         {
