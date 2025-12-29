@@ -1,7 +1,7 @@
 # MuJoCo Simulation
 
 ## Setup
-1. Follow the installation instructions [here](https://mujoco-rs.readthedocs.io/en/v1.5.x/installation.html#static-linking) to build mujoco for static linking, except replace the two cmake commands listed there with this:
+1. Follow the installation instructions [here](https://mujoco-rs.readthedocs.io/en/v2.0.x/installation.html#static-linking) to build mujoco for static linking, except replace the two cmake commands listed there with this:
 ```bash
 cmake -B build -S . \
   -DBUILD_SHARED_LIBS:BOOL=OFF \
@@ -27,7 +27,7 @@ This option synchronizes the time step of the physics simulation to the HZ at wh
 Additionally, starting the simulation this way launches the code for the lunabot, which is connected to the simulation environment so that the wheels will move when commanded to by the ```motor_ctrl``` task, actuators will move when commanded to by the v3_pico task, and sensor inputs for lidars and imus will be simulated by using Mujoco's rangefinder and accelerometer sensors respectively.
 
 
-*Currently only the motor_ctrl task is connected, no sensor inputs or actuators yet*
+*Currently only the motor_ctrl and actuators work, and the localizer has a stub to just directly know where it is*
 
 * Run the simulation by calling ```make sim```, this command may re build the entire project because mujoco requires using a different linker.
 
@@ -59,7 +59,7 @@ This option simply loads the artemis_arena.xml scene into the mujoco simulator w
  ```xml
  <include file="meshes/model_name/model_name.xml" />
  ```
-To artemis_arena.xml, or use [attach](https://mujoco.readthedocs.io/en/3.3.5/XMLreference.html#body-attach).
+To artemis_arena.xml, or use [attach](https://mujoco.readthedocs.io/en/3.3.7/XMLreference.html#body-attach).
 
 6. Set the [joint type](https://mujoco.readthedocs.io/en/stable/XMLreference.html#body-joint)
 7. Make sure the generated meshes look fine by changing the group of the visual class to 3 and the group of the collision class to 2 in artemis_arena.xml, because that will make the collision meshes visible in the simulator UI:
@@ -78,9 +78,9 @@ To artemis_arena.xml, or use [attach](https://mujoco.readthedocs.io/en/3.3.5/XML
 ### Learning Resources
 
 1. Mujoco-rs docs
-* Guide: https://mujoco-rs.readthedocs.io/en/v1.5.x/
+* Guide: https://mujoco-rs.readthedocs.io/en/v2.0.x/
 * API docs: https://docs.rs/mujoco-rs/latest/mujoco_rs/
 * Mujoco-rs examples: https://github.com/davidhozic/mujoco-rs/tree/main/examples 
-2. [Mujoco Docs](https://mujoco.readthedocs.io/en/3.3.5/overview.html)
-3. [Mujoco XML reference](https://mujoco.readthedocs.io/en/3.3.5/XMLreference.html)
+2. [Mujoco Docs](https://mujoco.readthedocs.io/en/3.3.7/overview.html)
+3. [Mujoco XML reference](https://mujoco.readthedocs.io/en/3.3.7/XMLreference.html)
 4. [Mujoco model examples](https://github.com/google-deepmind/mujoco_menagerie/tree/main)
