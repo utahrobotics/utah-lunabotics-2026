@@ -1,54 +1,30 @@
-//! Localizer module for multi-sensor fusion using Multiplicative EKF (MEKF).
-//!
-//! This module fuses pose estimates from multiple sensors:
-//! - **Kiss ICP**: ~5 Hz, accurate but relative to start frame
-//! - **T265**: High frequency velocity estimates (derived from pose deltas)
-//! - **AprilTags**: Sparse but globally-referenced position fixes
-//!
-//! # Approach
-//!
-//! We use a **Multiplicative Extended Kalman Filter (MEKF)** with a 12-state error vector:
-//! - Position [x, y, z]
-//! - Linear velocity [vx, vy, vz]  
-//! - Orientation ERROR [δθx, δθy, δθz] — small rotation from reference quaternion
-//! - Angular velocity [wx, wy, wz]
-//!
-//! The **reference quaternion** is stored separately and updated after each filter cycle.
-//! This avoids the singularity at ±π that occurs with axis-angle representations.
-//!
-//! ## MEKF Operation
-//!
-//! 1. **Predict**: Propagate reference quaternion with angular velocity, error state gets process noise
-//! 2. **Update**: Apply measurements as errors relative to reference quaternion
-//! 3. **Reset**: Compose error onto reference quaternion, reset error state to zero
-//!
-//! This keeps the orientation error small (near zero), completely avoiding the π singularity.
-//!
-//! ## Handling Relative vs Global Frames
-//!
-//! Both ICP and T265 provide poses relative to their own start frames, which drift
-//! from global. Our strategy:
-//!
-//! 1. **T265**: Transform to global frame, then extract velocities in global coordinates
-//! 2. **ICP**: Track an `icp_to_global` offset, updated when AprilTag is seen
-//! 3. **AprilTag**: Provides direct global position measurements
-//!
-//! When an AprilTag is detected, we:
-//! 1. Apply it as a high-confidence position/orientation measurement
-//! 2. Update the ICP offset: `icp_to_global = apriltag_pose * icp_pose.inverse()`
-//!
-//! This naturally handles drift: the Kalman filter weights measurements by their
-//! covariance, so AprilTag's low-covariance measurements pull the estimate
-//! toward ground truth.
-//!
-//! ## Tuning workflow:
-//! Symptom                              Fix
-//! Estimate is too noisy/jittery        Increase process noise OR decrease measurement variances
-//! Estimate lags behind reality         Decrease measurement variances (trust sensors more)
-//! Jumps when AprilTag seen             Increase AprilTag variance (less aggressive correction)
-//! Doesn't correct drift fast enough    Decrease AprilTag variance OR increase process noise
-//! T265 velocity making it unstable     Increase T265_VELOCITY_VARIANCE
-//! ICP not contributing enough          Decrease ICP variance in kiss_icp.rs
+///! # Overview:
+///! 
+///! ## How sensors are used: 
+///! AprilTags -> global pose reference (absolute position & orientation)
+///! 
+///! ICP -> local pose tracking (relative pose, drift-prone)
+///! 
+///! Intel T265 -> short-term motion (velocity from pose deltas)
+///! 
+///! IMU -> currently logged, not yet fused (since the l2's imus are garbage)
+///! 
+///! 
+///! ## Multiplicative Extended Kalman Filter
+///! Based on this: https://matthewhampsey.github.io/blog/2020/07/18/mekf
+///! 
+///! State representation: [x, y, z, vx, vy, vz, δθx, δθy, δθz, ωx, ωy, ωz]
+///! 
+///!  - where δθxyz is a small orientation error (magnitude will never get close to pi which solves the instability problem)
+///! 
+///! Basically the kalman filter state holds the small orientation error, and we keep track of a reference quaternion in the localizer where: q_true = q_reference * q_error
+///!  - q_reference is propagated using angular velocity in the kalman state
+///!  - on each update, the error is folded into the reference, and the error gets set back to zero, keeping the error from ever getting too big.
+///!  
+///!  
+///! ## Process noise
+///! How much you don't trust your motion model. lower noise = motion model trusted more than sensors
+///! 
 
 use std::f64::consts::PI;
 use std::sync::OnceLock;
