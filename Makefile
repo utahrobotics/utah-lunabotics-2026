@@ -23,7 +23,7 @@ resim:
 
 # Run the MuJoCo Simulation. Must include "ucf" or "artemis" as an env variable for it to load
 sim:
-	cd lunabot-cu && RUSTFLAGS="-C linker-features=-lld" cargo run --release --bin lunabot-sim --features sim ${SIM_ARENA}
+	cd lunabot-cu && cargo run --release --bin lunabot-sim --features sim ${SIM_ARENA}
 
 # Clean build and sync, then build everything
 clean-build: clean sync

@@ -60,7 +60,6 @@ impl Default for LunabotBlackboard {
                 .expect("ROBOT_STATE not initialized")
                 .kinematic_root, // we should always have the root node, and if not then we might as well abort
 
-            // TODO transfer kalman filter state as well
             outgoing_actuator_msg_queue: VecDeque::new(),
             outgoing_steering_msg: Some(Steering::new(0.0, 0.0, 0.0)),
             // when the user clicks continue mission for the first time, we move to manual

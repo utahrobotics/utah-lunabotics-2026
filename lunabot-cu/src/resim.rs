@@ -7,6 +7,7 @@ pub mod pathfinding;
 pub mod simple_monitor;
 pub mod tasks;
 pub mod utils;
+pub mod robot_state;
 
 use crossbeam::atomic::AtomicCell;
 use crossbeam_channel::{Receiver, Sender};
@@ -19,7 +20,7 @@ use rerun_viz::{Level, RECORDER};
 use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock, RwLock};
-use utils::RobotState;
+use robot_state::RobotState;
 
 const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 

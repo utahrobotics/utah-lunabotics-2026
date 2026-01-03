@@ -21,6 +21,7 @@ pub struct LunabotAi {
 impl Freezable for LunabotAi {}
 
 impl CuTask for LunabotAi {
+    // the occupancy grid recved here is the local occupancy grid
     type Input<'m> = input_msg!('m, FromLunabase, OccupancyGrid);
 
     // (Steering, ActuatorCommand)

@@ -7,6 +7,7 @@ pub mod pathfinding;
 pub mod simple_monitor;
 pub mod tasks;
 pub mod utils;
+pub mod robot_state;
 
 use common::FromLunabot;
 use crossbeam::atomic::AtomicCell;
@@ -21,7 +22,7 @@ use simple_motion::{ChainBuilder, NodeSerde};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::{OnceLock, RwLock};
-use utils::RobotState;
+use robot_state::RobotState;
 use wgsl_pcl::wgsl_setup::{init_gpu_blocking, is_gpu_initialized};
 
 use crate::rerun_viz::{RECORDER, ROBOT_STRUCTURE};

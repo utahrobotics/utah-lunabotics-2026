@@ -11,6 +11,7 @@ pub mod pathfinding;
 pub mod simple_monitor;
 pub mod tasks;
 pub mod utils;
+pub mod robot_state;
 
 use crossbeam::atomic::AtomicCell;
 use cu29::prelude::*;
@@ -23,7 +24,7 @@ use std::sync::{Arc, OnceLock, RwLock};
 use std::thread::sleep;
 use std::time::Duration;
 
-use utils::RobotState;
+use robot_state::RobotState;
 
 const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 

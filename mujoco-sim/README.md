@@ -2,20 +2,7 @@
 
 ## Setup
 1. Follow the installation instructions [here](https://mujoco-rs.readthedocs.io/en/v2.0.x/installation.html#static-linking) to build mujoco for static linking, except replace the two cmake commands listed there with this:
-```bash
-cmake -B build -S . \
-  -DBUILD_SHARED_LIBS:BOOL=OFF \
-  -DMUJOCO_HARDEN:BOOL=OFF \
-  -DCMAKE_BUILD_TYPE:STRING=Release \
-  -DCMAKE_INTERPROCEDURAL_OPTIMIZATION:BOOL=OFF \
-  -DMUJOCO_BUILD_EXAMPLES:BOOL=OFF \
-  -DGLFW_BUILD_WAYLAND=ON \
-  -DGLFW_BUILD_X11=OFF
-```
-and this:
-```bash
-cmake --build build --parallel --target glfw libmujoco_simulate --config=Release
-```
+
 2. Ensure that the correct environment variables are set to point to the mujoco library, e.g. ```export MUJOCO_STATIC_LINK_DIR=/home/matthew_a/mujoco-rs/mujoco/build/lib```
 
 ## Running
@@ -36,8 +23,8 @@ Additionally, starting the simulation this way launches the code for the lunabot
 ### Option 2: Without lunabot 
 This option simply loads the artemis_arena.xml scene into the mujoco simulator with physics enabled, but does not actually run the lunabot's code, allowing for hot reloading where you can change xml files and click reload in the mujoco UI to see changes.
 
-1. cd into the directory where you cloned mujoco-rs
-2. cd into ```mujoco/build/bin```
+1. Download and extract mujoco from [here](https://github.com/google-deepmind/mujoco/releases)
+2. cd into ```mujoco/bin```
 3. run ```./simulate /path/to/utah-lunabotics-2026/mujoco-sim/artemis_arena.xml```
 
 **What to use this option for:** Viewing changes to any of the xml files for the scene + model.
