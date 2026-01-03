@@ -1,10 +1,64 @@
+//! Localizer module for multi-sensor fusion using Multiplicative EKF (MEKF).
+//!
+//! This module fuses pose estimates from multiple sensors:
+//! - **Kiss ICP**: ~5 Hz, accurate but relative to start frame
+//! - **T265**: High frequency velocity estimates (derived from pose deltas)
+//! - **AprilTags**: Sparse but globally-referenced position fixes
+//!
+//! # Approach
+//!
+//! We use a **Multiplicative Extended Kalman Filter (MEKF)** with a 12-state error vector:
+//! - Position [x, y, z]
+//! - Linear velocity [vx, vy, vz]  
+//! - Orientation ERROR [δθx, δθy, δθz] — small rotation from reference quaternion
+//! - Angular velocity [wx, wy, wz]
+//!
+//! The **reference quaternion** is stored separately and updated after each filter cycle.
+//! This avoids the singularity at ±π that occurs with axis-angle representations.
+//!
+//! ## MEKF Operation
+//!
+//! 1. **Predict**: Propagate reference quaternion with angular velocity, error state gets process noise
+//! 2. **Update**: Apply measurements as errors relative to reference quaternion
+//! 3. **Reset**: Compose error onto reference quaternion, reset error state to zero
+//!
+//! This keeps the orientation error small (near zero), completely avoiding the π singularity.
+//!
+//! ## Handling Relative vs Global Frames
+//!
+//! Both ICP and T265 provide poses relative to their own start frames, which drift
+//! from global. Our strategy:
+//!
+//! 1. **T265**: Transform to global frame, then extract velocities in global coordinates
+//! 2. **ICP**: Track an `icp_to_global` offset, updated when AprilTag is seen
+//! 3. **AprilTag**: Provides direct global position measurements
+//!
+//! When an AprilTag is detected, we:
+//! 1. Apply it as a high-confidence position/orientation measurement
+//! 2. Update the ICP offset: `icp_to_global = apriltag_pose * icp_pose.inverse()`
+//!
+//! This naturally handles drift: the Kalman filter weights measurements by their
+//! covariance, so AprilTag's low-covariance measurements pull the estimate
+//! toward ground truth.
+//!
+//! ## Tuning workflow:
+//! Symptom                              Fix
+//! Estimate is too noisy/jittery        Increase process noise OR decrease measurement variances
+//! Estimate lags behind reality         Decrease measurement variances (trust sensors more)
+//! Jumps when AprilTag seen             Increase AprilTag variance (less aggressive correction)
+//! Doesn't correct drift fast enough    Decrease AprilTag variance OR increase process noise
+//! T265 velocity making it unstable     Increase T265_VELOCITY_VARIANCE
+//! ICP not contributing enough          Decrease ICP variance in kiss_icp.rs
+
 use std::f64::consts::PI;
+use std::sync::OnceLock;
 
 use crate::rerun_viz;
 use crate::rerun_viz::RECORDER;
 use crate::tasks::AprilTagMeasurement;
 use crate::tasks::IcpMeasurement;
 use crate::tasks::ImuMeasurement;
+use crate::tasks::T265Msg;
 use crate::utils::RobotState;
 use common::FromLunabot;
 use cu_spatial_payloads::EncodableIsometry;
@@ -12,79 +66,414 @@ use cu29::cutask::CuTask;
 use cu29::output_msg;
 use cu29::{
     CuError,
-    clock::{CuTime, Instant},
-    cutask::{CuMsg, CuSinkTask, Freezable},
+    clock::CuTime,
+    cutask::{CuMsg, Freezable},
     input_msg,
 };
 use embedded_common::FromPicoV3;
 
-use nalgebra::SMatrixViewMut;
-use nalgebra::{Isometry3, Vector3};
+use kfilter::kalman::{EKF, KalmanFilter, KalmanPredictInput, KalmanUpdate};
+use kfilter::measurement::LinearMeasurement;
+use kfilter::system::StepReturn;
+use kfilter::system::System;
+use nalgebra::UnitQuaternion;
+use nalgebra::{Isometry3, SMatrix, SVector, Vector3, Vector6};
+use rerun::Scalars;
 
 use crate::ROBOT_STATE;
 
-use kalman_filter::*;
+const STATE_DIM: usize = 12;
 
-/// Represents the variance assigned to values that are completely unknown. Should be extremely large.
-const UNKNOWN_PRIOR_VARIANCE: f64 = 1e64;
+/// Input dimension: just dt
+const INPUT_DIM: usize = 1;
+
+/// Position/orientation measurement dimension
+const POSE_MEAS_DIM: usize = 6;
+
+/// Velocity measurement dimension  
+const VEL_MEAS_DIM: usize = 6;
+
+/// Process noise for position (grows with time)
+static PROCESS_NOISE_POSITION: OnceLock<f64> = OnceLock::new();
+
+/// Process noise for velocity
+static PROCESS_NOISE_VELOCITY: OnceLock<f64> = OnceLock::new();
+
+/// Process noise for orientation
+static PROCESS_NOISE_ORIENTATION: OnceLock<f64> = OnceLock::new();
+
+/// Process noise for angular velocity
+static PROCESS_NOISE_ANGULAR_VEL: OnceLock<f64> = OnceLock::new();
+
+/// State vector type
+type StateVec = SVector<f64, STATE_DIM>;
+
+/// Input vector type (just dt)
+type InputVec = SVector<f64, INPUT_DIM>;
+
+/// Covariance matrix type
+type CovMat = SMatrix<f64, STATE_DIM, STATE_DIM>;
+
+/// Pose measurement type (position + orientation)
+type PoseMeasurement = LinearMeasurement<f64, STATE_DIM, POSE_MEAS_DIM>;
+
+/// Velocity measurement type (linear + angular velocity)
+type VelocityMeasurement = LinearMeasurement<f64, STATE_DIM, VEL_MEAS_DIM>;
+
+/// MEKF step function: constant velocity motion model for ERROR state
+///
+/// State: [x, y, z, vx, vy, vz, orientationerrorx, orientationerrory, orientationerrorz, wx, wy, wz]
+/// Input: [dt]
+///
+/// In MEKF, the orientation error state (orientationerrorx/y/z) represents the small rotation
+/// from the reference quaternion to the true orientation. During prediction:
+/// - The reference quaternion is propagated externally with angular velocity
+/// - The error state stays at zero (it's reset after each update)
+/// - Only process noise is added to the error covariance
+
+fn step_function(state: StateVec, input: InputVec) -> StepReturn<f64, STATE_DIM> {
+    if PROCESS_NOISE_POSITION.get().is_none() {
+        eprintln!("Process noise constants not initialized");
+        return StepReturn {
+            state,
+            jacobian: SMatrix::<f64, STATE_DIM, STATE_DIM>::identity(),
+            covariance: SMatrix::<f64, STATE_DIM, STATE_DIM>::zeros(),
+        };
+    }
+    let dt = input[0];
+
+    let position = state.fixed_rows::<3>(0);
+    let velocity = state.fixed_rows::<3>(3);
+    let orientation_error = state.fixed_rows::<3>(6);
+    let angular_velocity = state.fixed_rows::<3>(9);
+
+    let mut new_state = StateVec::zeros();
+
+    // Position update
+    new_state
+        .fixed_rows_mut::<3>(0)
+        .copy_from(&(position + velocity * dt));
+
+    // Velocity stays constant
+    new_state.fixed_rows_mut::<3>(3).copy_from(&velocity);
+
+    // the error state is reset to zero after each update,
+    // and the reference quaternion handles the actual rotation propagation.
+    new_state
+        .fixed_rows_mut::<3>(6)
+        .copy_from(&orientation_error);
+
+    // Angular velocity stays constant
+    new_state
+        .fixed_rows_mut::<3>(9)
+        .copy_from(&angular_velocity);
+
+    let mut jacobian = SMatrix::<f64, STATE_DIM, STATE_DIM>::identity();
+
+    // pos depends on velocity
+    jacobian[(0, 3)] = dt;
+    jacobian[(1, 4)] = dt;
+    jacobian[(2, 5)] = dt;
+
+    let wx = angular_velocity[0];
+    let wy = angular_velocity[1];
+    let wz = angular_velocity[2];
+
+    jacobian[(6, 7)] = wz * dt;
+    jacobian[(6, 8)] = -wy * dt;
+
+    jacobian[(7, 6)] = -wz * dt;
+    jacobian[(7, 8)] = wx * dt;
+
+    jacobian[(8, 6)] = wy * dt;
+    jacobian[(8, 7)] = -wx * dt;
+
+    let mut covariance = SMatrix::<f64, STATE_DIM, STATE_DIM>::zeros();
+    for i in 0..3 {
+        covariance[(i, i)] = *PROCESS_NOISE_POSITION.get().unwrap() * dt * dt;
+    }
+    for i in 3..6 {
+        covariance[(i, i)] = *PROCESS_NOISE_VELOCITY.get().unwrap() * dt;
+    }
+    for i in 6..9 {
+        covariance[(i, i)] = *PROCESS_NOISE_ORIENTATION.get().unwrap() * dt * dt;
+    }
+    for i in 9..12 {
+        covariance[(i, i)] = *PROCESS_NOISE_ANGULAR_VEL.get().unwrap() * dt;
+    }
+
+    StepReturn {
+        state: new_state,
+        jacobian,
+        covariance,
+    }
+}
+
+/// Compute the rotation error from reference quaternion to measured quaternion.
+/// Returns a small rotation vector (axis-angle) representing: ref * error = measured
+/// Therefore: error = ref.inverse() * measured
+///
+/// In the context of a MEKF: we always compute errors relative to the reference,
+/// keeping the error small and avoiding the π singularity.
+fn quaternion_error(
+    reference: &UnitQuaternion<f64>,
+    measured: &UnitQuaternion<f64>,
+) -> Vector3<f64> {
+    let delta = reference.inverse() * measured;
+    delta.scaled_axis()
+}
+
+/// Compose a small rotation error onto a reference quaternion.
+/// Returns: reference * error_rotation
+///
+/// Used after filter updates to fold the estimated error into the reference.
+fn compose_error(reference: &UnitQuaternion<f64>, error: &Vector3<f64>) -> UnitQuaternion<f64> {
+    let error_quat = UnitQuaternion::from_scaled_axis(*error);
+    reference * error_quat
+}
+
+/// Create observation matrix H for pose measurements (position + orientation)
+/// Selects indices [0,1,2,6,7,8] from state
+fn pose_observation_matrix() -> SMatrix<f64, POSE_MEAS_DIM, STATE_DIM> {
+    let mut h = SMatrix::<f64, POSE_MEAS_DIM, STATE_DIM>::zeros();
+    // Position: state[0:3] -> measurement[0:3]
+    h[(0, 0)] = 1.0;
+    h[(1, 1)] = 1.0;
+    h[(2, 2)] = 1.0;
+    // Orientation: state[6:9] -> measurement[3:6]
+    h[(3, 6)] = 1.0;
+    h[(4, 7)] = 1.0;
+    h[(5, 8)] = 1.0;
+    h
+}
+
+/// Create observation matrix H for velocity measurements (linear + angular)
+/// Selects indices [3,4,5,9,10,11] from state
+fn velocity_observation_matrix() -> SMatrix<f64, VEL_MEAS_DIM, STATE_DIM> {
+    let mut h = SMatrix::<f64, VEL_MEAS_DIM, STATE_DIM>::zeros();
+    // Linear velocity: state[3:6] -> measurement[0:3]
+    h[(0, 3)] = 1.0;
+    h[(1, 4)] = 1.0;
+    h[(2, 5)] = 1.0;
+    // Angular velocity: state[9:12] -> measurement[3:6]
+    h[(3, 9)] = 1.0;
+    h[(4, 10)] = 1.0;
+    h[(5, 11)] = 1.0;
+    h
+}
+
+/// Convert state vector and reference quaternion to Isometry3.
+/// The full orientation is: reference_quaternion * error_rotation
+fn state_to_isometry(state: &StateVec, reference_quat: &UnitQuaternion<f64>) -> Isometry3<f64> {
+    let translation = Vector3::new(state[0], state[1], state[2]);
+    let error = Vector3::new(state[6], state[7], state[8]);
+    let full_rotation = compose_error(reference_quat, &error);
+    Isometry3::from_parts(translation.into(), full_rotation)
+}
+
+/// returns the transformation that maps `from` frame to `to` frame
+fn compute_frame_offset(from: &Isometry3<f64>, to: &Isometry3<f64>) -> Isometry3<f64> {
+    to * from.inverse()
+}
 
 pub struct Localizer {
     robot_state: RobotState,
     last_rerun_log: std::time::Instant,
-    /// Stores all information of kalman filter, including past values, and update logic.
-    kalman_filter: KalmanFilter<15>,
+
+    /// Extended Kalman Filter with 12 error states, 1 input (dt)
+    /// State: [pos, vel, orientation_error, angular_vel]
+    ekf: EKF<f64, STATE_DIM, INPUT_DIM>,
+
+    /// Reference quaternion for MEKF — the "linearization point" for orientation.
+    /// The true orientation is: reference_quaternion * error_rotation
+    /// Updated after each filter cycle by composing the error and resetting.
+    reference_quaternion: UnitQuaternion<f64>,
+
+    /// Measurement model for pose (position + orientation error)
+    pose_measurement: PoseMeasurement,
+
+    /// Measurement model for velocity (linear + angular)
+    t265_velocity_measurement: VelocityMeasurement,
+
+    /// Time of most recent update
     most_recent_update: CuTime,
+
+    /// Transformation to convert ICP poses from ICP frame to filter's global frame
+    /// Updated when AprilTag is seen
+    icp_to_global: Option<Isometry3<f64>>,
+
+    /// Transformation to convert T265 poses from T265 frame to ICP frame
+    /// Either identity or computed from T265 to ICP transformation
+    /// Re calculated on each ICP measurement
+    t265_to_icp: Isometry3<f64>,
+
+    /// Most recent ICP pose in raw ICP frame (for computing offset when AprilTag seen)
+    last_raw_icp_pose: Option<Isometry3<f64>>,
+
+    /// Previous T265 pose
+    prev_t265_pose: Option<Isometry3<f64>>,
+
+    /// Previous T265 timestamp
+    prev_t265_time: Option<CuTime>,
+
+    /// Whether we've received our first global reference (AprilTag)
+    has_global_reference: bool,
+}
+
+impl Localizer {
+    /// Reset the orientation error state by composing it onto the reference quaternion.
+    /// This is called after each filter update to keep the error small.
+    fn reset_orientation_error(&mut self) {
+        let state = self.ekf.state();
+        let error = Vector3::new(state[6], state[7], state[8]);
+
+        self.reference_quaternion = compose_error(&self.reference_quaternion, &error);
+
+        let state_mut = self.ekf.system.state_mut();
+        state_mut[6] = 0.0;
+        state_mut[7] = 0.0;
+        state_mut[8] = 0.0;
+    }
+
+    /// Propagate the reference quaternion forward in time using angular velocity.
+    /// Called during the predict step.
+    fn propagate_reference_quaternion(&mut self, dt: f64) {
+        let state = self.ekf.state();
+        let angular_vel = Vector3::new(state[9], state[10], state[11]);
+
+        // Integrate angular velocity: q_new = q * exp(ω * dt / 2)
+        // Using scaled_axis which expects the full rotation angle
+        let delta_rotation = UnitQuaternion::from_scaled_axis(angular_vel * dt);
+        self.reference_quaternion = self.reference_quaternion * delta_rotation;
+    }
+
+    /// orientation is the ERROR relative to reference quaternion.
+    fn create_pose_measurement(&self, measured_pose: &Isometry3<f64>) -> Vector6<f64> {
+        let orient_error = quaternion_error(&self.reference_quaternion, &measured_pose.rotation);
+        Vector6::new(
+            measured_pose.translation.x,
+            measured_pose.translation.y,
+            measured_pose.translation.z,
+            orient_error.x,
+            orient_error.y,
+            orient_error.z,
+        )
+    }
 }
 
 impl Freezable for Localizer {}
 
 impl CuTask for Localizer {
-    // IMU from l2, apriltag detections
     type Input<'m> = input_msg!('m,
-        ImuMeasurement, // l2 imu
-        IcpMeasurement, // l2 kiss icp
-        FromPicoV3,
-        Vec<AprilTagMeasurement>, // apriltag detections
-        EncodableIsometry // reading from the t265, estimation of the robots isometry
+        ImuMeasurement,           // Shitty IMU data - ignored for now
+        IcpMeasurement,           // Kiss ICP pose
+        FromPicoV3,               // Ignored for now
+        Vec<AprilTagMeasurement>, // AprilTag detections - global reference
+        T265Msg         // T265 pose - for velocity extraction
     );
 
     type Output<'m> = output_msg!(FromLunabot);
 
-    fn new(_config: Option<&cu29::prelude::ComponentConfig>) -> cu29::CuResult<Self>
+    fn new(config: Option<&cu29::prelude::ComponentConfig>) -> cu29::CuResult<Self>
     where
         Self: Sized,
     {
-        let kalman_filter = KalmanFilter::new(
-            SimpleVector::from_element(0.0),
-            SimpleSquareMatrix::from_diagonal_element(100.0),
-            Self::evolution_function,
-        );
+        // load up values from config
+        let process_noise_position = config
+            .unwrap()
+            .get::<f64>("process_noise_position")
+            .expect("please supply process noise position");
+
+        let process_noise_velocity = config
+            .unwrap()
+            .get::<f64>("process_noise_velocity")
+            .expect("please supply process noise velocity");
+        let process_noise_orientation = config
+            .unwrap()
+            .get::<f64>("process_noise_orientation")
+            .expect("please supply process noise orientation");
+
+        let process_noise_angular_vel = config
+            .unwrap()
+            .get::<f64>("process_noise_angular_velocity")
+            .expect("please supply process noise angular velocity");
+
+        let initial_covariance = config
+            .unwrap()
+            .get::<f64>("initial_covariance")
+            .expect("please supply initial covariance");
+        PROCESS_NOISE_POSITION
+            .set(process_noise_position)
+            .map_err(|e| CuError::new_with_cause("process noise position already set", e))?;
+        PROCESS_NOISE_VELOCITY
+            .set(process_noise_velocity)
+            .map_err(|e| CuError::new_with_cause("process noise velocity already set", e))?;
+        PROCESS_NOISE_ORIENTATION
+            .set(process_noise_orientation)
+            .map_err(|e| CuError::new_with_cause("process noise orientation already set", e))?;
+        PROCESS_NOISE_ANGULAR_VEL
+            .set(process_noise_angular_vel)
+            .map_err(|e| {
+                CuError::new_with_cause("process noise angular velocity already set", e)
+            })?;
+
+        // Initial state: all zeros
+        let initial_state = StateVec::zeros();
+
+        // Initial covariance: high uncertainty
+        let initial_covariance = CovMat::from_diagonal_element(initial_covariance);
+
+        // Create EKF with our step function
+        let ekf = EKF::new_ekf_with_input(step_function, initial_state, initial_covariance);
+
+        // Create pose measurement model
+        let pose_h = pose_observation_matrix();
+        let pose_r = SMatrix::<f64, POSE_MEAS_DIM, POSE_MEAS_DIM>::identity(); // Will be updated per measurement
+        let pose_measurement = PoseMeasurement::new(pose_h, pose_r, Vector6::zeros());
+
+        // Create velocity measurement model with T265 noise
+        let vel_h = velocity_observation_matrix();
+        let vel_r = SMatrix::<f64, VEL_MEAS_DIM, VEL_MEAS_DIM>::identity();
+
+        let t265_velocity_measurement = VelocityMeasurement::new(vel_h, vel_r, Vector6::zeros());
 
         if let Some(robot_state) = ROBOT_STATE.get() {
-            return Ok(Self {
+            Ok(Self {
                 robot_state: robot_state.clone(),
                 last_rerun_log: std::time::Instant::now(),
-                kalman_filter,
+                ekf,
+                reference_quaternion: UnitQuaternion::identity(),
+                pose_measurement,
+                t265_velocity_measurement,
+
                 most_recent_update: CuTime::default(),
-            });
+                icp_to_global: None,
+                t265_to_icp: Isometry3::identity(),
+                last_raw_icp_pose: None,
+                prev_t265_pose: None,
+                prev_t265_time: None,
+                has_global_reference: false,
+            })
         } else {
-            return Err(CuError::new_with_cause(
+            Err(CuError::new_with_cause(
                 "no root node found",
                 std::io::Error::other("no root node found"),
-            ));
+            ))
         }
     }
 
     fn start(&mut self, _clock: &cu29::prelude::RobotClock) -> cu29::CuResult<()> {
+        // Log static geometry for visualization
         if let Some(logger) = RECORDER.get() {
-            let _ = logger.recorder.log_static(
-                format!("t265/xyz"),
-                &rerun::Arrows3D::from_vectors([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+            let axes =
+                rerun::Arrows3D::from_vectors([[0.5, 0.0, 0.0], [0.0, 0.5, 0.0], [0.0, 0.0, 0.5]])
                     .with_colors([[255, 0, 0], [0, 255, 0], [0, 0, 255]])
-                    .with_labels(vec!["x", "y", "z"]),
-            );
-        }
+                    .with_labels(vec!["x", "y", "z"]);
 
+            let _ = logger.recorder.log_static("localizer/t265_raw", &axes);
+            let _ = logger.recorder.log_static("localizer/icp_raw", &axes);
+            let _ = logger.recorder.log_static("localizer/icp_global", &axes);
+        }
         Ok(())
     }
 
@@ -94,370 +483,331 @@ impl CuTask for Localizer {
         input: &Self::Input<'i>,
         output: &mut Self::Output<'i>,
     ) -> cu29::CuResult<()> {
-        if let Some(pose_msg) = input.4.payload()
-            && let Some(logger) = RECORDER.get()
-            && let Some(pose_msg) = pose_msg.to_na()
-        {
-            // FIXME: remove this set isometry once kalman filter is fully tested and done
+        let now = clock.now();
 
-            if let Err(e) = logger.recorder.log(
-                rerun_viz::ROBOT_STRUCTURE,
-                &rerun::Transform3D::from_translation_rotation(
-                    pose_msg.translation.vector.cast::<f32>().data.0[0],
-                    rerun::Quaternion::from_xyzw(
-                        pose_msg.rotation.as_vector().cast::<f32>().data.0[0],
-                    ),
-                ),
-            ) {
-                return Err(CuError::new_with_cause(
-                    &format!("Failed to log robot transform: {e}"),
-                    std::io::Error::new(std::io::ErrorKind::Other, "Rerun logging failed"),
-                ));
-            };
-            ROBOT_STATE
-                .get()
-                .unwrap()
-                .kinematic_root
-                .set_isometry(pose_msg);
+        // Predict forward in time
+        let dt = ((now - self.most_recent_update).as_nanos() as f64) / 1e9;
+        self.most_recent_update = now;
 
-            output.set_payload(FromLunabot::RobotIsometry {
-                origin: pose_msg.translation.vector.cast::<f32>().data.0[0],
-                quat: pose_msg.rotation.as_vector().cast::<f32>().data.0[0],
-            });
-        }
-        // FIXME: remove this early return once kalman filter is fully tested and done
-        return Ok(());
+        if dt > 0.0 && dt < 1.0 {
+            // MEKF: Propagate reference quaternion with angular velocity
+            self.propagate_reference_quaternion(dt);
 
-        if let Some(imu_measurement) = input.0.payload()
-            && let Some(logger) = RECORDER.get()
-        {
-            let _ = logger.recorder.log(
-                "imu_corercted",
-                &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(
-                    imu_measurement.acceleration[0] as f32,
-                    imu_measurement.acceleration[1] as f32,
-                    imu_measurement.acceleration[2] as f32,
-                )]),
-            );
-            //self.root_node.set_isometry(pose_msg);
+            // Predict error state (error stays near zero, covariance grows)
+            let input_vec = InputVec::new(dt);
+            if let Err(e) = self.ekf.predict(input_vec) {
+                eprintln!("EKF predict failed: {:?}", e);
+            }
         }
 
-        // Step filter forward in time
-        let dt: f64 = ((clock.now() - self.most_recent_update).as_nanos() as f64) / 1e9;
-        self.most_recent_update = clock.now();
-        self.kalman_filter.step_time(dt);
-
-        // Apply all data
-        if let Some(imu_measurement) = input.0.payload() {
-            // Assemble measurement
-            let mut state: SimpleVector<15> = SimpleVector::zeros();
-            state
-                .fixed_rows_mut::<3>(6)
-                .copy_from_slice(&imu_measurement.acceleration);
-            state
-                .fixed_rows_mut::<3>(9)
-                .copy_from_slice(&imu_measurement.orientation);
-            state
-                .fixed_rows_mut::<3>(12)
-                .copy_from_slice(&imu_measurement.angular_velocity);
-
-            let mut covariance_matrix: SimpleSquareMatrix<15> =
-                SimpleSquareMatrix::from_diagonal_element(UNKNOWN_PRIOR_VARIANCE);
-            let measurement_matrix = array_to_matrix_9x9(&imu_measurement.variance);
-
-            covariance_matrix
-                .view_mut((6, 6), (9, 9))
-                .copy_from(&measurement_matrix.view((0, 0), (9, 9)));
-
-            self.kalman_filter
-                .apply_measurement(&state, &covariance_matrix);
-        }
-
-        if let Some(icp_measurement) = input.1.payload() {
-            // Assemble measurement
-            let mut state: SimpleVector<15> = SimpleVector::zeros();
-            state
-                .fixed_rows_mut::<3>(0)
-                .copy_from_slice(&icp_measurement.position);
-            state
-                .fixed_rows_mut::<3>(9)
-                .copy_from_slice(&icp_measurement.orientation);
-
-            let mut covariance_matrix: SimpleSquareMatrix<15> =
-                SimpleSquareMatrix::from_diagonal_element(UNKNOWN_PRIOR_VARIANCE);
-            let measurement_matrix = array_to_matrix_6x6(&icp_measurement.variance);
-
-            covariance_matrix
-                .view_mut((0, 0), (3, 3))
-                .copy_from(&measurement_matrix.view((0, 0), (3, 3)));
-            covariance_matrix
-                .view_mut((0, 9), (3, 3))
-                .copy_from(&measurement_matrix.view((0, 3), (3, 3)));
-            covariance_matrix
-                .view_mut((9, 0), (3, 3))
-                .copy_from(&measurement_matrix.view((3, 0), (3, 3)));
-            covariance_matrix
-                .view_mut((9, 9), (3, 3))
-                .copy_from(&measurement_matrix.view((3, 3), (3, 3)));
-
-            self.kalman_filter
-                .apply_measurement(&state, &covariance_matrix);
-        }
-
+        // Process AprilTags - they provide global reference
+        // - Stores the ICP-to-global offset
         if let Some(tags) = input.3.payload() {
             for tag in tags {
-                let estimated_isometry_of_observer =
-                    tag.estimated_isometry
-                        .to_na()
-                        .ok_or(CuError::new_with_cause(
-                            "Invalid Isometry",
-                            std::io::Error::other("Invalid encoded isometry"),
-                        ))?;
-                let mut state: SimpleVector<15> = SimpleVector::zeros();
-                state
-                    .fixed_rows_mut::<3>(0)
-                    .copy_from(&estimated_isometry_of_observer.translation.vector);
-                state
-                    .fixed_rows_mut::<3>(9)
-                    .copy_from(&estimated_isometry_of_observer.rotation.scaled_axis());
+                if let Some(global_pose) = tag.estimated_isometry.to_na() {
+                    // First AprilTag establishes global reference
+                    if !self.has_global_reference {
+                        self.has_global_reference = true;
+                        println!("First AprilTag seen - global reference established");
+                    }
 
-                let mut covariance_matrix: SimpleSquareMatrix<15> =
-                    SimpleSquareMatrix::from_diagonal_element(UNKNOWN_PRIOR_VARIANCE);
-                let measurement_matrix = array_to_matrix_6x6(&tag.variance);
+                    // Update ICP-to-global offset if we have a recent ICP pose
+                    if let Some(raw_icp) = &self.last_raw_icp_pose {
+                        self.icp_to_global = Some(compute_frame_offset(raw_icp, &global_pose));
+                        if let Some(logger) = RECORDER.get() {
+                            let _ = logger.recorder.log(
+                                "kiss_icp",
+                                &rerun::Transform3D::from_translation_rotation(
+                                    self.icp_to_global
+                                        .unwrap()
+                                        .translation
+                                        .vector
+                                        .cast::<f32>()
+                                        .data
+                                        .0[0],
+                                    rerun::Quaternion::from_xyzw(
+                                        self.icp_to_global
+                                            .unwrap()
+                                            .rotation
+                                            .as_vector()
+                                            .cast::<f32>()
+                                            .data
+                                            .0[0],
+                                    ),
+                                ),
+                            );
+                        }
+                    }
 
-                covariance_matrix
-                    .view_mut((0, 0), (3, 3))
-                    .copy_from(&measurement_matrix.view((0, 0), (3, 3)));
-                covariance_matrix
-                    .view_mut((0, 9), (3, 3))
-                    .copy_from(&measurement_matrix.view((0, 3), (3, 3)));
-                covariance_matrix
-                    .view_mut((9, 0), (3, 3))
-                    .copy_from(&measurement_matrix.view((3, 0), (3, 3)));
-                covariance_matrix
-                    .view_mut((9, 9), (3, 3))
-                    .copy_from(&measurement_matrix.view((3, 3), (3, 3)));
+                    // MEKF - pose measurement with orientation error relative to reference
+                    let pose_vec = self.create_pose_measurement(&global_pose);
 
-                self.kalman_filter
-                    .apply_measurement(&state, &covariance_matrix);
+                    // Extract variance from AprilTag measurement
+                    let mut pose_r =
+                        SMatrix::<f64, POSE_MEAS_DIM, POSE_MEAS_DIM>::from_row_slice(&tag.variance);
+
+                    // just in case
+                    for i in 0..POSE_MEAS_DIM {
+                        if pose_r[(i, i)] < 1e-6 {
+                            pose_r[(i, i)] = 1e-6;
+                        }
+                    }
+                    self.pose_measurement.R = pose_r;
+                    self.pose_measurement.z = pose_vec;
+
+                    if let Err(e) = self.ekf.update(&self.pose_measurement) {
+                        eprintln!("EKF update with AprilTag failed: {:?}", e);
+                    }
+
+                    self.reset_orientation_error();
+
+                    if let Some(logger) = RECORDER.get() {
+                        let _ = logger.recorder.log(
+                            "localizer/apriltag_update",
+                            &rerun::TextLog::new(format!(
+                                "AprilTag at ({:.2}, {:.2}, {:.2})",
+                                global_pose.translation.x,
+                                global_pose.translation.y,
+                                global_pose.translation.z
+                            )),
+                        );
+                    }
+                }
             }
         }
 
-        // Log and update chain at 60 Hz
-        if let Some(logger) = RECORDER.get()
-            && self.last_rerun_log.elapsed().as_millis() > 1000 / 60
-        {
+        // Process ICP - apply as pose measurement
+        //  - uses offset calculated by AprilTag if available
+        //  - updates T265-to-ICP transform for velocity extraction
+        if let Some(icp_msg) = input.1.payload() {
+            if let Some(raw_icp_pose) = icp_msg.pose.to_na() {
+                self.last_raw_icp_pose = Some(raw_icp_pose);
+
+                if let Some(logger) = RECORDER.get() {
+                    let _ = logger.recorder.log(
+                        "localizer/icp_raw",
+                        &rerun::Transform3D::from_translation_rotation(
+                            raw_icp_pose.translation.vector.cast::<f32>().data.0[0],
+                            rerun::Quaternion::from_xyzw(
+                                raw_icp_pose.rotation.as_vector().cast::<f32>().data.0[0],
+                            ),
+                        ),
+                    );
+                }
+                if let Some(most_recent_t265) = &self.prev_t265_pose {
+                    self.t265_to_icp = compute_frame_offset(
+                        &most_recent_t265,
+                        &(&self.icp_to_global.unwrap_or(Isometry3::identity()) * raw_icp_pose),
+                    );
+                }
+                let offset = self.icp_to_global.unwrap_or(Isometry3::identity());
+
+                let global_icp_pose = offset * raw_icp_pose;
+
+                if let Some(logger) = RECORDER.get() {
+                    let _ = logger.recorder.log(
+                        "localizer/icp_global",
+                        &rerun::Transform3D::from_translation_rotation(
+                            global_icp_pose.translation.vector.cast::<f32>().data.0[0],
+                            rerun::Quaternion::from_xyzw(
+                                global_icp_pose.rotation.as_vector().cast::<f32>().data.0[0],
+                            ),
+                        ),
+                    );
+                }
+
+                let pose_vec = self.create_pose_measurement(&global_icp_pose);
+
+                // get variance from ICP measurement
+                let mut pose_r =
+                    SMatrix::<f64, POSE_MEAS_DIM, POSE_MEAS_DIM>::from_row_slice(&icp_msg.variance);
+
+                // you never know lmao
+                for i in 0..POSE_MEAS_DIM {
+                    if pose_r[(i, i)] < 1e-6 {
+                        pose_r[(i, i)] = 1e-6;
+                    }
+                }
+
+                self.pose_measurement.R = pose_r;
+                self.pose_measurement.z = pose_vec;
+
+                if let Err(e) = self.ekf.update(&self.pose_measurement) {
+                    eprintln!("EKF update with ICP failed: {:?}", e);
+                }
+
+                self.reset_orientation_error();
+            }
+        }
+
+        // Step 4: Process T265 - extract velocities from pose deltas
+        //  - readings are transformed to global frame using t265_to_icp and icp_to_global if available
+        if let Some(t265_msg) = input.4.payload() {
+            if let Some(current_t265_raw) = t265_msg.pose.to_na() {
+                if let Some(logger) = RECORDER.get() {
+                    let _ = logger.recorder.log(
+                        "localizer/t265_raw",
+                        &rerun::Transform3D::from_translation_rotation(
+                            current_t265_raw.translation.vector.cast::<f32>().data.0[0],
+                            rerun::Quaternion::from_xyzw(
+                                current_t265_raw.rotation.as_vector().cast::<f32>().data.0[0],
+                            ),
+                        ),
+                    );
+                }
+
+                let t265_offset = self.t265_to_icp;
+
+                let current_t265_global = t265_offset * current_t265_raw;
+
+                if let (Some(prev_t265), Some(prev_time)) =
+                    (&self.prev_t265_pose, self.prev_t265_time)
+                {
+                    let prev_t265_global = t265_offset * prev_t265;
+                    let delta_time = ((now - prev_time).as_nanos() as f64) / 1e9;
+
+                    // all of the velocities are in GLOBAL frame if self.icp_to_global is set
+                    if delta_time > 1e-6 && delta_time < 0.5 {
+                        let linear_vel = (current_t265_global.translation.vector
+                            - prev_t265_global.translation.vector)
+                            / delta_time;
+
+                        let delta_rotation =
+                            prev_t265_global.rotation.inverse() * current_t265_global.rotation;
+
+                        let delta_axis_angle = delta_rotation.scaled_axis();
+                        let angular_vel = delta_axis_angle / delta_time;
+
+                        // If the t265 has a loop closure over a long distance, the velocities will be huge and wrong.
+                        let angular_speed = angular_vel.magnitude();
+                        let linear_speed = linear_vel.magnitude();
+
+                        const MAX_ANGULAR_SPEED: f64 = 10.0;
+                        const MAX_LINEAR_SPEED: f64 = 10.0;
+
+                        if angular_speed < MAX_ANGULAR_SPEED && linear_speed < MAX_LINEAR_SPEED {
+                            let vel_vec = Vector6::new(
+                                linear_vel.x,
+                                linear_vel.y,
+                                linear_vel.z,
+                                angular_vel.x,
+                                angular_vel.y,
+                                angular_vel.z,
+                            );
+
+                            self.t265_velocity_measurement.z = vel_vec;
+
+                            let velocity_variance = t265_msg.velocity_variance;
+                            let angular_velocity_variance = t265_msg.angular_velocity_variance;
+                            let mut vel_r = SMatrix::<f64, VEL_MEAS_DIM, VEL_MEAS_DIM>::zeros();
+                            for i in 0..3 {
+                                vel_r[(i, i)] = velocity_variance;
+                                vel_r[(3 + i, 3 + i)] = angular_velocity_variance;
+                            }
+
+                            if let Err(e) = self.ekf.update(&self.t265_velocity_measurement) {
+                                eprintln!("EKF update with T265 velocity failed: {:?}", e);
+                            }
+                            self.reset_orientation_error();
+                        } else {
+                            eprintln!(
+                                "Rejected T265 velocity: linear={:.2} m/s, angular={:.2} rad/s (likely discontinuity, tracking loss, or loop closure event)",
+                                linear_speed, angular_speed
+                            );
+                        }
+                    }
+                }
+
+                // store the current RAW pose
+                // (we apply t265_offset each time so it can be updated by ICP)
+                self.prev_t265_pose = Some(current_t265_raw);
+                self.prev_t265_time = Some(now);
+            }
+        }
+
+        if let Some(imu_measurement) = input.0.payload() {
+            if let Some(logger) = RECORDER.get() {
+                let _ = logger.recorder.log(
+                    "imu_corrected",
+                    &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(
+                        imu_measurement.acceleration[0] as f32,
+                        imu_measurement.acceleration[1] as f32,
+                        imu_measurement.acceleration[2] as f32,
+                    )]),
+                );
+            }
+
+            // apply IMU as velocity measurement
+            // gravity has already been subtracted, and it is in robot base frame
+            // TODO
+        }
+
+        // Output and update robot chain at 60 hz
+        if self.last_rerun_log.elapsed().as_millis() > 1000 / 60 {
             self.last_rerun_log = std::time::Instant::now();
 
-            //   Push data to rest of robot
-            // Convert to isometry for the kinematics object
-            let current_state = self.kalman_filter.get_current_state();
-            let mut iso_vector = SimpleVector::<6>::from_element(0.0);
-            iso_vector[(0, 0)] = current_state[(0, 0)];
-            iso_vector[(1, 0)] = current_state[(1, 0)];
-            iso_vector[(2, 0)] = current_state[(2, 0)];
-            iso_vector[(3, 0)] = current_state[(9, 0)];
-            iso_vector[(4, 0)] = current_state[(10, 0)];
-            iso_vector[(5, 0)] = current_state[(11, 0)];
-            let current_iso = vec_to_iso(iso_vector);
+            let state = self.ekf.state();
+            // MEKF: Get full isometry using reference quaternion + error
+            let current_iso = state_to_isometry(state, &self.reference_quaternion);
+
             self.robot_state.kinematic_root.set_isometry(current_iso);
 
-            {
-                let mut global_variance_lock = self.robot_state.kalman_variances.write();
-                let mut global_variance_view: SMatrixViewMut<f64, 15, 15> =
-                    global_variance_lock.as_mut().unwrap().as_view_mut();
-                global_variance_view.copy_from(&self.kalman_filter.get_current_covariance());
-            }
+            self.robot_state.kalman_state.store(Some(*state));
+            self.robot_state
+                .kalman_variances
+                .store(Some(*self.ekf.covariance()));
 
-            {
-                let mut global_state_lock = self.robot_state.kalman_state.write();
-                let mut global_state_view: SMatrixViewMut<f64, 15, 1> =
-                    global_state_lock.as_mut().unwrap().as_view_mut();
-                global_state_view.copy_from(&self.kalman_filter.get_current_state());
-            }
+            if let Some(logger) = RECORDER.get() {
+                let state = self.ekf.state();
 
-            //   Log data to rerun
-            // Variance
-            let _ = logger.recorder.log(
-                "kalman_state/state",
-                &rerun::Tensor::new(self.kalman_filter.get_current_covariance().data.as_slice()),
-            );
+                let _ = logger.recorder.log(
+                    "kalman_state/position",
+                    &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(
+                        state[0] as f32,
+                        state[1] as f32,
+                        state[2] as f32,
+                    )]),
+                );
 
-            // State
-            let _ = logger.recorder.log(
-                "kalman_state/position",
-                &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(
-                    current_state[0] as f32,
-                    current_state[1] as f32,
-                    current_state[2] as f32,
-                )]),
-            );
-            let _ = logger.recorder.log(
-                "kalman_state/velocity",
-                &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(
-                    current_state[3] as f32,
-                    current_state[4] as f32,
-                    current_state[5] as f32,
-                )]),
-            );
-            let _ = logger.recorder.log(
-                "kalman_state/acceleration",
-                &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(
-                    current_state[6] as f32,
-                    current_state[7] as f32,
-                    current_state[8] as f32,
-                )]),
-            );
-            let _ = logger.recorder.log(
-                "kalman_state/orientation",
-                &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(
-                    current_state[9] as f32,
-                    current_state[10] as f32,
-                    current_state[11] as f32,
-                )]),
-            );
-            let _ = logger.recorder.log(
-                "kalman_state/angular_velocity",
-                &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(
-                    current_state[12] as f32,
-                    current_state[13] as f32,
-                    current_state[14] as f32,
-                )]),
-            );
+                let _ = logger.recorder.log(
+                    "kalman_state/velocity",
+                    &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(
+                        state[3] as f32,
+                        state[4] as f32,
+                        state[5] as f32,
+                    )]),
+                );
+                let _ = logger.recorder.log(
+                    "kalman_state/angular_velocity",
+                    &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(
+                        state[9] as f32,
+                        state[10] as f32,
+                        state[11] as f32,
+                    )]),
+                );
 
-            // Robot position
-            if let Err(e) = logger.recorder.log(
-                rerun_viz::ROBOT_STRUCTURE,
-                &rerun::Transform3D::from_translation_rotation(
-                    current_iso.translation.vector.cast::<f32>().data.0[0],
-                    rerun::Quaternion::from_xyzw(
-                        current_iso.rotation.as_vector().cast::<f32>().data.0[0],
+                if let Err(e) = logger.recorder.log(
+                    rerun_viz::ROBOT_STRUCTURE,
+                    &rerun::Transform3D::from_translation_rotation(
+                        current_iso.translation.vector.cast::<f32>().data.0[0],
+                        rerun::Quaternion::from_xyzw(
+                            current_iso.rotation.as_vector().cast::<f32>().data.0[0],
+                        ),
                     ),
-                ),
-            ) {
-                return Err(CuError::new_with_cause(
-                    &format!("Failed to log robot transform: {e}"),
-                    std::io::Error::new(std::io::ErrorKind::Other, "Rerun logging failed"),
-                ));
-            };
-            // TODO add proper logging and display for other state components
+                ) {
+                    return Err(CuError::new_with_cause(
+                        &format!("Failed to log robot transform: {e}"),
+                        std::io::Error::new(std::io::ErrorKind::Other, "Rerun logging failed"),
+                    ));
+                }
+            }
+
+            output.set_payload(FromLunabot::RobotIsometry {
+                origin: current_iso.translation.vector.cast::<f32>().data.0[0],
+                quat: current_iso.rotation.as_vector().cast::<f32>().data.0[0],
+            });
         }
 
         Ok(())
-    }
-}
-
-fn vec_to_iso(vec: SimpleVector<6>) -> Isometry3<f64> {
-    let translation: Vector3<f64> = Vector3::<f64>::new(vec.x, vec.y, vec.z);
-
-    let rotation: Vector3<f64> = Vector3::<f64>::new(vec.w, vec.a, vec.b);
-
-    Isometry3::<f64>::new(translation, rotation)
-}
-
-#[allow(unused)]
-fn iso_to_vec(iso: Isometry3<f64>) -> SimpleVector<6> {
-    let rotation_vector = iso.rotation.scaled_axis();
-    SimpleVector::<6>::new(
-        iso.translation.x,
-        iso.translation.y,
-        iso.translation.z,
-        rotation_vector.x,
-        rotation_vector.y,
-        rotation_vector.z,
-    )
-}
-
-fn array_to_matrix_9x9(array: &[f64; 81]) -> SimpleSquareMatrix<9> {
-    SimpleSquareMatrix::<9>::from_row_slice(array)
-}
-
-fn array_to_matrix_6x6(array: &[f64; 36]) -> SimpleSquareMatrix<6> {
-    SimpleSquareMatrix::<6>::from_row_slice(array)
-}
-
-impl Localizer {
-    /// The evolution function used by the kalman filter. Steps the
-    /// state and variance forward by a given timestep in seconds, and
-    /// returns the result. Does not use any external data.
-    ///
-    /// Predictions for state and variance use simple laws of motion.
-    fn evolution_function(
-        prev_state: SimpleVector<15>,
-        prev_variance: SimpleSquareMatrix<15>,
-        dt: f64,
-    ) -> (SimpleVector<15>, SimpleSquareMatrix<15>) {
-        // State:
-        let mut result_state: SimpleVector<15> = SimpleVector::from_element(0.0);
-
-        // Decompose prev state
-        let prev_position = prev_state.view((0, 0), (3, 1));
-        let prev_velocity = prev_state.view((3, 0), (3, 1));
-        let prev_acceleration = prev_state.view((6, 0), (3, 1));
-        let prev_orientation = prev_state.view((9, 0), (3, 1));
-        let prev_angular_velocity = prev_state.view((12, 0), (3, 1));
-
-        // Translational
-        result_state
-            .fixed_rows_mut::<3>(0)
-            .copy_from(&(prev_position + prev_velocity * dt + 0.5 * prev_acceleration * dt * dt));
-
-        result_state
-            .fixed_rows_mut::<3>(3)
-            .copy_from(&(prev_velocity + prev_acceleration * dt));
-
-        result_state
-            .fixed_rows_mut::<3>(6)
-            .copy_from(&prev_acceleration);
-
-        // Angular
-        let mut temp_result_orientation = prev_orientation + prev_angular_velocity * dt;
-        if temp_result_orientation.magnitude_squared() > PI * PI {
-            temp_result_orientation -= temp_result_orientation.normalize() * -2.0 * PI;
-        }
-        result_state
-            .fixed_rows_mut::<3>(9)
-            .copy_from(&temp_result_orientation);
-
-        result_state
-            .fixed_rows_mut::<3>(12)
-            .copy_from(&prev_angular_velocity);
-
-        // Variances:
-        let mut result_variance = prev_variance;
-
-        // Formula: x = x + v*dt => o_x^2 = o_x^2 + o_v^2 * dt^2
-        // Translational
-        //   s_v += s_a * dt^2
-        let calculated_velocity_variance =
-            result_variance.view((3, 3), (3, 3)) + result_variance.view((6, 6), (3, 3)) * dt * dt;
-        result_variance
-            .view_mut((3, 3), (3, 3))
-            .copy_from(&calculated_velocity_variance);
-        //   s_x += s_v * dt^2
-        let calculated_position_variance =
-            result_variance.view((0, 0), (3, 3)) + result_variance.view((3, 3), (3, 3)) * dt * dt;
-        result_variance
-            .view_mut((0, 0), (3, 3))
-            .copy_from(&calculated_position_variance);
-
-        // Angular
-        //   s_theta += s_o * dt^2
-        let calculated_orientation_variance =
-            result_variance.view((9, 9), (3, 3)) + result_variance.view((12, 12), (3, 3)) * dt * dt;
-        result_variance
-            .view_mut((9, 9), (3, 3))
-            .copy_from(&calculated_orientation_variance);
-
-        (result_state, result_variance)
-    }
-
-    /// Returns the transformation needed to transform src to dst.
-    /// Used to find the correction between where kiss_icp thinks the robot
-    /// is relative to where the algorithm started mapping, to where the robot
-    /// actually is in world coords
-    #[allow(unused)]
-    fn transformation_between(relative: Isometry3<f64>, actual: Isometry3<f64>) -> Isometry3<f64> {
-        actual * relative.inverse()
     }
 }

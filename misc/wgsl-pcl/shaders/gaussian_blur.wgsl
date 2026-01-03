@@ -1,10 +1,10 @@
 // in this case we are working on a height map, but this image could be anything
 // if the value in the height map is f32 min, then we will know that the cell is considered to be unknown.
-@group(0) @binding(0) var<storage, read_write> height_map: array<f32>;
-@group(0) @binding(1) var<storage, read_write> filtered_height_map: array<f32>;
+@group(0) @binding(0) var<uniform> map_width: u32;
+@group(0) @binding(1) var<uniform> map_height: u32;
+@group(1) @binding(0) var<storage, read_write> height_map: array<f32>;
+@group(1) @binding(1) var<storage, read_write> filtered_height_map: array<f32>;
 
-override MAP_WIDTH: u32;
-override MAP_HEIGHT: u32;
 override WORKGROUP_X: u32 = 8;
 override WORKGROUP_Y: u32 = 8;
 // kernel radius includes the center pixel in the kernel
@@ -22,7 +22,7 @@ fn depth(
     let x = global_invocation_id.x;
     let y = global_invocation_id.y;
     
-    if x >= MAP_WIDTH || y >= MAP_HEIGHT {
+    if x >= map_width || y >= map_height {
         return;
     }
     
@@ -82,8 +82,8 @@ fn depth(
 
 // will return -1 if out of bounds
 fn xy_to_index(x: i32, y: i32) -> i32 {
-    if x < 0 || y < 0 || x >= i32(MAP_WIDTH) || y >= i32(MAP_HEIGHT) {
+    if x < 0 || y < 0 || x >= i32(map_width) || y >= i32(map_height) {
         return -1;
     }
-    return x + y * i32(MAP_WIDTH);
+    return x + y * i32(map_width);
 }

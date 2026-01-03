@@ -21,30 +21,18 @@ pub use cu_gstreamer::CuGstBuffer;
 
 pub type CuDefaultAutoGStreamer = CuAutoGStreamer<16>;
 
-/// Automatically starts a GStreamer pipeline when the desired camera is detected by `UdevMonitor`.
-/// While the pipeline is running it feeds the most recent buffers through a circular queue.
-/// If no frame is received for `timeout_ms` the pipeline is torn down so it can be rebuilt when the
-/// device re-appears
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 pub struct CuAutoGStreamer<const N: usize> {
-    // Desired USB port – matches `NewDevice.port`.
     desired_port: String,
-    _camera_id: String,
-    // Template pipeline string – contains the placeholder `<devpath>`.
+    camera_id: String,
     pipeline_template: String,
-    // Caps string applied to the pipeline's appsink.
     caps_str: String,
-    // Frame timeout.
-    req_timeout: Duration,
 
-    // Runtime state -------------------------------------------------------------------------
     pipeline: Option<Pipeline>,
-    _appsink: Option<AppSink>,
+    appsink: Option<AppSink>,
     circular_buffer: Arc<Mutex<CircularBuffer<N, CuGstBuffer>>>,
     last_frame_time: Option<Instant>,
-    // `Some` after we received a matching `NewDevice`, but before the pipeline is created.
     pending_dev_path: Option<String>,
-    teardown_requested: bool,
 }
 
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
@@ -63,32 +51,24 @@ impl<const N: usize> CuTask for CuAutoGStreamer<N> {
 
         let cfg = cfg.ok_or("No config provided for CuAutoGStreamer")?;
 
-        let desired_port = cfg
-            .get::<String>("device_port")
-            .ok_or("'device_port' missing from config")?;
-        let camera_id = cfg
-            .get::<String>("camera_id")
-            .ok_or("'camera_id' missing from config")?;
-        let pipeline_template = cfg
-            .get::<String>("pipeline")
-            .ok_or("'pipeline' missing from config")?;
-        let caps_str = cfg
-            .get::<String>("caps")
-            .ok_or("'caps' missing from config")?;
-        let req_timeout = Duration::from_millis(cfg.get::<u32>("timeout_ms").unwrap_or(500) as u64);
-
         Ok(Self {
-            desired_port,
-            _camera_id: camera_id,
-            pipeline_template,
-            caps_str,
-            req_timeout,
+            desired_port: cfg
+                .get::<String>("device_port")
+                .ok_or("'device_port' missing from config")?,
+            camera_id: cfg
+                .get::<String>("camera_id")
+                .ok_or("'camera_id' missing from config")?,
+            pipeline_template: cfg
+                .get::<String>("pipeline")
+                .ok_or("'pipeline' missing from config")?,
+            caps_str: cfg
+                .get::<String>("caps")
+                .ok_or("'caps' missing from config")?,
             pipeline: None,
-            _appsink: None,
+            appsink: None,
             circular_buffer: Arc::new(Mutex::new(CircularBuffer::new())),
             last_frame_time: None,
             pending_dev_path: None,
-            teardown_requested: false,
         })
     }
 
@@ -97,15 +77,13 @@ impl<const N: usize> CuTask for CuAutoGStreamer<N> {
     }
 
     fn preprocess(&mut self, _clock: &RobotClock) -> CuResult<()> {
-        if self.teardown_requested {
-            self.teardown_requested = false;
-            info!("GStreamer: Teardown requested");
+        if let Some(dev_path) = self.pending_dev_path.take() {
             self.stop_pipeline();
-        }
-
-        if self.pipeline.is_none() {
-            if let Some(dev_path) = self.pending_dev_path.take() {
-                self.open_pipeline(&dev_path)?;
+            if let Err(e) = self.open_pipeline(&dev_path) {
+                eprintln!(
+                    "Gstreamer [{}]: Failed to open pipeline: {}",
+                    self.camera_id, e
+                );
             }
         }
         Ok(())
@@ -117,55 +95,35 @@ impl<const N: usize> CuTask for CuAutoGStreamer<N> {
         input: &Self::Input<'_>,
         output: &mut Self::Output<'_>,
     ) -> CuResult<()> {
-        if self.pipeline.is_none() {
-            if let Some(dev) = input.payload() {
-                if *dev.port == self.desired_port {
-                    info!("GStreamer: Found device {}", &dev.dev_path);
-                    self.pending_dev_path = Some(dev.dev_path.to_string());
-                }
-            }
-            output.clear_payload();
-            return Err(CuError::new_with_cause(
-                "no frames received",
-                std::io::Error::other("no frames received"),
-            ));
-        }
-
-        if let Some(last) = self.last_frame_time {
-            if last.elapsed().as_millis() > self.req_timeout.as_millis() {
-                info!(
-                    "GStreamer: Frame timeout (>{}). Requesting teardown.",
-                    self.req_timeout
+        if let Some(dev) = input.payload() {
+            if *dev.port == self.desired_port {
+                println!(
+                    "GStreamer [{}]: Device detected at {}",
+                    self.camera_id, &dev.dev_path
                 );
-                self.teardown_requested = true;
-                self.last_frame_time = None;
+                self.pending_dev_path = Some(dev.dev_path.to_string());
             }
         }
 
-        // Process frames (non-blocking)
-        let frame = self.circular_buffer.lock().unwrap().pop_front();
-        if let Some(buffer) = frame {
+        output.clear_payload();
+
+        if let Some(buffer) = self.circular_buffer.lock().unwrap().pop_front() {
             output.tov = clock.now().into();
             output.set_payload(buffer);
             self.last_frame_time = Some(Instant::now());
-        } else {
-            output.clear_payload();
         }
 
-        if let Some(frame_time) = self.last_frame_time
-            && frame_time.elapsed().as_millis() > 500
-        {
-            return Err(CuError::new_with_cause(
+        match self.last_frame_time {
+            Some(t) if t.elapsed() <= Duration::from_millis(500) => Ok(()),
+            Some(_) => Err(CuError::new_with_cause(
                 "no frames received in 500 ms",
                 std::io::Error::other("no frames received in 500 ms"),
-            ));
-        } else if self.last_frame_time.is_none() {
-            return Err(CuError::new_with_cause(
+            )),
+            None => Err(CuError::new_with_cause(
                 "no frames received",
                 std::io::Error::other("no frames received"),
-            ));
+            )),
         }
-        Ok(())
     }
 
     fn stop(&mut self, _clock: &RobotClock) -> CuResult<()> {
@@ -179,18 +137,20 @@ impl<const N: usize> CuAutoGStreamer<N> {
     fn open_pipeline(&mut self, dev_path: &str) -> CuResult<()> {
         let pipeline_str = self.pipeline_template.replace("<devpath>", dev_path);
         let pipeline = parse::launch(&pipeline_str)
-            .map_err(|e| CuError::new_with_cause("Failed to parse pipeline", e))?;
-        let pipeline = pipeline
+            .map_err(|e| CuError::new_with_cause("Failed to parse pipeline", e))?
             .dynamic_cast::<Pipeline>()
             .map_err(|_| CuError::from("Parsed element is not a Pipeline"))?;
+
         let appsink = pipeline
-            .by_name(&format!("copper_{}", self._camera_id))
-            .ok_or("Appsink element named 'copper' not found in pipeline")?
+            .by_name(&format!("copper_{}", self.camera_id))
+            .ok_or("Appsink not found in pipeline")?
             .dynamic_cast::<AppSink>()
-            .map_err(|_| CuError::from("Element 'copper' is not an AppSink"))?;
-        let caps = Caps::from_str(&self.caps_str)
-            .map_err(|e| CuError::new_with_cause("Failed to parse caps", e))?;
-        appsink.set_caps(Some(&caps));
+            .map_err(|_| CuError::from("Element is not an AppSink"))?;
+
+        appsink
+            .set_caps(Some(&Caps::from_str(&self.caps_str).map_err(|e| {
+                CuError::new_with_cause("Failed to parse caps", e)
+            })?));
 
         self.circular_buffer.lock().unwrap().clear();
         let circular_buffer = self.circular_buffer.clone();
@@ -210,29 +170,40 @@ impl<const N: usize> CuAutoGStreamer<N> {
                 })
                 .build(),
         );
+        println!(
+            "GStreamer [{}]: Callbacks set for {}",
+            self.camera_id, dev_path
+        );
 
-        // Start playing.
         pipeline
             .set_state(gstreamer::State::Playing)
             .map_err(|e| CuError::new_with_cause("Failed to set pipeline to Playing", e))?;
 
+        println!(
+            "GStreamer [{}]: Pipeline started for {}",
+            self.camera_id, dev_path
+        );
+
         self.pipeline = Some(pipeline);
-        self._appsink = Some(appsink);
+        self.appsink = Some(appsink);
         self.last_frame_time = None;
         Ok(())
     }
 
     fn stop_pipeline(&mut self) {
-        info!("GStreamer: Stopping pipeline");
-        if let Some(pipeline) = &self.pipeline {
+        if let Some(pipeline) = self.pipeline.take() {
             let _ = pipeline.set_state(gstreamer::State::Null);
+            println!("GStreamer [{}]: Pipeline stopped", self.camera_id);
         }
-        self.pipeline = None;
-        self._appsink = None;
+        self.appsink = None;
         self.circular_buffer.lock().unwrap().clear();
         self.last_frame_time = None;
     }
 }
+
+// ============================================================================
+// Stub for non-Linux / simulation
+// ============================================================================
 
 #[cfg(any(not(target_os = "linux"), feature = "resim", feature = "sim"))]
 pub struct CuAutoGStreamer<const N: usize> {}
@@ -249,17 +220,13 @@ impl<const N: usize> CuTask for CuAutoGStreamer<N> {
     type Input<'m> = input_msg!(NewDevice);
     type Output<'m> = output_msg!(CuGstBuffer);
 
-    fn new(_cfg: Option<&ComponentConfig>) -> CuResult<Self>
-    where
-        Self: Sized,
-    {
+    fn new(_cfg: Option<&ComponentConfig>) -> CuResult<Self> {
         Ok(Self {})
     }
 
     fn start(&mut self, _clock: &RobotClock) -> CuResult<()> {
         Ok(())
     }
-
     fn preprocess(&mut self, _clock: &RobotClock) -> CuResult<()> {
         Ok(())
     }

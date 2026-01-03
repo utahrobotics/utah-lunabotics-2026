@@ -17,7 +17,7 @@ use iceoryx2::port::subscriber::Subscriber;
 use iceoryx2::prelude::*;
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use iceoryx2::service::port_factory::publish_subscribe::PortFactory;
-use kalman_filter::SimpleVector;
+use nalgebra::{SMatrix, SVector};
 use serde::Serialize;
 
 use crate::ROBOT_STATE;
@@ -79,7 +79,7 @@ impl CuSrcTask for ImuIceoryxReceiver {
             .create::<ipc::Service>()
             .map_err(|e| CuError::new_with_cause("ImuIceoryxReceiver: node create", e))?;
 
-        let diagonal = SimpleVector::<9>::from_column_slice(&[
+        let diagonal = SVector::<f64, 9>::from_column_slice(&[
             0.05 as f64, // Acceleration variance
             0.05 as f64,
             0.05 as f64,
@@ -90,7 +90,7 @@ impl CuSrcTask for ImuIceoryxReceiver {
             0.1 * 1E64 as f64,
             0.1 * 1E64 as f64,
         ]);
-        let variance: [f64; 81] = kalman_filter::SimpleSquareMatrix::<9>::from_diagonal(&diagonal)
+        let variance: [f64; 81] = SMatrix::<f64, 9, 9>::from_diagonal(&diagonal)
             .as_slice()
             .try_into()
             .expect("Variance matrix in [l2_imu.rs] was not 9x9");
@@ -188,7 +188,7 @@ impl CuSrcTask for ImuIceoryxReceiver {
             let orientation_state = imu_quaternion_base
                 .axis()
                 .and_then(|vec| Some(vec.into_inner()))
-                .unwrap_or(SimpleVector::<3>::zeros())
+                .unwrap_or(SVector::<f64, 3>::zeros())
                 * imu_quaternion_base.angle();
 
             let imu_orientation = Vector3::new(
@@ -222,9 +222,13 @@ impl CuSrcTask for ImuIceoryxReceiver {
                 continue;
             }
 
+            let gravity_world = Vector3::new(0.0, 0.0, self.gravity_magnitude);
+            let gravity_lidar = imu_quaternion_base * gravity_world;
+            let acc = acc - gravity_lidar;
+
             // After warmup, subtract the measured gravity magnitude in the z direction
             let actual_message = ImuMeasurement {
-                acceleration: [acc.x, acc.y, acc.z - 9.8], //self.gravity_magnitude],
+                acceleration: [acc.x, acc.y, acc.z],
                 angular_velocity: [gyr.x, gyr.y, gyr.z],
                 orientation: [imu_orientation.x, imu_orientation.y, imu_orientation.z],
                 variance: self.imu_variance,
@@ -246,7 +250,7 @@ impl CuSrcTask for ImuIceoryxReceiver {
     type Output<'m> = output_msg!(ImuMsg);
 
     fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
-        let diagonal = SimpleVector::<9>::from_column_slice(&[
+        let diagonal = SVector::<f64, 9>::from_column_slice(&[
             0.05 as f64, // Acceleration variance
             0.05 as f64,
             0.05 as f64,
@@ -257,7 +261,7 @@ impl CuSrcTask for ImuIceoryxReceiver {
             0.1 * 1E64 as f64,
             0.1 * 1E64 as f64,
         ]);
-        let variance: [f64; 81] = kalman_filter::SimpleSquareMatrix::<9>::from_diagonal(&diagonal)
+        let variance: [f64; 81] = SMatrix::<f64, 9, 9>::from_diagonal(&diagonal)
             .as_slice()
             .try_into()
             .expect("Variance matrix in [l2_imu.rs] was not 9x9");

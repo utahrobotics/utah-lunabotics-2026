@@ -13,11 +13,10 @@ use crossbeam::atomic::AtomicCell;
 use cu29::prelude::*;
 use cu29_helpers::basic_copper_setup;
 use embedded_common::Direction;
-use kalman_filter::SimpleSquareMatrix;
-use kalman_filter::SimpleVector;
 use mujoco_rs::cpp_viewer::MjViewerCpp;
 use mujoco_rs::prelude::*;
 use nalgebra::{Isometry3, Quaternion, Translation3, UnitQuaternion};
+use nalgebra::{SMatrix, SVector};
 use simple_motion::{ChainBuilder, NodeSerde};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -279,10 +278,12 @@ fn main() {
             let robot_chain = ChainBuilder::from(robot_chain).finish_static();
             let _ = ROBOT_STATE.set(RobotState {
                 kinematic_root: robot_chain,
-                kalman_state: Arc::new(RwLock::new(SimpleVector::<15>::from_element(0.0))),
-                kalman_variances: Arc::new(RwLock::new(
-                    SimpleSquareMatrix::<15>::from_diagonal_element(1E64),
-                )),
+                kalman_state: Arc::new(AtomicCell::new(Some(SVector::<f64, 12>::from_element(
+                    0.0,
+                )))),
+                kalman_variances: Arc::new(AtomicCell::new(Some(
+                    SMatrix::<f64, 12, 12>::from_diagonal_element(1E64),
+                ))),
             });
             let mut application = LunabotApplicationBuilder::new()
                 .with_context(&copper_ctx)

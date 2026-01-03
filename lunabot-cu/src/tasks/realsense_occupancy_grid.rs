@@ -1,7 +1,10 @@
 use bincode::Encode;
 use cu29::cutask::Freezable;
 use cu29::prelude::*;
+use nalgebra::{Isometry3, UnitQuaternion};
 use rayon::{ThreadPool, ThreadPoolBuilder};
+use std::f64::consts::PI;
+use std::fmt::Debug;
 use std::sync::{Arc, Mutex};
 use wgsl_pcl::pipelines::depth_to_obstacle::{ClearAffectedCellsOptions, ObstacleExpanderOptions};
 use wgsl_pcl::pipelines::filters::*;
@@ -19,6 +22,7 @@ use crate::rerun_viz::RECORDER;
 use crate::tasks::{DEPTH_FRAME_HEIGHT, DEPTH_FRAME_SIZE, DEPTH_FRAME_WIDTH};
 
 struct ProcessRequest {
+    layout: MapLayout,
     depths: Vec<u16>,
     depth_scale: f32,
     transform: AlignedMatrix4<f32>,
@@ -27,11 +31,17 @@ struct ProcessRequest {
 pub struct OccupancyGridTask {
     camera_node: StaticNode,
     depth_projector_pipeline: Arc<Mutex<DepthToPclAndHeightPipeline>>,
-    layout: MapLayout,
+    global_layout: MapLayout,
+    local_layout: MapLayout,
     output_buffer: Arc<Mutex<Option<OccupancyGrid>>>,
     /// technically an atomic would be enough but I dont trust my knowledge of atomic ordering enough to dare use them
     processing: Arc<Mutex<bool>>,
     thread_pool: Arc<ThreadPool>,
+    rolling_map_start_position: Isometry3<f64>,
+    max_distance_traveled_before_reset: f64,
+    max_radians_rotated_before_reset: f64,
+    _min_grad_for_obstacle: f32,
+    global_map: OccupancyGrid,
 }
 
 #[derive(Serialize, Encode, bincode::Decode, Clone, Debug)]
@@ -45,6 +55,25 @@ pub struct OccupancyGrid {
 }
 
 impl OccupancyGrid {
+    pub fn set_gradient_at(
+        &mut self,
+        cell_x: usize,
+        cell_y: usize,
+        value: f32,
+    ) -> Result<(), String> {
+        let cells_x = self.cells_x();
+        let cells_y = self.cells_y();
+        if cell_x >= cells_x || cell_y >= cells_y {
+            return Err("Cell coordinates out of bounds".to_string());
+        }
+        let index = cell_x + cell_y * cells_x;
+        if index >= self.gradient_map.len() {
+            return Err("Index out of bounds".to_string());
+        }
+        self.gradient_map[index] = value;
+        Ok(())
+    }
+
     pub fn cells_x(&self) -> usize {
         ((self.max_x - self.min_x) / self.cell_size).ceil() as usize
     }
@@ -178,13 +207,13 @@ impl CuTask for OccupancyGridTask {
 
     fn start(&mut self, _clock: &RobotClock) -> CuResult<()> {
         let center = [
-            (self.layout.max_x + self.layout.min_x) / 2.0,
-            (self.layout.max_y + self.layout.min_y) / 2.0,
+            (self.global_layout.max_x + self.global_layout.min_x) / 2.0,
+            (self.global_layout.max_y + self.global_layout.min_y) / 2.0,
             0.0,
         ];
         let half_size = [
-            (self.layout.max_x - self.layout.min_x) / 2.0,
-            (self.layout.max_y - self.layout.min_y) / 2.0,
+            (self.global_layout.max_x - self.global_layout.min_x) / 2.0,
+            (self.global_layout.max_y - self.global_layout.min_y) / 2.0,
             0.1,
         ];
         if let Some(logger) = RECORDER.get() {
@@ -299,11 +328,18 @@ impl CuTask for OccupancyGridTask {
             .unwrap_or(0.8) as f32;
         let clear_affected_cells = if clear_affected_cells_enabled {
             Some(ClearAffectedCellsOptions {
-                min_distance_to_clear: min_distance_to_clear,
+                min_distance_to_clear,
             })
         } else {
             None
         };
+
+        let max_distance_traveled_before_reset = config
+            .and_then(|c| c.get::<f64>("max_distance_traveled_before_reset"))
+            .unwrap_or(2.0);
+        let max_radians_rotated_before_reset = config
+            .and_then(|c| c.get::<f64>("max_radians_rotated_before_reset"))
+            .unwrap_or(std::f64::consts::PI / 4.0);
 
         let camera_node = ROBOT_STATE
             .get()
@@ -319,8 +355,15 @@ impl CuTask for OccupancyGridTask {
                 ))
             })?
             .clone();
-        let layout = MapLayout::new(max_x, min_x, max_y, min_y, cell_size);
-
+        let global_layout = MapLayout::new(max_x, min_x, max_y, min_y, cell_size);
+        let distance_buffer = max_depth + max_distance_traveled_before_reset as f32;
+        let local_layout = MapLayout::new(
+            distance_buffer,
+            -distance_buffer,
+            distance_buffer,
+            -distance_buffer,
+            cell_size,
+        );
         let blur_filter_options = if use_bilateral {
             BlurFilterOptions::Bilateral(BilateralOptions {
                 kernel_radius: bilateral_filter_kernel_radius,
@@ -353,7 +396,7 @@ impl CuTask for OccupancyGridTask {
                 get_device(),
                 (8, 8),
                 (16, 16),
-                layout,
+                local_layout.clone(),
                 blur_filter_options,
                 outlier_filter_options,
                 obstacle_expander_options,
@@ -376,10 +419,23 @@ impl CuTask for OccupancyGridTask {
         Ok(Self {
             camera_node,
             depth_projector_pipeline: pipeline,
-            layout,
+            local_layout,
+            global_layout,
             output_buffer: Arc::new(Mutex::new(None)),
             processing: Arc::new(Mutex::new(false)),
             thread_pool,
+            max_distance_traveled_before_reset,
+            max_radians_rotated_before_reset,
+            rolling_map_start_position: camera_node.get_global_isometry(),
+            _min_grad_for_obstacle: obstacle_gradient_threshold,
+            global_map: OccupancyGrid {
+                max_x,
+                min_x,
+                max_y,
+                min_y,
+                cell_size,
+                gradient_map: vec![f32::MIN; global_layout.cells_x() * global_layout.cells_y()],
+            },
         })
     }
 
@@ -390,13 +446,31 @@ impl CuTask for OccupancyGridTask {
         output: &mut Self::Output<'o>,
     ) -> CuResult<()> {
         // First, check if we have a result ready and grab it
-        {
-            let mut output_buf = self.output_buffer.lock().unwrap();
-            if let Some(grid) = output_buf.take() {
-                output.set_payload(grid);
-            } else {
-                output.clear_payload();
+
+        let mut output_buf = self.output_buffer.lock().unwrap();
+
+        if let Some(grid) = output_buf.take() {
+            let camera_isometry = self.camera_node.get_global_isometry();
+            let relative_rotation =
+                camera_isometry.rotation.inverse() * self.rolling_map_start_position.rotation;
+            if (camera_isometry.translation.vector
+                - self.rolling_map_start_position.translation.vector)
+                .norm()
+                > self.max_distance_traveled_before_reset
+                || relative_rotation.angle() > self.max_radians_rotated_before_reset
+            {
+                drop(output_buf); // appease the borrow checker by dropping immutable borrow to self
+                let start = self.rolling_map_start_position.cast::<f32>();
+                self.append_local_to_global(&grid, start).map_err(|e| {
+                    CuError::new_with_cause("failed to append local map to global", e)
+                })?;
+                self.rolling_map_start_position = camera_isometry;
+                let mut pipeline_guard = self.depth_projector_pipeline.lock().unwrap();
+                pipeline_guard.clear_map(get_device());
             }
+            output.set_payload(grid);
+        } else {
+            output.clear_payload();
         }
 
         // are we currently processing?
@@ -417,21 +491,20 @@ impl CuTask for OccupancyGridTask {
         // Mark as processing and spawn the work
         *processing = true;
 
+        let mut iso = self.camera_node.get_global_isometry();
+
+        iso.translation.vector -= self.rolling_map_start_position.translation.vector;
         let request = ProcessRequest {
+            layout: self.local_layout,
             depths: depth_frame.depths.to_vec(),
             depth_scale: depth_frame.depth_scale,
-            transform: self
-                .camera_node
-                .get_global_isometry()
-                .to_homogeneous()
-                .cast::<f32>()
-                .into(),
+            transform: iso.to_homogeneous().cast::<f32>().into(),
         };
 
         let pipeline = Arc::clone(&self.depth_projector_pipeline);
         let output_buffer = Arc::clone(&self.output_buffer);
         let processing_flag = Arc::clone(&self.processing);
-        let layout = self.layout.clone();
+        let layout = self.local_layout.clone();
 
         self.thread_pool.spawn_fifo(move || {
             let result = {
@@ -445,7 +518,7 @@ impl CuTask for OccupancyGridTask {
             };
 
             match result {
-                Ok((point_cloud, height_map)) => {
+                Ok((point_cloud, obstacle_map)) => {
                     if let Some(logger) = RECORDER.get() {
                         // Log the raw depth image
                         let depth_bytes: &[u8] = unsafe {
@@ -454,18 +527,22 @@ impl CuTask for OccupancyGridTask {
                                 request.depths.len() * std::mem::size_of::<u16>(),
                             )
                         };
-                        // let _ = logger.recorder.log(
-                        //     "realsense/depth_image",
-                        //     &rerun::DepthImage::new(
-                        //         depth_bytes,
-                        //         ImageFormat::depth(
-                        //             [DEPTH_FRAME_WIDTH as u32, DEPTH_FRAME_HEIGHT as u32],
-                        //             rerun::ChannelDatatype::U16,
-                        //         ),
-                        //     )
-                        //     .with_meter(1.0 / request.depth_scale)
-                        //     .with_depth_range([0.0, 2.0 / request.depth_scale as f64]),
-                        // );
+                        let _ = logger.recorder.log(
+                            "realsense/depth_image",
+                            &rerun::DepthImage::new(
+                                depth_bytes,
+                                ImageFormat::depth(
+                                    [DEPTH_FRAME_WIDTH as u32, DEPTH_FRAME_HEIGHT as u32],
+                                    rerun::ChannelDatatype::U16,
+                                ),
+                            )
+                            .with_meter(1.0 / request.depth_scale)
+                            .with_depth_range([0.0, 2.0 / request.depth_scale as f64]),
+                        );
+                        let _ = logger.recorder.log(
+                            "realsense/pcl",
+                            &Points3D::new(point_cloud.iter().map(|p| [p.x, p.y, p.z])),
+                        );
 
                         let pipeline_guard = pipeline.lock().unwrap();
 
@@ -477,133 +554,14 @@ impl CuTask for OccupancyGridTask {
                         let blur_filtered_height_map = pipeline_guard
                             .get_blur_filtered_height_map(get_device())
                             .unwrap();
-                        let _ = logger.recorder.log(
-                            "realsense/pcl",
-                            &Points3D::new(point_cloud.iter().map(|p| [p.x, p.y, p.z])),
-                        );
 
-                        let width = layout.max_x - layout.min_x;
-                        let height = layout.max_y - layout.min_y;
-                        let cells_x = (width / layout.cell_size).ceil() as usize;
-                        let cells_y = (height / layout.cell_size).ceil() as usize;
-
-                        // Create obstacle map as 2D image (RGB)
-                        let mut obstacle_image_data = vec![0u8; cells_x * cells_y * 3];
-                        for cell_y in 0..cells_y {
-                            for cell_x in 0..cells_x {
-                                let idx = cell_x + cell_y * cells_x;
-
-                                if idx < height_map.len() {
-                                    let z = height_map[idx];
-                                    let pixel_idx = idx * 3;
-
-                                    if z == f32::MIN {
-                                        // Black for invalid cells
-                                        obstacle_image_data[pixel_idx] = 0;
-                                        obstacle_image_data[pixel_idx + 1] = 0;
-                                        obstacle_image_data[pixel_idx + 2] = 0;
-                                    } else {
-                                        let normalized = ((z + 1.0) / 4.0).clamp(0.0, 1.0);
-                                        obstacle_image_data[pixel_idx] = (normalized * 255.0) as u8;
-                                        obstacle_image_data[pixel_idx + 1] = 50;
-                                        obstacle_image_data[pixel_idx + 2] =
-                                            ((1.0 - normalized) * 255.0) as u8;
-                                    }
-                                }
-                            }
-                        }
-
-                        let _ = logger.recorder.log(
-                            "realsense/obstacle_map",
-                            &rerun::Image::new(
-                                obstacle_image_data,
-                                ImageFormat::rgb8([cells_x as u32, cells_y as u32]),
-                            ),
-                        );
-
-                        // Log raw height map
-                        let mut raw_height_points = Vec::new();
-                        let mut raw_height_colors = Vec::new();
-                        for cell_y in 0..cells_y {
-                            for cell_x in 0..cells_x {
-                                let idx = cell_x + cell_y * cells_x;
-                                if idx < raw_height_map.len() {
-                                    let z = raw_height_map[idx];
-                                    if z == f32::MIN {
-                                        continue;
-                                    }
-                                    let x = layout.min_x + (cell_x as f32 + 0.5) * layout.cell_size;
-                                    let y = layout.min_y + (cell_y as f32 + 0.5) * layout.cell_size;
-                                    raw_height_points.push([x, y, z]);
-                                    let normalized = ((z + 1.0) / 4.0).clamp(0.0, 1.0);
-                                    raw_height_colors.push([
-                                        (normalized * 255.0) as u8,
-                                        100,
-                                        ((1.0 - normalized) * 255.0) as u8,
-                                    ]);
-                                }
-                            }
-                        }
-                        let _ = logger.recorder.log(
-                            "realsense/raw_height_map",
-                            &Points3D::new(raw_height_points).with_colors(raw_height_colors),
-                        );
-
-                        // Log gradient map
-                        let mut gradient_points = Vec::new();
-                        let mut gradient_colors = Vec::new();
-                        for cell_y in 0..cells_y {
-                            for cell_x in 0..cells_x {
-                                let idx = cell_x + cell_y * cells_x;
-                                if idx < raw_gradient_map.len() {
-                                    let gradient = raw_gradient_map[idx];
-                                    if gradient == f32::MIN {
-                                        continue;
-                                    }
-                                    let x = layout.min_x + (cell_x as f32 + 0.5) * layout.cell_size;
-                                    let y = layout.min_y + (cell_y as f32 + 0.5) * layout.cell_size;
-                                    // Use gradient value as z for visualization
-                                    gradient_points.push([x, y, gradient * 2.0]);
-                                    let normalized = (gradient * 2.0).clamp(0.0, 1.0);
-                                    gradient_colors.push([
-                                        (normalized * 255.0) as u8,
-                                        0,
-                                        ((1.0 - normalized) * 255.0) as u8,
-                                    ]);
-                                }
-                            }
-                        }
-                        let _ = logger.recorder.log(
-                            "realsense/gradient_map",
-                            &Points3D::new(gradient_points).with_colors(gradient_colors),
-                        );
-
-                        // Log blur filtered height map
-                        let mut blur_height_points = Vec::new();
-                        let mut blur_height_colors = Vec::new();
-                        for cell_y in 0..cells_y {
-                            for cell_x in 0..cells_x {
-                                let idx = cell_x + cell_y * cells_x;
-                                if idx < blur_filtered_height_map.len() {
-                                    let z = blur_filtered_height_map[idx];
-                                    if z == f32::MIN {
-                                        continue;
-                                    }
-                                    let x = layout.min_x + (cell_x as f32 + 0.5) * layout.cell_size;
-                                    let y = layout.min_y + (cell_y as f32 + 0.5) * layout.cell_size;
-                                    blur_height_points.push([x, y, z]);
-                                    let normalized = ((z + 1.0) / 4.0).clamp(0.0, 1.0);
-                                    blur_height_colors.push([
-                                        (normalized * 255.0) as u8,
-                                        150,
-                                        ((1.0 - normalized) * 255.0) as u8,
-                                    ]);
-                                }
-                            }
-                        }
-                        let _ = logger.recorder.log(
-                            "realsense/blur_filtered_height_map",
-                            &Points3D::new(blur_height_points).with_colors(blur_height_colors),
+                        log_map(
+                            layout,
+                            &obstacle_map,
+                            raw_height_map,
+                            raw_gradient_map,
+                            blur_filtered_height_map,
+                            logger,
                         );
                     }
 
@@ -613,7 +571,7 @@ impl CuTask for OccupancyGridTask {
                         max_y: layout.max_y,
                         min_y: layout.min_y,
                         cell_size: layout.cell_size,
-                        gradient_map: height_map,
+                        gradient_map: obstacle_map,
                     };
 
                     let mut output_buf = output_buffer.lock().unwrap();
@@ -628,4 +586,211 @@ impl CuTask for OccupancyGridTask {
         });
         Ok(())
     }
+}
+
+impl OccupancyGridTask {
+    /// also logs out the global map
+    fn append_local_to_global(
+        &mut self,
+        local: &OccupancyGrid,
+        origin: Isometry3<f32>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        for x in 0..local.cells_x() {
+            for y in 0..local.cells_y() {
+                let Some(local_coords) = local.cell_to_world(x, y) else {
+                    continue;
+                };
+                let Some(gradient) = local.gradient_at(x, y) else {
+                    continue;
+                };
+                let global_coords = origin.translation.vector
+                    + nalgebra::Vector3::new(local_coords.0, local_coords.1, 0.0);
+
+                if !self
+                    .global_layout
+                    .is_in_bounds(global_coords.data.0[0][0], global_coords.data.0[0][0])
+                {
+                    continue;
+                }
+                let Some((x, y)) = self
+                    .global_map
+                    .world_to_cell(global_coords.data.0[0][0], global_coords.data.0[0][1])
+                else {
+                    continue;
+                };
+                self.global_map.set_gradient_at(x, y, gradient)?;
+            }
+        }
+
+        if let Some(logger) = RECORDER.get() {
+            // Log global obstacle map
+            let mut global_obstacle_image_data =
+                vec![0u8; self.global_map.cells_x() * self.global_map.cells_y() * 3];
+            for cell_y in 0..self.global_map.cells_y() {
+                for cell_x in 0..self.global_map.cells_x() {
+                    let idx = cell_x + cell_y * self.global_map.cells_x();
+
+                    if idx < self.global_map.gradient_map.len() {
+                        let z = self.global_map.gradient_map[idx];
+                        let pixel_idx = idx * 3;
+
+                        if z == f32::MIN {
+                            // Black for invalid cells
+                            global_obstacle_image_data[pixel_idx] = 0;
+                            global_obstacle_image_data[pixel_idx + 1] = 0;
+                            global_obstacle_image_data[pixel_idx + 2] = 0;
+                        } else {
+                            let normalized = ((z + 1.0) / 4.0).clamp(0.0, 1.0);
+                            global_obstacle_image_data[pixel_idx] = (normalized * 255.0) as u8;
+                            global_obstacle_image_data[pixel_idx + 1] = 50;
+                            global_obstacle_image_data[pixel_idx + 2] =
+                                ((1.0 - normalized) * 255.0) as u8;
+                        }
+                    }
+                }
+            }
+            let _ = logger.recorder.log(
+                "realsense/global_obstacle_map",
+                &rerun::Image::new(
+                    global_obstacle_image_data,
+                    ImageFormat::rgb8([
+                        self.global_map.cells_x() as u32,
+                        self.global_map.cells_y() as u32,
+                    ]),
+                ),
+            );
+        }
+
+        Ok(())
+    }
+}
+
+fn log_map(
+    layout: MapLayout,
+    local_obstacle_map: &Vec<f32>,
+    raw_height_map: Vec<f32>,
+    raw_gradient_map: Vec<f32>,
+    blur_filtered_height_map: Vec<f32>,
+    logger: &crate::rerun_viz::RecorderData,
+) {
+    let cells_x = layout.cells_x();
+    let cells_y = layout.cells_y();
+
+    // Create obstacle map as 2D image (RGB)
+    let mut obstacle_image_data = vec![0u8; cells_x * cells_y * 3];
+    for cell_y in 0..cells_y {
+        for cell_x in 0..cells_x {
+            let idx = cell_x + cell_y * cells_x;
+
+            if idx < local_obstacle_map.len() {
+                let z = local_obstacle_map[idx];
+                let pixel_idx = idx * 3;
+
+                if z == f32::MIN {
+                    // Black for invalid cells
+                    obstacle_image_data[pixel_idx] = 0;
+                    obstacle_image_data[pixel_idx + 1] = 0;
+                    obstacle_image_data[pixel_idx + 2] = 0;
+                } else {
+                    let normalized = ((z + 1.0) / 4.0).clamp(0.0, 1.0);
+                    obstacle_image_data[pixel_idx] = (normalized * 255.0) as u8;
+                    obstacle_image_data[pixel_idx + 1] = 50;
+                    obstacle_image_data[pixel_idx + 2] = ((1.0 - normalized) * 255.0) as u8;
+                }
+            }
+        }
+    }
+
+    let _ = logger.recorder.log(
+        "realsense/local_obstacle_map",
+        &rerun::Image::new(
+            obstacle_image_data,
+            ImageFormat::rgb8([cells_x as u32, cells_y as u32]),
+        ),
+    );
+
+    // Log raw height map
+    let mut raw_height_points = Vec::new();
+    let mut raw_height_colors = Vec::new();
+    for cell_y in 0..cells_y {
+        for cell_x in 0..cells_x {
+            let idx = cell_x + cell_y * cells_x;
+            if idx < raw_height_map.len() {
+                let z = raw_height_map[idx];
+                if z == f32::MIN {
+                    continue;
+                }
+                let x = layout.min_x + (cell_x as f32 + 0.5) * layout.cell_size;
+                let y = layout.min_y + (cell_y as f32 + 0.5) * layout.cell_size;
+                raw_height_points.push([x, y, z]);
+                let normalized = ((z + 1.0) / 4.0).clamp(0.0, 1.0);
+                raw_height_colors.push([
+                    (normalized * 255.0) as u8,
+                    100,
+                    ((1.0 - normalized) * 255.0) as u8,
+                ]);
+            }
+        }
+    }
+    let _ = logger.recorder.log(
+        "realsense/raw_height_map",
+        &Points3D::new(raw_height_points).with_colors(raw_height_colors),
+    );
+
+    // Log gradient map
+    let mut gradient_points = Vec::new();
+    let mut gradient_colors = Vec::new();
+    for cell_y in 0..cells_y {
+        for cell_x in 0..cells_x {
+            let idx = cell_x + cell_y * cells_x;
+            if idx < raw_gradient_map.len() {
+                let gradient = raw_gradient_map[idx];
+                if gradient == f32::MIN {
+                    continue;
+                }
+                let x = layout.min_x + (cell_x as f32 + 0.5) * layout.cell_size;
+                let y = layout.min_y + (cell_y as f32 + 0.5) * layout.cell_size;
+                // Use gradient value as z for visualization
+                gradient_points.push([x, y, gradient * 2.0]);
+                let normalized = (gradient * 2.0).clamp(0.0, 1.0);
+                gradient_colors.push([
+                    (normalized * 255.0) as u8,
+                    0,
+                    ((1.0 - normalized) * 255.0) as u8,
+                ]);
+            }
+        }
+    }
+    let _ = logger.recorder.log(
+        "realsense/gradient_map",
+        &Points3D::new(gradient_points).with_colors(gradient_colors),
+    );
+
+    // Log blur filtered height map
+    let mut blur_height_points = Vec::new();
+    let mut blur_height_colors = Vec::new();
+    for cell_y in 0..cells_y {
+        for cell_x in 0..cells_x {
+            let idx = cell_x + cell_y * cells_x;
+            if idx < blur_filtered_height_map.len() {
+                let z = blur_filtered_height_map[idx];
+                if z == f32::MIN {
+                    continue;
+                }
+                let x = layout.min_x + (cell_x as f32 + 0.5) * layout.cell_size;
+                let y = layout.min_y + (cell_y as f32 + 0.5) * layout.cell_size;
+                blur_height_points.push([x, y, z]);
+                let normalized = ((z + 1.0) / 4.0).clamp(0.0, 1.0);
+                blur_height_colors.push([
+                    (normalized * 255.0) as u8,
+                    150,
+                    ((1.0 - normalized) * 255.0) as u8,
+                ]);
+            }
+        }
+    }
+    let _ = logger.recorder.log(
+        "realsense/blur_filtered_height_map",
+        &Points3D::new(blur_height_points).with_colors(blur_height_colors),
+    );
 }

@@ -1,9 +1,9 @@
-@group(0) @binding(0) var<storage, read> depths: array<u32>;
-@group(0) @binding(1) var<storage, read_write> height_map: array<atomic<u32>>;
+@group(1) @binding(0) var<storage, read> depths: array<u32>;
+@group(1) @binding(1) var<storage, read_write> height_map: array<atomic<u32>>;
 
-@group(1) @binding(0) var<uniform> transform: mat4x4f;
-@group(1) @binding(1) var<uniform> depth_scale: f32;
-@group(1) @binding(2) var<uniform> map_layout: MapLayout;
+@group(0) @binding(0) var<uniform> transform: mat4x4f;
+@group(0) @binding(1) var<uniform> depth_scale: f32;
+@group(0) @binding(2) var<uniform> map_layout: MapLayout;
 
 var<workgroup> heightmap_width_cells: u32;
 var<workgroup> heightmap_height_cells: u32;
