@@ -9,7 +9,7 @@
   </asset>
 
   <worldbody>
-    <body name="lunar_surface" pos="0 0 -1.2">
+    <body name="lunar_surface" pos="0 0 0">
       <geom material="DefaultMaterialLunarSurface1"
         mesh="lunar_surface"
         class="visual" />

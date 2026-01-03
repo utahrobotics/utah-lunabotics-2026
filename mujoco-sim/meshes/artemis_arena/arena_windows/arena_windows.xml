@@ -6,7 +6,7 @@
     <mesh file="arena_windows_collision_1.obj" />
   </asset>
   <worldbody>
-    <body name="arena_windows">
+    <body name="arena_windows" pos = "0 0 1.2">
       <geom material="DefaultMaterialWindows" mesh="arena_windows" class="visual" />
       <geom mesh="arena_windows_collision_0"
         rgba="0.9904621354876483 0.6722046480866822 0.2558248646148681 1" class="collision" />

@@ -14,7 +14,7 @@
     <mesh file="arena_columns_collision_8.obj" />
   </asset>
   <worldbody>
-    <body name="arena_columns">
+    <body name="arena_columns" pos="0 0 1.2">
       <geom material="DefaultMaterialArenaColumns" mesh="arena_columns" class="visual" />
       <geom mesh="arena_columns_collision_0"
         rgba="0.07709513132448476 0.1525624663121371 0.42352277580517494 1" class="collision" />
