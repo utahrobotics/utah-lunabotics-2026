@@ -1,63 +1,76 @@
 use nalgebra::Vector2;
+use rerun::{Vec2D, Vec3D};
+use tasker::tokio::sync::{mpsc, watch};
 
-use crate::tasks::{OccupancyGrid, ai::jobs::Job};
+use crate::{
+    pathfinding::rrt::find_path,
+    rerun_viz::RECORDER,
+    tasks::{OccupancyGrid, ai::jobs::Job, realsense_occupancy_grid::GLOBAL_MAP},
+};
 
-pub fn find_path_job(latest_local_map: OccupancyGrid) -> Job<Vec<Vector2<f64>>> {
+/// IMPORTANT: this job should not take more than a few ms, because since it has access to the global map's read guard,
+/// it could cause delays in other tasks that need the global map if it takes too long.
+pub fn find_path_job(
+    latest_local_map: OccupancyGrid,
+    start: Vector2<f32>,
+    end: Vector2<f32>,
+) -> Job<Vec<Vector2<f32>>> {
+    let (status_tx, status_rx) = watch::channel(bonsai_bt::Status::Running);
+    let (output_tx, output_rx) = mpsc::channel(5);
 
-    if let Some(ref map) = blackboard.latest_obstacle_map {
-                    let translation = blackboard.kinematic_root.get_global_isometry().translation;
-                    if let Some(path) = find_path(
-                        map,
-                        [translation.x as f32, translation.y as f32],
-                        PATHFINDING_GOAL,
-                        0.3,
-                        map.cell_size * 2.,
-                        // FIXME: tune this parameter
-                        1000,
-                    ) && let Some(rec) = RECORDER.get()
-                    {
-                        let _ = rec.recorder.log(
-                            "ai/calculated_path",
-                            &rerun::LineStrips3D::new(&[path
-                                .iter()
-                                .map(|p| Vec3D::new(p.0 as f32, p.1 as f32, 1.0))
-                                .collect::<Vec<_>>()])
-                            .with_colors(vec![rerun::Color::from_rgb(0, 200, 0)]),
-                        );
-                        Success
-                    } else {
-                        Failure
-                    }
+    Job::spawn(
+        async move {
+            if let Some(rec) = RECORDER.get() {
+                let _ = rec.recorder.log(
+                    "ai/position",
+                    &rerun::Points2D::new([Vec2D::new(start.x, start.y)])
+                        .with_colors([rerun::Color::from_rgb(0, 255, 0)]),
+                );
+            }
+            let path_result = tasker::tokio::task::spawn_blocking(move || {
+                let global_map_guard = if let Some(global_map) = GLOBAL_MAP.get() {
+                    global_map.read().ok()
                 } else {
-                    Failure
-                } // if let Some(ref map) = blackboard.latest_obstacle_map {
-                    let translation = blackboard.kinematic_root.get_global_isometry().translation;
-                    if let Some(path) = find_path(
-                        map,
-                        [translation.x as f32, translation.y as f32],
-                        PATHFINDING_GOAL,
-                        0.3,
-                        map.cell_size * 2.,
-                        // FIXME: tune this parameter
-                        1000,
-                    ) && let Some(rec) = RECORDER.get()
-                    {
-                        let _ = rec.recorder.log(
-                            "ai/calculated_path",
-                            &rerun::LineStrips3D::new(&[path
-                                .iter()
-                                .map(|p| Vec3D::new(p.0 as f32, p.1 as f32, 1.0))
-                                .collect::<Vec<_>>()])
-                            .with_colors(vec![rerun::Color::from_rgb(0, 200, 0)]),
-                        );
-                        Success
-                    } else {
-                        Failure
-                    }
-                } else {
-                    Failure
+                    None
+                };
+
+                find_path(
+                    &latest_local_map,
+                    global_map_guard.as_deref(),
+                    [start.x, start.y],
+                    [end.x, end.y],
+                    0.3,                                     // max_acceptable_gradient
+                    latest_local_map.layout.cell_size * 2.0, // extend_length
+                    3000,                                    // FIXME: tune this parameter
+                )
+            })
+            .await
+            .unwrap_or(None);
+
+            if let Some(path) = path_result {
+                if let Some(rec) = RECORDER.get() {
+                    let _ = rec.recorder.log(
+                        "ai/calculated_path",
+                        &rerun::LineStrips2D::new([path
+                            .iter()
+                            .map(|p| Vec2D::new(p.0, p.1))
+                            .collect::<Vec<_>>()])
+                        .with_colors([rerun::Color::from_rgb(0, 200, 0)]),
+                    );
                 }
 
-    todo!()
+                let vector_path: Vec<Vector2<f32>> =
+                    path.into_iter().map(|(x, y)| Vector2::new(x, y)).collect();
 
+                let _ = output_tx.send(vector_path).await;
+                let _ = status_tx.send(bonsai_bt::Status::Success);
+                bonsai_bt::Status::Success
+            } else {
+                let _ = status_tx.send(bonsai_bt::Status::Failure);
+                bonsai_bt::Status::Failure
+            }
+        },
+        status_rx,
+        output_rx,
+    )
 }

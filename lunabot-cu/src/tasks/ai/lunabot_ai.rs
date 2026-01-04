@@ -61,7 +61,7 @@ impl CuTask for LunabotAi {
         }
 
         if let Some(map) = input.1.payload() {
-            self.bt.blackboard_mut().latest_obstacle_map = Some(map.clone());
+            self.bt.blackboard_mut().latest_local_map = Some(map.clone());
         }
 
         self.bt

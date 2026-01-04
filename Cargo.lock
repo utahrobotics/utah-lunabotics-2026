@@ -7466,10 +7466,12 @@ name = "wgsl-pcl"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "bincode 2.0.1",
  "bytemuck",
  "futures",
  "nalgebra",
  "pollster",
+ "serde",
  "thiserror 2.0.17",
  "wgpu",
 ]

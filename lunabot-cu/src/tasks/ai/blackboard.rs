@@ -5,7 +5,7 @@ use std::{
 
 use common::{FromLunabase, LUNABOT_STAGE, LunabotStage, Steering};
 use embedded_common::ActuatorCommand;
-use nalgebra::{SMatrix, SVector};
+use nalgebra::{SMatrix, SVector, Vector2};
 use simple_motion::StaticNode;
 
 use crate::{
@@ -19,7 +19,7 @@ pub struct LunabotBlackboard {
     pub kinematic_root: StaticNode,
 
     /// TODO fill out this comment
-    pub latest_obstacle_map: Option<OccupancyGrid>,
+    pub latest_local_map: Option<OccupancyGrid>,
 
     /// stores the last lift actuator message received from lunabase
     pub last_lift: Option<i8>,
@@ -50,6 +50,11 @@ pub struct LunabotBlackboard {
 
     /// if a path following long running task is going, the job will be stored here
     pub path_follower: Option<Job<Steering>>,
+    /// if a path finding job is running, it will be stored here
+    pub path_finder: Option<Job<Vec<Vector2<f32>>>>,
+    /// the calculated path from the path finder job
+    pub calculated_path: Option<Vec<Vector2<f32>>>,
+    pub global_map: OccupancyGrid,
 }
 
 impl Default for LunabotBlackboard {
@@ -65,13 +70,16 @@ impl Default for LunabotBlackboard {
             // when the user clicks continue mission for the first time, we move to manual
             last_mission: LunabotStage::Manual,
             current_mission: LunabotStage::SoftStop,
-            latest_obstacle_map: None,
+            latest_local_map: None,
             last_lift: None,
             last_bucket: None,
+            path_finder: None,
+            calculated_path: None,
             last_steering: None,
             navigate_destination: None,
             yielded: false,
             path_follower: None,
+            global_map: OccupancyGrid::default(),
         }
     }
 }
