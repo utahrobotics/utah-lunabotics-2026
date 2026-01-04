@@ -55,7 +55,8 @@ pub fn find_path_job(
                             .iter()
                             .map(|p| Vec2D::new(p.0, p.1))
                             .collect::<Vec<_>>()])
-                        .with_colors([rerun::Color::from_rgb(0, 200, 0)]),
+                        .with_colors([rerun::Color::from_rgb(0, 200, 0)])
+                        .with_draw_order(100.0),
                     );
                 }
 
