@@ -106,8 +106,8 @@ pub fn find_path(
 }
 
 /// used for when the robot appears to be stuck in unknown or obstacle space
-/// returns pretty much the nearest free space
-/// max search distance is limited by either max num
+/// returns the nearest free space (by Euclidean distance)
+/// Searches both local and global maps properly by checking each in world coordinates
 fn flood_fill_escape(
     local_map: &OccupancyGrid,
     global_map: Option<&OccupancyGrid>,
@@ -115,44 +115,81 @@ fn flood_fill_escape(
     max_acceptable_gradient: f32,
     num_max_try: usize,
 ) -> Option<(f32, f32)> {
-    // local prioritized
-    let (cell_x, cell_y) = local_map
-        .world_to_cell(start[0], start[1])
-        .or_else(|| global_map.and_then(|g| g.world_to_cell(start[0], start[1])))?;
+    let check_map = |map: &OccupancyGrid, cell_x: usize, cell_y: usize| -> Option<(f32, f32)> {
+        let grad = map.gradient_around_cell(cell_x, cell_y, 3)?;
+        if grad <= max_acceptable_gradient {
+            map.cell_to_world(cell_x, cell_y)
+        } else {
+            None
+        }
+    };
+
+    let local_start = local_map.world_to_cell(start[0], start[1]);
+    let global_start = global_map.and_then(|g| g.world_to_cell(start[0], start[1]));
+
+    if local_start.is_none() && global_start.is_none() {
+        return None;
+    }
 
     let mut layer = 1;
     loop {
         if layer > num_max_try as isize {
             break;
         }
-        for i in -layer as isize..=layer as isize {
-            for j in -layer as isize..=layer as isize {
-                if i.abs() != layer && j.abs() != layer {
-                    continue;
-                }
-                let x = cell_x as isize + i;
-                let y = cell_y as isize + j;
-                if x < 0 || y < 0 {
-                    continue;
-                }
-                let found_x = (cell_x as isize + i) as usize;
-                let found_y = (cell_y as isize + j) as usize;
 
-                let grad = local_map
-                    .gradient_around_cell(found_x, found_y, 3)
-                    .or_else(|| {
-                        global_map.and_then(|gmap| gmap.gradient_around_cell(found_x, found_y, 3))
-                    });
+        let mut candidates = Vec::new();
 
-                if let Some(grad) = grad {
-                    if grad <= max_acceptable_gradient {
-                        return local_map.cell_to_world(found_x, found_y).or_else(|| {
-                            global_map.and_then(|g| g.cell_to_world(found_x, found_y))
-                        });
+        //  in local map if we have a starting cell
+        if let Some((cell_x, cell_y)) = local_start {
+            for i in -layer..=layer {
+                for j in -layer..=layer {
+                    if i.abs() != layer && j.abs() != layer {
+                        continue;
+                    }
+                    let x = cell_x as isize + i;
+                    let y = cell_y as isize + j;
+                    if x < 0 || y < 0 {
+                        continue;
+                    }
+
+                    if let Some(world_pos) = check_map(local_map, x as usize, y as usize) {
+                        let dist_sq =
+                            (world_pos.0 - start[0]).powi(2) + (world_pos.1 - start[1]).powi(2);
+                        candidates.push((world_pos, dist_sq));
                     }
                 }
             }
         }
+
+        //  in global map if we have a starting cell
+        if let Some(gmap) = global_map {
+            if let Some((cell_x, cell_y)) = global_start {
+                for i in -layer..=layer {
+                    for j in -layer..=layer {
+                        if i.abs() != layer && j.abs() != layer {
+                            continue;
+                        }
+                        let x = cell_x as isize + i;
+                        let y = cell_y as isize + j;
+                        if x < 0 || y < 0 {
+                            continue;
+                        }
+
+                        if let Some(world_pos) = check_map(gmap, x as usize, y as usize) {
+                            let dist_sq =
+                                (world_pos.0 - start[0]).powi(2) + (world_pos.1 - start[1]).powi(2);
+                            candidates.push((world_pos, dist_sq));
+                        }
+                    }
+                }
+            }
+        }
+
+        if !candidates.is_empty() {
+            candidates.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+            return Some(candidates[0].0);
+        }
+
         layer += 1;
     }
     None
