@@ -196,10 +196,6 @@ impl FromLunabase {
         Ok(())
     }
 
-    pub fn lift_shake() -> Self {
-        FromLunabase::LiftShake
-    }
-
     pub fn set_lift_actuator(mut speed: f64) -> Self {
         speed = speed.clamp(-1.0, 1.0);
         let speed = if speed < 0.0 {

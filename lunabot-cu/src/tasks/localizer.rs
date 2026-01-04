@@ -1,22 +1,22 @@
 ///! # Overview:
-///! 
-///! ## How sensors are used: 
+///!
+///! ## How sensors are used:
 ///! AprilTags -> global pose reference (absolute position & orientation)
-///! 
+///!
 ///! ICP -> local pose tracking (relative pose, drift-prone)
-///! 
+///!
 ///! Intel T265 -> short-term motion (velocity from pose deltas)
-///! 
+///!
 ///! IMU -> currently logged, not yet fused (since the l2's imus are garbage)
-///! 
-///! 
+///!
+///!
 ///! ## Multiplicative Extended Kalman Filter
 ///! Based on this: https://matthewhampsey.github.io/blog/2020/07/18/mekf
-///! 
+///!
 ///! State representation: [x, y, z, vx, vy, vz, δθx, δθy, δθz, ωx, ωy, ωz]
-///! 
+///!
 ///!  - where δθxyz is a small orientation error (magnitude will never get close to pi which solves the instability problem)
-///! 
+///!
 ///! Basically the kalman filter state holds the small orientation error, and we keep track of a reference quaternion in the localizer where: q_true = q_reference * q_error
 ///!  - q_reference is propagated using angular velocity in the kalman state
 ///!  - on each update, the error is folded into the reference, and the error gets set back to zero, keeping the error from ever getting too big.
@@ -24,20 +24,17 @@
 ///!  
 ///! ## Process noise
 ///! How much you don't trust your motion model. lower noise = motion model trusted more than sensors
-///! 
-
-use std::f64::consts::PI;
+///!
 use std::sync::OnceLock;
 
 use crate::rerun_viz;
 use crate::rerun_viz::RECORDER;
+use crate::robot_state::RobotState;
 use crate::tasks::AprilTagMeasurement;
 use crate::tasks::IcpMeasurement;
 use crate::tasks::ImuMeasurement;
 use crate::tasks::T265Msg;
-use crate::robot_state::RobotState;
 use common::FromLunabot;
-use cu_spatial_payloads::EncodableIsometry;
 use cu29::cutask::CuTask;
 use cu29::output_msg;
 use cu29::{
@@ -54,7 +51,6 @@ use kfilter::system::StepReturn;
 use kfilter::system::System;
 use nalgebra::UnitQuaternion;
 use nalgebra::{Isometry3, SMatrix, SVector, Vector3, Vector6};
-use rerun::Scalars;
 
 use crate::ROBOT_STATE;
 

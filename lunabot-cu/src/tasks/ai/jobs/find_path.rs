@@ -1,5 +1,5 @@
 use nalgebra::Vector2;
-use rerun::{Vec2D, Vec3D};
+use rerun::Vec2D;
 use tasker::tokio::sync::{mpsc, watch};
 
 use crate::{

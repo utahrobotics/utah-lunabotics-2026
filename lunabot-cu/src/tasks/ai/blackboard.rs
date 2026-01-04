@@ -1,11 +1,8 @@
-use std::{
-    collections::VecDeque,
-    sync::{Arc, RwLock},
-};
+use std::collections::VecDeque;
 
 use common::{FromLunabase, LUNABOT_STAGE, LunabotStage, Steering};
 use embedded_common::ActuatorCommand;
-use nalgebra::{SMatrix, SVector, Vector2};
+use nalgebra::Vector2;
 use simple_motion::StaticNode;
 
 use crate::{

@@ -1,4 +1,4 @@
-use bonsai_bt::Behavior::{self, Action, AlwaysSucceed, Invert, Wait};
+use bonsai_bt::Behavior::{self, Action, AlwaysSucceed, Wait};
 use common::Steering;
 
 use crate::tasks::ai::action::LunabotAction;

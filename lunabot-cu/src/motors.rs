@@ -87,6 +87,7 @@ impl VescIDs {
         false
     }
 
+    #[allow(unused)]
     pub fn add_single_vesc(&mut self, id: u8, mask: MotorMask) -> bool {
         if self.motor_masks.contains_key(&id) {
             return true;

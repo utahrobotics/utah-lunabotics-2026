@@ -2,7 +2,6 @@ use bonsai_bt::Status::{self, *};
 use common::{LUNABOT_STAGE, LunabotStage, Steering};
 use embedded_common::{Actuator, ActuatorCommand};
 use nalgebra::Vector2;
-use rerun::Vec3D;
 
 use crate::{
     ROBOT_STATE,

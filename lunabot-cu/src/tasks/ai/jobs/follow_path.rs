@@ -13,9 +13,9 @@ use crate::tasks::ai::jobs::Job;
 /// follows path fails if the robot fails to move significantly in stuck_timeout_secs
 /// also could fail if this job is cancelled
 pub fn follow_path_job(
-    stuck_timeout_secs: f32,
+    _stuck_timeout_secs: f32,
     chain: StaticNode,
-    path: Vec<Vector2<f32>>,
+    _path: Vec<Vector2<f32>>,
 ) -> Job<Steering> {
     let (status_tx, status_rx) = watch::channel(bonsai_bt::Status::Running);
     let (output_tx, output_rx) = mpsc::channel(5);
