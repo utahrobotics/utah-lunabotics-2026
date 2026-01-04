@@ -277,7 +277,10 @@ pub struct Localizer {
     /// Transformation to convert T265 poses from T265 frame to ICP frame
     /// Either identity or computed from T265 to ICP transformation
     /// Re calculated on each ICP measurement
-    t265_to_icp: Isometry3<f64>,
+    t265_to_icp: Option<Isometry3<f64>>,
+
+    /// Most recent T265-to-global transformation, useful if only T265 + apriltags are available
+    t265_to_global: Option<Isometry3<f64>>,
 
     /// Most recent ICP pose in raw ICP frame (for computing offset when AprilTag seen)
     last_raw_icp_pose: Option<Isometry3<f64>>,
@@ -420,7 +423,8 @@ impl CuTask for Localizer {
 
                 most_recent_update: CuTime::default(),
                 icp_to_global: None,
-                t265_to_icp: Isometry3::identity(),
+                t265_to_icp: None,
+                t265_to_global: None,
                 last_raw_icp_pose: None,
                 prev_t265_pose: None,
                 prev_t265_time: None,
@@ -481,6 +485,10 @@ impl CuTask for Localizer {
                     if !self.has_global_reference {
                         self.has_global_reference = true;
                         println!("First AprilTag seen - global reference established");
+                    }
+
+                    if let Some(raw_t265) = self.prev_t265_pose {
+                        self.t265_to_global = Some(compute_frame_offset(&raw_t265, &global_pose));
                     }
 
                     // Update ICP-to-global offset if we have a recent ICP pose
@@ -567,10 +575,10 @@ impl CuTask for Localizer {
                     );
                 }
                 if let Some(most_recent_t265) = &self.prev_t265_pose {
-                    self.t265_to_icp = compute_frame_offset(
+                    self.t265_to_icp = Some(compute_frame_offset(
                         &most_recent_t265,
                         &(&self.icp_to_global.unwrap_or(Isometry3::identity()) * raw_icp_pose),
-                    );
+                    ));
                 }
                 let offset = self.icp_to_global.unwrap_or(Isometry3::identity());
 
@@ -628,7 +636,10 @@ impl CuTask for Localizer {
                     );
                 }
 
-                let t265_offset = self.t265_to_icp;
+                // prioritize using t265 -> icp  transform if available, otherwise use t265 -> global, otherwise identity
+                let t265_offset = self
+                    .t265_to_icp
+                    .unwrap_or(self.t265_to_global.unwrap_or(Isometry3::identity()));
 
                 let current_t265_global = t265_offset * current_t265_raw;
 
