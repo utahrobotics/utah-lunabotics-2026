@@ -5,7 +5,7 @@ use nalgebra::{Isometry3, UnitQuaternion};
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use std::f64::consts::PI;
 use std::fmt::Debug;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use wgsl_pcl::pipelines::depth_to_obstacle::{ClearAffectedCellsOptions, ObstacleExpanderOptions};
 use wgsl_pcl::pipelines::filters::*;
 
@@ -21,6 +21,9 @@ use crate::ROBOT_STATE;
 use crate::rerun_viz::RECORDER;
 use crate::tasks::{DEPTH_FRAME_HEIGHT, DEPTH_FRAME_SIZE, DEPTH_FRAME_WIDTH};
 
+pub static GLOBAL_MAP: OnceLock<Arc<RwLock<OccupancyGrid>>> = OnceLock::new();
+
+#[allow(unused)]
 struct ProcessRequest {
     layout: MapLayout,
     depths: Vec<u16>,
@@ -41,7 +44,6 @@ pub struct OccupancyGridTask {
     max_distance_traveled_before_reset: f64,
     max_radians_rotated_before_reset: f64,
     _min_grad_for_obstacle: f32,
-    global_map: OccupancyGrid,
 }
 
 #[derive(Serialize, Encode, bincode::Decode, Clone, Debug)]
@@ -415,6 +417,16 @@ impl CuTask for OccupancyGridTask {
                 .build()
                 .map_err(|e| CuError::new_with_cause("failed to create thread pool", e))?,
         );
+        GLOBAL_MAP.get_or_init(|| {
+            Arc::new(RwLock::new(OccupancyGrid {
+                max_x,
+                min_x,
+                max_y,
+                min_y,
+                cell_size,
+                gradient_map: vec![f32::MIN; global_layout.cells_x() * global_layout.cells_y()],
+            }))
+        });
 
         Ok(Self {
             camera_node,
@@ -428,14 +440,6 @@ impl CuTask for OccupancyGridTask {
             max_radians_rotated_before_reset,
             rolling_map_start_position: camera_node.get_global_isometry(),
             _min_grad_for_obstacle: obstacle_gradient_threshold,
-            global_map: OccupancyGrid {
-                max_x,
-                min_x,
-                max_y,
-                min_y,
-                cell_size,
-                gradient_map: vec![f32::MIN; global_layout.cells_x() * global_layout.cells_y()],
-            },
         })
     }
 
@@ -461,9 +465,12 @@ impl CuTask for OccupancyGridTask {
             {
                 drop(output_buf); // appease the borrow checker by dropping immutable borrow to self
                 let start = self.rolling_map_start_position.cast::<f32>();
-                self.append_local_to_global(&grid, start).map_err(|e| {
-                    CuError::new_with_cause("failed to append local map to global", e)
-                })?;
+                if let Some(global) = GLOBAL_MAP.get() {
+                    let mut write_guard = global.write().map_err(|e| CuError::new_with_cause("failed to get global map write guard", e))?;
+                    self.append_local_to_global(&grid, start, &mut *write_guard).map_err(|e| {
+                        CuError::new_with_cause("failed to append local map to global", e)
+                    })?;
+                }
                 self.rolling_map_start_position = camera_isometry;
                 let mut pipeline_guard = self.depth_projector_pipeline.lock().unwrap();
                 pipeline_guard.clear_map(get_device());
@@ -590,10 +597,12 @@ impl CuTask for OccupancyGridTask {
 
 impl OccupancyGridTask {
     /// also logs out the global map
+    /// only needs self for access to the global layout
     fn append_local_to_global(
         &mut self,
         local: &OccupancyGrid,
         origin: Isometry3<f32>,
+        global_map: &mut OccupancyGrid,
     ) -> Result<(), Box<dyn std::error::Error>> {
         for x in 0..local.cells_x() {
             for y in 0..local.cells_y() {
@@ -612,26 +621,25 @@ impl OccupancyGridTask {
                 {
                     continue;
                 }
-                let Some((x, y)) = self
-                    .global_map
+                let Some((x, y)) = global_map
                     .world_to_cell(global_coords.data.0[0][0], global_coords.data.0[0][1])
                 else {
                     continue;
                 };
-                self.global_map.set_gradient_at(x, y, gradient)?;
+                global_map.set_gradient_at(x, y, gradient)?;
             }
         }
 
         if let Some(logger) = RECORDER.get() {
             // Log global obstacle map
             let mut global_obstacle_image_data =
-                vec![0u8; self.global_map.cells_x() * self.global_map.cells_y() * 3];
-            for cell_y in 0..self.global_map.cells_y() {
-                for cell_x in 0..self.global_map.cells_x() {
-                    let idx = cell_x + cell_y * self.global_map.cells_x();
+                vec![0u8; global_map.cells_x() * global_map.cells_y() * 3];
+            for cell_y in 0..global_map.cells_y() {
+                for cell_x in 0..global_map.cells_x() {
+                    let idx = cell_x + cell_y * global_map.cells_x();
 
-                    if idx < self.global_map.gradient_map.len() {
-                        let z = self.global_map.gradient_map[idx];
+                    if idx < global_map.gradient_map.len() {
+                        let z = global_map.gradient_map[idx];
                         let pixel_idx = idx * 3;
 
                         if z == f32::MIN {
@@ -654,8 +662,8 @@ impl OccupancyGridTask {
                 &rerun::Image::new(
                     global_obstacle_image_data,
                     ImageFormat::rgb8([
-                        self.global_map.cells_x() as u32,
-                        self.global_map.cells_y() as u32,
+                        global_map.cells_x() as u32,
+                        global_map.cells_y() as u32,
                     ]),
                 ),
             );
