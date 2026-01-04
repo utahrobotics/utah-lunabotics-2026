@@ -151,14 +151,14 @@ fn step_function(state: StateVec, input: InputVec) -> StepReturn<f64, STATE_DIM>
     let wy = angular_velocity[1];
     let wz = angular_velocity[2];
 
-    jacobian[(6, 7)] = wz * dt;
-    jacobian[(6, 8)] = -wy * dt;
+    // jacobian[(6, 7)] = wz * dt;
+    // jacobian[(6, 8)] = -wy * dt;
 
-    jacobian[(7, 6)] = -wz * dt;
-    jacobian[(7, 8)] = wx * dt;
+    // jacobian[(7, 6)] = -wz * dt;
+    // jacobian[(7, 8)] = wx * dt;
 
-    jacobian[(8, 6)] = wy * dt;
-    jacobian[(8, 7)] = -wx * dt;
+    // jacobian[(8, 6)] = wy * dt;
+    // jacobian[(8, 7)] = -wx * dt;
 
     let mut covariance = SMatrix::<f64, STATE_DIM, STATE_DIM>::zeros();
     for i in 0..3 {
