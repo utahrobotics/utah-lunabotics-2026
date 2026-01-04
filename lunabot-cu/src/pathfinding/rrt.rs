@@ -40,6 +40,7 @@ pub fn find_path(
         eprintln!("Invalid map dimensions: max_x <= min_x or max_y <= min_y");
         return None;
     }
+
     let mut initial_path = Vec::new();
     if get_gradient(start[0], start[1])
         .map(|val| {
@@ -52,18 +53,15 @@ pub fn find_path(
         .flatten()
         .is_none()
     {
-        if let Some(valid_cell) = flood_fill_escape(
-            local_map,
-            global_map,
-            start,
-            max_acceptable_gradient,
-            num_max_try,
-        ) {
+        if let Some(valid_cell) =
+            flood_fill_escape(local_map, global_map, start, max_acceptable_gradient, 200)
+        {
             initial_path.push(valid_cell);
         } else {
             return None;
         }
     }
+
     let start = if initial_path.is_empty() {
         start
     } else {
@@ -83,6 +81,7 @@ pub fn find_path(
         let y_range = Uniform::new(world_min_y, world_max_y).unwrap();
         vec![x_range.sample(&mut rng), y_range.sample(&mut rng)]
     };
+
     let mut path = rrt::dual_rrt_connect(
         &start,
         &goal,
@@ -92,6 +91,7 @@ pub fn find_path(
         num_max_try,
     )
     .ok()?;
+
     rrt::smooth_path(&mut path, is_free, extend_length, num_max_try);
 
     let path = path
@@ -101,11 +101,13 @@ pub fn find_path(
     if path.is_empty() {
         eprintln!("failed to calc path");
     }
+
     Some(path)
 }
 
 /// used for when the robot appears to be stuck in unknown or obstacle space
 /// returns pretty much the nearest free space
+/// max search distance is limited by either max num
 fn flood_fill_escape(
     local_map: &OccupancyGrid,
     global_map: Option<&OccupancyGrid>,
@@ -137,9 +139,9 @@ fn flood_fill_escape(
                 let found_y = (cell_y as isize + j) as usize;
 
                 let grad = local_map
-                    .gradient_around_cell(found_x, found_y, 10)
+                    .gradient_around_cell(found_x, found_y, 3)
                     .or_else(|| {
-                        global_map.and_then(|gmap| gmap.gradient_around_cell(found_x, found_y, 10))
+                        global_map.and_then(|gmap| gmap.gradient_around_cell(found_x, found_y, 3))
                     });
 
                 if let Some(grad) = grad {
