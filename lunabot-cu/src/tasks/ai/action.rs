@@ -16,9 +16,13 @@ static PATHFINDING_GOAL: [f32; 2] = [1.490662524, 1.22606992];
 pub enum LunabotAction {
     Yield,
     SetSteering(Steering),
+    /// sets steering to last known value rx'd from lunabase
     SetLastSteering,
+    /// sets lift to last known value rx'd from lunabase
     SetLastLift,
+    /// sets bucket to last known value rx'd from lunabase
     SetLastBucket,
+
     SetLift(i8),
     SetBucket(i8),
     // actions for checking the lunabot stage (dig, dump, manual, soft stop, navigate)
@@ -42,6 +46,9 @@ pub enum LunabotAction {
     FollowPath,
     SetStage(LunabotStage),
     GetUnstuck,
+
+    /// Cancels long running jobs like pathfinding and path following
+    CancelJobs,
 }
 
 impl LunabotAction {
@@ -235,6 +242,15 @@ impl LunabotAction {
                 blackboard.current_mission = *stage;
                 blackboard.path_follower = None;
                 LUNABOT_STAGE.store(*stage);
+                Success
+            }
+            LunabotAction::CancelJobs => {
+                if let Some(ref mut pathfinder) = blackboard.path_finder {
+                    pathfinder.cancel();
+                }
+                if let Some(ref mut pathfollower) = blackboard.path_follower {
+                    pathfollower.cancel();
+                }
                 Success
             }
         };

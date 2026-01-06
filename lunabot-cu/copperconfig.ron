@@ -86,9 +86,9 @@
                 "bilateral_filter_kernel_radius": 5,
                 "bilateral_filter_sigma_spatial":0.5,
                 "bilateral_filter_sigma_range": 0.1,
-                "gradient_filter_kernel_radius": 4,
-                "gaussian_blur_kernel_radius": 4,
-                "gaussian_sigma_spatial": 0.5,
+                "gradient_filter_kernel_radius": 2,
+                "gaussian_blur_kernel_radius": 3,
+                "gaussian_sigma_spatial": 0.2,
                 "outlier_filter_kernel_radius": 7,
                 // outlier removal works best when the clear affected cells is enabled
                 // this is because it allows the outlier cells to be re mapped on the next frame

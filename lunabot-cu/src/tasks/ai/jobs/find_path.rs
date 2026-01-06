@@ -3,7 +3,7 @@ use rerun::Vec2D;
 use tasker::tokio::sync::{mpsc, watch};
 
 use crate::{
-    pathfinding::rrt::find_path,
+    pathfinding::field_dstar::find_path_dstar,
     rerun_viz::RECORDER,
     tasks::{OccupancyGrid, ai::jobs::Job, realsense_occupancy_grid::GLOBAL_MAP},
 };
@@ -31,23 +31,25 @@ pub fn find_path_job(
                 let global_map_guard = if let Some(global_map) = GLOBAL_MAP.get() {
                     global_map.read().ok()
                 } else {
-                    None
+                    return None;
                 };
 
-                find_path(
+                let Some(global_map_guard) = global_map_guard else {
+                    return None;
+                };
+
+                find_path_dstar(
                     &latest_local_map,
-                    global_map_guard.as_deref(),
+                    &*global_map_guard,
                     [start.x, start.y],
                     [end.x, end.y],
-                    0.3,                                     // max_acceptable_gradient
-                    latest_local_map.layout.cell_size * 2.0, // extend_length
-                    3000,                                    // FIXME: tune this parameter
+                    0.3, // max_acceptable_gradient
                 )
             })
             .await
             .unwrap_or(None);
 
-            if let Some(path) = path_result {
+            let result = if let Some(path) = path_result {
                 if let Some(rec) = RECORDER.get() {
                     let _ = rec.recorder.log(
                         "ai/calculated_path",
@@ -69,7 +71,8 @@ pub fn find_path_job(
             } else {
                 let _ = status_tx.send(bonsai_bt::Status::Failure);
                 bonsai_bt::Status::Failure
-            }
+            };
+            result
         },
         status_rx,
         output_rx,

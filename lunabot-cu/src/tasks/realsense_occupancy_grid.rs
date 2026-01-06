@@ -4,6 +4,7 @@ use cu29::prelude::*;
 use nalgebra::Isometry3;
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use std::fmt::Debug;
+use std::io;
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use wgsl_pcl::pipelines::depth_to_obstacle::{ClearAffectedCellsOptions, ObstacleExpanderOptions};
 use wgsl_pcl::pipelines::filters::*;
@@ -85,36 +86,41 @@ impl OccupancyGrid {
     }
 
     /// Get gradient value at cell coordinates
-    pub fn gradient_at(&self, cell_x: usize, cell_y: usize) -> Option<f32> {
+    /// Returns None if a cell has not yet been mapped
+    /// Returns Err if a cell is out of bounds
+    pub fn gradient_at(&self, cell_x: usize, cell_y: usize) -> Result<Option<f32>, std::io::Error> {
         let cells_x = self.cells_x();
         let cells_y = self.cells_y();
         if cell_x >= cells_x || cell_y >= cells_y {
-            return None;
+            return Err(io::Error::other("cell out of bounds"));
         }
         let index = cell_x + cell_y * cells_x;
-        self.gradient_map
+        Ok(self
+            .gradient_map
             .get(index)
             .copied()
-            .filter(|&val| val != f32::MIN)
+            .filter(|&val| val != f32::MIN))
     }
 
     /// Get gradient value at world coordinates
     /// uses origin to convert world coordinates to map-local coordinates
-    pub fn gradient_closest_to(&self, x: f32, y: f32) -> Option<f32> {
+    /// returns None if x and y are not in map bounds or if the gradient at x,y is unknown
+    pub fn gradient_closest_to(&self, x: f32, y: f32) -> Result<Option<f32>, std::io::Error> {
         let (cell_x, cell_y) = self.world_to_cell(x, y)?;
         self.gradient_at(cell_x, cell_y)
     }
 
     /// returns average gradient around cell
-    /// returns None if central cell is invalid
+    /// returns Err if central cell is out of bounds
+    /// returns Ok(none) if none of the cells in the kernel have been mapped
     pub fn gradient_around_cell(
         &self,
         cell_x: usize,
         cell_y: usize,
         kernel_size: usize,
-    ) -> Option<f32> {
-        if self.gradient_at(cell_x, cell_y).is_none() {
-            return None;
+    ) -> Result<Option<f32>, io::Error> {
+        if self.gradient_at(cell_x, cell_y)?.is_none() {
+            return Ok(None);
         }
         let mut gradients = Vec::new();
         let half_kernel = kernel_size as isize / 2;
@@ -125,24 +131,29 @@ impl OccupancyGrid {
                 if nx < 0 || ny < 0 {
                     continue;
                 }
-                if let Some(grad) = self.gradient_at(nx as usize, ny as usize) {
+                if let Ok(Some(grad)) = self.gradient_at(nx as usize, ny as usize) {
                     gradients.push(grad);
                 }
             }
         }
         if gradients.is_empty() {
-            None
+            Ok(None)
         } else {
-            Some(gradients.iter().sum::<f32>() / gradients.len() as f32)
+            Ok(Some(gradients.iter().sum::<f32>() / gradients.len() as f32))
         }
     }
 
     /// returns average gradient around world coordinate
-    /// returns None if central cell is invalid
-    pub fn gradient_around(&self, x: f32, y: f32, kernel_size: usize) -> Option<f32> {
+    /// returns none if no cells in the kernel have been mapped yet
+    pub fn gradient_around(
+        &self,
+        x: f32,
+        y: f32,
+        kernel_size: usize,
+    ) -> Result<Option<f32>, io::Error> {
         let (cell_x, cell_y) = self.world_to_cell(x, y)?;
-        if self.gradient_at(cell_x, cell_y).is_none() {
-            return None;
+        if self.gradient_at(cell_x, cell_y)?.is_none() {
+            return Ok(None);
         }
         let mut gradients = Vec::new();
         let half_kernel = kernel_size as isize / 2;
@@ -153,22 +164,24 @@ impl OccupancyGrid {
                 if nx < 0 || ny < 0 {
                     continue;
                 }
-                if let Some(grad) = self.gradient_at(nx as usize, ny as usize) {
+                if let Ok(Some(grad)) = self.gradient_at(nx as usize, ny as usize) {
                     gradients.push(grad);
                 }
             }
         }
+
         if gradients.is_empty() {
-            None
+            return Ok(None);
         } else {
-            Some(gradients.iter().sum::<f32>() / gradients.len() as f32)
+            return Ok(Some(gradients.iter().sum::<f32>() / gradients.len() as f32));
         }
     }
 
     /// Convert world coordinates to cell indices
     /// cell 0,0 is at (min_x, min_y)
     /// The origin offset is applied to transform world coordinates into the map's local coordinate system
-    pub fn world_to_cell(&self, x: f32, y: f32) -> Option<(usize, usize)> {
+    /// Returns Err if cell out of bounds
+    pub fn world_to_cell(&self, x: f32, y: f32) -> Result<(usize, usize), std::io::Error> {
         // Convert world coordinates to map-local coordinates by subtracting the origin
         let local_x = x - self.origin.0;
         let local_y = y - self.origin.1;
@@ -178,24 +191,25 @@ impl OccupancyGrid {
             || local_y < self.layout.min_y
             || local_y >= self.layout.max_y
         {
-            return None;
+            return Err(io::Error::other("cell out of bounds"));
         }
         let cell_x = ((local_x - self.layout.min_x) / self.layout.cell_size).floor() as usize;
         let cell_y = ((local_y - self.layout.min_y) / self.layout.cell_size).floor() as usize;
-        Some((cell_x, cell_y))
+        Ok((cell_x, cell_y))
     }
 
     /// Convert cell indices to world coordinates (returns cell center)
     /// The origin offset is applied to transform map-local coordinates into world coordinates
-    pub fn cell_to_world(&self, cell_x: usize, cell_y: usize) -> Option<(f32, f32)> {
+    /// returns Err if cell out of bounds
+    pub fn cell_to_world(&self, cell_x: usize, cell_y: usize) -> Result<(f32, f32), io::Error> {
         let cells_x = self.cells_x();
         let cells_y = self.cells_y();
         if cell_x >= cells_x || cell_y >= cells_y {
-            return None;
+            return Err(io::Error::other("cell out of bounds"));
         }
         let local_x = self.layout.min_x + (cell_x as f32 + 0.5) * self.layout.cell_size;
         let local_y = self.layout.min_y + (cell_y as f32 + 0.5) * self.layout.cell_size;
-        Some((local_x + self.origin.0, local_y + self.origin.1))
+        Ok((local_x + self.origin.0, local_y + self.origin.1))
     }
 }
 
@@ -580,6 +594,7 @@ impl CuTask for OccupancyGridTask {
                             raw_height_map,
                             raw_gradient_map,
                             blur_filtered_height_map,
+                            request.origin,
                             logger,
                         );
                     }
@@ -615,10 +630,10 @@ impl OccupancyGridTask {
         for x in 0..local.cells_x() {
             for y in 0..local.cells_y() {
                 // cell_to_world now returns world coordinates (already includes local map's origin)
-                let Some(world_coords) = local.cell_to_world(x, y) else {
+                let Ok(world_coords) = local.cell_to_world(x, y) else {
                     continue;
                 };
-                let Some(gradient) = local.gradient_at(x, y) else {
+                let Ok(Some(gradient)) = local.gradient_at(x, y) else {
                     continue;
                 };
 
@@ -628,8 +643,7 @@ impl OccupancyGridTask {
                 {
                     continue;
                 }
-                let Some((gx, gy)) = global_map.world_to_cell(world_coords.0, world_coords.1)
-                else {
+                let Ok((gx, gy)) = global_map.world_to_cell(world_coords.0, world_coords.1) else {
                     continue;
                 };
                 global_map.set_gradient_at(gx, gy, gradient)?;
@@ -647,8 +661,7 @@ impl OccupancyGridTask {
                         let gradient = global_map.gradient_map[idx];
 
                         if gradient != f32::MIN {
-                            if let Some((world_x, world_y)) =
-                                global_map.cell_to_world(cell_x, cell_y)
+                            if let Ok((world_x, world_y)) = global_map.cell_to_world(cell_x, cell_y)
                             {
                                 global_obstacle_map_points.push([world_x, world_y]);
 
@@ -679,6 +692,7 @@ fn log_map(
     raw_height_map: Vec<f32>,
     raw_gradient_map: Vec<f32>,
     blur_filtered_height_map: Vec<f32>,
+    origin: (f32, f32),
     logger: &crate::rerun_viz::RecorderData,
 ) {
     let cells_x = layout.cells_x();
@@ -694,8 +708,9 @@ fn log_map(
                 let gradient = local_obstacle_map[idx];
 
                 if gradient != f32::MIN {
-                    let x = layout.min_x + (cell_x as f32 + 0.5) * layout.cell_size;
-                    let y = layout.min_y + (cell_y as f32 + 0.5) * layout.cell_size;
+                    let x = layout.min_x + (cell_x as f32 + 0.5) * layout.cell_size + origin.0;
+                    let y = layout.min_y + (cell_y as f32 + 0.5) * layout.cell_size + origin.1;
+
                     local_obstacle_points.push([x, y]);
 
                     let normalized = ((gradient + 1.0) / 4.0).clamp(0.0, 1.0);
@@ -725,8 +740,8 @@ fn log_map(
                 if z == f32::MIN {
                     continue;
                 }
-                let x = layout.min_x + (cell_x as f32 + 0.5) * layout.cell_size;
-                let y = layout.min_y + (cell_y as f32 + 0.5) * layout.cell_size;
+                let x = layout.min_x + (cell_x as f32 + 0.5) * layout.cell_size + origin.0;
+                let y = layout.min_y + (cell_y as f32 + 0.5) * layout.cell_size + origin.1;
                 raw_height_points.push([x, y, z]);
                 let normalized = ((z + 1.0) / 4.0).clamp(0.0, 1.0);
                 raw_height_colors.push([
@@ -753,8 +768,8 @@ fn log_map(
                 if gradient == f32::MIN {
                     continue;
                 }
-                let x = layout.min_x + (cell_x as f32 + 0.5) * layout.cell_size;
-                let y = layout.min_y + (cell_y as f32 + 0.5) * layout.cell_size;
+                let x = layout.min_x + (cell_x as f32 + 0.5) * layout.cell_size + origin.0;
+                let y = layout.min_y + (cell_y as f32 + 0.5) * layout.cell_size + origin.1;
                 // Use gradient value as z for visualization
                 gradient_points.push([x, y, gradient * 2.0]);
                 let normalized = (gradient * 2.0).clamp(0.0, 1.0);
@@ -782,8 +797,8 @@ fn log_map(
                 if z == f32::MIN {
                     continue;
                 }
-                let x = layout.min_x + (cell_x as f32 + 0.5) * layout.cell_size;
-                let y = layout.min_y + (cell_y as f32 + 0.5) * layout.cell_size;
+                let x = layout.min_x + (cell_x as f32 + 0.5) * layout.cell_size + origin.0;
+                let y = layout.min_y + (cell_y as f32 + 0.5) * layout.cell_size + origin.1;
                 blur_height_points.push([x, y, z]);
                 let normalized = ((z + 1.0) / 4.0).clamp(0.0, 1.0);
                 blur_height_colors.push([
