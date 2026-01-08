@@ -10,6 +10,9 @@ use crate::{
 
 /// IMPORTANT: this job should not take more than a few ms, because since it has access to the global map's read guard,
 /// it could cause delays in other tasks that need the global map if it takes too long.
+/// Uses D* to navigate from start to end
+/// prioritizes the local map as the source of ultimate truth, but falls back to the global map if a cell is unknown locally
+/// Eventually may need to take in multiple local maps from different realsense devices
 pub fn find_path_job(
     latest_local_map: OccupancyGrid,
     start: Vector2<f32>,

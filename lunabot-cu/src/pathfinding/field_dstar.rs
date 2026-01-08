@@ -47,6 +47,8 @@ impl PartialOrd for Node {
 
 /// If goal is an obstacle, it will not pathfind to it
 /// If goal is out of the bounds of the global map, it will fail to find a path
+/// prioritizes the local map as the source of ultimate truth, but falls back to the global map if a cell is unknown locally
+/// Eventually may need to take in multiple local maps from different realsense devices
 pub fn find_path_dstar(
     local_map: &OccupancyGrid,
     global_map: &OccupancyGrid,

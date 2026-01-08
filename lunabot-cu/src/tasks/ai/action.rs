@@ -10,7 +10,7 @@ use crate::{
         jobs::{find_path_job, follow_path_job},
     },
 };
-static PATHFINDING_GOAL: [f32; 2] = [1.490662524, 1.22606992];
+static PATHFINDING_GOAL: [f32; 2] = [2.490662524, 0.72606992];
 
 #[derive(Clone, Debug, Copy)]
 pub enum LunabotAction {
@@ -141,6 +141,7 @@ impl LunabotAction {
                         Vector2::new(current_translation.x as f32, current_translation.y as f32);
 
                     // Get destination from blackboard, or use default PATHFINDING_GOAL
+                    // PATHFINDING_GOAL is just for testing for now.
                     let end = if let Some((x, y)) = blackboard.navigate_destination {
                         Vector2::new(x, y)
                     } else {
@@ -161,12 +162,12 @@ impl LunabotAction {
                                 blackboard.path_finder = None;
                                 Success
                             } else {
-                                eprintln!("Path finder job succeeded but produced no output");
+                                eprintln!("Path finder job succeeded but produced no output.");
                                 blackboard.path_finder = None;
                                 Failure
                             }
                         } else if status == Failure {
-                            eprintln!("Path finder job failed");
+                            eprintln!("Path finder job failed.");
                             blackboard.path_finder = None;
                             Failure
                         } else {
@@ -175,7 +176,7 @@ impl LunabotAction {
                         }
                     } else {
                         // Start a new path finder job
-                        println!("Starting path finder job from {:?} to {:?}", start, end);
+                        println!("Starting path finder job from {:?} to {:?}.", start, end);
                         let mut job = find_path_job(local_map.clone(), start, end);
                         let initial_status = job.get_status();
                         blackboard.path_finder = Some(job);
