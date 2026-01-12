@@ -3,9 +3,9 @@
 ///! ## How sensors are used:
 ///! AprilTags -> global pose reference (absolute position & orientation)
 ///!
-///! ICP -> local pose tracking (relative pose, drift-prone)
+///! ICP (5hz) -> local pose tracking (less drift prone so long as you stay in one room and arent moving down long featureless corridors)
 ///!
-///! Intel T265 -> short-term motion (velocity from pose deltas)
+///! Intel T265 (200hz) -> short-term motion (velocity from pose deltas more drift prone than ICP)
 ///!
 ///! IMU -> currently logged, not yet fused (since the l2's imus are garbage)
 ///!
