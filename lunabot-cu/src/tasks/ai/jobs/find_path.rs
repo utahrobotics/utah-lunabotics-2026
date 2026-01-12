@@ -17,6 +17,7 @@ pub fn find_path_job(
     latest_local_map: OccupancyGrid,
     start: Vector2<f32>,
     end: Vector2<f32>,
+    max_acceptable_gradient: f32,
 ) -> Job<Vec<Vector2<f32>>> {
     let (status_tx, status_rx) = watch::channel(bonsai_bt::Status::Running);
     let (output_tx, output_rx) = mpsc::channel(5);
@@ -46,7 +47,7 @@ pub fn find_path_job(
                     &*global_map_guard,
                     [start.x, start.y],
                     [end.x, end.y],
-                    0.3, // max_acceptable_gradient
+                    max_acceptable_gradient,
                 )
             })
             .await
