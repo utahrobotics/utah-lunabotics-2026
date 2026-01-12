@@ -52,7 +52,7 @@
             ),
             run_in_sim: false
         ),
-
+        // subscribes to 6dof messages from the intel T265 camera
         (
             id: "t265_subscriber",
             type: "crate::tasks::sources::T265Subscriber",
@@ -68,8 +68,7 @@
             ),
             run_in_sim: false
         ),
-        // takes depth frames and imu information from the realsense subscriber and uses obstacle detection to create an occupancy grid
-        // the size of the arena
+        // takes depth frames and imu information from the realsense subscriber and uses a compute shader pipeline to estimate a local and global map of obstacles
         (
             id:"occupancy_grid_pipeline",
             type: "crate::tasks::OccupancyGridTask",
@@ -216,7 +215,8 @@
         (src:"detection_handler",             dst: "localizer",              msg:"Vec<crate::tasks::AprilTagMeasurement>"),
         (src:"t265_subscriber",               dst:"localizer",               msg:"crate::tasks::sources::T265Msg"),
     ],
-    
+
+    // comms to lunabase software
     bridges: [
         (
             id: "lunabase_bridge",
@@ -286,6 +286,7 @@
     // monitor:(type:"cu_consolemon::CuConsoleMon"),
     monitor: (type:"simple_monitor::SimpleMonitor"),
     logging:(
+    // if true, each output payload of each will be logged unless a task opts out
         enable_task_logging: true,
         section_size_mib:100,
     ),
