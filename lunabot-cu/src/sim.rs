@@ -4,10 +4,10 @@ pub mod rerun_viz;
 
 pub mod bridges;
 pub mod pathfinding;
+pub mod robot_state;
 pub mod simple_monitor;
 pub mod tasks;
 pub mod utils;
-pub mod robot_state;
 
 use common::FromLunabot;
 use crossbeam::atomic::AtomicCell;
@@ -18,11 +18,11 @@ use mujoco_rs::cpp_viewer::MjViewerCpp;
 use mujoco_rs::prelude::*;
 use nalgebra::{Isometry3, Quaternion, Translation3, UnitQuaternion};
 use nalgebra::{SMatrix, SVector};
+use robot_state::RobotState;
 use simple_motion::{ChainBuilder, NodeSerde};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::{OnceLock, RwLock};
-use robot_state::RobotState;
 use wgsl_pcl::wgsl_setup::{init_gpu_blocking, is_gpu_initialized};
 
 use crate::rerun_viz::{RECORDER, ROBOT_STRUCTURE};
@@ -243,101 +243,82 @@ fn main() {
     if is_gpu_initialized() == false {
         init_gpu_blocking().expect("failed to init gpu");
     }
-    std::thread::Builder::new()
-        .stack_size(20 * 1000000) // this size will depend on how big the copper list is
-        .spawn(move || {
-            let (model, mut viewer, data) = set_up_mujoco();
 
-            // Setup logging path for resimulation
-            let logger_path = "logs/lunabotsim.copper";
-            if let Some(parent) = Path::new(logger_path).parent() {
-                if !parent.exists() {
-                    std::fs::create_dir_all(parent).expect("Failed to create logs directory");
-                }
-            }
-            // Create mock robot clock for simulation
-            let (robot_clock, robot_clock_mock) = RobotClock::mock();
+    let (model, mut viewer, data) = set_up_mujoco();
 
-            let copper_ctx = basic_copper_setup(
-                &PathBuf::from(&logger_path),
-                PREALLOCATED_STORAGE_SIZE,
-                true,
-                Some(robot_clock.clone()),
-            )
-            .expect("Failed to setup logger.");
+    // Setup logging path for resimulation
+    let logger_path = "logs/lunabotsim.copper";
+    if let Some(parent) = Path::new(logger_path).parent() {
+        if !parent.exists() {
+            std::fs::create_dir_all(parent).expect("Failed to create logs directory");
+        }
+    }
+    // Create mock robot clock for simulation
+    let (robot_clock, robot_clock_mock) = RobotClock::mock();
 
-            rerun_viz::init_rerun(rerun_viz::RerunViz::Viz(rerun_viz::Level::All)).expect(
-                "Failed to initialize Rerun. Please check that the rerun binary is in your path.",
-            );
+    let copper_ctx = basic_copper_setup(
+        &PathBuf::from(&logger_path),
+        PREALLOCATED_STORAGE_SIZE,
+        true,
+        Some(robot_clock.clone()),
+    )
+    .expect("Failed to setup logger.");
 
-            let robot_chain = NodeSerde::from_reader(
-                std::fs::File::open("../robot-layout/lunabot.ron")
-                    .expect("Failed to read robot chain"),
-            )
-            .expect("Failed to parse robot chain");
+    rerun_viz::init_rerun(rerun_viz::RerunViz::Viz(rerun_viz::Level::All))
+        .expect("Failed to initialize Rerun. Please check that the rerun binary is in your path.");
 
-            let robot_chain = ChainBuilder::from(robot_chain).finish_static();
-            let _ = ROBOT_STATE.set(RobotState {
-                kinematic_root: robot_chain,
-                kalman_state: Arc::new(AtomicCell::new(Some(SVector::<f64, 12>::from_element(
-                    0.0,
-                )))),
-                kalman_variances: Arc::new(AtomicCell::new(Some(
-                    SMatrix::<f64, 12, 12>::from_diagonal_element(1E64),
-                ))),
-            });
-            let mut application = LunabotApplicationBuilder::new()
-                .with_context(&copper_ctx)
-                .with_sim_callback(&mut default_callback)
-                .build()
-                .expect("Failed to create application.");
+    let robot_chain = NodeSerde::from_reader(
+        std::fs::File::open("../robot-layout/lunabot.ron").expect("Failed to read robot chain"),
+    )
+    .expect("Failed to parse robot chain");
 
+    let robot_chain = ChainBuilder::from(robot_chain).finish_static();
+    let _ = ROBOT_STATE.set(RobotState {
+        kinematic_root: robot_chain,
+        kalman_state: Arc::new(AtomicCell::new(Some(SVector::<f64, 12>::from_element(0.0)))),
+        kalman_variances: Arc::new(AtomicCell::new(Some(
+            SMatrix::<f64, 12, 12>::from_diagonal_element(1E64),
+        ))),
+    });
+    let mut application = LunabotApplicationBuilder::new()
+        .with_context(&copper_ctx)
+        .with_sim_callback(&mut default_callback)
+        .build()
+        .expect("Failed to create application.");
+
+    let mut sim_cb = |step: default::SimStep| -> SimOverride { sim_callback(step, data) };
+
+    application
+        .start_all_tasks(&mut sim_cb)
+        .expect("Failed to start all tasks.");
+
+    let target_duration = std::time::Duration::from_nanos(1_000_000_000 / TARGET_HZ as u64);
+    let mut last_time = std::time::Instant::now();
+    let start = std::time::Instant::now();
+    let mut counter = 0;
+    while viewer.running() {
+        counter += 1;
+        robot_clock_mock.set_value(start.elapsed().as_nanos() as u64);
+        {
             let mut sim_cb = |step: default::SimStep| -> SimOverride { sim_callback(step, data) };
 
             application
-                .start_all_tasks(&mut sim_cb)
-                .expect("Failed to start all tasks.");
-
-            let target_duration = std::time::Duration::from_nanos(1_000_000_000 / TARGET_HZ as u64);
-            let mut last_time = std::time::Instant::now();
-            let start = std::time::Instant::now();
-            let mut counter = 0;
-            while viewer.running() {
-                counter += 1;
-                robot_clock_mock.set_value(start.elapsed().as_nanos() as u64);
-                {
-                    let mut sim_cb =
-                        |step: default::SimStep| -> SimOverride { sim_callback(step, data) };
-
-                    application
-                        .run_one_iteration(&mut sim_cb)
-                        .expect("failed to run copper list iteration");
-                }
-                let elapsed = last_time.elapsed();
-                data.step();
-                if elapsed < target_duration {
-                    std::thread::sleep(target_duration - elapsed);
-                }
-                // we don't need to sync and render at TARGET_HZ, only step the simulation
-                if counter == 20 {
-                    viewer.sync();
-                    viewer.render(true);
-                    counter = 0;
-                }
-                last_time = std::time::Instant::now();
-            }
-        })
-        .expect("failed to spawn main thread")
-        .join()
-        .unwrap_or_else(|e| {
-            if let Some(panic_msg) = e.downcast_ref::<&str>() {
-                panic!("Thread panicked with message: {}", panic_msg);
-            } else if let Some(panic_msg) = e.downcast_ref::<String>() {
-                panic!("Thread panicked with message: {}", panic_msg);
-            } else {
-                panic!("Thread panicked with unknown error: {:?}", e);
-            }
-        });
+                .run_one_iteration(&mut sim_cb)
+                .expect("failed to run copper list iteration");
+        }
+        let elapsed = last_time.elapsed();
+        data.step();
+        if elapsed < target_duration {
+            std::thread::sleep(target_duration - elapsed);
+        }
+        // we don't need to sync and render at TARGET_HZ, only step the simulation
+        if counter == 20 {
+            viewer.sync();
+            viewer.render(true);
+            counter = 0;
+        }
+        last_time = std::time::Instant::now();
+    }
 
     debug!("End of log replay.");
 }
@@ -360,6 +341,7 @@ fn set_up_mujoco() -> (
             "Arena not specified in arguments. Valid args: ucf, artemis. (set with SIM_ARENA=ucf make sim)"
         );
     }));
+
     let timestep = 1.0 / (TARGET_HZ as f64);
     // speed up the simulation by a little
     // timestep *= 1.6;
