@@ -32,13 +32,6 @@ theme_override_constants/separation = 10
 layout_mode = 2
 text = "IP Address:"
 
-[node name="VeloLabel" type="Label" parent="VBoxContainer/TopPanel/Label"]
-layout_mode = 0
-offset_right = 183.0
-offset_bottom = 52.0
-text = "Velocity: "
-vertical_alignment = 2
-
 [node name="IPInput" type="LineEdit" parent="VBoxContainer/TopPanel"]
 custom_minimum_size = Vector2(150, 0)
 layout_mode = 2

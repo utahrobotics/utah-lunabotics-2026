@@ -15,7 +15,7 @@ extends Control
 @onready var location_label: Label = $VBoxContainer/TopPanel/Spacer/location_label
 @onready var orientation_label: Label = $OrientationLabel
 @onready var PitchAndRollGUI: Control = $VBoxContainer/CenterContainer/UIAttitude
-@onready var velocity_label: Label = $VBoxContainer/TopPanel/Label/VeloLabel
+
 var command_recorder: CommandRecorder
 
 #Speed Slider
@@ -100,14 +100,7 @@ func _process(delta: float) -> void:
 	var orientation = connection.get_orientation()
 	orientation_label.text = "orientation: [%.2f, %.2f, %.2f, %.2f]" % [orientation[0], orientation[1], orientation[2], orientation[3]
 ]
- # velocity + acceleration labels
-	var velocity = connection.get_velocity()
-	var speed = sqrt(pow(velocity[0],2) + pow(velocity[1],2) + pow(velocity[2],2))
-	
-	#velocity_label.text = "velocity: [%.2f, %.2f, %.2f]" % [velocity[0], velocity[1], velocity[2]]
-	velocity_label.text = "Velocity: " + str(speed)
-	
-	
+ 
 	# Update errored tasks
 	var errored_tasks: Dictionary = connection.get_errored_tasks()
 	if errored_tasks.is_empty():

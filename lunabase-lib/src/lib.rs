@@ -33,8 +33,8 @@ struct LunabaseConnection {
     current_weight: f64,
     global_position: Arc<Mutex<[f32; 3]>>,
     orientation: Arc<Mutex<[f32; 4]>>,
-    velocity_base: Arc<Mutex<[f32;3]>>,
-    acceleration_base: Arc<Mutex<[f32;3]>>,
+   // velocity_base: Arc<Mutex<[f32;3]>>,
+   // acceleration_base: Arc<Mutex<[f32;3]>>,
 }
 
 #[godot_api]
@@ -51,8 +51,8 @@ impl INode for LunabaseConnection {
             current_weight: 1250.0,
             global_position: Arc::new(Mutex::new([0.0; 3])),
             orientation: Arc::new(Mutex::new([0.0; 4])),
-            velocity_base: Arc::new(Mutex::new([0.0;3])),
-            acceleration_base: Arc::new(Mutex::new([0.0;3])),
+           // velocity_base: Arc::new(Mutex::new([0.0;3])),
+            // acceleration_base: Arc::new(Mutex::new([0.0;3])),
 
         }
     }
@@ -111,8 +111,8 @@ impl LunabaseConnection {
                     let errored_tasks = self.errored_tasks.clone();
                     let global_position = self.global_position.clone();
                     let orientation = self.orientation.clone();
-                    let velocity_base = self.velocity_base.clone();
-                    let acceleration_base = self.acceleration_base.clone();
+                   // let velocity_base = self.velocity_base.clone();
+                   //let acceleration_base = self.acceleration_base.clone();
                     let recv_thread = std::thread::spawn(move || {
                         loop {
                             match cleint_c.recv() {
@@ -126,15 +126,15 @@ impl LunabaseConnection {
                                         }
                                     }
                                     FromLunabot::ArmAngles { .. } => {}
-                                    FromLunabot::RobotMotion {velocity,acceleration} => {
-                                       if let Ok(mut velo) = velocity_base.lock(){
-                                        *velo = velocity;
-                                       }
-                                       if let Ok(mut acel) = acceleration_base.lock(){
-                                        *acel = acceleration;
-                                       }
+                                    //FromLunabot::RobotMotion {velocity,acceleration} => {
+                                    //    if let Ok(mut velo) = velocity_base.lock(){
+                                    //     *velo = velocity;
+                                    //    }
+                                    //    if let Ok(mut acel) = acceleration_base.lock(){
+                                    //     *acel = acceleration;
+                                    //    }
 
-                                    }
+                                    // }
                                     FromLunabot::ErroredTasks(hash_map) => {
                                         if let Ok(mut guard) = errored_tasks.lock() {
                                             *guard = hash_map;
@@ -336,27 +336,27 @@ impl LunabaseConnection {
         values_sent
        
     }
-    #[func]
-    fn get_velocity(&mut self) -> PackedFloat32Array {
-        let mut values_sent = PackedFloat32Array::new();
-        if let Ok(velo) = self.velocity_base.lock() {
-            values_sent.clear();
-            values_sent.push(velo[0]);
-            values_sent.push(velo[1]);
-            values_sent.push(velo[2]);
-        }
-        values_sent
-    }
+    // #[func]
+    // fn get_velocity(&mut self) -> PackedFloat32Array {
+    //     let mut values_sent = PackedFloat32Array::new();
+    //     if let Ok(velo) = self.velocity_base.lock() {
+    //         values_sent.clear();
+    //         values_sent.push(velo[0]);
+    //         values_sent.push(velo[1]);
+    //         values_sent.push(velo[2]);
+    //     }
+    //     values_sent
+    // }
 
-    #[func]
-    fn get_acceleration(&mut self) -> PackedFloat32Array{
-       let mut values_sent = PackedFloat32Array::new();
-       if let Ok(accel ) = self.acceleration_base.lock(){
-         values_sent.clear();
-         values_sent.push(accel[0]);
-         values_sent.push(accel[1]);
-         values_sent.push(accel[2]);
-       }
-       values_sent
-    }
+    // #[func]
+    // fn get_acceleration(&mut self) -> PackedFloat32Array{
+    //    let mut values_sent = PackedFloat32Array::new();
+    //    if let Ok(accel ) = self.acceleration_base.lock(){
+    //      values_sent.clear();
+    //      values_sent.push(accel[0]);
+    //      values_sent.push(accel[1]);
+    //      values_sent.push(accel[2]);
+    //    }
+    //    values_sent
+    // }
 }

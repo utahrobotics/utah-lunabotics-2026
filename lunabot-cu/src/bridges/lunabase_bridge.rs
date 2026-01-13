@@ -164,26 +164,26 @@ impl CuBridge for Lunabase {
                 }) {
                     eprintln!("cannot send isometries to lunabase: {}", e);
                 }
-                let velo = ROBOT_STATE.get().unwrap().get_velocity();
+                // let velo = ROBOT_STATE.get().unwrap().get_velocity();
 
-                let accel = ROBOT_STATE.get().unwrap().get_acceleration();
+                // let accel = ROBOT_STATE.get().unwrap().get_acceleration();
 
-                let velof32 = [
-                    velo[0] as f32, 
-                    velo[1] as f32, 
-                    velo[2] as f32
-                ];
-                let accelf32 = [
-                    accel[0] as f32,
-                    accel[1] as f32,
-                    accel[2] as f32,
-                ];
-                if let Err(e) = self.connection.try_send(FromLunabot::RobotMotion { 
-                    velocity: (velof32),
-                    acceleration: (accelf32)
-                 }){
-                    eprintln!("cannot send motion to lunabase{}" , e);
-                 }
+                // let velof32 = [
+                //     velo[0] as f32, 
+                //     velo[1] as f32, 
+                //     velo[2] as f32
+                // ];
+                // let accelf32 = [
+                //     accel[0] as f32,
+                //     accel[1] as f32,
+                //     accel[2] as f32,
+                // ];
+                // if let Err(e) = self.connection.try_send(FromLunabot::RobotMotion { 
+                //     velocity: (velof32),
+                //     acceleration: (accelf32)
+                //  }){
+                //     eprintln!("cannot send motion to lunabase{}" , e);
+                //  }
 
 
             }
