@@ -2,32 +2,35 @@ extends Control
 
 @onready var connection: Node = $LunabaseConnection
 @onready var controller: LunabaseHumanController = $LunabaseHumanController
-@onready var ip_input: LineEdit = $VBoxContainer/TopPanel/IPInput
-@onready var connect_button: Button = $VBoxContainer/TopPanel/ConnectButton
-@onready var packet_label: Label = $VBoxContainer/TopPanel/PacketLabel
-@onready var stage_label: Label = $VBoxContainer/TopPanel/StageLabel
-@onready var soft_stop_button: Button = $VBoxContainer/BottomPanel/SoftStopButton
-@onready var manual_button: Button = $VBoxContainer/BottomPanel/ManualButton
-@onready var autonomous_button: Button = $VBoxContainer/BottomPanel/AutonomousButton
-@onready var errored_tasks_label: Label = $VBoxContainer/CenterContainer/HBoxContainer/ErroredTasksPanel/MarginContainer/ScrollContainer/VBox/ErroredTasksLabel
-@onready var speed_label: Label = $VBoxContainer/TopPanel/SpeedLabel
-@onready var speed_slider: HSlider = $SpeedMultiplierSlider
-@onready var location_label: Label = $VBoxContainer/TopPanel/Spacer/location_label
-@onready var orientation_label: Label = $OrientationLabel
-@onready var PitchAndRollGUI: Control = $VBoxContainer/CenterContainer/UIAttitude
+
+# Top Bar
+@onready var ip_input: LineEdit = $MarginContainer/VBoxContainer/TopBar/MarginContainer/HBoxContainer/ConnectionGroup/IPInput
+@onready var connect_button: Button = $MarginContainer/VBoxContainer/TopBar/MarginContainer/HBoxContainer/ConnectionGroup/ConnectButton
+@onready var packet_label: Label = $MarginContainer/VBoxContainer/TopBar/MarginContainer/HBoxContainer/StatusGroup/PacketLabel
+@onready var stage_label: Label = $MarginContainer/VBoxContainer/TopBar/MarginContainer/HBoxContainer/StatusGroup/StageLabel
+@onready var speed_label: Label = $MarginContainer/VBoxContainer/TopBar/MarginContainer/HBoxContainer/StatusGroup/SpeedLabel
+
+# Center Panel
+@onready var PitchAndRollGUI: Control = $MarginContainer/VBoxContainer/MainContent/CenterPanel/AttitudeContainer/UIAttitude
+@onready var orientation_label: Label = $MarginContainer/VBoxContainer/MainContent/CenterPanel/OrientationPanel/MarginContainer/OrientationLabel
+@onready var speed_slider: HSlider = $MarginContainer/VBoxContainer/MainContent/CenterPanel/SpeedControlPanel/MarginContainer/VBoxContainer/SpeedMultiplierSlider
+
+# Right Panel
+@onready var errored_tasks_label: Label = $MarginContainer/VBoxContainer/MainContent/ErroredTasksPanel/MarginContainer/VBoxContainer/ScrollContainer/ErroredTasksLabel
+
+# Bottom Bar
+@onready var soft_stop_button: Button = $MarginContainer/VBoxContainer/BottomBar/MarginContainer/HBoxContainer/SoftStopButton
+@onready var manual_button: Button = $MarginContainer/VBoxContainer/BottomBar/MarginContainer/HBoxContainer/ManualButton
+@onready var autonomous_button: Button = $MarginContainer/VBoxContainer/BottomBar/MarginContainer/HBoxContainer/AutonomousButton
 
 var command_recorder: CommandRecorder
 
-#Speed Slider
-
-var set_weight:= SetSpeedMultiplier.new()
+# Speed Slider
+var set_weight := SetSpeedMultiplier.new()
 var weight: float
 
-#location label
-
-var get_location:= GetLocation.new()
-
-
+# Location label
+var get_location := GetLocation.new()
 
 # Should match the LunabotStage enum in the Rust extension
 enum LunabotStage {
@@ -44,15 +47,12 @@ func _ready() -> void:
 	manual_button.pressed.connect(_on_manual_pressed)
 	autonomous_button.pressed.connect(_on_autonomous_pressed)
 	
-	
-	speed_slider.value = 0;
+	speed_slider.value = 0
 	var new_weight = connection.set_speed(weight)
 	
 	speed_label.text = "SpeedMultiplier set to " + str(new_weight)
 	
 	PitchAndRollGUI.set_conn(connection)
-	
-
 
 func _process(delta: float) -> void:
 	var ms_since_packet: int = connection.get_ms_since_last_packet()
@@ -88,18 +88,11 @@ func _process(delta: float) -> void:
 		LunabotStage.AUTONOMY:
 			stage_label.text = "Stage: Autonomy"
 			stage_label.modulate = Color.CYAN
-			
 	
-	
-	
-	#location  maybe temporary 
+	# Update orientation and location label
 	var location = connection.get_location()
-	location_label.text = "location: [%.2f, %.2f, %.2f]" % [location[0], location[1], location[2]]
-	
-	#orientation label prob only here for debugging purposes 
 	var orientation = connection.get_orientation()
-	orientation_label.text = "orientation: [%.2f, %.2f, %.2f, %.2f]" % [orientation[0], orientation[1], orientation[2], orientation[3]
-]
+	orientation_label.text = "Location: [%.2f, %.2f, %.2f] | Orientation: [%.2f, %.2f, %.2f, %.2f]" % [location[0], location[1], location[2], orientation[0], orientation[1], orientation[2], orientation[3]]
  
 	# Update errored tasks
 	var errored_tasks: Dictionary = connection.get_errored_tasks()
@@ -111,13 +104,9 @@ func _process(delta: float) -> void:
 			var error_msg: String = errored_tasks[task_name]
 			error_text += task_name + ":\n  " + error_msg + "\n\n"
 		errored_tasks_label.text = error_text.strip_edges()
-		
-	
-
 
 func _on_stage_changed(stage: int) -> void:
 	print("Stage changed to: ", stage)
-
 
 func _on_connect_pressed() -> void:
 	var address := ip_input.text
@@ -126,24 +115,19 @@ func _on_connect_pressed() -> void:
 		return
 	
 	print("Connecting to: ", address)
-	# this should probably an action also idk
 	connection.reconnect(address)
-
 
 func _on_soft_stop_pressed() -> void:
 	print("Sending SoftStop command")
 	controller.command_recorder.execute_and_store(SoftStopCommand.new())
 
-
 func _on_manual_pressed() -> void:
 	print("Sending ContinueMission command (Manual mode)")
 	controller.command_recorder.execute_and_store(ContinueMissionCommand.new())
 
-
 func _on_autonomous_pressed() -> void:
 	print("Sending Navigate command (Autonomous mode)")
 	controller.command_recorder.execute_and_store(NavigateCommand.new())
-	
 
 func _on_speed_multiplier_slider_value_changed(value: float) -> void:
 	# Update slider weight
@@ -151,4 +135,3 @@ func _on_speed_multiplier_slider_value_changed(value: float) -> void:
 
 	# Update UI
 	speed_label.text = "SpeedMultiplier set to " + str(new_weight)
-	

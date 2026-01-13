@@ -22,7 +22,8 @@ SettingsMenu="*res://GUI/SettingsMenu/Scene/SettingsMenu.tscn"
 
 [display]
 
-window/size/viewport_width=1000
+window/size/viewport_width=1500
+window/size/viewport_height=1000
 
 [file_customization]
 

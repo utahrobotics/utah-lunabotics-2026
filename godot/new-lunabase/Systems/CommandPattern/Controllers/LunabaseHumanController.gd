@@ -7,8 +7,7 @@ var actor: Node
 
 @export var deadzone: float = 0.2
 
-@onready var speed_slider = $"../SpeedMultiplierSlider"
-
+@onready var speed_slider = get_node("../MarginContainer/VBoxContainer/MainContent/CenterPanel/SpeedControlPanel/MarginContainer/VBoxContainer/SpeedMultiplierSlider")
 var command_recorder: CommandRecorder
 
 # track previous state to detect button releases
@@ -39,8 +38,8 @@ func _process(_delta: float) -> void:
 	# GAMEPAD INPUT IS UNTESTED, I DONT OWN A CONTROLLER. (this will need testing and tweaking likely)
 
 	# Clamping values from 0 to 1 to keep cohesion
-	var forward_input : float = clampf(Input.get_action_strength("move_forward"), 0.0, 1.0)
-	var backward_input : float = clampf(Input.get_action_strength("move_backward"), 0.0, 1.0)
+	var forward_input: float = clampf(Input.get_action_strength("move_forward"), 0.0, 1.0)
+	var backward_input: float = clampf(Input.get_action_strength("move_backward"), 0.0, 1.0)
 	
 	var turn_input: float = Input.get_action_strength("move_right") - Input.get_action_strength("move_left")
 	
@@ -58,8 +57,8 @@ func _process(_delta: float) -> void:
 	# diff steering calculation
 	
 	# The inputs of moving the left or right wheels individually
-	var left_wheel : float = Input.get_action_strength("left_wheel")
-	var right_wheel : float = Input.get_action_strength("right_wheel")
+	var left_wheel: float = Input.get_action_strength("left_wheel")
+	var right_wheel: float = Input.get_action_strength("right_wheel")
 	
 	# Gets left and right wheel speed if using the forward/backward input
 	var calculated_left_speed: float = forward_backward + turn_input
@@ -101,9 +100,9 @@ func _process(_delta: float) -> void:
 	#=====Speed Slider increment and decrement
 	const SPEED_SLIDER_STEP := 100
 	if Input.is_action_pressed("increment_speed"):
-		speed_slider.value = clamp(speed_slider.value + 
-		SPEED_SLIDER_STEP, 
-		speed_slider.min_value,speed_slider.max_value)
+		speed_slider.value = clamp(speed_slider.value +
+		SPEED_SLIDER_STEP,
+		speed_slider.min_value, speed_slider.max_value)
 	
 	if Input.is_action_pressed("decrement_speed"):
 		speed_slider.value = clamp(speed_slider.value -
