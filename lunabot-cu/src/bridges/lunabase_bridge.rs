@@ -266,7 +266,7 @@ impl CuBridge for Lunabase {
                 if std::any::TypeId::of::<Payload>() == std::any::TypeId::of::<FromLunabase>() {
                     let payload_msg =
                         unsafe { std::mem::transmute_copy::<FromLunabase, Payload>(&next_msg) };
-                    println!("setting payload msg: {:?}", next_msg);
+                    println!("{:?}", next_msg);
                     msg.set_payload(payload_msg);
                     msg.metadata.process_time.start = clock.now().into();
                 }

@@ -97,7 +97,7 @@ tasker = { path = "../misc/tasker" }
 iceoryx-types = { path = "../misc/iceoryx-types" }
 launcher = { path = "../misc/launcher", optional = true }
 vesc-translator = { path = "../misc/vesc-translator", optional = true }
-kalman_filter = { path = "../misc/kalman-filter" }
+kfilter = { git = "https://github.com/utahrobotics/kfilter.git" }
 quic = { path = "../misc/quic", optional = true }
 wgsl-pcl = { path = "../misc/wgsl-pcl" }
 

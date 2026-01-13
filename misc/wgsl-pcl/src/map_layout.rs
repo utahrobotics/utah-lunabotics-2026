@@ -37,6 +37,17 @@ impl MapLayout {
     pub fn height_meters(&self) -> f32 {
         self.max_y - self.min_y
     }
+
+    pub fn is_in_bounds(&self, x: f32, y: f32) -> bool {
+        x >= self.min_x && x <= self.max_x && y >= self.min_y && y <= self.max_y
+    }
+
+    pub fn cells_x(&self) -> usize {
+        ((self.width_meters() / self.cell_size).ceil()) as usize
+    }
+    pub fn cells_y(&self) -> usize {
+        ((self.height_meters() / self.cell_size).ceil()) as usize
+    }
 }
 
 // Safety: MapLayout contains only f32 values and padding

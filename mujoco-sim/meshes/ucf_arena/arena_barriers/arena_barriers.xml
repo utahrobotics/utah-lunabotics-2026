@@ -28,7 +28,7 @@
     <mesh file="arena_barriers_collision_22.obj"/>
   </asset>
   <worldbody>
-    <body name="arena_barriers" pos="0 1.5 0">
+    <body name="arena_barriers" pos="0 1.5 1.2">
       <geom material="DefaultMaterialArenaBarriers" mesh="arena_barriers" class="visual"/>
       <geom mesh="arena_barriers_collision_0" rgba="0.4426981786422861 0.6720485860521146 0.09767575243116 1" class="collision"/>
       <geom mesh="arena_barriers_collision_1" rgba="0.10398784029416497 0.12403133703121849 0.42399608207532 1" class="collision"/>

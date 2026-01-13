@@ -5,12 +5,12 @@ use nalgebra::Vector3;
 use wgpu::{ShaderStages, include_wgsl};
 
 use crate::{
-    benchmark::BenchmarkableComputePipeline,
     errors::WgslPclError,
     gpu_types::{AlignedMatrix4, AlignedVec4, GpuType},
     map_layout,
     mem_layouts::{BindGroupLayoutBuilder, GpuBuffer},
     pipelines::{
+        expander::new_obstacle_expander_pipeline,
         filters::{
             BlurFilterOptions, OutlierFilterOptions, new_blur_pipeline,
             new_outlier_removal_pipeline,
@@ -42,15 +42,19 @@ pub struct DepthToPclAndHeightPipeline {
     depth_scale_buffer: GpuBuffer,
     input_img_buffer: GpuBuffer,
     output_pcl_buffer: GpuBuffer,
-    _output_height_map_buffer: GpuBuffer,
-    _output_filtered_height_map_buffer: GpuBuffer,
-    _output_outlier_filtered_height_map_buffer: GpuBuffer,
-    _output_gradient_map_buffer: GpuBuffer,
+    blur_filtered_height_map_buffer: GpuBuffer,
+    output_outlier_filtered_height_map_buffer: GpuBuffer,
+    output_gradient_map_buffer: GpuBuffer,
     output_expanded_gradient_map_buffer: GpuBuffer,
     camera_transform_buffer: GpuBuffer,
     workgroup_size_stage1: (u32, u32, u32),
     workgroup_size_stage2: (u32, u32, u32),
     pub map_layout: map_layout::MapLayout,
+    map_layout_buffer: GpuBuffer,
+    map_height_buffer: GpuBuffer,
+    map_width_buffer: GpuBuffer,
+    height_map_buffer: GpuBuffer,
+
     /// Whether the clear affected cells stage is enabled
     clear_affected_cells_enabled: bool,
 }
@@ -76,28 +80,28 @@ impl DepthToPclAndHeightPipeline {
     ) -> Result<Self, WgslPclError> {
         // Create buffers for depth -> pcl -> height map shader
         let input_img_buffer = GpuBuffer::new_storage(
-            &device,
+            device,
             ((depth_image_dimensions.0 * depth_image_dimensions.1) * size_of::<u16>() as u32)
                 as u64,
             Some("input_img_buffer"),
         );
         let output_pcl_buffer = GpuBuffer::new_storage(
-            &device,
+            device,
             ((depth_image_dimensions.0 * depth_image_dimensions.1)
                 * size_of::<AlignedVec4<f32>>() as u32) as u64,
             Some("output_pcl_buffer"),
         );
         let camera_transform_buffer = GpuBuffer::new_uniform(
-            &device,
+            device,
             size_of::<AlignedMatrix4<f32>>() as u64,
             Some("camera_transform_buffer"),
         );
         let depth_scale_buffer =
-            GpuBuffer::new_uniform(&device, size_of::<f32>() as u64, Some("depth_scale_buffer"));
+            GpuBuffer::new_uniform(device, size_of::<f32>() as u64, Some("depth_scale_buffer"));
         let map_layout_buffer =
-            GpuBuffer::new_uniform_with_data(&device, &map_layout, Some("map_layout_buffer"));
+            GpuBuffer::new_uniform_with_data(device, &map_layout, Some("map_layout_buffer"));
         let height_map_buffer = GpuBuffer::new_storage_with_data(
-            &device,
+            device,
             &vec![
                 f32::MIN;
                 ((map_layout.width_meters() / map_layout.cell_size).ceil() as usize)
@@ -124,7 +128,7 @@ impl DepthToPclAndHeightPipeline {
                 ),
             ]);
 
-            let (clear_layout_0, clear_bind_group_0) = BindGroupLayoutBuilder::new(None)
+            let (img_buffers_layout, img_buffers_bindgrp) = BindGroupLayoutBuilder::new(None)
                 .with_entry(
                     0,
                     ShaderStages::COMPUTE,
@@ -145,45 +149,50 @@ impl DepthToPclAndHeightPipeline {
                     },
                     height_map_buffer.as_entire_binding(),
                 )
-                .build(&device, "clear_affected_bind_group_0".to_string());
+                .build(device, "clear_affected_bind_group_0".to_string());
 
-            let (clear_layout_1, clear_bind_group_1) = BindGroupLayoutBuilder::new(None)
-                .with_entry(
-                    0,
-                    ShaderStages::COMPUTE,
-                    wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    camera_transform_buffer.as_entire_binding(),
-                )
-                .with_entry(
-                    1,
-                    ShaderStages::COMPUTE,
-                    wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    depth_scale_buffer.as_entire_binding(),
-                )
-                .with_entry(
-                    2,
-                    ShaderStages::COMPUTE,
-                    wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    map_layout_buffer.as_entire_binding(),
-                )
-                .build(&device, "clear_affected_bind_group_1".to_string());
+            let (clear_map_layout_transforms_layout, clear_map_layout_transforms_bindgrp) =
+                BindGroupLayoutBuilder::new(None)
+                    .with_entry(
+                        0,
+                        ShaderStages::COMPUTE,
+                        wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        camera_transform_buffer.as_entire_binding(),
+                    )
+                    .with_entry(
+                        1,
+                        ShaderStages::COMPUTE,
+                        wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        depth_scale_buffer.as_entire_binding(),
+                    )
+                    .with_entry(
+                        2,
+                        ShaderStages::COMPUTE,
+                        wgpu::BindingType::Buffer {
+                            ty: wgpu::BufferBindingType::Uniform,
+                            has_dynamic_offset: false,
+                            min_binding_size: None,
+                        },
+                        map_layout_buffer.as_entire_binding(),
+                    )
+                    .build(device, "clear_affected_bind_group_1".to_string());
 
             let clear_pipeline = ComputePipelineBuilder::new(device)
                 .with_constants(clear_constants)
-                .with_bind_group(0, clear_layout_0, clear_bind_group_0)
-                .with_bind_group(1, clear_layout_1, clear_bind_group_1)
+                .with_bind_group(
+                    0,
+                    clear_map_layout_transforms_layout,
+                    clear_map_layout_transforms_bindgrp,
+                )
+                .with_bind_group(1, img_buffers_layout, img_buffers_bindgrp)
                 .with_shader_module(include_wgsl!("../../shaders/clear_affected_cells.wgsl"))
                 .with_label("clear_affected_cells_pipeline")
                 .build()?;
@@ -225,41 +234,42 @@ impl DepthToPclAndHeightPipeline {
                 },
                 height_map_buffer.as_entire_binding(),
             )
-            .build(&device, "bind_group_0".to_string());
+            .build(device, "bind_group_0".to_string());
 
         // define layout and bind groups for camera transform and depth scale
-        let (layout_2, bind_group_2) = BindGroupLayoutBuilder::new(None)
-            .with_entry(
-                0,
-                ShaderStages::COMPUTE,
-                wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                camera_transform_buffer.as_entire_binding(),
-            )
-            .with_entry(
-                1,
-                ShaderStages::COMPUTE,
-                wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                depth_scale_buffer.as_entire_binding(),
-            )
-            .with_entry(
-                2,
-                ShaderStages::COMPUTE,
-                wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                map_layout_buffer.as_entire_binding(),
-            )
-            .build(&device, "depth_to_pcl_bind_group".to_string());
+        let (transforms_map_layout, transforms_map_layout_bindgrp) =
+            BindGroupLayoutBuilder::new(None)
+                .with_entry(
+                    0,
+                    ShaderStages::COMPUTE,
+                    wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    camera_transform_buffer.as_entire_binding(),
+                )
+                .with_entry(
+                    1,
+                    ShaderStages::COMPUTE,
+                    wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    depth_scale_buffer.as_entire_binding(),
+                )
+                .with_entry(
+                    2,
+                    ShaderStages::COMPUTE,
+                    wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    map_layout_buffer.as_entire_binding(),
+                )
+                .build(device, "depth_to_pcl_bind_group".to_string());
 
         let constants: HashMap<&str, f64> = HashMap::from([
             ("IMAGE_WIDTH", depth_image_dimensions.0 as f64),
@@ -275,11 +285,22 @@ impl DepthToPclAndHeightPipeline {
 
         let pipeline = ComputePipelineBuilder::new(device)
             .with_constants(constants)
-            .with_bind_group(0, layout_1, bind_group_1)
-            .with_bind_group(1, layout_2, bind_group_2)
+            .with_bind_group(0, transforms_map_layout, transforms_map_layout_bindgrp)
+            .with_bind_group(1, layout_1, bind_group_1)
             .with_shader_module(include_wgsl!("../../shaders/depth_to_pcl_and_height.wgsl"))
             .with_label("depth_to_pcl_pipeline")
             .build()?;
+
+        let map_height_buffer = GpuBuffer::new_uniform_with_data(
+            device,
+            &((map_layout.height_meters() / map_layout.cell_size).ceil() as u32),
+            Some("map_height_buffer"),
+        );
+        let map_width_buffer = GpuBuffer::new_uniform_with_data(
+            device,
+            &((map_layout.width_meters() / map_layout.cell_size).ceil() as u32),
+            Some("map_width_buffer"),
+        );
 
         let (outlier_filtered_height_map_buffer, outlier_filter_pipeline) =
             new_outlier_removal_pipeline(
@@ -287,6 +308,8 @@ impl DepthToPclAndHeightPipeline {
                 map_layout,
                 outlier_filter_options,
                 &height_map_buffer,
+                &map_width_buffer,
+                &map_height_buffer,
             )?;
 
         let (blur_filtered_height_map_buffer, filter_pipeline) = new_blur_pipeline(
@@ -295,6 +318,8 @@ impl DepthToPclAndHeightPipeline {
             map_layout,
             blur_filter_options,
             &outlier_filtered_height_map_buffer,
+            &map_width_buffer,
+            &map_height_buffer,
         )?;
 
         let (gradient_map_buffer, gradient_pipeline) = new_gradient_pipeline(
@@ -303,78 +328,19 @@ impl DepthToPclAndHeightPipeline {
             map_layout,
             gradient_kernel_radius,
             &blur_filtered_height_map_buffer,
+            &map_width_buffer,
+            &map_height_buffer,
         )?;
 
-        let obstacle_expander_constants: HashMap<&str, f64> = HashMap::from([
-            (
-                "MAP_WIDTH",
-                (map_layout.width_meters() / map_layout.cell_size).ceil() as f64,
-            ),
-            (
-                "MAP_HEIGHT",
-                (map_layout.height_meters() / map_layout.cell_size).ceil() as f64,
-            ),
-            (
-                "ROBOT_RADIUS_METERS",
-                obstacle_expander_options.expansion_radius_meters as f64,
-            ),
-            ("CELL_SIZE_METERS", map_layout.cell_size as f64),
-        ]);
-
-        let obstacle_expander_output_buffer = GpuBuffer::new_storage_with_data(
-            &device,
-            &vec![
-                f32::MIN;
-                ((map_layout.width_meters() / map_layout.cell_size).ceil() as usize)
-                    * ((map_layout.height_meters() / map_layout.cell_size).ceil() as usize)
-            ],
-            Some("obstacle_expanded_height_map"),
-        );
-        let max_gradient_buffer = GpuBuffer::new_uniform_with_data(
-            &device,
-            &obstacle_expander_options.obstacle_gradient_threshold,
-            Some("max_gradient_buffer"),
-        );
-        let (obstacle_expander_layout, obstacle_expander_bind_group) =
-            BindGroupLayoutBuilder::new(None)
-                .with_entry(
-                    0,
-                    ShaderStages::COMPUTE,
-                    wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: false },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    gradient_map_buffer.as_entire_binding(),
-                )
-                .with_entry(
-                    1,
-                    ShaderStages::COMPUTE,
-                    wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Storage { read_only: false },
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    obstacle_expander_output_buffer.as_entire_binding(),
-                )
-                .with_entry(
-                    2,
-                    ShaderStages::COMPUTE,
-                    wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    max_gradient_buffer.as_entire_binding(),
-                )
-                .build(&device, "obstacle_expander_bind_group".to_string());
-
-        let obstacle_expander_pipeline = ComputePipelineBuilder::new(device)
-            .with_label("obstacle_expander")
-            .with_shader_module(include_wgsl!("../../shaders/expand_obstacles.wgsl"))
-            .with_bind_group(0, obstacle_expander_layout, obstacle_expander_bind_group)
-            .with_constants(obstacle_expander_constants)
-            .build()?;
+        let (obstacle_expander_output_buffer, obstacle_expander_pipeline) =
+            new_obstacle_expander_pipeline(
+                device,
+                map_layout,
+                obstacle_expander_options,
+                &gradient_map_buffer,
+                &map_width_buffer,
+                &map_height_buffer,
+            )?;
 
         let mut chain_builder = ComputePipelineChainBuilder::new();
 
@@ -412,19 +378,22 @@ impl DepthToPclAndHeightPipeline {
         Ok(Self {
             pipeline: combined_pipeline,
             depth_image_dimensions_px: depth_image_dimensions,
-            _output_height_map_buffer: height_map_buffer,
+            height_map_buffer,
             input_img_buffer,
             output_pcl_buffer,
             camera_transform_buffer,
             depth_scale_buffer,
             map_layout,
-            _output_filtered_height_map_buffer: blur_filtered_height_map_buffer,
-            _output_outlier_filtered_height_map_buffer: outlier_filtered_height_map_buffer,
-            _output_gradient_map_buffer: gradient_map_buffer,
+            blur_filtered_height_map_buffer,
+            output_outlier_filtered_height_map_buffer: outlier_filtered_height_map_buffer,
+            output_gradient_map_buffer: gradient_map_buffer,
             output_expanded_gradient_map_buffer: obstacle_expander_output_buffer,
             workgroup_size_stage1: (workgroup_size_stage1.0, workgroup_size_stage1.1, 1),
             workgroup_size_stage2: (workgroup_size_stage2.0, workgroup_size_stage2.1, 1),
             clear_affected_cells_enabled: clear_affected_cells.is_some(),
+            map_width_buffer,
+            map_height_buffer,
+            map_layout_buffer,
         })
     }
 
@@ -435,6 +404,7 @@ impl DepthToPclAndHeightPipeline {
         device: &GpuDevice,
         camera_transform: AlignedMatrix4<f32>,
         depth_scale: f32,
+        // map_layout: &map_layout::MapLayout,
     ) -> anyhow::Result<(Vec<Vector3<f32>>, Vec<f32>)> {
         self.camera_transform_buffer
             .write_data(device, camera_transform.to_bytes(), 0);
@@ -516,9 +486,16 @@ impl DepthToPclAndHeightPipeline {
         ))
     }
 
-    pub fn get_height_map(&self, device: &GpuDevice) -> anyhow::Result<Vec<f32>> {
+    pub fn get_outlier_filtered_height_map(&self, device: &GpuDevice) -> anyhow::Result<Vec<f32>> {
         let height_map_data: Vec<f32> = self
-            ._output_outlier_filtered_height_map_buffer
+            .output_outlier_filtered_height_map_buffer
+            .read_data_blocking(device)?;
+        Ok(height_map_data)
+    }
+
+    pub fn get_blur_filtered_height_map(&self, device: &GpuDevice) -> anyhow::Result<Vec<f32>> {
+        let height_map_data: Vec<f32> = self
+            .blur_filtered_height_map_buffer
             .read_data_blocking(device)?;
         Ok(height_map_data)
     }
@@ -528,5 +505,24 @@ impl DepthToPclAndHeightPipeline {
             .output_expanded_gradient_map_buffer
             .read_data_blocking(device)?;
         Ok(height_map_data)
+    }
+
+    pub fn get_raw_height_map(&self, device: &GpuDevice) -> anyhow::Result<Vec<f32>> {
+        let height_map_data: Vec<f32> = self.height_map_buffer.read_data_blocking(device)?;
+        Ok(height_map_data)
+    }
+
+    pub fn get_gradient_map(&self, device: &GpuDevice) -> anyhow::Result<Vec<f32>> {
+        let gradient_map_data: Vec<f32> =
+            self.output_gradient_map_buffer.read_data_blocking(device)?;
+        Ok(gradient_map_data)
+    }
+
+    pub fn clear_map(&mut self, device: &GpuDevice) {
+        let map_layout = self.map_layout;
+        let width = (map_layout.width_meters() / map_layout.cell_size).ceil() as u32;
+        let height = (map_layout.height_meters() / map_layout.cell_size).ceil() as u32;
+        let empty_map = vec![f32::MIN; (width * height) as usize];
+        self.height_map_buffer.write_data(device, &empty_map, 0);
     }
 }

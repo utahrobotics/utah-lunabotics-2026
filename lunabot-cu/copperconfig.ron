@@ -52,22 +52,23 @@
             ),
             run_in_sim: false
         ),
-
+        // subscribes to 6dof messages from the intel T265 camera
         (
             id: "t265_subscriber",
             type: "crate::tasks::sources::T265Subscriber",
             config: {
                 "serial_num": "929122111514",
                 "camera_node": "upper_depth_camera_t265",
-                "node": "T265_right"
+                "node": "T265_right",
+                "t265_velocity_variance": 1.0,
+                "t265_angular_velocity_variance": 1.0,
             },
             logging: (
                 enabled: true
             ),
             run_in_sim: false
         ),
-        // takes depth frames and imu information from the realsense subscriber and uses obstacle detection to create an occupancy grid
-        // the size of the arena
+        // takes depth frames and imu information from the realsense subscriber and uses a compute shader pipeline to estimate a local and global map of obstacles
         (
             id:"occupancy_grid_pipeline",
             type: "crate::tasks::OccupancyGridTask",
@@ -78,32 +79,37 @@
                 "ppy": 245.91605,
                 "heightmap_max_x": 10.0,
                 "heightmap_max_y": 10.0,
-                "heightmap_min_x": -5.0,
-                "heightmap_min_y": -10.0,
+                "heightmap_min_x": -3.0,
+                "heightmap_min_y": -5.0,
                 "heightmap_cell_size": 0.025,
-                "bilateral_filter_kernel_radius": 15,
-                "bilateral_filter_sigma_spatial": 15,
-                "bilateral_filter_sigma_range": 0.05,
-                "gradient_filter_kernel_radius": 3,
-                "gaussian_blur_kernel_radius": 2,
-                "gaussian_sigma_spatial": 3.0,
-                "outlier_filter_kernel_radius": 3,
+                "bilateral_filter_kernel_radius": 5,
+                "bilateral_filter_sigma_spatial":0.5,
+                "bilateral_filter_sigma_range": 0.1,
+                "gradient_filter_kernel_radius": 4,
+                "gaussian_blur_kernel_radius": 4,
+                "gaussian_sigma_spatial": 0.5,
+                "outlier_filter_kernel_radius": 7,
                 // outlier removal works best when the clear affected cells is enabled
                 // this is because it allows the outlier cells to be re mapped on the next frame
                 "outlier_filter_std_dev_threshold": 3.5,
+                "outlier_filter_max_unknown_neighbors_ratio": 0.3,
                 "use_bilateral_filter": false,
                 "robot_radius_meters": 0.1,
                 "min_depth": 0.2,
-                "max_depth": 3.0,
-                "clear_affected_cells": true,
-                "min_distance_to_clear": 2.0,
+                "max_depth": 2.0,
+                "clear_affected_cells": false,
+                "min_distance_to_clear": 1.5,
                 // this is the gradient threshold for the obstacle expander
                 // if the gradient is greater than this value, the cell is considered an obstacle
-                "obstacle_gradient_threshold": 0.5,
+                "obstacle_gradient_threshold": 1.0,
+
+                // parameters for when to reset the local map
+                "max_distance_traveled_before_reset": 1.5,
+                "max_rotation_radians_before_reset": 3.0,
             },
             background: false,
             logging: (
-                enabled: true,
+                enabled: false,
             )
         ),
         // registers point clouds into a global map, and estimates the isometry of the lidar node.
@@ -115,19 +121,26 @@
                 "voxel_size": .6,
                 "max_range": 10.0,
                 "min_range": 1.5,
-                "max_points_per_voxel": 50,
+                "max_points_per_voxel": 200,
                 "initial_threshold": 2.0,
                 "min_motion_th": 0.2,
                 "enable_deskewing": true,
                 "max_num_threads": 10,
                 "convergence_criterion": 0.0001,
                 "max_num_iterations": 500,
-                "max_accumulation": 15,
+                "max_accumulation": 3,
                 "max_point_age_seconds": 30.0,
+                "min_reflectivity": 0.0,
 
                 // max distances between poses used to deskew. if any pose is too far apart, we skip deskewing
                 "max_angle_between_poses": 0.10472, // 6 degrees in radians
-                "max_distance_between_poses": 0.05, // 1 meter
+                "max_distance_between_poses": 0.05,
+                // time between poses collected for deskewing
+                "time_between_pose_collections_ms": 2,
+
+                // kalman filtering parameters
+                "icp_position_variance": 0.6,
+                "icp_orientation_variance": 0.001,
             },
             logging: (
                 enabled: false
@@ -138,7 +151,14 @@
         // position is logged to rerun at 60 hz
         (
             id:"localizer", type:"crate::tasks::Localizer",
-            config:{},
+            config:{
+                "process_noise_position": 0.5,
+                "process_noise_velocity": 0.5,
+                "process_noise_orientation": 0.5,
+                "process_noise_angular_velocity": 0.5,
+
+                "initial_covariance": 100.0,
+            },
             // task does not get stubbed out in sim mode
             run_in_sim: true,
         ),
@@ -174,6 +194,10 @@
         (
             id: "detection_handler",
             type: "crate::tasks::AprilDetectionHandler",
+            config: {
+                // all tags > max_distance away will be ignored
+                "max_distance": 1.0
+            }
         )
     ],
     cnx:[
@@ -189,9 +213,10 @@
         (src:"new_ai",                        dst:"v3_pico",                 msg:"(Option<common::Steering>, Option<embedded_common::ActuatorCommand>)"),
         (src:"v3_pico",                       dst:"localizer",               msg:"embedded_common::FromPicoV3"),
         (src:"detection_handler",             dst: "localizer",              msg:"Vec<crate::tasks::AprilTagMeasurement>"),
-        (src:"t265_subscriber",               dst:"localizer",               msg:"cu_spatial_payloads::EncodableIsometry"),
+        (src:"t265_subscriber",               dst:"localizer",               msg:"crate::tasks::sources::T265Msg"),
     ],
-    
+
+    // comms to lunabase software
     bridges: [
         (
             id: "lunabase_bridge",
@@ -215,13 +240,13 @@
             path:"camera_configs/camera_template_gstreamer.ron",
             params:{
                 "id":"back",
-                "port":"pci-0000:34:00.4-usb-0:2.4:1.0",
-                "fx":689.93,
-                "fy":689.93,
-                "cx":320.84,
-                "cy":240.819,
-                "width":640,
-                "height":480,
+                "port":"pci-0000:00:14.0-usb-0:5.3:1.0",
+                "fx":667.0,
+                "fy":667.0,
+                "cx":960.84,
+                "cy":600.819,
+                "width":1920,
+                "height":1200,
                 "udp_host":"192.168.0.108",
                 "udp_port":5004,
             },
@@ -231,12 +256,12 @@
             params:{
                 "id":"side",
                 "port":"pci-0000:00:14.0-usb-0:1:1.0",
-                "fx":689.93,
-                "fy":689.93,
-                "cx":320.84,
-                "cy":240.819,
-                "width":640,
-                "height":480,
+                "fx":667.0,
+                "fy":667.0,
+                "cx":960.84,
+                "cy":600.819,
+                "width":1920,
+                "height":1200,
                 "udp_host":"127.0.0.1",
                 "udp_port":5003,
             },
@@ -261,6 +286,7 @@
     // monitor:(type:"cu_consolemon::CuConsoleMon"),
     monitor: (type:"simple_monitor::SimpleMonitor"),
     logging:(
+    // if true, each output payload of each will be logged unless a task opts out
         enable_task_logging: true,
         section_size_mib:100,
     ),

@@ -1,4 +1,7 @@
+use std::time::Duration;
+
 use bincode::{Decode, Encode};
+use cu_spatial_payloads::EncodableIsometry;
 use cu29::{
     CuResult,
     config::ComponentConfig,
@@ -8,14 +11,10 @@ use cu29::{
 };
 
 use iceoryx_types::IceoryxPointCloud;
-use kalman_filter::SimpleVector;
-use nalgebra::Isometry3;
+use nalgebra::{Isometry3, SMatrix, SVector};
 use simple_icp::{config::Config, icp_pipeline::IcpPipeline};
 
 use crate::{ROBOT_STATE, rerun_viz::RECORDER};
-
-const REFERENCE_VARIANCE_THRESHOLD: f64 = 1.0;
-const POSE_COLLECTION_INTERVAL: std::time::Duration = std::time::Duration::from_millis(5);
 
 pub struct KissIcp {
     pipeline: simple_icp::icp_pipeline::IcpPipeline,
@@ -23,16 +22,16 @@ pub struct KissIcp {
     pub frame_accumulation_index: usize,
     pub max_accumulation: usize,
     icp_variance: [f64; 36],
-    reference_offset: Option<Isometry3<f64>>,
     pub timestamped_poses: Vec<(std::time::Instant, Isometry3<f64>)>,
     pub last_pose_collection_time: std::time::Instant,
+    pub time_between_pose_collections: Duration,
+    pub min_reflectivity: f32,
 }
 
 #[derive(Clone, Copy, Debug, Encode, Decode, Serialize)]
 #[repr(C)]
 pub struct IcpMeasurement {
-    pub position: [f64; 3],
-    pub orientation: [f64; 3],
+    pub pose: EncodableIsometry,
     #[serde(serialize_with = "<[_]>::serialize")]
     pub variance: [f64; 36],
 }
@@ -40,8 +39,7 @@ pub struct IcpMeasurement {
 impl Default for IcpMeasurement {
     fn default() -> Self {
         Self {
-            position: Default::default(),
-            orientation: Default::default(),
+            pose: EncodableIsometry::default(),
             variance: [0.0; 36],
         }
     }
@@ -60,6 +58,10 @@ impl CuTask for KissIcp {
         let voxel_size = config
             .and_then(|c| c.get::<f64>("voxel_size"))
             .unwrap_or(0.5) as f32;
+
+        let min_reflectivity = config
+            .and_then(|c| c.get::<f64>("min_reflectivity"))
+            .unwrap_or(150.) as f32;
         let max_range = config
             .and_then(|c| c.get::<f64>("max_range"))
             .unwrap_or(100.0) as f32;
@@ -100,7 +102,20 @@ impl CuTask for KissIcp {
 
         let max_distance_between_poses = config
             .and_then(|c| c.get::<f64>("max_distance_between_poses"))
-            .unwrap_or(0.05); // 1 meter
+            .unwrap_or(0.05);
+
+        // time betwene poses collected for deskewing
+        let time_between_pose_collections = config
+            .and_then(|c| c.get::<u32>("time_between_pose_collections_ms"))
+            .unwrap_or(2);
+
+        let position_variance = config
+            .and_then(|c| c.get::<f64>("position_variance"))
+            .unwrap_or(0.10472);
+
+        let orientation_variance = config
+            .and_then(|c| c.get::<f64>("orientation_variance"))
+            .unwrap_or(0.001);
 
         let config = Config {
             voxel_size,
@@ -119,15 +134,15 @@ impl CuTask for KissIcp {
         };
         let pipeline = IcpPipeline::new_with_config(config);
 
-        let diagonal = SimpleVector::<6>::new(
-            0.05 as f64, // Position variance
-            0.05 as f64,
-            0.05 as f64,
-            0.5 as f64, // Orientation variance
-            0.5 as f64,
-            0.5 as f64,
+        let diagonal = SVector::<f64, 6>::new(
+            position_variance,
+            position_variance,
+            position_variance,
+            orientation_variance,
+            orientation_variance,
+            orientation_variance,
         );
-        let variance: [f64; 36] = kalman_filter::SimpleSquareMatrix::<6>::from_diagonal(&diagonal)
+        let variance: [f64; 36] = SMatrix::<f64, 6, 6>::from_diagonal(&diagonal)
             .as_slice()
             .try_into()
             .expect("Variance matrix in [kiss_icp.rs] was not 6x6");
@@ -138,17 +153,33 @@ impl CuTask for KissIcp {
             accumulated_frames: Vec::new(),
             frame_accumulation_index: 0,
             icp_variance: variance,
-            reference_offset: None,
             timestamped_poses: Vec::new(),
             last_pose_collection_time: std::time::Instant::now(),
+            time_between_pose_collections: Duration::from_millis(
+                time_between_pose_collections as u64,
+            ),
+            min_reflectivity,
         })
+    }
+
+    fn start(&mut self, _clock: &RobotClock) -> CuResult<()> {
+        if let Some(recorder) = RECORDER.get() {
+            let _ = recorder.recorder.log_static(
+                format!("kiss_icp/local/xyz"),
+                &rerun::Arrows3D::from_vectors([[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]])
+                    .with_colors([[255, 0, 0], [0, 255, 0], [0, 0, 255]])
+                    .with_labels(vec!["x", "y", "z"]),
+            );
+        }
+
+        Ok(())
     }
 
     fn preprocess(&mut self, _clock: &RobotClock) -> CuResult<()> {
         if let Some(state) = ROBOT_STATE.get() {
             let current_time = std::time::Instant::now();
             if current_time.duration_since(self.last_pose_collection_time)
-                >= POSE_COLLECTION_INTERVAL
+                >= self.time_between_pose_collections
             {
                 let pose = state.kinematic_root.get_global_isometry();
                 self.timestamped_poses.push((current_time, pose));
@@ -196,59 +227,38 @@ impl CuTask for KissIcp {
             }
             self.pipeline.process_frame(
                 &mut self.accumulated_frames,
-                200.0,
+                self.min_reflectivity,
                 &self.timestamped_poses,
             );
+
+            if let Some(recorder) = RECORDER.get() {
+                let _ = recorder.recorder.log(
+                    format!("kiss_icp/local"),
+                    &rerun::Transform3D::from_translation_rotation(
+                        self.pipeline.t_origin_current.translation.vector.data.0[0],
+                        rerun::Quaternion::from_xyzw(
+                            self.pipeline
+                                .t_origin_current
+                                .cast::<f32>()
+                                .rotation
+                                .coords
+                                .data
+                                .0[0],
+                        ),
+                    ),
+                );
+            }
 
             let map_points = self.pipeline.get_last_batch_points();
             let relative_position = self.pipeline.t_origin_current;
 
-            if let Some(reference_offset) = self.reference_offset {
-                let position = reference_offset * relative_position;
-
-                let trans = position.translation;
-                let rotat = position
-                    .rotation
-                    .axis()
-                    .and_then(|vec| Some(vec.into_inner()))
-                    .unwrap_or(SimpleVector::<3>::zeros())
-                    * position.rotation.angle();
-
-                let actual_message = IcpMeasurement {
-                    position: [trans.x, trans.y, trans.z],
-                    orientation: [rotat.x, rotat.y, rotat.z],
-                    variance: self.icp_variance,
-                };
-
-                output.set_payload(actual_message);
-            } else {
-                let position_variance = ROBOT_STATE.get().unwrap().get_position_variance();
-                let orientation_variance = ROBOT_STATE.get().unwrap().get_orientation_variance();
-
-                // Get total variance, to determine if we have good values yet.
-                let mut total_variance: f64 = 0.0;
-                for variance in position_variance.diagonal().as_slice() {
-                    total_variance += variance;
-                }
-
-                for variance in orientation_variance.diagonal().as_slice() {
-                    total_variance += variance;
-                }
-
-                if total_variance < REFERENCE_VARIANCE_THRESHOLD {
-                    // Think about this being substituted into the uses of reference offset
-                    self.reference_offset = Some(
-                        ROBOT_STATE
-                            .get()
-                            .unwrap()
-                            .kinematic_root
-                            .get_global_isometry()
-                            * relative_position.inverse(),
-                    );
-                }
-            }
+            output.set_payload(IcpMeasurement {
+                pose: EncodableIsometry::from_na(&relative_position),
+                variance: self.icp_variance,
+            });
 
             self.log_accumulated_map(map_points)?;
+
             self.accumulated_frames.clear();
             self.timestamped_poses.clear();
             self.frame_accumulation_index = 0;

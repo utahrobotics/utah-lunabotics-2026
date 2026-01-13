@@ -121,7 +121,7 @@ impl CuSrcTask for PointCloudIceoryxReceiver {
             }
             if RECORDER.get().is_some() && RECORDER.get().unwrap().level == Level::All {
                 if let Err(e) = RECORDER.get().unwrap().recorder.log(
-                    "l2_pcl",
+                    format!("kiss_icp/local/cloud"),
                     &rerun::Points3D::new(positions)
                         .with_colors(colors)
                         .with_radii([0.02f32]),

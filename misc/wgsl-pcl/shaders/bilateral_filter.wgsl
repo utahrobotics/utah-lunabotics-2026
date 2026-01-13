@@ -1,16 +1,19 @@
 // in this case we are working on a height map, but this image could be anything
 // if the value in the height map is f32 min, then we will know that the cell is considered to be unknown.
-@group(0) @binding(0) var<storage, read_write> height_map: array<f32>;
-@group(0) @binding(1) var<storage, read_write> filtered_height_map: array<f32>;
-override MAP_WIDTH: u32;
-override MAP_HEIGHT: u32;
+@group(1) @binding(0) var<storage, read_write> height_map: array<f32>;
+@group(1) @binding(1) var<storage, read_write> filtered_height_map: array<f32>;
+@group(0) @binding(0) var<uniform> map_width: u32;
+@group(0) @binding(1) var<uniform> map_height: u32;
+
 override WORKGROUP_X: u32 = 8;
 override WORKGROUP_Y: u32 = 8;
 // kernel radius includes the center pixel in the kernel
 override KERNEL_RADIUS: u32 = 4;
-// sigma spatial in this case is actually the distance between pixels.
-override SIGMA_SPATIAL: u32 = 3;
+
+override SIGMA_SPATIAL: f32 = 0.1;
 override SIGMA_RANGE: f32 = 0.2;
+override CELL_SIZE: f32 = 0.1;
+
 
 @compute
 @workgroup_size(WORKGROUP_X, WORKGROUP_Y, 1)
@@ -21,7 +24,7 @@ fn depth(
     let x = global_invocation_id.x;
     let y = global_invocation_id.y;
     
-    if x >= MAP_WIDTH || y >= MAP_HEIGHT {
+    if x >= map_width || y >= map_height {
         return;
     }
     
@@ -58,8 +61,8 @@ fn depth(
                     continue;
                 }
                 
-                let dx = f32(x_coord - i32(x));
-                let dy = f32(y_coord - i32(y));
+                let dx = f32(x_coord - i32(x)) * CELL_SIZE;
+                let dy = f32(y_coord - i32(y)) * CELL_SIZE;
                 let spatial_dist = sqrt(dx * dx + dy * dy);
                 
                 let range_dist = abs(neighbor_value - center_value);
@@ -86,8 +89,8 @@ fn depth(
 
 // will return -1 if out of bounds
 fn xy_to_index(x: i32, y: i32) -> i32 {
-    if x < 0 || y < 0 || x >= i32(MAP_WIDTH) || y >= i32(MAP_HEIGHT) {
+    if x < 0 || y < 0 || x >= i32(map_width) || y >= i32(map_height) {
         return -1;
     }
-    return x + y * i32(MAP_WIDTH);
+    return x + y * i32(map_width);
 }

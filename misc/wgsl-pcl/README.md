@@ -1,7 +1,9 @@
 # WGSL-PCL
-### Shaders for: Height Mapping, Gradient mapping, Depth Image to point cloud, Filtering, Outlier removal
-
-## Depth to pcl and height
-(and also gradient)
-
-This is the main pipeline for 
+### Shaders for
+* Depth image to point cloud
+* point cloud to height map 
+* gaussian filtering for heightmaps
+* bilateral filtering 
+* heightmap statistical outlier removal
+* heightmap to gradient 
+* gradient to obstacle + expansion radius

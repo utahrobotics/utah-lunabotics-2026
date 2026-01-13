@@ -61,7 +61,7 @@
     <mesh file="arena_walls_collision_55.obj"/>
   </asset>
   <worldbody>
-    <body name="arena_walls">
+    <body name="arena_walls" pos = "0 0 1.2">
       <geom material="DefaultMaterialArenaWalls" mesh="arena_walls" class="visual"/>
       <geom mesh="arena_walls_collision_0" rgba="0.24005392570862905 0.27646511660967077 0.7343536367402101 1" class="collision"/>
       <geom mesh="arena_walls_collision_1" rgba="0.27301233649202183 0.9833072785689125 0.5050841994021588 1" class="collision"/>

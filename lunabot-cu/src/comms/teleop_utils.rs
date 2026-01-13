@@ -78,7 +78,7 @@ impl LunabaseConnection {
                 match rx_outgoing.recv() {
                     Ok(msg) => {
                         if let Err(e) = server_c2.send(msg) {
-                            eprintln!("Failed to send message via server: {}", e);
+                            // eprintln!("Failed to send message via server: {}", e);
                         }
                     }
                     Err(e) => {

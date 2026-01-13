@@ -1,4 +1,3 @@
-pub mod benchmark;
 pub mod errors;
 pub mod gpu_types;
 pub mod map_layout;

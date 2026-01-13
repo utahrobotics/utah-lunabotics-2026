@@ -6,15 +6,11 @@ use std::{
 
 use crate::{
     constants::DEPTH_FRAME_SIZE,
-    iceoryx_utils::{
-        create_depth_frame_publisher, create_imu_frame_publisher, create_node,
-        create_pose_frame_publisher,
-    },
+    iceoryx_utils::{create_depth_frame_publisher, create_imu_frame_publisher, create_node},
 };
 use iceoryx2::{port::publisher::Publisher, service::ipc};
-use iceoryx_types::{IceoryxDepthFrame, ImuMsg, PoseMsg};
+use iceoryx_types::{IceoryxDepthFrame, ImuMsg};
 use realsense_rust::{
-    device::Device,
     frame::{self, DepthFrame, PixelKind},
     kind::Rs2Format,
     pipeline::{ActivePipeline, FrameWaitError},

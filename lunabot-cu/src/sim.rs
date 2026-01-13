@@ -7,20 +7,22 @@ pub mod pathfinding;
 pub mod simple_monitor;
 pub mod tasks;
 pub mod utils;
+pub mod robot_state;
 
 use common::FromLunabot;
+use crossbeam::atomic::AtomicCell;
 use cu29::prelude::*;
 use cu29_helpers::basic_copper_setup;
-use kalman_filter::SimpleSquareMatrix;
-use kalman_filter::SimpleVector;
+use embedded_common::Direction;
 use mujoco_rs::cpp_viewer::MjViewerCpp;
 use mujoco_rs::prelude::*;
 use nalgebra::{Isometry3, Quaternion, Translation3, UnitQuaternion};
-use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
+use nalgebra::{SMatrix, SVector};
+use simple_motion::{ChainBuilder, NodeSerde};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::sync::{Mutex, OnceLock, RwLock};
-use utils::RobotState;
+use std::sync::{OnceLock, RwLock};
+use robot_state::RobotState;
 use wgsl_pcl::wgsl_setup::{init_gpu_blocking, is_gpu_initialized};
 
 use crate::rerun_viz::{RECORDER, ROBOT_STRUCTURE};
@@ -31,16 +33,10 @@ pub static ROBOT_STATE: OnceLock<RobotState> = OnceLock::new();
 
 pub static TARGET_HZ: usize = 1000; // MUST BE THE SAME AS THE TARGET HZ IN COPPERCONFIG.RON
 
-pub static MJ_MODEL: OnceLock<&'static MjModel> = OnceLock::new();
-pub static MJ_DATA: OnceLock<Mutex<&'static mut MjData<&'static MjModel>>> = OnceLock::new();
-
 #[copper_runtime(config = "copperconfig.ron", sim_mode = true)]
 struct LunabotApplication {}
 
-fn sim_callback(step: default::SimStep) -> SimOverride {
-    // mj model and data should always be set before this function is called
-    let model = MJ_MODEL.get().unwrap();
-    let mut data = MJ_DATA.get().unwrap().lock().unwrap();
+fn default_callback(step: default::SimStep) -> SimOverride {
     match step {
         default::SimStep::UdevMonitor(_) => SimOverride::ExecutedBySim,
         default::SimStep::CamSide(_) => SimOverride::ExecutedBySim,
@@ -52,6 +48,109 @@ fn sim_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::L2Pointcloud(_) => SimOverride::ExecutedBySim,
         default::SimStep::L2Imu(_) => SimOverride::ExecutedBySim,
         default::SimStep::V3Pico(_) => SimOverride::ExecutedBySim,
+        default::SimStep::MotorCtrl(_) => SimOverride::ExecutedBySim,
+        default::SimStep::DetectorCamBack(_) => SimOverride::ExecutedBySim,
+        default::SimStep::DetectorCamSide(_) => SimOverride::ExecutedBySim,
+        default::SimStep::DetectorCamLaptopFront(_) => SimOverride::ExecutedBySim,
+        default::SimStep::RealsenseSubscriber(_) => SimOverride::ExecutedBySim,
+        default::SimStep::T265Subscriber(_) => SimOverride::ExecutedBySim,
+        default::SimStep::DetectionHandler(_) => SimOverride::ExecutedBySim,
+        default::SimStep::L2KissIcp(_) => SimOverride::ExecuteByRuntime,
+        default::SimStep::OccupancyGridPipeline(_) => SimOverride::ExecuteByRuntime,
+        default::SimStep::NewAi(_) => SimOverride::ExecuteByRuntime,
+        default::SimStep::Localizer(_) => SimOverride::ExecutedBySim,
+        default::SimStep::LunabaseBridgeRxFromLunabaseRx(_) => SimOverride::ExecuteByRuntime,
+        default::SimStep::LunabaseBridgeTxToLunabase(_) => SimOverride::ExecuteByRuntime,
+        default::SimStep::__Phantom(_) => SimOverride::ExecutedBySim,
+    }
+}
+
+fn sim_callback(step: default::SimStep, data: &mut MjData<&MjModel>) -> SimOverride {
+    match step {
+        default::SimStep::UdevMonitor(_) => SimOverride::ExecutedBySim,
+        default::SimStep::CamSide(_) => SimOverride::ExecutedBySim,
+        default::SimStep::CamBack(_) => SimOverride::ExecutedBySim,
+        default::SimStep::CamLaptopFront(_) => SimOverride::ExecutedBySim,
+        default::SimStep::GstConvertBack(_) => SimOverride::ExecutedBySim,
+        default::SimStep::GstConvertSide(_) => SimOverride::ExecutedBySim,
+        default::SimStep::GstConvertLaptopFront(_) => SimOverride::ExecutedBySim,
+        default::SimStep::L2Pointcloud(_) => SimOverride::ExecutedBySim,
+        default::SimStep::L2Imu(_) => SimOverride::ExecutedBySim,
+        default::SimStep::V3Pico(CuTaskCallbackState::Process(input, _)) => {
+            static LIFT_DIRECTION: AtomicCell<Direction> = AtomicCell::new(Direction::Forward);
+            static BUCKET_DIRECTION: AtomicCell<Direction> = AtomicCell::new(Direction::Forward);
+            static LIFT_SPEED: AtomicCell<u16> = AtomicCell::new(0);
+            static BUCKET_SPEED: AtomicCell<u16> = AtomicCell::new(0);
+
+            static LIFT_TARGET: AtomicCell<f64> = AtomicCell::new(0.0);
+            static BUCKET_TARGET: AtomicCell<f64> = AtomicCell::new(0.0);
+
+            if let Some((_, Some(actuator_cmd))) = input.payload() {
+                match actuator_cmd {
+                    embedded_common::ActuatorCommand::SetSpeed(speed, actuator) => match actuator {
+                        embedded_common::Actuator::Lift => {
+                            LIFT_SPEED.store(*speed);
+                        }
+                        embedded_common::Actuator::Bucket => {
+                            BUCKET_SPEED.store(*speed);
+                        }
+                    },
+                    embedded_common::ActuatorCommand::SetDirection(direction, actuator) => {
+                        match actuator {
+                            embedded_common::Actuator::Lift => {
+                                LIFT_DIRECTION.store(*direction);
+                            }
+                            embedded_common::Actuator::Bucket => {
+                                BUCKET_DIRECTION.store(*direction);
+                            }
+                        }
+                    }
+                    embedded_common::ActuatorCommand::Shake => {}
+                    embedded_common::ActuatorCommand::StartPercuss => {}
+                    embedded_common::ActuatorCommand::StopPercuss => {}
+                }
+            }
+
+            let lift_speed = LIFT_SPEED.load();
+            let bucket_speed = BUCKET_SPEED.load();
+
+            let speed_scale = 0.01;
+
+            let mut lift_target = LIFT_TARGET.load();
+            if lift_speed > 0 {
+                let speed_normalized = (lift_speed as f64) / 65535.0;
+                let delta = speed_normalized * speed_scale;
+                lift_target += match LIFT_DIRECTION.load() {
+                    Direction::Forward => delta,
+                    Direction::Backward => -delta,
+                };
+                lift_target = lift_target.clamp(-3.5, 1.0);
+                LIFT_TARGET.store(lift_target);
+            }
+            data.actuator("lift_cylinder")
+                .expect("lift_cylinder actuator not found")
+                .view_mut(data)
+                .ctrl[0] = lift_target;
+
+            let mut bucket_target = BUCKET_TARGET.load();
+            if bucket_speed > 0 {
+                let speed_normalized = (bucket_speed as f64) / 65535.0;
+                let delta = speed_normalized * speed_scale;
+                bucket_target += match BUCKET_DIRECTION.load() {
+                    Direction::Forward => delta,
+                    Direction::Backward => -delta,
+                };
+                bucket_target = bucket_target.clamp(-2.0, 3.0);
+                BUCKET_TARGET.store(bucket_target);
+            }
+            data.actuator("bucket_cylinder")
+                .expect("bucket_cylinder actuator not found")
+                .view_mut(data)
+                .ctrl[0] = bucket_target;
+
+            SimOverride::ExecutedBySim
+        }
+        default::SimStep::V3Pico(..) => SimOverride::ExecutedBySim,
         default::SimStep::MotorCtrl(CuTaskCallbackState::Process(input, _)) => {
             if let Some((Some(steering), _)) = input.payload() {
                 let (left, right) = steering.get_left_and_right();
@@ -59,11 +158,11 @@ fn sim_callback(step: default::SimStep) -> SimOverride {
                 let left = (left * speed_mult) * 0.022;
                 let right = (right * speed_mult) * 0.022;
                 // left vesc
-                data.actuator("motor_fl").unwrap().view_mut(&mut data).ctrl[0] = left;
-                data.actuator("motor_bl").unwrap().view_mut(&mut data).ctrl[0] = left;
+                data.actuator("motor_fl").unwrap().view_mut(data).ctrl[0] = left;
+                data.actuator("motor_bl").unwrap().view_mut(data).ctrl[0] = left;
                 // right vesc
-                data.actuator("motor_fr").unwrap().view_mut(&mut data).ctrl[0] = right;
-                data.actuator("motor_br").unwrap().view_mut(&mut data).ctrl[0] = right;
+                data.actuator("motor_fr").unwrap().view_mut(data).ctrl[0] = right;
+                data.actuator("motor_br").unwrap().view_mut(data).ctrl[0] = right;
             }
             SimOverride::ExecutedBySim
         }
@@ -117,7 +216,7 @@ fn sim_callback(step: default::SimStep) -> SimOverride {
                     last_log_time.store(now_ns, Ordering::Relaxed);
                     if let Some(recorder) = RECORDER.get()
                         && let Err(e) = recorder.recorder.log(
-                            rerun_viz::ROBOT_STRUCTURE,
+                            ROBOT_STRUCTURE,
                             &rerun::Transform3D::from_translation_rotation(
                                 isometry.translation.vector.cast::<f32>().data.0[0],
                                 rerun::Quaternion::from_xyzw(
@@ -148,11 +247,7 @@ fn main() {
         .stack_size(20 * 1000000) // this size will depend on how big the copper list is
         .spawn(move || {
             let (model, mut viewer, data) = set_up_mujoco();
-            MJ_MODEL.set(model).expect("Failed to set mj model");
 
-            if MJ_DATA.set(Mutex::new(data)).is_err() {
-                panic!("Failed to set mj data");
-            }
             // Setup logging path for resimulation
             let logger_path = "logs/lunabotsim.copper";
             if let Some(parent) = Path::new(logger_path).parent() {
@@ -184,21 +279,25 @@ fn main() {
             let robot_chain = ChainBuilder::from(robot_chain).finish_static();
             let _ = ROBOT_STATE.set(RobotState {
                 kinematic_root: robot_chain,
-                kalman_state: Arc::new(RwLock::new(SimpleVector::<15>::from_element(0.0))),
-                kalman_variances: Arc::new(RwLock::new(
-                    SimpleSquareMatrix::<15>::from_diagonal_element(1E64),
-                )),
+                kalman_state: Arc::new(AtomicCell::new(Some(SVector::<f64, 12>::from_element(
+                    0.0,
+                )))),
+                kalman_variances: Arc::new(AtomicCell::new(Some(
+                    SMatrix::<f64, 12, 12>::from_diagonal_element(1E64),
+                ))),
             });
-
             let mut application = LunabotApplicationBuilder::new()
-                .with_sim_callback(&mut sim_callback)
                 .with_context(&copper_ctx)
+                .with_sim_callback(&mut default_callback)
                 .build()
                 .expect("Failed to create application.");
 
+            let mut sim_cb = |step: default::SimStep| -> SimOverride { sim_callback(step, data) };
+
             application
-                .start_all_tasks(&mut sim_callback)
+                .start_all_tasks(&mut sim_cb)
                 .expect("Failed to start all tasks.");
+
             let target_duration = std::time::Duration::from_nanos(1_000_000_000 / TARGET_HZ as u64);
             let mut last_time = std::time::Instant::now();
             let start = std::time::Instant::now();
@@ -206,12 +305,16 @@ fn main() {
             while viewer.running() {
                 counter += 1;
                 robot_clock_mock.set_value(start.elapsed().as_nanos() as u64);
-                application
-                    .run_one_iteration(&mut sim_callback)
-                    .expect("failed to run copper list iteration");
-                MJ_DATA.get().unwrap().lock().unwrap().step();
+                {
+                    let mut sim_cb =
+                        |step: default::SimStep| -> SimOverride { sim_callback(step, data) };
 
+                    application
+                        .run_one_iteration(&mut sim_cb)
+                        .expect("failed to run copper list iteration");
+                }
                 let elapsed = last_time.elapsed();
+                data.step();
                 if elapsed < target_duration {
                     std::thread::sleep(target_duration - elapsed);
                 }
@@ -257,7 +360,7 @@ fn set_up_mujoco() -> (
             "Arena not specified in arguments. Valid args: ucf, artemis. (set with SIM_ARENA=ucf make sim)"
         );
     }));
-    let mut timestep = 1.0 / (TARGET_HZ as f64);
+    let timestep = 1.0 / (TARGET_HZ as f64);
     // speed up the simulation by a little
     // timestep *= 1.6;
     model.opt_mut().timestep = timestep;
