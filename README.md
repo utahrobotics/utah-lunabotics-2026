@@ -234,11 +234,11 @@ List of common problems and how to fix them can be found [here](https://github.c
 ## misc/ 
 Contains libraries for kinematics, network protocols, GPU utilites/Shader pipelines, camera auto discovery, and interaction with VESC boards.
 
-## lunabot-cu/src/tasks/sources
-Contains source tasks for:
+## lunabot-cu/src/bridges/
+Contains task for communicating with the lunabase.
 
-* Receiving messages from sensors in external tasks (Realsense, L2 lidar)
-* Handling the connection to the lunabase.
+## lunabot-cu/src/tasks/sources
+
 
 ## lunabot-cu/src/tasks/sinks
 * Sink tasks for interacting with the actuators and motors
