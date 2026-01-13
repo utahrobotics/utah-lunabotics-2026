@@ -12,9 +12,10 @@ extends Control
 @onready var errored_tasks_label: Label = $VBoxContainer/CenterContainer/HBoxContainer/ErroredTasksPanel/MarginContainer/ScrollContainer/VBox/ErroredTasksLabel
 @onready var speed_label: Label = $VBoxContainer/TopPanel/SpeedLabel
 @onready var speed_slider: HSlider = $SpeedMultiplierSlider
-@onready var location_label: Label = $LocationLabel
+@onready var location_label: Label = $VBoxContainer/TopPanel/Spacer/location_label
 @onready var orientation_label: Label = $OrientationLabel
 @onready var PitchAndRollGUI: Control = $VBoxContainer/CenterContainer/UIAttitude
+@onready var velocity_label: Label = $VBoxContainer/TopPanel/Label/VeloLabel
 var command_recorder: CommandRecorder
 
 #Speed Slider
@@ -25,7 +26,7 @@ var weight: float
 #location label
 
 var get_location:= GetLocation.new()
-var location: PackedFloat32Array
+
 
 
 # Should match the LunabotStage enum in the Rust extension
@@ -95,9 +96,16 @@ func _process(delta: float) -> void:
 	var location = connection.get_location()
 	location_label.text = "location: [%.2f, %.2f, %.2f]" % [location[0], location[1], location[2]]
 	
+	#orientation label prob only here for debugging purposes 
 	var orientation = connection.get_orientation()
 	orientation_label.text = "orientation: [%.2f, %.2f, %.2f, %.2f]" % [orientation[0], orientation[1], orientation[2], orientation[3]
 ]
+ # velocity + acceleration labels
+	var velocity = connection.get_velocity()
+	var speed = sqrt(pow(velocity[0],2) + pow(velocity[1],2) + pow(velocity[2],2))
+	
+	#velocity_label.text = "velocity: [%.2f, %.2f, %.2f]" % [velocity[0], velocity[1], velocity[2]]
+	velocity_label.text = "Velocity: " + str(speed)
 	
 	
 	# Update errored tasks
@@ -150,4 +158,4 @@ func _on_speed_multiplier_slider_value_changed(value: float) -> void:
 
 	# Update UI
 	speed_label.text = "SpeedMultiplier set to " + str(new_weight)
-	print("Speed Multiplier set to ", new_weight)
+	

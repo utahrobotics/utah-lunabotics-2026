@@ -32,6 +32,13 @@ theme_override_constants/separation = 10
 layout_mode = 2
 text = "IP Address:"
 
+[node name="VeloLabel" type="Label" parent="VBoxContainer/TopPanel/Label"]
+layout_mode = 0
+offset_right = 183.0
+offset_bottom = 52.0
+text = "Velocity: "
+vertical_alignment = 2
+
 [node name="IPInput" type="LineEdit" parent="VBoxContainer/TopPanel"]
 custom_minimum_size = Vector2(150, 0)
 layout_mode = 2
@@ -45,6 +52,12 @@ text = "Connect"
 [node name="Spacer" type="Control" parent="VBoxContainer/TopPanel"]
 layout_mode = 2
 size_flags_horizontal = 3
+
+[node name="location_label" type="Label" parent="VBoxContainer/TopPanel/Spacer"]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 23.0
+text = "location:unknown"
 
 [node name="PacketLabel" type="Label" parent="VBoxContainer/TopPanel"]
 layout_mode = 2
@@ -182,20 +195,12 @@ position = Vector2(66.40618, 588.619)
 scale = Vector2(0.087393455, 0.07955249)
 texture = ExtResource("3_w6ul0")
 
-[node name="LocationLabel" type="Label" parent="."]
-layout_mode = 0
-offset_left = 443.0
-offset_top = 516.0
-offset_right = 608.0
-offset_bottom = 561.0
-text = "Location: Unkown"
-
 [node name="OrientationLabel" type="Label" parent="."]
 layout_mode = 0
-offset_left = 444.0
-offset_top = 535.0
-offset_right = 603.0
-offset_bottom = 586.0
+offset_left = 453.0
+offset_top = 529.0
+offset_right = 612.0
+offset_bottom = 580.0
 text = "Orientation:Unkown"
 
 [connection signal="value_changed" from="SpeedMultiplierSlider" to="." method="_on_speed_multiplier_slider_value_changed"]

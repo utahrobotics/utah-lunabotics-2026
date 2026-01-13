@@ -56,8 +56,8 @@ fn sim_callback(step: default::SimStep) -> SimOverride {
             if let Some((Some(steering), _)) = input.payload() {
                 let (left, right) = steering.get_left_and_right();
                 let speed_mult = steering.get_weight();
-                let left = (left * speed_mult) * 0.05;
-                let right = (right * speed_mult) * 0.05;
+                let left = (left * speed_mult) * 0.022;
+                let right = (right * speed_mult) * 0.022;
                 // left vesc
                 data.actuator("motor_fl").unwrap().view_mut(&mut data).ctrl[0] = left;
                 data.actuator("motor_bl").unwrap().view_mut(&mut data).ctrl[0] = left;

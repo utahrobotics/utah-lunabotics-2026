@@ -336,4 +336,27 @@ impl LunabaseConnection {
         values_sent
        
     }
+    #[func]
+    fn get_velocity(&mut self) -> PackedFloat32Array {
+        let mut values_sent = PackedFloat32Array::new();
+        if let Ok(velo) = self.velocity_base.lock() {
+            values_sent.clear();
+            values_sent.push(velo[0]);
+            values_sent.push(velo[1]);
+            values_sent.push(velo[2]);
+        }
+        values_sent
+    }
+
+    #[func]
+    fn get_acceleration(&mut self) -> PackedFloat32Array{
+       let mut values_sent = PackedFloat32Array::new();
+       if let Ok(accel ) = self.acceleration_base.lock(){
+         values_sent.clear();
+         values_sent.push(accel[0]);
+         values_sent.push(accel[1]);
+         values_sent.push(accel[2]);
+       }
+       values_sent
+    }
 }
