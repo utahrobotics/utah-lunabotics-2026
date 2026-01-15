@@ -12,6 +12,8 @@ use crate::tasks::ai::jobs::Job;
 
 // Distance between wheels, in m
 const WHEEL_BASE_SIZE: f32 = 0.6; // TODO fill in
+const MAX_DOT_SPEED: f32 = 3.0; // In m/s
+const DOT_SPEED_FACTOR: f32 = 1.0; // In m/s // TODO test and adjust
 
 /// follows path fails if the robot fails to move significantly in stuck_timeout_secs
 /// also could fail if this job is cancelled
@@ -30,12 +32,14 @@ pub fn follow_path_job(
             loop {
                 let robot_pos = _robot_isometry.translation.vector.xy().cast(); // TODO get robot position repeatedly
                 let robot_angle = _robot_isometry.rotation.euler_angles().2 as f32;
+                let error = dot - robot_pos;
 
                 let path: Vec<Vector2<f32>> = Vec::new(); // TODO get path
 
-                let dt: f32 = 0.1; // TODO determine or fix dt
-                // In m/s. Will be determined by distance between robot and dot.
-                let dot_speed = 0.1; // TODO determine by distance between robot and dot
+                let dt: f32 = 0.05; // TODO determine or fix dt
+
+                // In m/s. Moves faster when robot is closer, by inverse square law.
+                let dot_speed = (DOT_SPEED_FACTOR / error.norm_squared()).min(MAX_DOT_SPEED);
 
                 // Update dot location
                 //   Find closest segment
@@ -54,8 +58,6 @@ pub fn follow_path_job(
                     (path[closest_segment_index], path[closest_segment_index+1]),
                     dot_speed * dt
                 );
-
-                let error = dot - robot_pos;
 
                 // Calculate steering from dot and robot position
                 //   Some relevant math:
