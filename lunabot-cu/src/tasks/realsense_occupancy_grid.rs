@@ -1,16 +1,16 @@
 use bincode::Encode;
 use cu29::cutask::Freezable;
 use cu29::prelude::*;
-use nalgebra::{Isometry3, UnitQuaternion};
+use nalgebra::Isometry3;
 use rayon::{ThreadPool, ThreadPoolBuilder};
-use std::f64::consts::PI;
 use std::fmt::Debug;
-use std::sync::{Arc, Mutex};
+use std::io;
+use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use wgsl_pcl::pipelines::depth_to_obstacle::{ClearAffectedCellsOptions, ObstacleExpanderOptions};
 use wgsl_pcl::pipelines::filters::*;
 
 use iceoryx_types::{IceoryxDepthFrame, ImuMsg};
-use rerun::{ImageFormat, Points3D};
+use rerun::{ImageFormat, Points2D, Points3D};
 use simple_motion::StaticNode;
 use wgsl_pcl::DepthToPclAndHeightPipeline;
 use wgsl_pcl::gpu_types::AlignedMatrix4;
@@ -21,11 +21,15 @@ use crate::ROBOT_STATE;
 use crate::rerun_viz::RECORDER;
 use crate::tasks::{DEPTH_FRAME_HEIGHT, DEPTH_FRAME_SIZE, DEPTH_FRAME_WIDTH};
 
+pub static GLOBAL_MAP: OnceLock<Arc<RwLock<OccupancyGrid>>> = OnceLock::new();
+
+#[allow(unused)]
 struct ProcessRequest {
     layout: MapLayout,
     depths: Vec<u16>,
     depth_scale: f32,
     transform: AlignedMatrix4<f32>,
+    origin: (f32, f32),
 }
 
 pub struct OccupancyGridTask {
@@ -41,17 +45,16 @@ pub struct OccupancyGridTask {
     max_distance_traveled_before_reset: f64,
     max_radians_rotated_before_reset: f64,
     _min_grad_for_obstacle: f32,
-    global_map: OccupancyGrid,
 }
 
 #[derive(Serialize, Encode, bincode::Decode, Clone, Debug)]
 pub struct OccupancyGrid {
-    pub max_x: f32,
-    pub min_x: f32,
-    pub max_y: f32,
-    pub min_y: f32,
-    pub cell_size: f32,
+    /// the layout describes the size and resolution of the map
+    /// the layout is not sufficient to interpret the map data alone, the origin field is also needed
+    /// however the origin is automatically applied in some getter methods such as gradient_closest_to and world_to_cell
+    pub layout: MapLayout,
     pub gradient_map: Vec<f32>,
+    pub origin: (f32, f32),
 }
 
 impl OccupancyGrid {
@@ -75,43 +78,49 @@ impl OccupancyGrid {
     }
 
     pub fn cells_x(&self) -> usize {
-        ((self.max_x - self.min_x) / self.cell_size).ceil() as usize
+        ((self.layout.max_x - self.layout.min_x) / self.layout.cell_size).ceil() as usize
     }
 
     pub fn cells_y(&self) -> usize {
-        ((self.max_y - self.min_y) / self.cell_size).ceil() as usize
+        ((self.layout.max_y - self.layout.min_y) / self.layout.cell_size).ceil() as usize
     }
 
     /// Get gradient value at cell coordinates
-    pub fn gradient_at(&self, cell_x: usize, cell_y: usize) -> Option<f32> {
+    /// Returns None if a cell has not yet been mapped
+    /// Returns Err if a cell is out of bounds
+    pub fn gradient_at(&self, cell_x: usize, cell_y: usize) -> Result<Option<f32>, std::io::Error> {
         let cells_x = self.cells_x();
         let cells_y = self.cells_y();
         if cell_x >= cells_x || cell_y >= cells_y {
-            return None;
+            return Err(io::Error::other("cell out of bounds"));
         }
         let index = cell_x + cell_y * cells_x;
-        self.gradient_map
+        Ok(self
+            .gradient_map
             .get(index)
             .copied()
-            .filter(|&val| val != f32::MIN)
+            .filter(|&val| val != f32::MIN))
     }
 
     /// Get gradient value at world coordinates
-    pub fn gradient_closest_to(&self, x: f32, y: f32) -> Option<f32> {
+    /// uses origin to convert world coordinates to map-local coordinates
+    /// returns None if x and y are not in map bounds or if the gradient at x,y is unknown
+    pub fn gradient_closest_to(&self, x: f32, y: f32) -> Result<Option<f32>, std::io::Error> {
         let (cell_x, cell_y) = self.world_to_cell(x, y)?;
         self.gradient_at(cell_x, cell_y)
     }
 
     /// returns average gradient around cell
-    /// returns None if central cell is invalid
+    /// returns Err if central cell is out of bounds
+    /// returns Ok(none) if none of the cells in the kernel have been mapped
     pub fn gradient_around_cell(
         &self,
         cell_x: usize,
         cell_y: usize,
         kernel_size: usize,
-    ) -> Option<f32> {
-        if self.gradient_at(cell_x, cell_y).is_none() {
-            return None;
+    ) -> Result<Option<f32>, io::Error> {
+        if self.gradient_at(cell_x, cell_y)?.is_none() {
+            return Ok(None);
         }
         let mut gradients = Vec::new();
         let half_kernel = kernel_size as isize / 2;
@@ -122,24 +131,29 @@ impl OccupancyGrid {
                 if nx < 0 || ny < 0 {
                     continue;
                 }
-                if let Some(grad) = self.gradient_at(nx as usize, ny as usize) {
+                if let Ok(Some(grad)) = self.gradient_at(nx as usize, ny as usize) {
                     gradients.push(grad);
                 }
             }
         }
         if gradients.is_empty() {
-            None
+            Ok(None)
         } else {
-            Some(gradients.iter().sum::<f32>() / gradients.len() as f32)
+            Ok(Some(gradients.iter().sum::<f32>() / gradients.len() as f32))
         }
     }
 
     /// returns average gradient around world coordinate
-    /// returns None if central cell is invalid
-    pub fn gradient_around(&self, x: f32, y: f32, kernel_size: usize) -> Option<f32> {
+    /// returns none if no cells in the kernel have been mapped yet
+    pub fn gradient_around(
+        &self,
+        x: f32,
+        y: f32,
+        kernel_size: usize,
+    ) -> Result<Option<f32>, io::Error> {
         let (cell_x, cell_y) = self.world_to_cell(x, y)?;
-        if self.gradient_at(cell_x, cell_y).is_none() {
-            return None;
+        if self.gradient_at(cell_x, cell_y)?.is_none() {
+            return Ok(None);
         }
         let mut gradients = Vec::new();
         let half_kernel = kernel_size as isize / 2;
@@ -150,51 +164,61 @@ impl OccupancyGrid {
                 if nx < 0 || ny < 0 {
                     continue;
                 }
-                if let Some(grad) = self.gradient_at(nx as usize, ny as usize) {
+                if let Ok(Some(grad)) = self.gradient_at(nx as usize, ny as usize) {
                     gradients.push(grad);
                 }
             }
         }
+
         if gradients.is_empty() {
-            None
+            return Ok(None);
         } else {
-            Some(gradients.iter().sum::<f32>() / gradients.len() as f32)
+            return Ok(Some(gradients.iter().sum::<f32>() / gradients.len() as f32));
         }
     }
 
     /// Convert world coordinates to cell indices
     /// cell 0,0 is at (min_x, min_y)
-    pub fn world_to_cell(&self, x: f32, y: f32) -> Option<(usize, usize)> {
-        if x < self.min_x || x >= self.max_x || y < self.min_y || y >= self.max_y {
-            return None;
+    /// The origin offset is applied to transform world coordinates into the map's local coordinate system
+    /// Returns Err if cell out of bounds
+    pub fn world_to_cell(&self, x: f32, y: f32) -> Result<(usize, usize), std::io::Error> {
+        // Convert world coordinates to map-local coordinates by subtracting the origin
+        let local_x = x - self.origin.0;
+        let local_y = y - self.origin.1;
+
+        if local_x < self.layout.min_x
+            || local_x >= self.layout.max_x
+            || local_y < self.layout.min_y
+            || local_y >= self.layout.max_y
+        {
+            return Err(io::Error::other("cell out of bounds"));
         }
-        let cell_x = ((x - self.min_x) / self.cell_size).floor() as usize;
-        let cell_y = ((y - self.min_y) / self.cell_size).floor() as usize;
-        Some((cell_x, cell_y))
+        let cell_x = ((local_x - self.layout.min_x) / self.layout.cell_size).floor() as usize;
+        let cell_y = ((local_y - self.layout.min_y) / self.layout.cell_size).floor() as usize;
+        Ok((cell_x, cell_y))
     }
 
     /// Convert cell indices to world coordinates (returns cell center)
-    pub fn cell_to_world(&self, cell_x: usize, cell_y: usize) -> Option<(f32, f32)> {
+    /// The origin offset is applied to transform map-local coordinates into world coordinates
+    /// returns Err if cell out of bounds
+    pub fn cell_to_world(&self, cell_x: usize, cell_y: usize) -> Result<(f32, f32), io::Error> {
         let cells_x = self.cells_x();
         let cells_y = self.cells_y();
         if cell_x >= cells_x || cell_y >= cells_y {
-            return None;
+            return Err(io::Error::other("cell out of bounds"));
         }
-        let x = self.min_x + (cell_x as f32 + 0.5) * self.cell_size;
-        let y = self.min_y + (cell_y as f32 + 0.5) * self.cell_size;
-        Some((x, y))
+        let local_x = self.layout.min_x + (cell_x as f32 + 0.5) * self.layout.cell_size;
+        let local_y = self.layout.min_y + (cell_y as f32 + 0.5) * self.layout.cell_size;
+        Ok((local_x + self.origin.0, local_y + self.origin.1))
     }
 }
 
 impl Default for OccupancyGrid {
     fn default() -> Self {
         OccupancyGrid {
-            max_x: 0.0,
-            min_x: 0.0,
-            max_y: 0.0,
-            min_y: 0.0,
-            cell_size: 0.0,
+            layout: MapLayout::new(0.0, 0.0, 0.0, 0.0, 0.1),
             gradient_map: Vec::new(),
+            origin: (0.0, 0.0),
         }
     }
 }
@@ -415,6 +439,13 @@ impl CuTask for OccupancyGridTask {
                 .build()
                 .map_err(|e| CuError::new_with_cause("failed to create thread pool", e))?,
         );
+        GLOBAL_MAP.get_or_init(|| {
+            Arc::new(RwLock::new(OccupancyGrid {
+                layout: global_layout.clone(),
+                gradient_map: vec![f32::MIN; global_layout.cells_x() * global_layout.cells_y()],
+                origin: (0.0, 0.0),
+            }))
+        });
 
         Ok(Self {
             camera_node,
@@ -428,14 +459,6 @@ impl CuTask for OccupancyGridTask {
             max_radians_rotated_before_reset,
             rolling_map_start_position: camera_node.get_global_isometry(),
             _min_grad_for_obstacle: obstacle_gradient_threshold,
-            global_map: OccupancyGrid {
-                max_x,
-                min_x,
-                max_y,
-                min_y,
-                cell_size,
-                gradient_map: vec![f32::MIN; global_layout.cells_x() * global_layout.cells_y()],
-            },
         })
     }
 
@@ -449,7 +472,11 @@ impl CuTask for OccupancyGridTask {
 
         let mut output_buf = self.output_buffer.lock().unwrap();
 
-        if let Some(grid) = output_buf.take() {
+        if let Some(grid) = output_buf.take()
+            && let Some(global) = GLOBAL_MAP.get()
+            && let Ok(mut write_guard) = global.try_write()
+        // avoid deadlock if global map is being used elsewhere, this means the global map may be slightly behind at times but only for a short time
+        {
             let camera_isometry = self.camera_node.get_global_isometry();
             let relative_rotation =
                 camera_isometry.rotation.inverse() * self.rolling_map_start_position.rotation;
@@ -460,10 +487,12 @@ impl CuTask for OccupancyGridTask {
                 || relative_rotation.angle() > self.max_radians_rotated_before_reset
             {
                 drop(output_buf); // appease the borrow checker by dropping immutable borrow to self
-                let start = self.rolling_map_start_position.cast::<f32>();
-                self.append_local_to_global(&grid, start).map_err(|e| {
-                    CuError::new_with_cause("failed to append local map to global", e)
-                })?;
+
+                self.append_local_to_global(&grid, &mut *write_guard)
+                    .map_err(|e| {
+                        CuError::new_with_cause("failed to append local map to global", e)
+                    })?;
+
                 self.rolling_map_start_position = camera_isometry;
                 let mut pipeline_guard = self.depth_projector_pipeline.lock().unwrap();
                 pipeline_guard.clear_map(get_device());
@@ -499,6 +528,10 @@ impl CuTask for OccupancyGridTask {
             depths: depth_frame.depths.to_vec(),
             depth_scale: depth_frame.depth_scale,
             transform: iso.to_homogeneous().cast::<f32>().into(),
+            origin: (
+                self.rolling_map_start_position.translation.vector.x as f32,
+                self.rolling_map_start_position.translation.vector.y as f32,
+            ),
         };
 
         let pipeline = Arc::clone(&self.depth_projector_pipeline);
@@ -561,17 +594,15 @@ impl CuTask for OccupancyGridTask {
                             raw_height_map,
                             raw_gradient_map,
                             blur_filtered_height_map,
+                            request.origin,
                             logger,
                         );
                     }
 
                     let grid = OccupancyGrid {
-                        max_x: layout.max_x,
-                        min_x: layout.min_x,
-                        max_y: layout.max_y,
-                        min_y: layout.min_y,
-                        cell_size: layout.cell_size,
+                        layout,
                         gradient_map: obstacle_map,
+                        origin: request.origin,
                     };
 
                     let mut output_buf = output_buffer.lock().unwrap();
@@ -590,74 +621,64 @@ impl CuTask for OccupancyGridTask {
 
 impl OccupancyGridTask {
     /// also logs out the global map
+    /// only needs self for access to the global layout
     fn append_local_to_global(
         &mut self,
         local: &OccupancyGrid,
-        origin: Isometry3<f32>,
+        global_map: &mut OccupancyGrid,
     ) -> Result<(), Box<dyn std::error::Error>> {
         for x in 0..local.cells_x() {
             for y in 0..local.cells_y() {
-                let Some(local_coords) = local.cell_to_world(x, y) else {
+                // cell_to_world now returns world coordinates (already includes local map's origin)
+                let Ok(world_coords) = local.cell_to_world(x, y) else {
                     continue;
                 };
-                let Some(gradient) = local.gradient_at(x, y) else {
+                let Ok(Some(gradient)) = local.gradient_at(x, y) else {
                     continue;
                 };
-                let global_coords = origin.translation.vector
-                    + nalgebra::Vector3::new(local_coords.0, local_coords.1, 0.0);
 
                 if !self
                     .global_layout
-                    .is_in_bounds(global_coords.data.0[0][0], global_coords.data.0[0][0])
+                    .is_in_bounds(world_coords.0, world_coords.1)
                 {
                     continue;
                 }
-                let Some((x, y)) = self
-                    .global_map
-                    .world_to_cell(global_coords.data.0[0][0], global_coords.data.0[0][1])
-                else {
+                let Ok((gx, gy)) = global_map.world_to_cell(world_coords.0, world_coords.1) else {
                     continue;
                 };
-                self.global_map.set_gradient_at(x, y, gradient)?;
+                global_map.set_gradient_at(gx, gy, gradient)?;
             }
         }
 
         if let Some(logger) = RECORDER.get() {
-            // Log global obstacle map
-            let mut global_obstacle_image_data =
-                vec![0u8; self.global_map.cells_x() * self.global_map.cells_y() * 3];
-            for cell_y in 0..self.global_map.cells_y() {
-                for cell_x in 0..self.global_map.cells_x() {
-                    let idx = cell_x + cell_y * self.global_map.cells_x();
+            let mut global_obstacle_map_points = vec![];
+            let mut global_obstacle_map_colors = vec![];
+            for cell_y in 0..global_map.cells_y() {
+                for cell_x in 0..global_map.cells_x() {
+                    let idx = cell_x + cell_y * global_map.cells_x();
 
-                    if idx < self.global_map.gradient_map.len() {
-                        let z = self.global_map.gradient_map[idx];
-                        let pixel_idx = idx * 3;
+                    if idx < global_map.gradient_map.len() {
+                        let gradient = global_map.gradient_map[idx];
 
-                        if z == f32::MIN {
-                            // Black for invalid cells
-                            global_obstacle_image_data[pixel_idx] = 0;
-                            global_obstacle_image_data[pixel_idx + 1] = 0;
-                            global_obstacle_image_data[pixel_idx + 2] = 0;
-                        } else {
-                            let normalized = ((z + 1.0) / 4.0).clamp(0.0, 1.0);
-                            global_obstacle_image_data[pixel_idx] = (normalized * 255.0) as u8;
-                            global_obstacle_image_data[pixel_idx + 1] = 50;
-                            global_obstacle_image_data[pixel_idx + 2] =
-                                ((1.0 - normalized) * 255.0) as u8;
+                        if gradient != f32::MIN {
+                            if let Ok((world_x, world_y)) = global_map.cell_to_world(cell_x, cell_y)
+                            {
+                                global_obstacle_map_points.push([world_x, world_y]);
+
+                                let normalized = ((gradient + 1.0) / 4.0).clamp(0.0, 1.0);
+                                global_obstacle_map_colors.push([
+                                    (normalized * 255.0) as u8,
+                                    50,
+                                    ((1.0 - normalized) * 255.0) as u8,
+                                ]);
+                            }
                         }
                     }
                 }
             }
             let _ = logger.recorder.log(
                 "realsense/global_obstacle_map",
-                &rerun::Image::new(
-                    global_obstacle_image_data,
-                    ImageFormat::rgb8([
-                        self.global_map.cells_x() as u32,
-                        self.global_map.cells_y() as u32,
-                    ]),
-                ),
+                &Points2D::new(global_obstacle_map_points).with_colors(global_obstacle_map_colors),
             );
         }
 
@@ -671,31 +692,33 @@ fn log_map(
     raw_height_map: Vec<f32>,
     raw_gradient_map: Vec<f32>,
     blur_filtered_height_map: Vec<f32>,
+    origin: (f32, f32),
     logger: &crate::rerun_viz::RecorderData,
 ) {
     let cells_x = layout.cells_x();
     let cells_y = layout.cells_y();
 
-    // Create obstacle map as 2D image (RGB)
-    let mut obstacle_image_data = vec![0u8; cells_x * cells_y * 3];
+    let mut local_obstacle_points = Vec::new();
+    let mut local_obstacle_colors = Vec::new();
     for cell_y in 0..cells_y {
         for cell_x in 0..cells_x {
             let idx = cell_x + cell_y * cells_x;
 
             if idx < local_obstacle_map.len() {
-                let z = local_obstacle_map[idx];
-                let pixel_idx = idx * 3;
+                let gradient = local_obstacle_map[idx];
 
-                if z == f32::MIN {
-                    // Black for invalid cells
-                    obstacle_image_data[pixel_idx] = 0;
-                    obstacle_image_data[pixel_idx + 1] = 0;
-                    obstacle_image_data[pixel_idx + 2] = 0;
-                } else {
-                    let normalized = ((z + 1.0) / 4.0).clamp(0.0, 1.0);
-                    obstacle_image_data[pixel_idx] = (normalized * 255.0) as u8;
-                    obstacle_image_data[pixel_idx + 1] = 50;
-                    obstacle_image_data[pixel_idx + 2] = ((1.0 - normalized) * 255.0) as u8;
+                if gradient != f32::MIN {
+                    let x = layout.min_x + (cell_x as f32 + 0.5) * layout.cell_size + origin.0;
+                    let y = layout.min_y + (cell_y as f32 + 0.5) * layout.cell_size + origin.1;
+
+                    local_obstacle_points.push([x, y]);
+
+                    let normalized = ((gradient + 1.0) / 4.0).clamp(0.0, 1.0);
+                    local_obstacle_colors.push([
+                        (normalized * 255.0) as u8,
+                        50,
+                        ((1.0 - normalized) * 255.0) as u8,
+                    ]);
                 }
             }
         }
@@ -703,10 +726,7 @@ fn log_map(
 
     let _ = logger.recorder.log(
         "realsense/local_obstacle_map",
-        &rerun::Image::new(
-            obstacle_image_data,
-            ImageFormat::rgb8([cells_x as u32, cells_y as u32]),
-        ),
+        &Points2D::new(local_obstacle_points).with_colors(local_obstacle_colors),
     );
 
     // Log raw height map
@@ -720,8 +740,8 @@ fn log_map(
                 if z == f32::MIN {
                     continue;
                 }
-                let x = layout.min_x + (cell_x as f32 + 0.5) * layout.cell_size;
-                let y = layout.min_y + (cell_y as f32 + 0.5) * layout.cell_size;
+                let x = layout.min_x + (cell_x as f32 + 0.5) * layout.cell_size + origin.0;
+                let y = layout.min_y + (cell_y as f32 + 0.5) * layout.cell_size + origin.1;
                 raw_height_points.push([x, y, z]);
                 let normalized = ((z + 1.0) / 4.0).clamp(0.0, 1.0);
                 raw_height_colors.push([
@@ -748,8 +768,8 @@ fn log_map(
                 if gradient == f32::MIN {
                     continue;
                 }
-                let x = layout.min_x + (cell_x as f32 + 0.5) * layout.cell_size;
-                let y = layout.min_y + (cell_y as f32 + 0.5) * layout.cell_size;
+                let x = layout.min_x + (cell_x as f32 + 0.5) * layout.cell_size + origin.0;
+                let y = layout.min_y + (cell_y as f32 + 0.5) * layout.cell_size + origin.1;
                 // Use gradient value as z for visualization
                 gradient_points.push([x, y, gradient * 2.0]);
                 let normalized = (gradient * 2.0).clamp(0.0, 1.0);
@@ -777,8 +797,8 @@ fn log_map(
                 if z == f32::MIN {
                     continue;
                 }
-                let x = layout.min_x + (cell_x as f32 + 0.5) * layout.cell_size;
-                let y = layout.min_y + (cell_y as f32 + 0.5) * layout.cell_size;
+                let x = layout.min_x + (cell_x as f32 + 0.5) * layout.cell_size + origin.0;
+                let y = layout.min_y + (cell_y as f32 + 0.5) * layout.cell_size + origin.1;
                 blur_height_points.push([x, y, z]);
                 let normalized = ((z + 1.0) / 4.0).clamp(0.0, 1.0);
                 blur_height_colors.push([

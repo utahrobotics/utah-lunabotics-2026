@@ -8,19 +8,19 @@ pub mod rerun_viz;
 
 pub mod bridges;
 pub mod pathfinding;
+pub mod robot_state;
 pub mod simple_monitor;
 pub mod tasks;
 pub mod utils;
-pub mod robot_state;
 
 use crossbeam::atomic::AtomicCell;
 use cu29::prelude::*;
 use cu29_helpers::basic_copper_setup;
 use launcher::ProcessCommand;
 use nalgebra::{SMatrix, SVector};
-use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
+use simple_motion::{ChainBuilder, NodeSerde};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, OnceLock, RwLock};
+use std::sync::{Arc, OnceLock};
 use std::thread::sleep;
 use std::time::Duration;
 

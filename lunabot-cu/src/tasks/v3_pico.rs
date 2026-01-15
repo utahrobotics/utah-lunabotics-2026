@@ -251,7 +251,7 @@ mod prod_impl {
                 && *is_broken.borrow()
             {
                 error!("Pico broken");
-                powercycle_ioctl();
+                let _ = powercycle_ioctl();
                 return Err(CuError::new_with_cause(
                     "Error reading form pico",
                     std::io::Error::other("is broken signal received"),
