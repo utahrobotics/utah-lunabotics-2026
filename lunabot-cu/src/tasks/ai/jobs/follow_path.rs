@@ -78,7 +78,7 @@ pub fn follow_path_job(
 
                 let _ = output_tx.send(steering).await;
                 tokio::time::sleep(Duration::from_secs_f32(dt)).await;
-                let _ = status_tx.send(bonsai_bt::Status::Success); // This was used without full understanding - H
+                let _ = status_tx.send(bonsai_bt::Status::Running); // This was used without full understanding - H
             }
         },
         status_rx,
