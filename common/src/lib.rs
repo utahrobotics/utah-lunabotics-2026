@@ -86,6 +86,38 @@ impl Steering {
             weight,
         }
     }
+
+    /// Creates a new steering command from speed, angular velocity, and weight,
+    /// rather than just left and right.
+    /// 
+    /// ### Details
+    /// Inputs are normalized and then passed along to the regular `new`. The
+    /// ratio between speed and turning is maintained, thereby preserving
+    /// the turning radius.
+    /// Some relevant math: https://www.desmos.com/calculator/qgav8qt6ep
+    /// 
+    /// ### Arguments
+    /// * `speed` - \[-1.0, 1.0\] - How fast the robot should try to move forward,
+    ///   in percent of max speed.
+    /// * `turning` - \[-1.0, 1.0\] - How fast the robot should try to turn,
+    ///   in percent of max angular velocity. Positive is CCW.
+    pub fn new_ik(speed: f64, turning: f64, weight: f64) -> Self {
+        let left = speed - turning;
+        let right = speed + turning;
+
+        // Normalize
+        if left > 1.0 || left < -1.0 || right > 1.0 || right < -1.0 {
+            // Divide by larger, guaranteeing the smaller ends up in the box,
+            // and the larger is on the edge
+            if left.abs() > right.abs() {
+                return Steering::new(left / left.abs(), right / left.abs(), weight)
+            } else {
+                return Steering::new(left / right.abs(), right / right.abs(), weight)
+            }
+        }
+
+        return Steering::new(left, right, weight)
+    }
 }
 
 impl Default for Steering {
