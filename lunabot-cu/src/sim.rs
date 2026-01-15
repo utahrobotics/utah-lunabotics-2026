@@ -202,7 +202,7 @@ fn sim_callback(step: default::SimStep, data: &mut MjData<&MjModel>) -> SimOverr
                 let isometry = Isometry3::from_parts(
                     Translation3::new(coords[0], coords[1], coords[2]),
                     UnitQuaternion::from_quaternion(Quaternion::new(
-                        quat[0], quat[2], quat[2], quat[3],
+                        quat[0], quat[1], quat[2], quat[3],
                     )),
                 );
                 state.kinematic_root.set_isometry(isometry);
