@@ -20,7 +20,7 @@ const DOT_SPEED_FACTOR: f32 = 1.0; // In m/s // TODO test and adjust
 pub fn follow_path_job(
     _stuck_timeout_secs: f32,
     chain: StaticNode,
-    _path: Vec<Vector2<f32>>, // I just realized we're being given Vector2s, not f32 pairs. I'm a truly a fool.
+    _path: Vec<Vector2<f32>>,
 ) -> Job<Steering> {
     let (status_tx, status_rx) = watch::channel(bonsai_bt::Status::Running);
     let (output_tx, output_rx) = mpsc::channel(5);
