@@ -1,7 +1,7 @@
-use std::{f32, time::Duration};
+use std::{f32::{self, consts::PI}, time::Duration};
 
 use common::Steering;
-use nalgebra::Vector2;
+use nalgebra::{Matrix2, Rotation2, Vector2};
 use simple_motion::StaticNode;
 use tasker::tokio::{
     self,
@@ -23,9 +23,9 @@ pub fn follow_path_job(
         async move {
             let _robot_isometry = chain.get_global_isometry();
             // The current target on the path being followed. Will move along the path continuously.
-            let mut dot: (f32, f32) = (_robot_isometry.translation.x as f32, _robot_isometry.translation.y as f32);
+            let mut dot: Vector2<f32> = _robot_isometry.translation.vector.xy().cast();
             loop {
-                let path: Vec<(f32, f32)> = Vec::new(); // TODO get path
+                let path: Vec<Vector2<f32>> = Vec::new(); // TODO get path
                 let dt: f32 = 0.1; // TODO determine or fix dt
                 // In m/s. Will be determined by distance between robot and dot.
                 let dot_speed = 0.1; // TODO determine by distance between robot and dot
@@ -74,46 +74,33 @@ pub fn follow_path_job(
 }
 
 /// Determines the minimum distance between any part of a given line segment to a given point.
-fn distance_to_segment(start: (f32, f32), segment: ((f32, f32), (f32, f32))) -> f32 {
-    let start_point_dist = pair_dist(start, segment.0);
-    let end_point_dist = pair_dist(start, segment.1);
-    
-    let normalized_perpendicular_vector = pair_normalize((segment.0.1 - segment.1.1, segment.1.0 - segment.0.0));
-    let parallel_dist = pair_dot_prod(normalized_perpendicular_vector, start).abs();
+fn distance_to_segment(point: Vector2<f32>, segment: (Vector2<f32>, Vector2<f32>)) -> f32 {
+    // Move to frame where the start point is at the origin
+    let segment_vec = segment.1 - segment.0;
+    let point_from_start = point - segment.0;
 
-    start_point_dist.min(end_point_dist).min(parallel_dist)
+    let start_point_dist = point_from_start.norm();
+    let end_point_dist = (point - segment.1).norm();
+    
+    // If the point is between the two points (in the perpendicular projection of the segment),
+    // return the parallel distance
+    let dist_along_segment = point_from_start.dot(&segment_vec.normalize());
+    if dist_along_segment > 0.0 || dist_along_segment < segment_vec.norm() {
+        // a X v = |a| |b| cos(theta), but length of line segment shouldn't matter,
+        // so divide by |b|.
+        return segment_vec.cross(&point_from_start).norm() / segment_vec.norm();
+    }
+
+    return start_point_dist.min(end_point_dist);
 }
 
 /// Finds the closest point on a given line segment to a given point, then moves a given distance in the
 /// direction of the segment. Pretends the line is infinite.
-fn project_and_move_point_on_segment(start: (f32, f32), segment: ((f32, f32), (f32, f32)), movement: f32) -> (f32, f32) {
+fn project_and_move_point_on_segment(point: Vector2<f32>, segment: (Vector2<f32>, Vector2<f32>), movement: f32) -> Vector2<f32> {
+    // Move to frame where the start point is at the origin
+    let segment_vec = segment.1 - segment.0;
+    let point_from_start = point - segment.0;
     // Use a dot product to project the given point onto the segment
-    let normalized_parallel_vector = pair_normalize((segment.1.0 - segment.0.0, segment.0.1 - segment.1.1));
-    let parallel_dist = movement + pair_dot_prod((start.0 - segment.0.0, start.1 - segment.0.1), normalized_parallel_vector);
-    let parallel_projected_displacement = (normalized_parallel_vector.0 * parallel_dist, normalized_parallel_vector.1 * parallel_dist);
-
-    (segment.0.0 + parallel_projected_displacement.0, segment.0.1 + parallel_projected_displacement.1)
-}
-
-/// Finds the distance between two points represented as tuples.
-fn pair_dist(a: (f32, f32), b: (f32, f32)) -> f32 {
-    let dif_x = a.0 - b.0;
-    let dif_y = a.1 - b.1;
-
-    pair_magnitude((dif_x, dif_y))
-}
-
-/// Finds the dot product between two points represented as tuples.
-fn pair_dot_prod(a: (f32, f32), b: (f32, f32)) -> f32 {
-    a.0*b.0 + a.1*b.1
-}
-
-/// Converts a tuple fector to a unit tuple vector.
-fn pair_normalize(v: (f32, f32)) -> (f32, f32) {
-    (v.0 / pair_magnitude(v), v.1 / pair_magnitude(v))
-}
-
-/// Finds the magnitude of a pair vector.
-fn pair_magnitude(v: (f32, f32)) -> f32 {
-    (v.0*v.0 + v.1*v.1).sqrt()
+    let projection_distance = point_from_start.dot(&segment_vec.normalize());
+    return (projection_distance + movement) * segment_vec.normalize() + segment.0;
 }
