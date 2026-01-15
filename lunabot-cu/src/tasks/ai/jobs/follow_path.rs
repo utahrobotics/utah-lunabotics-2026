@@ -1,7 +1,7 @@
-use std::{f32::{self, consts::PI}, time::Duration};
+use std::{f32::{self}, time::Duration};
 
 use common::Steering;
-use nalgebra::{Matrix2, Rotation2, Vector2};
+use nalgebra::Vector2;
 use simple_motion::StaticNode;
 use tasker::tokio::{
     self,
@@ -15,10 +15,10 @@ const WHEEL_BASE_SIZE: f32 = 0.6; // TODO fill in
 const MAX_DOT_SPEED: f32 = 3.0; // In m/s
 const DOT_SPEED_FACTOR: f32 = 1.0; // In m/s // TODO test and adjust
 
-/// follows path fails if the robot fails to move significantly in stuck_timeout_secs
+/// follows path ~~fails if the robot fails to move significantly in stuck_timeout_secs~~ (TODO)
 /// also could fail if this job is cancelled
 pub fn follow_path_job(
-    _stuck_timeout_secs: f32,
+    _stuck_timeout_secs: f32, // Currently not used
     chain: StaticNode,
     _path: Vec<Vector2<f32>>,
 ) -> Job<Steering> {
@@ -26,15 +26,22 @@ pub fn follow_path_job(
     let (output_tx, output_rx) = mpsc::channel(5);
     Job::spawn(
         async move {
-            let _robot_isometry = chain.get_global_isometry();
             // The current target on the path being followed. Will move along the path continuously.
-            let mut dot: Vector2<f32> = _robot_isometry.translation.vector.xy().cast();
+            let mut dot: Vector2<f32> = chain.get_global_isometry().translation.vector.xy().cast();
             loop {
-                let robot_pos = _robot_isometry.translation.vector.xy().cast(); // TODO get robot position repeatedly
+                let _robot_isometry = chain.get_global_isometry();
+                // Flatten and set up
+                let robot_pos = _robot_isometry.translation.vector.xy().cast();
                 let robot_angle = _robot_isometry.rotation.euler_angles().2 as f32;
                 let error = dot - robot_pos;
 
-                let path: Vec<Vector2<f32>> = Vec::new(); // TODO get path
+                let path: Vec<Vector2<f32>> = vec![ // Temp hardcoded path
+                    Vector2::new(0.0, 0.0),
+                    Vector2::new(5.0, 1.0),
+                    Vector2::new(6.0, 5.0),
+                    Vector2::new(4.0, 3.0),
+                    Vector2::new(-1.0, -1.0), // Part of hacky way to end path
+                ]; // TODO get path
 
                 let dt: f32 = 0.05; // TODO determine or fix dt
 
@@ -52,12 +59,15 @@ pub fn follow_path_job(
                         closest_segment_index = i;
                     }
                 }
-                //   Move dot along closest segment
-                dot = project_and_move_point_on_segment(
-                    dot, 
-                    (path[closest_segment_index], path[closest_segment_index+1]),
-                    dot_speed * dt
-                );
+
+                if closest_segment_index < path.len() - 1 { // Hacky way to end path
+                    //   Move dot along closest segment
+                    dot = project_and_move_point_on_segment(
+                        dot, 
+                        (path[closest_segment_index], path[closest_segment_index+1]),
+                        dot_speed * dt
+                    );
+                }
 
                 // Calculate steering from dot and robot position
                 //   Some relevant math:
@@ -70,11 +80,18 @@ pub fn follow_path_job(
                 let angle_difference = error_angle - robot_angle;
                 let radius = target_distance / (2.0 * angle_difference.sin()); // Check if this has a sign error
 
-                //   Radius is proportional to the ratio of velocity to angular velocity:
-                //   https://www.desmos.com/calculator/f7grn652s4
-                let velocity = 1.0; // will be fixed by normalization // currently always goes max speed
-                let turning = velocity * WHEEL_BASE_SIZE * 0.5 / radius;
-                let steering = Steering::new_ik(velocity as f64, turning as f64, 5000.0);
+                // Only move if the dot is far enough away
+                let steering = if error.norm_squared() > 0.1 {
+                    //   Radius is proportional to the ratio of velocity to angular velocity:
+                    //   https://www.desmos.com/calculator/f7grn652s4
+                    let velocity = 1.0; // will be fixed by normalization // currently always goes max speed
+                    let turning = velocity * WHEEL_BASE_SIZE * 0.5 / radius;
+                    Steering::new_ik(velocity as f64, turning as f64, 5000.0)
+                } else {
+                    Steering::new(0.0, 0.0, 5000.0)
+                };
+
+                println!("Robot: {}\t Dot: {}", robot_pos, dot);
 
                 let _ = output_tx.send(steering).await;
                 tokio::time::sleep(Duration::from_secs_f32(dt)).await;
