@@ -10,6 +10,9 @@ use tasker::tokio::{
 
 use crate::tasks::ai::jobs::Job;
 
+// Distance between wheels, in m
+const WHEEL_BASE_SIZE: f32 = 0.6; // TODO fill in
+
 /// follows path fails if the robot fails to move significantly in stuck_timeout_secs
 /// also could fail if this job is cancelled
 pub fn follow_path_job(
@@ -25,7 +28,11 @@ pub fn follow_path_job(
             // The current target on the path being followed. Will move along the path continuously.
             let mut dot: Vector2<f32> = _robot_isometry.translation.vector.xy().cast();
             loop {
+                let robot_pos = _robot_isometry.translation.vector.xy().cast(); // TODO get robot position repeatedly
+                let robot_angle = _robot_isometry.rotation.euler_angles().2 as f32;
+
                 let path: Vec<Vector2<f32>> = Vec::new(); // TODO get path
+
                 let dt: f32 = 0.1; // TODO determine or fix dt
                 // In m/s. Will be determined by distance between robot and dot.
                 let dot_speed = 0.1; // TODO determine by distance between robot and dot
@@ -48,25 +55,29 @@ pub fn follow_path_job(
                     dot_speed * dt
                 );
 
+                let error = dot - robot_pos;
+
                 // Calculate steering from dot and robot position
-                //   TODO
+                //   Some relevant math:
+                //     https://www.desmos.com/calculator/pbk1kdxg5z
+                //     https://www.desmos.com/geometry/emcgvxxrg5
+                //   Determine radius of turn, so that turn intersects dot, and
+                //   aligns with current robot angle.
+                let target_distance = error.norm();
+                let error_angle = error.y.atan2(error.x);
+                let angle_difference = error_angle - robot_angle;
+                let radius = target_distance / (2.0 * angle_difference.sin()); // Check if this has a sign error
 
+                //   Radius is proportional to the ratio of velocity to angular velocity:
+                //   https://www.desmos.com/calculator/f7grn652s4
+                let velocity = 1.0; // will be fixed by normalization // currently always goes max speed
+                let turning = velocity * WHEEL_BASE_SIZE * 0.5 / radius;
+                let steering = Steering::new_ik(velocity as f64, turning as f64, 5000.0);
 
-                // OLD PLACEHOLDER CODE BELOW
-                println!("sending steering value");
-                // just sleep and then fail as an example but this loop should be following the path
-                let _ = output_tx.send(Steering::new(1.0, 1.0, 5000.0)).await;
-                // if you dont give a command to the vesc for more then ~1 second, as a saftey feature it will stop moving.
-                // in order to get the robot to continuously move you have to continuously send commands.
-                // For that reason, in this case it might be a good idea to keep track of the last known steering command from this job in the
-                // match arm for this Action, and just always use the last known steering instead of "consuming" the steering commands requiring this
-                // job to send more all the time.
-                tokio::time::sleep(Duration::from_secs(1)).await;
-                let _ = status_tx.send(bonsai_bt::Status::Failure);
-                break;
+                let _ = output_tx.send(steering).await;
+                tokio::time::sleep(Duration::from_secs_f32(dt)).await;
+                let _ = status_tx.send(bonsai_bt::Status::Success); // This was used without full understanding - H
             }
-            let _ = output_tx.send(Steering::new(0.0, 0.0, 5000.0)).await;
-            bonsai_bt::Status::Failure
         },
         status_rx,
         output_rx,
