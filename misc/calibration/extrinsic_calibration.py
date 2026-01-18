@@ -5,9 +5,6 @@ from pathlib import Path
 from typing import List, Tuple
 from datafusion import col
 
-import pyarrow as pa
-import pyarrow.compute as pc
-
 import numpy as np
 import rerun as rr
 import argparse
@@ -270,63 +267,39 @@ class Pose:
     log_time: int
 
 
-def arrow_vec_to_numpy(arr: pa.Array, width: int) -> np.ndarray:
-    t = arr.type
-
-    if pa.types.is_struct(t):
-        fields = [np.asarray(arr.field(i).to_numpy(zero_copy_only=False), dtype=np.float64) for i in range(width)]
-        return np.stack(fields, axis=1)
-
-    if pa.types.is_fixed_size_list(t):
-        flat = np.asarray(arr.values.to_numpy(zero_copy_only=False), dtype=np.float64)
-        return flat.reshape((-1, width))
-
-    if pa.types.is_list(t) or pa.types.is_large_list(t):
-        inner_type = t.value_type
-        if pa.types.is_fixed_size_list(inner_type):
-            flat_arr = pc.list_flatten(arr)
-            flat = np.asarray(flat_arr.values.to_numpy(zero_copy_only=False), dtype=np.float64)
-            return flat.reshape((-1, width))
+def extract_nested_array(series, width: int) -> np.ndarray:
+    result = []
+    for val in series:
+        if val is None or len(val) == 0:
+            result.append(np.full(width, np.nan))
         else:
-            flat_arr = pc.list_flatten(arr)
-            flat = np.asarray(flat_arr.to_numpy(zero_copy_only=False), dtype=np.float64)
-            return flat.reshape((-1, width))
-
-    raise TypeError(f"Unsupported Arrow type for vector column: {t}")
+            result.append(np.asarray(val[0], dtype=np.float64))
+    return np.array(result)
 
 
 def extract_poses(dataset, entity_path: str) -> List[Pose]:
     t_col = f"{entity_path}:Transform3D:translation"
     q_col = f"{entity_path}:Transform3D:quaternion"
 
-    poses: List[Pose] = []
-
     view = dataset.filter_contents([entity_path])
     df = view.reader(index="log_time", fill_latest_at=True)
     df = df.select(col("log_time"), col(t_col), col(q_col)).sort(col("log_time"))
 
-    for batch in df.collect():
-        log_time = np.asarray(batch.column("log_time").to_numpy(zero_copy_only=False), dtype=np.int64)
+    pdf = df.to_pandas()
 
-        t_arr = batch.column(t_col)
-        q_arr = batch.column(q_col)
+    times = pdf["log_time"].values.astype(np.int64)
+    translations = extract_nested_array(pdf[t_col], 3)
+    quaternions = extract_nested_array(pdf[q_col], 4)
 
-        t_null = np.asarray(t_arr.is_null().to_numpy(zero_copy_only=False), dtype=bool)
-        q_null = np.asarray(q_arr.is_null().to_numpy(zero_copy_only=False), dtype=bool)
-        keep = ~(t_null | q_null)
+    valid = ~(np.isnan(translations).any(axis=1) | np.isnan(quaternions).any(axis=1))
 
-        if not np.any(keep):
-            continue
-
-        t_np_all = arrow_vec_to_numpy(t_arr, 3)
-        q_np_all = arrow_vec_to_numpy(q_arr, 4)
-
-        t_np = t_np_all[keep]
-        q_np = q_np_all[keep]
-        times = log_time[keep]
-
-        for i in range(len(times)):
-            poses.append(Pose(t_xyz=t_np[i], q_xyzw=q_np[i], log_time=int(times[i])))
+    poses: List[Pose] = []
+    for i in np.where(valid)[0]:
+        poses.append(Pose(
+            t_xyz=translations[i],
+            q_xyzw=quaternions[i],
+            log_time=int(times[i])
+        ))
 
     return poses
 
