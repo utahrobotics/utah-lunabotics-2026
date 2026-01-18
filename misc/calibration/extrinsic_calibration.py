@@ -4,83 +4,42 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Tuple
 from datafusion import col
+from scipy.spatial.transform import Rotation, Slerp
 
 import numpy as np
 import rerun as rr
 import argparse
 
 
-def normalize_quat(q: np.ndarray) -> np.ndarray:
-    return q / np.linalg.norm(q)
+@dataclass(frozen=True)
+class Pose:
+    t_xyz: np.ndarray
+    q_xyzw: np.ndarray
+    log_time: int
 
+    def to_matrix(self) -> np.ndarray:
+        T = np.eye(4)
+        T[:3, :3] = Rotation.from_quat(self.q_xyzw).as_matrix()
+        T[:3, 3] = self.t_xyz
+        return T
 
-def quat_to_rot(q: np.ndarray) -> np.ndarray:
-    x, y, z, w = q
-    return np.array([
-        [1 - 2*(y*y + z*z), 2*(x*y - z*w), 2*(x*z + y*w)],
-        [2*(x*y + z*w), 1 - 2*(x*x + z*z), 2*(y*z - x*w)],
-        [2*(x*z - y*w), 2*(y*z + x*w), 1 - 2*(x*x + y*y)]
-    ])
+    @staticmethod
+    def from_matrix(T: np.ndarray, log_time: int = 0) -> "Pose":
+        return Pose(
+            t_xyz=T[:3, 3].copy(),
+            q_xyzw=Rotation.from_matrix(T[:3, :3]).as_quat(),
+            log_time=log_time
+        )
 
+    def inverse(self) -> "Pose":
+        T_inv = np.linalg.inv(self.to_matrix())
+        return Pose.from_matrix(T_inv, self.log_time)
 
-def rot_to_quat(R: np.ndarray) -> np.ndarray:
-    trace = np.trace(R)
-    if trace > 0:
-        s = 0.5 / np.sqrt(trace + 1.0)
-        w = 0.25 / s
-        x = (R[2, 1] - R[1, 2]) * s
-        y = (R[0, 2] - R[2, 0]) * s
-        z = (R[1, 0] - R[0, 1]) * s
-    elif R[0, 0] > R[1, 1] and R[0, 0] > R[2, 2]:
-        s = 2.0 * np.sqrt(1.0 + R[0, 0] - R[1, 1] - R[2, 2])
-        w = (R[2, 1] - R[1, 2]) / s
-        x = 0.25 * s
-        y = (R[0, 1] + R[1, 0]) / s
-        z = (R[0, 2] + R[2, 0]) / s
-    elif R[1, 1] > R[2, 2]:
-        s = 2.0 * np.sqrt(1.0 + R[1, 1] - R[0, 0] - R[2, 2])
-        w = (R[0, 2] - R[2, 0]) / s
-        x = (R[0, 1] + R[1, 0]) / s
-        y = 0.25 * s
-        z = (R[1, 2] + R[2, 1]) / s
-    else:
-        s = 2.0 * np.sqrt(1.0 + R[2, 2] - R[0, 0] - R[1, 1])
-        w = (R[1, 0] - R[0, 1]) / s
-        x = (R[0, 2] + R[2, 0]) / s
-        y = (R[1, 2] + R[2, 1]) / s
-        z = 0.25 * s
-    return normalize_quat(np.array([x, y, z, w]))
+    def compose(self, other: "Pose") -> "Pose":
+        return Pose.from_matrix(self.to_matrix() @ other.to_matrix(), other.log_time)
 
-
-def pose_to_matrix(pose: "Pose") -> np.ndarray:
-    T = np.eye(4)
-    T[:3, :3] = quat_to_rot(pose.q_xyzw)
-    T[:3, 3] = pose.t_xyz
-    return T
-
-
-def matrix_to_pose(T: np.ndarray, log_time: int = 0) -> "Pose":
-    return Pose(
-        t_xyz=T[:3, 3].copy(),
-        q_xyzw=rot_to_quat(T[:3, :3]),
-        log_time=log_time
-    )
-
-
-def invert_pose(pose: "Pose") -> "Pose":
-    T = pose_to_matrix(pose)
-    T_inv = np.linalg.inv(T)
-    return matrix_to_pose(T_inv, pose.log_time)
-
-
-def compose_poses(p1: "Pose", p2: "Pose") -> "Pose":
-    T1 = pose_to_matrix(p1)
-    T2 = pose_to_matrix(p2)
-    return matrix_to_pose(T1 @ T2, p2.log_time)
-
-
-def compute_relative_motion(pose_prev: "Pose", pose_curr: "Pose") -> "Pose":
-    return compose_poses(invert_pose(pose_prev), pose_curr)
+    def relative_to(self, other: "Pose") -> "Pose":
+        return self.inverse().compose(other)
 
 
 def skew(v: np.ndarray) -> np.ndarray:
@@ -91,24 +50,7 @@ def skew(v: np.ndarray) -> np.ndarray:
     ])
 
 
-def rot_to_axis_angle(R: np.ndarray) -> Tuple[np.ndarray, float]:
-    angle = np.arccos(np.clip((np.trace(R) - 1) / 2, -1, 1))
-    if angle < 1e-10:
-        return np.array([1.0, 0.0, 0.0]), 0.0
-    if np.abs(angle - np.pi) < 1e-10:
-        eigvals, eigvecs = np.linalg.eig(R)
-        idx = np.argmin(np.abs(eigvals - 1))
-        axis = np.real(eigvecs[:, idx])
-        return axis / np.linalg.norm(axis), angle
-    axis = np.array([
-        R[2, 1] - R[1, 2],
-        R[0, 2] - R[2, 0],
-        R[1, 0] - R[0, 1]
-    ]) / (2 * np.sin(angle))
-    return axis, angle
-
-
-def calibrate_hand_eye(poses_A: List["Pose"], poses_B: List["Pose"]) -> np.ndarray:
+def calibrate_hand_eye(poses_A: List[Pose], poses_B: List[Pose]) -> np.ndarray:
     n = len(poses_A)
     if n != len(poses_B) or n < 3:
         raise ValueError("Need at least 3 synchronized pose pairs")
@@ -117,8 +59,8 @@ def calibrate_hand_eye(poses_A: List["Pose"], poses_B: List["Pose"]) -> np.ndarr
     B_list = []
 
     for i in range(n - 1):
-        A_rel = compute_relative_motion(poses_A[i], poses_A[i + 1])
-        B_rel = compute_relative_motion(poses_B[i], poses_B[i + 1])
+        A_rel = poses_A[i].relative_to(poses_A[i + 1])
+        B_rel = poses_B[i].relative_to(poses_B[i + 1])
         A_list.append(A_rel)
         B_list.append(B_rel)
 
@@ -126,21 +68,18 @@ def calibrate_hand_eye(poses_A: List["Pose"], poses_B: List["Pose"]) -> np.ndarr
     b = np.zeros(3 * len(A_list))
 
     valid_count = 0
-    for i, (A_rel, B_rel) in enumerate(zip(A_list, B_list)):
-        R_A = quat_to_rot(A_rel.q_xyzw)
-        R_B = quat_to_rot(B_rel.q_xyzw)
+    for A_rel, B_rel in zip(A_list, B_list):
+        rotvec_A = Rotation.from_quat(A_rel.q_xyzw).as_rotvec()
+        rotvec_B = Rotation.from_quat(B_rel.q_xyzw).as_rotvec()
 
-        axis_A, angle_A = rot_to_axis_angle(R_A)
-        axis_B, angle_B = rot_to_axis_angle(R_B)
+        angle_A = np.linalg.norm(rotvec_A)
+        angle_B = np.linalg.norm(rotvec_B)
 
         if angle_A < 0.01 or angle_B < 0.01:
             continue
 
-        alpha = axis_A * angle_A
-        beta = axis_B * angle_B
-
-        M[3*valid_count:3*valid_count+3, :] = skew(alpha + beta)
-        b[3*valid_count:3*valid_count+3] = beta - alpha
+        M[3*valid_count:3*valid_count+3, :] = skew(rotvec_A + rotvec_B)
+        b[3*valid_count:3*valid_count+3] = rotvec_B - rotvec_A
         valid_count += 1
 
     if valid_count < 2:
@@ -151,19 +90,14 @@ def calibrate_hand_eye(poses_A: List["Pose"], poses_B: List["Pose"]) -> np.ndarr
 
     r_x, _, _, _ = np.linalg.lstsq(M, b, rcond=None)
 
-    theta = np.linalg.norm(r_x)
-    if theta < 1e-10:
-        R_X = np.eye(3)
-    else:
-        k = r_x / theta
-        R_X = np.eye(3) + np.sin(theta) * skew(k) + (1 - np.cos(theta)) * (skew(k) @ skew(k))
+    R_X = Rotation.from_rotvec(r_x).as_matrix()
 
     C = np.zeros((3 * len(A_list), 3))
     d = np.zeros(3 * len(A_list))
 
     valid_count = 0
-    for i, (A_rel, B_rel) in enumerate(zip(A_list, B_list)):
-        R_A = quat_to_rot(A_rel.q_xyzw)
+    for A_rel, B_rel in zip(A_list, B_list):
+        R_A = Rotation.from_quat(A_rel.q_xyzw).as_matrix()
         t_A = A_rel.t_xyz
         t_B = B_rel.t_xyz
 
@@ -183,32 +117,7 @@ def calibrate_hand_eye(poses_A: List["Pose"], poses_B: List["Pose"]) -> np.ndarr
     return X
 
 
-def slerp(q0: np.ndarray, q1: np.ndarray, t: float) -> np.ndarray:
-    q0 = normalize_quat(q0)
-    q1 = normalize_quat(q1)
-
-    dot = np.dot(q0, q1)
-
-    if dot < 0:
-        q1 = -q1
-        dot = -dot
-
-    if dot > 0.9995:
-        result = q0 + t * (q1 - q0)
-        return normalize_quat(result)
-
-    theta_0 = np.arccos(dot)
-    theta = theta_0 * t
-    sin_theta = np.sin(theta)
-    sin_theta_0 = np.sin(theta_0)
-
-    s0 = np.cos(theta) - dot * sin_theta / sin_theta_0
-    s1 = sin_theta / sin_theta_0
-
-    return s0 * q0 + s1 * q1
-
-
-def interpolate_pose(p0: "Pose", p1: "Pose", target_time: int) -> "Pose":
+def interpolate_pose(p0: Pose, p1: Pose, target_time: int) -> Pose:
     t0, t1 = p0.log_time, p1.log_time
     if t1 == t0:
         return p0
@@ -216,14 +125,17 @@ def interpolate_pose(p0: "Pose", p1: "Pose", target_time: int) -> "Pose":
     alpha = (target_time - t0) / (t1 - t0)
 
     t_interp = p0.t_xyz + alpha * (p1.t_xyz - p0.t_xyz)
-    q_interp = slerp(p0.q_xyzw, p1.q_xyzw, alpha)
+
+    rots = Rotation.from_quat([p0.q_xyzw, p1.q_xyzw])
+    slerp = Slerp([0, 1], rots)
+    q_interp = slerp(alpha).as_quat()
 
     return Pose(t_xyz=t_interp, q_xyzw=q_interp, log_time=target_time)
 
 
 def interpolate_poses_to_timestamps(
-    poses: List["Pose"], target_times: np.ndarray
-) -> Tuple[List["Pose"], np.ndarray]:
+    poses: List[Pose], target_times: np.ndarray
+) -> Tuple[List[Pose], np.ndarray]:
     if not poses:
         return [], np.array([], dtype=bool)
 
@@ -258,13 +170,6 @@ def interpolate_poses_to_timestamps(
         valid_mask.append(True)
 
     return interpolated, np.array(valid_mask, dtype=bool)
-
-
-@dataclass(frozen=True)
-class Pose:
-    t_xyz: np.ndarray
-    q_xyzw: np.ndarray
-    log_time: int
 
 
 def extract_nested_array(series, width: int) -> np.ndarray:
@@ -317,7 +222,7 @@ def main() -> None:
         t265_poses = extract_poses(dataset, "/localizer/t265_raw")
 
     print(f"Extracted {len(kiss_icp_poses)} kiss-icp poses")
-    print(f"Extracted {len(t265_poses)} t256 poses")
+    print(f"Extracted {len(t265_poses)} t265 poses")
 
     kiss_times = np.array([p.log_time for p in kiss_icp_poses])
     t265_interp, valid_mask = interpolate_poses_to_timestamps(t265_poses, kiss_times)
@@ -330,33 +235,29 @@ def main() -> None:
 
     X = calibrate_hand_eye(kiss_icp_aligned, t265_interp)
 
-    R = X[:3, :3]
-    sy = np.sqrt(R[0, 0]**2 + R[1, 0]**2)
-    singular = sy < 1e-6
-    if not singular:
-        roll = np.arctan2(R[2, 1], R[2, 2])
-        pitch = np.arctan2(-R[2, 0], sy)
-        yaw = np.arctan2(R[1, 0], R[0, 0])
-    else:
-        roll = np.arctan2(-R[1, 2], R[1, 1])
-        pitch = np.arctan2(-R[2, 0], sy)
-        yaw = 0
+    R = Rotation.from_matrix(X[:3, :3])
+    q = R.as_quat()
+    euler = R.as_euler('xyz', degrees=True)
 
     print("\nExtrinsic Calibration Results:")
-    print("Transform from t256 --> kiss-icp")
+    print("Transform from t265 --> kiss-icp")
 
     print("\n4x4 Transformation Matrix:")
     for row in X:
         print(f"  [{row[0]:+.6f}, {row[1]:+.6f}, {row[2]:+.6f}, {row[3]:+.6f}]")
 
-    print(f"\nTranslation (whatever units rerun uses):")
+    print(f"\nTranslation:")
     print(f"  x: {X[0, 3]:+.6f}")
     print(f"  y: {X[1, 3]:+.6f}")
     print(f"  z: {X[2, 3]:+.6f}")
 
-    print(f"\nRotation quaternion")
-    q = rot_to_quat(R)
+    print(f"\nRotation (quaternion [x, y, z, w]):")
     print(f"  [{q[0]:+.6f}, {q[1]:+.6f}, {q[2]:+.6f}, {q[3]:+.6f}]")
+
+    print(f"\nRotation (euler xyz, degrees):")
+    print(f"  roll:  {euler[0]:+.3f}")
+    print(f"  pitch: {euler[1]:+.3f}")
+    print(f"  yaw:   {euler[2]:+.3f}")
 
 
 if __name__ == "__main__":
