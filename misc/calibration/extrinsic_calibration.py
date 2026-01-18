@@ -186,31 +186,6 @@ def calibrate_hand_eye(poses_A: List["Pose"], poses_B: List["Pose"]) -> np.ndarr
     return X
 
 
-def compute_calibration_error(poses_A: List["Pose"], poses_B: List["Pose"], X: np.ndarray) -> dict:
-    rotation_errors = []
-    translation_errors = []
-
-    for i in range(len(poses_A) - 1):
-        A_rel = pose_to_matrix(compute_relative_motion(poses_A[i], poses_A[i + 1]))
-        B_rel = pose_to_matrix(compute_relative_motion(poses_B[i], poses_B[i + 1]))
-
-        AX = A_rel @ X
-        XB = X @ B_rel
-
-        R_err = AX[:3, :3] - XB[:3, :3]
-        rotation_errors.append(np.linalg.norm(R_err, 'fro'))
-
-        t_err = AX[:3, 3] - XB[:3, 3]
-        translation_errors.append(np.linalg.norm(t_err))
-
-    return {
-        'rotation_rmse': np.sqrt(np.mean(np.array(rotation_errors)**2)),
-        'translation_rmse': np.sqrt(np.mean(np.array(translation_errors)**2)),
-        'rotation_max': np.max(rotation_errors),
-        'translation_max': np.max(translation_errors),
-    }
-
-
 def slerp(q0: np.ndarray, q1: np.ndarray, t: float) -> np.ndarray:
     q0 = normalize_quat(q0)
     q1 = normalize_quat(q1)
@@ -381,7 +356,6 @@ def main() -> None:
         return
 
     X = calibrate_hand_eye(kiss_icp_aligned, t265_interp)
-    errors = compute_calibration_error(kiss_icp_aligned, t265_interp, X)
 
     R = X[:3, :3]
     sy = np.sqrt(R[0, 0]**2 + R[1, 0]**2)
@@ -396,7 +370,7 @@ def main() -> None:
         yaw = 0
 
     print("\nExtrinsic Calibration Results:")
-    print("Transform from t256 to kiss-icp frame")
+    print("Transform from t256 --> kiss-icp")
 
     print("\n4x4 Transformation Matrix:")
     for row in X:
