@@ -157,7 +157,7 @@ impl CuTask for AprilDetectionHandler {
                         continue;
                     };
                     if observation.tag_local_isometry.translation.vector.magnitude() > self.max_distance {
-                        println!("ignored > max distance");
+                        // println!("ignored > max distance");
                         continue;
                     }
 

@@ -6,7 +6,6 @@ use std::time::{Duration, Instant};
 
 use bincode::error::DecodeError;
 use common::{FromLunabase, FromLunabot, LunabotStage, Steering};
-use crossbeam_channel::{Receiver, Sender};
 use godot::prelude::*;
 use quic::QuicClient;
 
@@ -258,7 +257,7 @@ impl LunabaseConnection {
     }
 
     #[func]
-    fn set_speed(&mut self, weight: f64) -> f64{
+    fn set_speed(&mut self, weight: f64) -> f64 {
         self.current_weight = weight;
         if let Some(ref client) = self.client {
             match client.send(FromLunabase::Steering(Steering::new(
@@ -274,9 +273,7 @@ impl LunabaseConnection {
         } else {
             godot_warn!("Cannot send steering: not connected");
         }
-        
-        self.current_weight
 
+        self.current_weight
     }
-    
 }

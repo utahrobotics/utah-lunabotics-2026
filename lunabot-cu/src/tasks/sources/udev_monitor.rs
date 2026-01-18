@@ -52,14 +52,14 @@ impl CuSrcTask for UdevMonitor {
             let udev = match Udev::new() {
                 Ok(x) => x,
                 Err(e) => {
-                    error!("Failed to create udev context: {e}");
+                    eprintln!("Failed to create udev context: {e}");
                     return Err(CuError::new_with_cause("Failed to create udev context", e));
                 }
             };
             match udev::Enumerator::with_udev(udev) {
                 Ok(x) => x,
                 Err(e) => {
-                    error!("Failed to create udev enumerator: {e}");
+                    eprintln!("Failed to create udev enumerator: {e}");
                     return Err(CuError::new_with_cause(
                         "Failed to create udev enumerator",
                         e,
@@ -68,12 +68,12 @@ impl CuSrcTask for UdevMonitor {
             }
         };
         if let Err(e) = enumerator.match_subsystem("video4linux") {
-            error!("Failed to set match-subsystem filter: {e}");
+            eprintln!("Failed to set match-subsystem filter: {e}");
         }
         let devices = match enumerator.scan_devices() {
             Ok(x) => x,
             Err(e) => {
-                error!("Failed to scan devices: {e}");
+                eprintln!("Failed to scan devices: {e}");
                 return Err(CuError::new_with_cause("Failed to enumerate devices", e));
             }
         };
@@ -89,7 +89,7 @@ impl CuSrcTask for UdevMonitor {
                 continue;
             }
             let Some(udev_index) = device.attribute_value("index") else {
-                info!("No udev_index for camera {}", path_str);
+                println!("No udev_index for camera {}", path_str);
                 continue;
             };
             if udev_index.to_str() != Some("0") {
@@ -103,11 +103,11 @@ impl CuSrcTask for UdevMonitor {
                 }
             }
             let Some(port_raw) = device.property_value("ID_PATH") else {
-                info!("No port for camera {}", &path_str);
+                println!("No port for camera {}", &path_str);
                 continue;
             };
             let Some(port) = port_raw.to_str() else {
-                info!("Failed to parse port of camera {path_str}");
+                println!("Failed to parse port of camera {path_str}");
                 continue;
             };
             self.initial_enumerated.push(NewDevice {
@@ -125,12 +125,12 @@ impl CuSrcTask for UdevMonitor {
         Ok(())
     }
 
-    fn process(&mut self, clock: &RobotClock, output: &mut Self::Output<'_>) -> CuResult<()> {
+    fn process(&mut self, _clock: &RobotClock, output: &mut Self::Output<'_>) -> CuResult<()> {
         output.clear_payload();
         // first pop off the initial enumerated devices
         if !self.initial_enumerated.is_empty() {
             let device = self.initial_enumerated.pop().unwrap();
-            info!("udev_monitor: Found device {}", &device.dev_path);
+            println!("udev_monitor: Found device {}", &device.dev_path);
             output.set_payload(device);
             return Ok(());
         }
@@ -150,7 +150,7 @@ impl CuSrcTask for UdevMonitor {
                             return Ok(());
                         }
                         let Some(udev_index) = event.attribute_value("index") else {
-                            info!("No udev_index for camera {path_str}");
+                            println!("No udev_index for camera {path_str}");
                             return Ok(());
                         };
                         if udev_index.to_str() != Some("0") {
@@ -164,14 +164,13 @@ impl CuSrcTask for UdevMonitor {
                             }
                         }
                         let Some(port_raw) = event.property_value("ID_PATH") else {
-                            info!("No port for camera {}", &path_str);
+                            println!("No port for camera {}", &path_str);
                             return Ok(());
                         };
                         let Some(port) = port_raw.to_str() else {
-                            info!("Failed to parse port of camera {path_str}");
+                            println!("Failed to parse port of camera {path_str}");
                             return Ok(());
                         };
-                        debug!("got add event for main video device {}", path_str);
                         output.set_payload(NewDevice {
                             port: Box::new(port.to_string()),
                             dev_path: Box::new(path_str.to_string()),
