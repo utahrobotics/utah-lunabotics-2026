@@ -94,6 +94,8 @@
       <geom material="DefaultMaterialLunabot" mesh="simplify_lunabot" class="visual" />
       <site name="lift_actuator_base" pos="0.39 -0.22 0.04" />
 
+      <site name="imu_mount" pos="0.4 -0.20 0.09" />
+
       <body name="lift_arm">
         <joint name="lift_hinge" type="hinge" axis="0 1 0" pos="0.0 -0.20 0.10" damping="0.0" />
         <site name="lift_arm_actuator_attach" pos="0.717 -0.218 0.643" />
@@ -348,6 +350,11 @@
 
 
   </contact>
+
+  <sensor>
+    <velocimeter name="lunabot_velocimeter" site="imu_mount" />
+    <gyro name="lunabot_gyro" site="imu_mount" />
+  </sensor>
 
   <actuator>
     <velocity ctrllimited="true" ctrlrange="-100 1000" name="motor_fl" joint="motor_fl" gear="5"

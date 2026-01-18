@@ -192,6 +192,8 @@ fn sim_callback(step: default::SimStep, data: &mut MjData<&MjModel>) -> SimOverr
 
             if let Some(state) = ROBOT_STATE.get()
                 && let Some(lunabot_body) = data.body("simplify_lunabot")
+                && let Some(velocimeter) = data.sensor("lunabot_velocimeter")
+                && let Some(gyro) = data.sensor("lunabot_gyro")
             {
                 let coords = lunabot_body.view(&data).xpos.to_vec();
                 let quat = lunabot_body.view(&data).xquat.to_vec();
@@ -210,6 +212,30 @@ fn sim_callback(step: default::SimStep, data: &mut MjData<&MjModel>) -> SimOverr
                     origin: isometry.translation.vector.cast::<f32>().data.0[0],
                     quat: isometry.rotation.as_vector().cast::<f32>().data.0[0],
                 });
+
+                // [x,y,z]
+                let velocity = velocimeter.view(data).data.to_vec();
+
+                let angular_velocity = gyro.view(data).data.to_vec();
+
+                // store the state:
+                // State: [x, y, z, vx, vy, vz, orientationerrorx, orientationerrory, orientationerrorz, wx, wy, wz]
+                let kalman_state = SVector::<f64, 12>::from_row_slice(&[
+                    coords[0],
+                    coords[1],
+                    coords[2],
+                    velocity[0],
+                    velocity[1],
+                    velocity[2],
+                    0.0,
+                    0.0,
+                    0.0, // orientation error starts at zero
+                    angular_velocity[0],
+                    angular_velocity[1],
+                    angular_velocity[2],
+                ]);
+                // we are just going to ignore variances for now
+                state.kalman_state.store(Some(kalman_state));
 
                 let last = last_log_time.load(Ordering::Relaxed);
                 if now_ns - last > log_interval_ns {
