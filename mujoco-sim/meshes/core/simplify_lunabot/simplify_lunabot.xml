@@ -89,13 +89,25 @@
 
   <worldbody>
     <body name="simplify_lunabot" pos="1 1 0.4" euler="0 0 0 ">
-      <inertial mass="90" pos="0.4 -0.20 0.09" diaginertia="1 1 1" />
+      <!-- Center of mass explicitly defined based on actual mass distribution -->
+      <inertial mass="90" pos="0.4 -0.10 0.09" diaginertia="1 1 1" />
       <joint type="free" />
       <geom material="DefaultMaterialLunabot" mesh="simplify_lunabot" class="visual" />
-      <site name="lift_actuator_base" pos="0.39 -0.22 0.04" />
+      <site name="lift_actuator_base" pos="0.39 -0.15 0.04" />
 
-      <site name="imu_mount" pos="0.4 -0.20 0.09" />
+      <site name="imu_mount" pos="0.25 -0.15 -0.09" />
 
+      <!-- TODO: measure this correctly -->
+      <body name="depth_cam_mount">
+        <camera name="front_depth_camera"
+          mode="fixed"
+          pos="1.26 -0.22 0.25"
+          euler="0 -62 90"
+          resolution="640 480"
+          focalpixel="383 383"
+          sensorsize="0.0095 0.0095"
+        />
+      </body>
       <body name="lift_arm">
         <joint name="lift_hinge" type="hinge" axis="0 1 0" pos="0.0 -0.20 0.10" damping="0.0" />
         <site name="lift_arm_actuator_attach" pos="0.717 -0.218 0.643" />
@@ -357,13 +369,13 @@
   </sensor>
 
   <actuator>
-    <velocity ctrllimited="true" ctrlrange="-100 1000" name="motor_fl" joint="motor_fl" gear="5"
+    <velocity ctrllimited="true" ctrlrange="-1000 1000" name="motor_fl" joint="motor_fl" gear="5"
       kv="1" />
-    <velocity ctrllimited="true" ctrlrange="-100 1000" name="motor_fr" joint="motor_fr" gear="5"
+    <velocity ctrllimited="true" ctrlrange="-1000 1000" name="motor_fr" joint="motor_fr" gear="5"
       kv="1" />
-    <velocity ctrllimited="true" ctrlrange="-100 1000" name="motor_bl" joint="motor_bl" gear="5"
+    <velocity ctrllimited="true" ctrlrange="-1000 1000" name="motor_bl" joint="motor_bl" gear="5"
       kv="1" />
-    <velocity ctrllimited="true" ctrlrange="-100 1000" name="motor_br" joint="motor_br" gear="5"
+    <velocity ctrllimited="true" ctrlrange="-1000 1000" name="motor_br" joint="motor_br" gear="5"
       kv="1" />
     <!-- Lift cylinder - controls extension distance -->
     <position name="lift_cylinder" tendon="lift_cylinder_length"

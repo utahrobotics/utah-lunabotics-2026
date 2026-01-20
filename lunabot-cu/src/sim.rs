@@ -14,10 +14,13 @@ use crossbeam::atomic::AtomicCell;
 use cu29::prelude::*;
 use cu29_helpers::basic_copper_setup;
 use embedded_common::Direction;
+use iceoryx_types::IceoryxDepthFrame;
 use mujoco_rs::cpp_viewer::MjViewerCpp;
 use mujoco_rs::prelude::*;
-use nalgebra::{Isometry3, Quaternion, Translation3, UnitQuaternion};
+use mujoco_rs::renderer::MjRendererBuilder;
+use nalgebra::{Isometry3, Quaternion, Translation, Translation3, UnitQuaternion, Vector3};
 use nalgebra::{SMatrix, SVector};
+use rerun::{Arrows3D, Transform3D};
 use robot_state::RobotState;
 use simple_motion::{ChainBuilder, NodeSerde};
 use std::path::{Path, PathBuf};
@@ -26,6 +29,7 @@ use std::sync::{OnceLock, RwLock};
 use wgsl_pcl::wgsl_setup::{init_gpu_blocking, is_gpu_initialized};
 
 use crate::rerun_viz::{RECORDER, ROBOT_STRUCTURE};
+use crate::tasks::{DEPTH_FRAME_HEIGHT, DEPTH_FRAME_WIDTH};
 
 const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 
@@ -65,7 +69,11 @@ fn default_callback(step: default::SimStep) -> SimOverride {
     }
 }
 
-fn sim_callback(step: default::SimStep, data: &mut MjData<&MjModel>) -> SimOverride {
+fn sim_callback(
+    step: default::SimStep,
+    data: &mut MjData<&MjModel>,
+    renderer: &mut mujoco_rs::renderer::MjRenderer<&MjModel>,
+) -> SimOverride {
     match step {
         default::SimStep::UdevMonitor(_) => SimOverride::ExecutedBySim,
         default::SimStep::CamSide(_) => SimOverride::ExecutedBySim,
@@ -170,11 +178,60 @@ fn sim_callback(step: default::SimStep, data: &mut MjData<&MjModel>) -> SimOverr
         default::SimStep::DetectorCamBack(_) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamSide(_) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamLaptopFront(_) => SimOverride::ExecutedBySim,
-        default::SimStep::RealsenseSubscriber(_) => SimOverride::ExecutedBySim,
+        default::SimStep::RealsenseSubscriber(CuTaskCallbackState::Process(_, output)) => {
+            use std::sync::atomic::{AtomicU64, Ordering};
+            use std::time::SystemTime;
+
+            static LAST_OUTPUT_TIME: OnceLock<AtomicU64> = OnceLock::new();
+
+            let now_ns = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos() as u64;
+
+            let output_interval_ns = 1_000_000_000 / 20; // output at 20 Hz
+            let last_output_time = LAST_OUTPUT_TIME.get_or_init(|| AtomicU64::new(0));
+
+            let last = last_output_time.load(Ordering::Relaxed);
+            if now_ns - last > output_interval_ns {
+                last_output_time.store(now_ns, Ordering::Relaxed);
+
+                let depth_image = renderer.depth_flat();
+
+                const DEPTH_SIZE: usize = DEPTH_FRAME_WIDTH as usize * DEPTH_FRAME_HEIGHT as usize;
+                let mut depths = [0u16; DEPTH_SIZE];
+                let depth_scale = 0.001; // 1 unit = 1mm
+
+                if let Some(depth_image) = depth_image {
+                    for (i, value) in depth_image.iter().enumerate() {
+                        let depth_mm = (value * 1000.0).clamp(0.0, 65535.0) as u16;
+                        // Mirror the image left to right
+                        let row = i / DEPTH_FRAME_WIDTH as usize;
+                        let col = i % DEPTH_FRAME_WIDTH as usize;
+                        let mirrored_col = DEPTH_FRAME_WIDTH as usize - 1 - col;
+                        let mirrored_idx = row * DEPTH_FRAME_WIDTH as usize + mirrored_col;
+                        depths[mirrored_idx] = depth_mm;
+                    }
+
+                    let focal_len = (383.0, 383.0);
+
+                    output.set_payload((
+                        Some(IceoryxDepthFrame {
+                            depths,
+                            depth_scale,
+                            focal_len,
+                        }),
+                        None,
+                    ));
+                }
+            }
+            SimOverride::ExecutedBySim
+        }
+        default::SimStep::RealsenseSubscriber(..) => SimOverride::ExecutedBySim,
         default::SimStep::T265Subscriber(_) => SimOverride::ExecutedBySim,
         default::SimStep::DetectionHandler(_) => SimOverride::ExecutedBySim,
         default::SimStep::L2KissIcp(_) => SimOverride::ExecuteByRuntime,
-        default::SimStep::OccupancyGridPipeline(_) => SimOverride::ExecuteByRuntime,
+        default::SimStep::OccupancyGridPipeline(..) => SimOverride::ExecuteByRuntime,
         default::SimStep::NewAi(_) => SimOverride::ExecuteByRuntime,
         default::SimStep::Localizer(CuTaskCallbackState::Process(_, output)) => {
             use std::sync::atomic::{AtomicU64, Ordering};
@@ -201,8 +258,14 @@ fn sim_callback(step: default::SimStep, data: &mut MjData<&MjModel>) -> SimOverr
                     eprintln!("Unexpected pose buffer len");
                     return SimOverride::ExecutedBySim;
                 }
+                // Offset from MuJoCo body origin to robot center (matches center of mass in simplify_lunabot.xml)
+                // The kinematic chain in lunabot.ron assumes origin at robot center
+                let body_origin_to_center = Translation3::new(0.37, -0.18, 0.00);
                 let isometry = Isometry3::from_parts(
-                    Translation3::new(coords[0], coords[1], coords[2]),
+                    Translation3::from(
+                        Translation3::new(coords[0], coords[1], coords[2]).vector
+                            + body_origin_to_center.vector,
+                    ),
                     UnitQuaternion::from_quaternion(Quaternion::new(
                         quat[0], quat[1], quat[2], quat[3],
                     )),
@@ -240,8 +303,8 @@ fn sim_callback(step: default::SimStep, data: &mut MjData<&MjModel>) -> SimOverr
                 let last = last_log_time.load(Ordering::Relaxed);
                 if now_ns - last > log_interval_ns {
                     last_log_time.store(now_ns, Ordering::Relaxed);
-                    if let Some(recorder) = RECORDER.get()
-                        && let Err(e) = recorder.recorder.log(
+                    if let Some(recorder) = RECORDER.get() {
+                        let _ = recorder.recorder.log(
                             ROBOT_STRUCTURE,
                             &rerun::Transform3D::from_translation_rotation(
                                 isometry.translation.vector.cast::<f32>().data.0[0],
@@ -249,9 +312,69 @@ fn sim_callback(step: default::SimStep, data: &mut MjData<&MjModel>) -> SimOverr
                                     isometry.rotation.as_vector().cast::<f32>().data.0[0],
                                 ),
                             ),
-                        )
-                    {
-                        eprintln!("Failed to log robot pose: {}", e);
+                        );
+                        let cam_translation = data
+                            .camera("front_depth_camera")
+                            .unwrap()
+                            .view(data)
+                            .xpos
+                            .to_vec();
+                        let cam_mat = data
+                            .camera("front_depth_camera")
+                            .unwrap()
+                            .view(data)
+                            .xmat
+                            .to_vec();
+
+                        // Convert translation to [f32; 3]
+                        let cam_pos = [
+                            cam_translation[0] as f32,
+                            cam_translation[1] as f32,
+                            cam_translation[2] as f32,
+                        ];
+
+                        // Convert 3x3 rotation matrix to quaternion
+                        let rot_mat = nalgebra::Matrix3::from_row_slice(&cam_mat);
+                        let cam_quat = UnitQuaternion::from_matrix(&rot_mat);
+
+                        let actual_depth_camera_pose = state
+                            .kinematic_root
+                            .get_node_with_name("upper_depth_camera")
+                            .unwrap()
+                            .get_global_isometry();
+
+                        let _ = recorder.recorder.log(
+                            "actual_depth_camera_pose",
+                            &Transform3D::from_translation_rotation(
+                                actual_depth_camera_pose
+                                    .translation
+                                    .vector
+                                    .cast::<f32>()
+                                    .data
+                                    .0[0],
+                                rerun::Quaternion::from_xyzw(
+                                    actual_depth_camera_pose
+                                        .rotation
+                                        .as_vector()
+                                        .cast::<f32>()
+                                        .data
+                                        .0[0],
+                                ),
+                            ),
+                        );
+
+                        let _ = recorder.recorder.log(
+                            "depth_cam_pose",
+                            &Transform3D::from_translation_rotation(
+                                cam_pos,
+                                rerun::Quaternion::from_xyzw([
+                                    cam_quat.i as f32,
+                                    cam_quat.j as f32,
+                                    cam_quat.k as f32,
+                                    cam_quat.w as f32,
+                                ]),
+                            ),
+                        );
                     }
                 }
             }
@@ -270,8 +393,6 @@ fn main() {
         init_gpu_blocking().expect("failed to init gpu");
     }
 
-    let (model, mut viewer, data) = set_up_mujoco();
-
     // Setup logging path for resimulation
     let logger_path = "logs/lunabotsim.copper";
     if let Some(parent) = Path::new(logger_path).parent() {
@@ -281,6 +402,7 @@ fn main() {
     }
     // Create mock robot clock for simulation
     let (robot_clock, robot_clock_mock) = RobotClock::mock();
+    let (model, mut viewer, data, mut renderer) = set_up_mujoco();
 
     let copper_ctx = basic_copper_setup(
         &PathBuf::from(&logger_path),
@@ -312,11 +434,22 @@ fn main() {
         .build()
         .expect("Failed to create application.");
 
-    let mut sim_cb = |step: default::SimStep| -> SimOverride { sim_callback(step, data) };
+    let mut sim_cb =
+        |step: default::SimStep| -> SimOverride { sim_callback(step, data, &mut renderer) };
 
     application
         .start_all_tasks(&mut sim_cb)
         .expect("Failed to start all tasks.");
+
+    if let Some(rec) = RECORDER.get() {
+        let axes =
+            rerun::Arrows3D::from_vectors([[0.5, 0.0, 0.0], [0.0, 0.5, 0.0], [0.0, 0.0, 0.5]])
+                .with_colors([[255, 0, 0], [0, 255, 0], [0, 0, 255]])
+                .with_labels(vec!["x", "y", "z"]);
+
+        let _ = rec.recorder.log("depth_cam_pose", &axes);
+        let _ = rec.recorder.log("actual_depth_camera_pose", &axes);
+    }
 
     let target_duration = std::time::Duration::from_nanos(1_000_000_000 / TARGET_HZ as u64);
     let mut last_time = std::time::Instant::now();
@@ -326,7 +459,8 @@ fn main() {
         counter += 1;
         robot_clock_mock.set_value(start.elapsed().as_nanos() as u64);
         {
-            let mut sim_cb = |step: default::SimStep| -> SimOverride { sim_callback(step, data) };
+            let mut sim_cb =
+                |step: default::SimStep| -> SimOverride { sim_callback(step, data, &mut renderer) };
 
             application
                 .run_one_iteration(&mut sim_cb)
@@ -340,6 +474,7 @@ fn main() {
         // we don't need to sync and render at TARGET_HZ, only step the simulation
         if counter == 20 {
             viewer.sync();
+            renderer.sync(data);
             viewer.render(true);
             counter = 0;
         }
@@ -353,6 +488,7 @@ fn set_up_mujoco() -> (
     &'static MjModel,
     MjViewerCpp<&'static MjModel>,
     &'static mut MjData<&'static MjModel>,
+    mujoco_rs::renderer::MjRenderer<&'static MjModel>,
 ) {
     println!("Creating model...");
     let args: Vec<String> = std::env::args().collect();
@@ -375,11 +511,30 @@ fn set_up_mujoco() -> (
 
     model.opt_mut().disableflags |= MjtDisableBit::mjDSBL_NATIVECCD as i32;
     model.opt_mut().enableflags |= MjtEnableBit::mjENBL_MULTICCD as i32;
+
     println!("Making Data...");
     let data = model.make_data();
-    let leaked_data = Box::leak(Box::new(data));
+    let data = Box::leak(Box::new(data));
+    data.actuator("lift_cylinder")
+        .expect("lift_cylinder actuator not found")
+        .view_mut(data)
+        .ctrl[0] = -3.0;
     println!("Launching Viewer...");
 
-    let viewer = MjViewerCpp::launch_passive(model as &_, leaked_data as &_, 100);
-    (model, viewer, leaked_data)
+    let viewer = MjViewerCpp::launch_passive(model as &_, data as &_, 100);
+
+    let camera = MjvCamera::new_fixed(
+        data.camera("front_depth_camera")
+            .expect("front_depth_camera not found")
+            .id as u32,
+    );
+    let renderer = MjRendererBuilder::new()
+        .depth(true)
+        .num_visual_internal_geom(900)
+        .camera(camera)
+        .width(DEPTH_FRAME_WIDTH)
+        .height(DEPTH_FRAME_HEIGHT)
+        .build(model as &_)
+        .expect("Failed to build renderer");
+    (model, viewer, data, renderer)
 }

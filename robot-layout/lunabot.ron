@@ -19,8 +19,8 @@
         },
         {
             "name": Some("upper_depth_camera"),
-            "origin": [0.80, 0.0, 0.35],
-            "euler": [0.0, 34.0, 0.0]
+            "origin": [0.86, 0.0, 0.35],
+            "euler": [0.0, 28.0, 0.0]
         },
         {
             "name": Some("upper_depth_camera_t265"),
