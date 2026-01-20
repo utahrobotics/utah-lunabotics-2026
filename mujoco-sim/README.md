@@ -33,6 +33,12 @@ This option simply loads the artemis_arena.xml scene into the mujoco simulator w
 ## Tooling
 
 1. [obj2mjcf](https://github.com/kevinzakka/obj2mjcf)
+    - Used to convert .obj mesh files into mujoco compatible xml and mesh files for importing into the scene.
+    - Install instructions: 
+      - For macOS:
+        * Install `pipx` - `brew install pipx`
+        * Clone the repo and cd into it
+        * Run `pipx install .`
 
 ## Development 
 
