@@ -4,10 +4,10 @@ pub mod rerun_viz;
 
 pub mod bridges;
 pub mod pathfinding;
+pub mod robot_state;
 pub mod simple_monitor;
 pub mod tasks;
 pub mod utils;
-pub mod robot_state;
 
 use crossbeam::atomic::AtomicCell;
 use crossbeam_channel::{Receiver, Sender};
@@ -17,10 +17,10 @@ use cu29_helpers::basic_copper_setup;
 use embedded_common::{ActuatorCommand, FromPicoV3};
 use nalgebra::{SMatrix, SVector};
 use rerun_viz::{Level, RECORDER};
+use robot_state::RobotState;
 use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock, RwLock};
-use robot_state::RobotState;
 
 const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 

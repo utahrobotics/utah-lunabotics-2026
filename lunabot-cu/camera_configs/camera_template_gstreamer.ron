@@ -6,7 +6,7 @@
             config: {
                 "camera_id": "cam_{{id}}",
                 "device_port": "{{port}}",
-                "pipeline": "v4l2src device=<devpath> ! video/x-raw,width={{width}},height={{height}} ! videoconvert ! tee name=t ! queue ! videoconvert ! video/x-raw,format=GRAY8 ! appsink name=copper_cam_{{id}} t. ! queue ! videoconvert ! video/x-raw,format=NV12 ! vaapih264enc bitrate=2000 ! rtph264pay ! udpsink host={{udp_host}} port={{udp_port}} sync=false",
+                "pipeline": "v4l2src device=<devpath> ! image/jpeg,width={{width}},height={{height}},framerate=30/1 ! jpegdec ! videoconvert ! tee name=t ! queue ! videoconvert ! video/x-raw,format=GRAY8 ! appsink name=copper_cam_{{id}} t. ! queue ! videoconvert ! video/x-raw,format=NV12 ! vaapih264enc bitrate=2000 ! rtph264pay ! udpsink host={{udp_host}} port={{udp_port}} sync=false",
                 "caps": "video/x-raw, format=GRAY8, width={{width}}, height={{height}}",
                 "timeout_ms": 500,
             },
@@ -33,7 +33,7 @@
             type: "cu_apriltag::AprilTags",
             config: {
                 "family": "tag36h11",
-                "tag_size": 0.14,
+                "tag_size": 0.145,
                 "fx": {{fx}},
                 "fy": {{fy}},
                 "cx": {{cx}},

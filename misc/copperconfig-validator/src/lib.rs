@@ -533,7 +533,7 @@ impl ConfigValidator {
         graph: &ValidationGraph,
         mission_id: Option<&str>,
     ) -> ValidationResult<()> {
-        let mission_str = mission_id
+        let _mission_str = mission_id
             .map(|m| format!(" (mission: {})", m))
             .unwrap_or_default();
 

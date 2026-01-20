@@ -31,7 +31,7 @@ impl CuSinkTask for MotorController {
 
     fn new(config: Option<&ComponentConfig>) -> CuResult<Self> {
         let motor_ref;
-        let mut prev_speed_multi: f32;
+        let prev_speed_multi: f32;
         if let Some(config) = config
             && let Some(vesc_pairs) = config.get::<Vec<VescPair>>("vesc_pairs")
         {
