@@ -39,7 +39,7 @@ This option simply loads the artemis_arena.xml scene into the mujoco simulator w
         * Make sure mujoco is installed and added to your PATH.
         * Install `pipx` - `brew install pipx`
         * Clone the repo and cd into it
-        * Set environment variables - MUJOCO_PATH=
+        * Set environment variables - MUJOCO_PATH=`/Applications/MuJoCo.app/Contents/Frameworks` and MUJOCO_PLUGIN_PATH=`/Applications/MuJoCo.app/Contents/MacOS/mujoco_plugin`
         * Run `pipx install .`
       - For Windows: 
         * Make sure MuJoCo is installed and `simulate` is in your PATH. 
