@@ -33,6 +33,22 @@ This option simply loads the artemis_arena.xml scene into the mujoco simulator w
 ## Tooling
 
 1. [obj2mjcf](https://github.com/kevinzakka/obj2mjcf)
+    - Used to convert .obj mesh files into mujoco compatible xml and mesh files for importing into the scene.
+    - Install instructions: 
+      - For macOS:
+        * Make sure mujoco is installed and added to your PATH.
+        * Install `pipx` - `brew install pipx`
+        * Clone the repo and cd into it
+        * Set environment variables - MUJOCO_PATH=`/Applications/MuJoCo.app/Contents/Frameworks` and MUJOCO_PLUGIN_PATH=`/Applications/MuJoCo.app/Contents/MacOS/mujoco_plugin`
+        * Run `pipx install .`
+      - For Windows: 
+        * Make sure MuJoCo is installed and `simulate` is in your PATH. 
+        * Make sure cmake is installed. 
+        * Make sure you are using Python 3.12. 
+        * Install the package manager [Scoop](https://scoop.sh/)
+        * In a new terminal session install `pipx`- `scoop install pipx` and `pipx ensurepath`.
+        * Set environment variables - You can do this through PowerShell or system settings. Set `MUJOCO_PATH` and `MUJOCO_PLUGIN_PATH` to point to `Program Files/mujoco/bin` (or wherever you have installed MuJoCo).
+        * Install - `pipx install obj2mjcf`. 
 
 ## Development 
 
