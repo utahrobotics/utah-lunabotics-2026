@@ -114,9 +114,10 @@ def calibrate_hand_eye(poses_A: List[Pose], poses_B: List[Pose]) -> np.ndarray:
     :return: The homogenous transformation matrix `X` from given poses.
     :rtype: ndarray
     """
+
     n = len(poses_A)
-    if n != len(poses_B) or n < 3:
-        raise ValueError("Need at least 3 synchronized pose pairs")
+    if n != len(poses_B):
+        raise ValueError("List of poses for A and poses for B must be of equal size to calibrate!")
 
     A_list = []
     B_list = []
@@ -141,8 +142,11 @@ def calibrate_hand_eye(poses_A: List[Pose], poses_B: List[Pose]) -> np.ndarray:
         # If the angles are tiny, just skip them for the sake of numerical stability.
         # If somehow you don't have enough angles from the .rrd data, you need to pilot the robot
         # more aggresively.
-        if angle_A < 0.01 or angle_B < 0.01:
-            continue
+        # UPDATE: I disabled this for now since I've given freedom to the user to up-interpolate to a higher rate if they wish
+        # I don't know how accurate such matrix created from heavy up-interpolation will be, so use at your own risk!
+        # (Or better yet, interpolate down from the higher data-rate sensor)
+        # if angle_A < 0.01 or angle_B < 0.01:
+            # continue
 
         M[3*valid_count:3*valid_count+3, :] = skew(rotvec_A + rotvec_B)
         b[3*valid_count:3*valid_count+3] = rotvec_B - rotvec_A
@@ -219,8 +223,7 @@ def interpolate_pose(p0: Pose, p1: Pose, target_time: int) -> Pose:
 def interpolate_poses_to_timestamps(poses: List[Pose], target_times: np.ndarray) -> Tuple[List[Pose], np.ndarray]:
     """
     Takes in a list of poses and interpolates them to the given list of target times. 
-    Since kiss-icp has a significantly lower frequency (about 90x less), passing in the 
-    kiss-icp timestamps for target_times and interpolating the t265 to those times works fine.
+    You should probably interpolate the sensor with a higher data rate for better results.
 
     Additionally returns an array containing whether the pose at the given index is valid or not.
     An interpolated pose is considered invalid if the target time for that pose is outside the range of
@@ -331,40 +334,75 @@ def extract_poses(dataset, entity_path: str) -> List[Pose]:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("rrd_file")
+
+    parser.add_argument(
+        "rrd_file",
+        type=str,
+        help="Path the the input rrd file"
+    )
+    parser.add_argument(
+        "pose_a",
+        type=str,
+        help="Rrd path for the first pose (the transformation matrix will go FROM this pose)"
+    )
+    parser.add_argument(
+        "pose_b",
+        type=str,
+        help="Rrd path for the second pose (the transformation matrix will go TO this pose)"
+    )
+    parser.add_argument(
+        "-i",
+        type=str,
+        help="Which sensor times you want to interpolate. It is recommended you choose the sensor with a higher rate of capture. Valid value are [a/b]",
+        default="a"
+    )
+
     args = parser.parse_args()
     rrd_path = Path(args.rrd_file)
+    pose_a_path = args.pose_a
+    pose_b_path = args.pose_b
+    interpolation_pose = args.i
+
+    # Only valid values of interpolation pose is pose a or pose b.
+    if interpolation_pose != "a" and interpolation_pose != "b":
+        print(f"Invalid value for flag `-i`: {interpolation_pose}. Expected either 'a' or 'b'!")
+        return
 
     # Extract poses from .rrd file.
     with rr.server.Server(datasets={"dataset": [rrd_path]}) as server:
         dataset = server.client().get_dataset("dataset")
 
-        kiss_icp_poses = extract_poses(dataset, "/kiss_icp/local")
-        t265_poses = extract_poses(dataset, "/localizer/t265_raw")
+        a_poses = extract_poses(dataset, pose_a_path)
+        b_poses = extract_poses(dataset, pose_b_path)
 
-    print(f"Extracted {len(kiss_icp_poses)} kiss-icp poses")
-    print(f"Extracted {len(t265_poses)} t265 poses")
+    print(f"Extracted {len(a_poses)} poses from {pose_b_path}")
+    print(f"Extracted {len(b_poses)} poses from {pose_a_path}")
 
-    # Interpolate t265 poses to match timestamp of kiss-icp poses.
-    kiss_times = np.array([p.log_time for p in kiss_icp_poses])
-    t265_interp, valid_mask = interpolate_poses_to_timestamps(t265_poses, kiss_times)
-
-    kiss_icp_aligned = [p for p, valid in zip(kiss_icp_poses, valid_mask) if valid]
+    # Interpolate chosen poses to match timestamp of other poses.
+    if interpolation_pose == 'a':
+        pose_times = np.array([p.log_time for p in b_poses]) 
+        pose_interp, valid_mask = interpolate_poses_to_timestamps(a_poses, pose_times) 
+        pose_aligned = [p for p, valid in zip(b_poses, valid_mask) if valid]
+    elif interpolation_pose == 'b':
+        pose_times = np.array([p.log_time for p in a_poses])
+        pose_interp, valid_mask = interpolate_poses_to_timestamps(b_poses, pose_times) 
+        pose_aligned = [p for p, valid in zip(a_poses, valid_mask) if valid]
 
     # I can't imagine you'd have less than 3 poses from the data, if that happens it's indicative of some
     # deeper issue.
-    if len(t265_interp) < 3:
+    if len(pose_interp) < 3:
         print("ERROR: Need at least 3 aligned poses for calibration!")
         return
 
-    X = calibrate_hand_eye(kiss_icp_aligned, t265_interp)
+    # If we interpolated a, start from interpolated to aligned poses. If we chose b to interpolate, start from aligned poses to interpolated ones.
+    X = calibrate_hand_eye(pose_interp, pose_aligned) if interpolation_pose == 'a' else calibrate_hand_eye(pose_aligned, pose_interp)
 
     R = Rotation.from_matrix(X[:3, :3])
     q = R.as_quat()
     euler = R.as_euler('xyz', degrees=True)
 
     print("\nExtrinsic Calibration Results:")
-    print("Transform from t265 --> kiss-icp")
+    print(f"Transform from {pose_a_path} --> {pose_b_path}")
 
     print("\n4x4 Transformation Matrix:")
     for row in X:
