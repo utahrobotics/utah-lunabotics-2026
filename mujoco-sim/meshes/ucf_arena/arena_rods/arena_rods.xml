@@ -13,7 +13,7 @@
     <mesh file="arena_rods_collision_7.obj"/>
   </asset>
   <worldbody>
-    <body name="arena_rods" pos = "0 0 1.2">
+    <body name="arena_rods" pos = "0 0 1.2" >
       <geom material="DefaultMaterialArenaRods" mesh="arena_rods" class="visual"/>
       <geom mesh="arena_rods_collision_0" rgba="0.13457738193411994 0.1874449976087489 0.24934051894078424 1" class="collision"/>
       <geom mesh="arena_rods_collision_1" rgba="0.20601990213779386 0.33238193568514907 0.4853147173750705 1" class="collision"/>

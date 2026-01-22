@@ -88,7 +88,7 @@
   </asset>
 
   <worldbody>
-    <body name="simplify_lunabot" pos="1 1 0.4" euler="0 0 0 ">
+    <body name="simplify_lunabot" pos="1 1 0" >
       <inertial mass="90" pos="0.4 -0.20 0.09" diaginertia="1 1 1" />
       <joint type="free" />
       <geom material="DefaultMaterialLunabot" mesh="simplify_lunabot" class="visual" />
