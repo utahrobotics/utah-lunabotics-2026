@@ -1,23 +1,29 @@
 use bonsai_bt::Status::{self, *};
 use common::{LUNABOT_STAGE, LunabotStage, Steering};
 use embedded_common::{Actuator, ActuatorCommand};
-use rerun::Vec3D;
+use nalgebra::Vector2;
 
 use crate::{
     ROBOT_STATE,
-    pathfinding::rrt::find_path,
-    rerun_viz::RECORDER,
-    tasks::ai::{blackboard::LunabotBlackboard, jobs::follow_path_job},
+    tasks::ai::{
+        blackboard::LunabotBlackboard,
+        jobs::{find_path_job, follow_path_job},
+    },
 };
-static PATHFINDING_GOAL: [f32; 2] = [3.0, 0.0];
+static PATHFINDING_GOAL: [f32; 2] = [2.490662524, 0.72606992];
+static MAX_ACCEPTABLE_GRADIENT: f32 = 0.3;
 
 #[derive(Clone, Debug, Copy)]
 pub enum LunabotAction {
     Yield,
     SetSteering(Steering),
+    /// sets steering to last known value rx'd from lunabase
     SetLastSteering,
+    /// sets lift to last known value rx'd from lunabase
     SetLastLift,
+    /// sets bucket to last known value rx'd from lunabase
     SetLastBucket,
+
     SetLift(i8),
     SetBucket(i8),
     // actions for checking the lunabot stage (dig, dump, manual, soft stop, navigate)
@@ -41,6 +47,9 @@ pub enum LunabotAction {
     FollowPath,
     SetStage(LunabotStage),
     GetUnstuck,
+
+    /// Cancels long running jobs like pathfinding and path following
+    CancelJobs,
 }
 
 impl LunabotAction {
@@ -120,60 +129,69 @@ impl LunabotAction {
             LunabotAction::IsInFreeCell => todo!(),
             LunabotAction::IsInUnknownCell => todo!(),
             LunabotAction::CalculatePath => {
-                // if let Some(ref map) = blackboard.latest_obstacle_map {
-                //     let translation = blackboard.kinematic_root.get_global_isometry().translation;
-                //     if let Some(path) = find_path(
-                //         map,
-                //         [translation.x as f32, translation.y as f32],
-                //         PATHFINDING_GOAL,
-                //         0.3,
-                //         map.cell_size * 2.,
-                //         // FIXME: tune this parameter
-                //         1000,
-                //     ) && let Some(rec) = RECORDER.get()
-                //     {
-                //         let _ = rec.recorder.log(
-                //             "ai/calculated_path",
-                //             &rerun::LineStrips3D::new(&[path
-                //                 .iter()
-                //                 .map(|p| Vec3D::new(p.0 as f32, p.1 as f32, 1.0))
-                //                 .collect::<Vec<_>>()])
-                //             .with_colors(vec![rerun::Color::from_rgb(0, 200, 0)]),
-                //         );
-                //         Success
-                //     } else {
-                //         Failure
-                //     }
-                // } else {
-                //     Failure
-                // } // if let Some(ref map) = blackboard.latest_obstacle_map {
-                //     let translation = blackboard.kinematic_root.get_global_isometry().translation;
-                //     if let Some(path) = find_path(
-                //         map,
-                //         [translation.x as f32, translation.y as f32],
-                //         PATHFINDING_GOAL,
-                //         0.3,
-                //         map.cell_size * 2.,
-                //         // FIXME: tune this parameter
-                //         1000,
-                //     ) && let Some(rec) = RECORDER.get()
-                //     {
-                //         let _ = rec.recorder.log(
-                //             "ai/calculated_path",
-                //             &rerun::LineStrips3D::new(&[path
-                //                 .iter()
-                //                 .map(|p| Vec3D::new(p.0 as f32, p.1 as f32, 1.0))
-                //                 .collect::<Vec<_>>()])
-                //             .with_colors(vec![rerun::Color::from_rgb(0, 200, 0)]),
-                //         );
-                //         Success
-                //     } else {
-                //         Failure
-                //     }
-                // } else {
-                //     Failure
-                // }
-                Success
+                if let Some(ref local_map) = blackboard.latest_local_map {
+                    // if the kinematic root is not initialized, we might as well just blow up because nothing will work anyways
+                    let current_translation = ROBOT_STATE
+                        .get()
+                        .unwrap()
+                        .kinematic_root
+                        .get_global_isometry()
+                        .translation;
+
+                    let start =
+                        Vector2::new(current_translation.x as f32, current_translation.y as f32);
+
+                    // Get destination from blackboard, or use default PATHFINDING_GOAL
+                    // PATHFINDING_GOAL is just for testing for now.
+                    let end = if let Some((x, y)) = blackboard.navigate_destination {
+                        Vector2::new(x, y)
+                    } else {
+                        Vector2::new(PATHFINDING_GOAL[0], PATHFINDING_GOAL[1])
+                    };
+
+                    // Check if we already have a path finder job running
+                    if let Some(ref mut path_finder) = blackboard.path_finder {
+                        let status = path_finder.get_status();
+                        if status == Success {
+                            // Job completed successfully, get the path
+                            if let Some(path) = path_finder.get_output() {
+                                println!(
+                                    "Path calculation completed with {} waypoints",
+                                    path.len()
+                                );
+                                blackboard.calculated_path = Some(path);
+                                blackboard.path_finder = None;
+                                Success
+                            } else {
+                                eprintln!("Path finder job succeeded but produced no output.");
+                                blackboard.path_finder = None;
+                                Failure
+                            }
+                        } else if status == Failure {
+                            eprintln!("Path finder job failed.");
+                            blackboard.path_finder = None;
+                            Failure
+                        } else {
+                            // Still running
+                            Running
+                        }
+                    } else {
+                        // Start a new path finder job
+                        println!("Starting path finder job from {:?} to {:?}.", start, end);
+                        let mut job =
+                            find_path_job(local_map.clone(), start, end, MAX_ACCEPTABLE_GRADIENT);
+                        let initial_status = job.get_status();
+                        blackboard.path_finder = Some(job);
+                        println!(
+                            "Path finder job started with initial status: {:?}",
+                            initial_status
+                        );
+                        initial_status
+                    }
+                } else {
+                    eprintln!("Cannot calculate path: no local map available");
+                    Failure
+                }
             }
             LunabotAction::FollowPath => {
                 if ROBOT_STATE.get().is_none() {
@@ -192,16 +210,22 @@ impl LunabotAction {
                     }
                     status
                 } else {
-                    println!("Starting new follow path job");
-                    let mut follower_job =
-                        follow_path_job(5.0, ROBOT_STATE.get().unwrap().kinematic_root, vec![]);
-                    let job_initial_status = follower_job.get_status();
-                    blackboard.path_follower = Some(follower_job);
-                    println!(
-                        "Follow path job started with initial status: {:?}",
+                    // Use the calculated path from CalculatePath action
+                    if let Some(path) = blackboard.calculated_path.take() {
+                        println!("Starting new follow path job with {} waypoints", path.len());
+                        let mut follower_job =
+                            follow_path_job(5.0, ROBOT_STATE.get().unwrap().kinematic_root, path);
+                        let job_initial_status = follower_job.get_status();
+                        blackboard.path_follower = Some(follower_job);
+                        println!(
+                            "Follow path job started with initial status: {:?}",
+                            job_initial_status
+                        );
                         job_initial_status
-                    );
-                    job_initial_status
+                    } else {
+                        eprintln!("Cannot follow path: no calculated path available");
+                        Failure
+                    }
                 }
             }
             LunabotAction::CheckNavigation => Running,
@@ -221,6 +245,15 @@ impl LunabotAction {
                 blackboard.current_mission = *stage;
                 blackboard.path_follower = None;
                 LUNABOT_STAGE.store(*stage);
+                Success
+            }
+            LunabotAction::CancelJobs => {
+                if let Some(ref mut pathfinder) = blackboard.path_finder {
+                    pathfinder.cancel();
+                }
+                if let Some(ref mut pathfollower) = blackboard.path_follower {
+                    pathfollower.cancel();
+                }
                 Success
             }
         };

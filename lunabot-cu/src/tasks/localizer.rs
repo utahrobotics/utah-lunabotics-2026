@@ -1,22 +1,22 @@
 ///! # Overview:
-///! 
-///! ## How sensors are used: 
+///!
+///! ## How sensors are used:
 ///! AprilTags -> global pose reference (absolute position & orientation)
-///! 
-///! ICP -> local pose tracking (relative pose, drift-prone)
-///! 
-///! Intel T265 -> short-term motion (velocity from pose deltas)
-///! 
+///!
+///! ICP (5hz) -> local pose tracking (less drift prone so long as you stay in one room and arent moving down long featureless corridors)
+///!
+///! Intel T265 (200hz) -> short-term motion (velocity from pose deltas more drift prone than ICP)
+///!
 ///! IMU -> currently logged, not yet fused (since the l2's imus are garbage)
-///! 
-///! 
+///!
+///!
 ///! ## Multiplicative Extended Kalman Filter
 ///! Based on this: https://matthewhampsey.github.io/blog/2020/07/18/mekf
-///! 
+///!
 ///! State representation: [x, y, z, vx, vy, vz, δθx, δθy, δθz, ωx, ωy, ωz]
-///! 
+///!
 ///!  - where δθxyz is a small orientation error (magnitude will never get close to pi which solves the instability problem)
-///! 
+///!
 ///! Basically the kalman filter state holds the small orientation error, and we keep track of a reference quaternion in the localizer where: q_true = q_reference * q_error
 ///!  - q_reference is propagated using angular velocity in the kalman state
 ///!  - on each update, the error is folded into the reference, and the error gets set back to zero, keeping the error from ever getting too big.
@@ -24,20 +24,17 @@
 ///!  
 ///! ## Process noise
 ///! How much you don't trust your motion model. lower noise = motion model trusted more than sensors
-///! 
-
-use std::f64::consts::PI;
+///!
 use std::sync::OnceLock;
 
 use crate::rerun_viz;
 use crate::rerun_viz::RECORDER;
+use crate::robot_state::RobotState;
 use crate::tasks::AprilTagMeasurement;
 use crate::tasks::IcpMeasurement;
 use crate::tasks::ImuMeasurement;
 use crate::tasks::T265Msg;
-use crate::robot_state::RobotState;
 use common::FromLunabot;
-use cu_spatial_payloads::EncodableIsometry;
 use cu29::cutask::CuTask;
 use cu29::output_msg;
 use cu29::{
@@ -54,7 +51,6 @@ use kfilter::system::StepReturn;
 use kfilter::system::System;
 use nalgebra::UnitQuaternion;
 use nalgebra::{Isometry3, SMatrix, SVector, Vector3, Vector6};
-use rerun::Scalars;
 
 use crate::ROBOT_STATE;
 
@@ -281,7 +277,10 @@ pub struct Localizer {
     /// Transformation to convert T265 poses from T265 frame to ICP frame
     /// Either identity or computed from T265 to ICP transformation
     /// Re calculated on each ICP measurement
-    t265_to_icp: Isometry3<f64>,
+    t265_to_icp: Option<Isometry3<f64>>,
+
+    /// Most recent T265-to-global transformation, useful if only T265 + apriltags are available
+    t265_to_global: Option<Isometry3<f64>>,
 
     /// Most recent ICP pose in raw ICP frame (for computing offset when AprilTag seen)
     last_raw_icp_pose: Option<Isometry3<f64>>,
@@ -424,7 +423,8 @@ impl CuTask for Localizer {
 
                 most_recent_update: CuTime::default(),
                 icp_to_global: None,
-                t265_to_icp: Isometry3::identity(),
+                t265_to_icp: None,
+                t265_to_global: None,
                 last_raw_icp_pose: None,
                 prev_t265_pose: None,
                 prev_t265_time: None,
@@ -485,6 +485,10 @@ impl CuTask for Localizer {
                     if !self.has_global_reference {
                         self.has_global_reference = true;
                         println!("First AprilTag seen - global reference established");
+                    }
+
+                    if let Some(raw_t265) = self.prev_t265_pose {
+                        self.t265_to_global = Some(compute_frame_offset(&raw_t265, &global_pose));
                     }
 
                     // Update ICP-to-global offset if we have a recent ICP pose
@@ -571,10 +575,10 @@ impl CuTask for Localizer {
                     );
                 }
                 if let Some(most_recent_t265) = &self.prev_t265_pose {
-                    self.t265_to_icp = compute_frame_offset(
+                    self.t265_to_icp = Some(compute_frame_offset(
                         &most_recent_t265,
                         &(&self.icp_to_global.unwrap_or(Isometry3::identity()) * raw_icp_pose),
-                    );
+                    ));
                 }
                 let offset = self.icp_to_global.unwrap_or(Isometry3::identity());
 
@@ -632,7 +636,10 @@ impl CuTask for Localizer {
                     );
                 }
 
-                let t265_offset = self.t265_to_icp;
+                // prioritize using t265 -> icp  transform if available, otherwise use t265 -> global, otherwise identity
+                let t265_offset = self
+                    .t265_to_icp
+                    .unwrap_or(self.t265_to_global.unwrap_or(Isometry3::identity()));
 
                 let current_t265_global = t265_offset * current_t265_raw;
 

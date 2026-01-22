@@ -6,7 +6,6 @@ use std::time::{Duration, Instant};
 
 use bincode::error::DecodeError;
 use common::{FromLunabase, FromLunabot, LunabotStage, Steering};
-use crossbeam_channel::{Receiver, Sender};
 use godot::prelude::*;
 use quic::QuicClient;
 

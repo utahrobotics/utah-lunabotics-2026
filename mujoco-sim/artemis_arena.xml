@@ -7,7 +7,7 @@
       <geom group="2" type="mesh" />
     </default>
     <default class="wheel">
-        <geom group="2" type="mesh" solimp="0.8" />
+      <geom group="2" type="mesh" solimp="0.8" />
     </default>
   </default>
   <visual>
@@ -15,7 +15,6 @@
     <rgba fog="0.07 0.07 0.07 1" />
     <global offwidth="1920" offheight="1080" />
   </visual>
-
 
   <include file="meshes/artemis_arena/lunar_surface/lunar_surface.xml" />
   <include file="meshes/artemis_arena/arena_columns/arena_columns.xml" />

@@ -36,6 +36,8 @@ impl<Output> Job<Output> {
         self.body_thread.abort();
     }
 
+    /// if a job is finished, this will return the final status returned by the job body
+    /// otherwise it will return the latest status sent by the job body
     pub fn get_status(&mut self) -> Status {
         if self.is_finished() {
             let status = get_tokio_handle().block_on(async { (&mut self.body_thread).await });

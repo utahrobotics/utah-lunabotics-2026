@@ -1,6 +1,5 @@
-use std::process::{Command, Stdio};
 use std::collections::HashMap;
-use std::path::Path;
+use std::process::{Command, Stdio};
 
 #[derive(Debug, Clone)]
 pub struct ProcessConfig {
@@ -105,9 +104,12 @@ impl ProcessLauncher {
         Ok(())
     }
 
-    fn launch_process(&mut self, process_command: &ProcessCommand) -> Result<(), Box<dyn std::error::Error>> {
+    fn launch_process(
+        &mut self,
+        process_command: &ProcessCommand,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         let mut cmd = Command::new(&process_command.command);
-        
+
         // Add arguments
         if !process_command.args.is_empty() {
             cmd.args(&process_command.args);

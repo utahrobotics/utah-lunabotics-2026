@@ -1,7 +1,6 @@
-use bonsai_bt::Behavior::{self, Action, Wait, While, WhileAll};
-use common::Steering;
+use bonsai_bt::Behavior::{self, Action, WhileAll};
 
-use crate::tasks::ai::{action::LunabotAction, blackboard::LunabotBlackboard};
+use crate::tasks::ai::action::LunabotAction;
 
 pub fn manual_ctrl_behavior() -> Behavior<LunabotAction> {
     WhileAll(
@@ -10,7 +9,7 @@ pub fn manual_ctrl_behavior() -> Behavior<LunabotAction> {
             Action(LunabotAction::SetLastSteering),
             Action(LunabotAction::SetLastLift),
             Action(LunabotAction::SetLastBucket),
-            Action(LunabotAction::Yield)
+            Action(LunabotAction::Yield),
         ],
     )
 }

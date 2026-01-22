@@ -50,7 +50,7 @@ impl CuMonitor for SimpleMonitor {
 
                     if !errors.is_empty() {
                         println!("\n=== ERRORED TASKS ===");
-                        for (&task_id, (name, state, error, _)) in errors.iter() {
+                        for (&task_id, (_, state, error, _)) in errors.iter() {
                             let task_name =
                                 tasks.get(task_id).map(|&name| name).unwrap_or("Unknown");
                             println!(
