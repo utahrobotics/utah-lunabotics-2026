@@ -58,7 +58,7 @@
             type: "crate::tasks::sources::T265Subscriber",
             config: {
                 "serial_num": "929122111514",
-                "camera_node": "upper_depth_camera_t265",
+                "camera_node": "T265_right",
                 "node": "T265_right",
                 "t265_velocity_variance": 1.0,
                 "t265_angular_velocity_variance": 1.0,
