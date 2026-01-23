@@ -42,9 +42,9 @@ mod prod_impl {
         // input is the actuator command as bytes
         // the reason this is a tuple is a hack to get around the fact that copper doesnt support one task
         // having multiple outputs in the same way it does multiple inputs
-        type Input<'m> = input_msg!((
+        type Input<'m> = input_msg!(
             embedded_common::ActuatorCommand
-        ));
+        );
         type Output<'m> = output_msg!(FromPicoV3);
         type Resources<'r> = ();
 
