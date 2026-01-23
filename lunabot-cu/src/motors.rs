@@ -3,7 +3,6 @@ use crate::utils::udev_poll;
 use core::f32;
 use crossbeam::{atomic::AtomicCell, utils::Backoff};
 use cu29::{config::Value, prelude::*};
-use ron::de::SpannedError;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Arc;
