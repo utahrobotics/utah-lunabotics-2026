@@ -27,6 +27,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::{OnceLock, RwLock};
 use wgsl_pcl::wgsl_setup::{init_gpu_blocking, is_gpu_initialized};
+extern crate cu_bincode as bincode;
 
 use crate::rerun_viz::{RECORDER, ROBOT_STRUCTURE};
 use crate::tasks::{DEPTH_FRAME_HEIGHT, DEPTH_FRAME_WIDTH};
@@ -93,7 +94,7 @@ fn sim_callback(
             static LIFT_TARGET: AtomicCell<f64> = AtomicCell::new(0.0);
             static BUCKET_TARGET: AtomicCell<f64> = AtomicCell::new(0.0);
 
-            if let Some((_, Some(actuator_cmd))) = input.payload() {
+            if let Some(actuator_cmd) = input.payload() {
                 match actuator_cmd {
                     embedded_common::ActuatorCommand::SetSpeed(speed, actuator) => match actuator {
                         embedded_common::Actuator::Lift => {
@@ -160,7 +161,7 @@ fn sim_callback(
         }
         default::SimStep::V3Pico(..) => SimOverride::ExecutedBySim,
         default::SimStep::MotorCtrl(CuTaskCallbackState::Process(input, _)) => {
-            if let Some((Some(steering), _)) = input.payload() {
+            if let Some(steering) = input.payload() {
                 let (left, right) = steering.get_left_and_right();
                 let speed_mult = steering.get_weight();
                 let left = (left * speed_mult) * 0.022;

@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 mod constants;
 pub mod ports;
 pub use constants::*;
+extern crate cu_bincode as bincode;
 
 #[repr(C)]
 #[derive(
@@ -18,6 +19,7 @@ pub use constants::*;
     Pod,
     Zeroable,
     Serialize,
+    Deserialize
 )]
 pub struct Steering {
     left: i8,
@@ -170,8 +172,8 @@ impl TryFrom<u8> for LunabotStage {
 }
 
 #[derive(
-    bincode::Encode, bincode::Decode, Debug, Encode, Decode, Clone, Copy, PartialEq, Serialize,
-)]
+    bincode::Encode, bincode::Decode, Debug, Encode, Decode, Clone, Copy, PartialEq, Serialize, Deserialize
+)] 
 pub enum FromLunabase {
     ContinueMission,
     /// Skid steer message, 1,1 is full speed forward, -1,-1 is full speed back

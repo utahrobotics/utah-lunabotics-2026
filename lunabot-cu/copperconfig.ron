@@ -166,22 +166,7 @@
         // receives messages from the ai_source and tells the motors to move accordingly
         (
             id:"motor_ctrl", type:"crate::tasks::sinks::MotorController", config:{
-                "speed_multiplier": 1500,
-                "vesc_pairs": [
-                    // yes having these as strings is janky but it works
-                    "VescPair(
-                        id1: 75,
-                        id2: 110,
-                        mask1: Right,
-                        mask2: Right
-                    )",
-                    "VescPair(
-                        id1: 63,
-                        id2: 74,
-                        mask1: Left,
-                        mask2: Left
-                    )"
-                ]
+                "speed_multiplier": 1500
             },
             run_in_sim: false,
         ),
@@ -209,8 +194,8 @@
         // copper doesn't support multiple outputs on a single task so for now we just put them in a tuple and ignore one side
         (src:"realsense_subscriber",          dst:"occupancy_grid_pipeline", msg:"(Option<iceoryx_types::IceoryxDepthFrame<307200>>, Option<iceoryx_types::ImuMsg>)"),
         (src:"occupancy_grid_pipeline",       dst:"new_ai",                  msg:"crate::tasks::OccupancyGrid"),
-        (src:"new_ai",                        dst:"motor_ctrl",              msg:"(Option<common::Steering>, Option<embedded_common::ActuatorCommand>)"),
-        (src:"new_ai",                        dst:"v3_pico",                 msg:"(Option<common::Steering>, Option<embedded_common::ActuatorCommand>)"),
+        (src:"new_ai",                        dst:"motor_ctrl",              msg:"common::Steering"),
+        (src:"new_ai",                        dst:"v3_pico",                 msg:"embedded_common::ActuatorCommand"),
         (src:"v3_pico",                       dst:"localizer",               msg:"embedded_common::FromPicoV3"),
         (src:"detection_handler",             dst: "localizer",              msg:"Vec<crate::tasks::AprilTagMeasurement>"),
         (src:"t265_subscriber",               dst:"localizer",               msg:"crate::tasks::sources::T265Msg"),

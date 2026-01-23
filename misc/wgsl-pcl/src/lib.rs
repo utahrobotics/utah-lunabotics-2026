@@ -8,3 +8,4 @@ pub mod wgsl_setup;
 
 pub mod pipelines;
 pub use pipelines::depth_to_obstacle::DepthToPclAndHeightPipeline;
+extern crate cu_bincode as bincode;

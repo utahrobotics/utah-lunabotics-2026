@@ -123,19 +123,19 @@ dependencies = [
 [[package]]
 name = "apriltag"
 version = "0.5.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#7e195326e4a8b1939c014b992d6ee2263032b44e"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=merge_test#65cd6d72dc416a22ae4741420d7ae84b0831fee4"
 dependencies = [
  "apriltag-sys",
  "libc",
  "measurements",
  "noisy_float",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
 name = "apriltag-nalgebra"
 version = "0.1.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#7e195326e4a8b1939c014b992d6ee2263032b44e"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=merge_test#65cd6d72dc416a22ae4741420d7ae84b0831fee4"
 dependencies = [
  "apriltag",
  "nalgebra",
@@ -144,7 +144,7 @@ dependencies = [
 [[package]]
 name = "apriltag-sys"
 version = "0.4.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#7e195326e4a8b1939c014b992d6ee2263032b44e"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=merge_test#65cd6d72dc416a22ae4741420d7ae84b0831fee4"
 dependencies = [
  "anyhow",
  "cc",
@@ -366,7 +366,7 @@ dependencies = [
  "nom",
  "num-traits",
  "rusticata-macros",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "time",
 ]
 
@@ -519,9 +519,9 @@ dependencies = [
 
 [[package]]
 name = "az"
-version = "1.2.1"
+version = "1.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b7e4c2464d97fe331d41de9d5db0def0a96f4d823b8b32a2efd503578988973"
+checksum = "be5eb007b7cacc6c660343e96f650fedf4b5a77512399eb952ca6642cf8d13f7"
 
 [[package]]
 name = "backtrace"
@@ -569,26 +569,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bincode"
-version = "2.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "36eaf5d7b090263e8150820482d5d93cd964a81e4019913c972f4edcc6edb740"
-dependencies = [
- "bincode_derive",
- "serde",
- "unty",
-]
-
-[[package]]
-name = "bincode_derive"
-version = "2.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf95709a440f45e986983918d0e8a1f30a9b1df04918fc828670606804ac3c09"
-dependencies = [
- "virtue",
-]
-
-[[package]]
 name = "bindgen"
 version = "0.72.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -632,7 +612,7 @@ dependencies = [
  "arrayvec",
  "bitcode_derive",
  "bytemuck",
- "glam 0.30.10",
+ "glam 0.31.0",
  "serde",
 ]
 
@@ -785,7 +765,7 @@ dependencies = [
  "semver 1.0.27",
  "serde",
  "serde_json",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -799,9 +779,9 @@ dependencies = [
 
 [[package]]
 name = "cc"
-version = "1.2.52"
+version = "1.2.54"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd4932aefd12402b36c60956a4fe0035421f544799057659ff86f923657aada3"
+checksum = "6354c81bbfd62d9cfa9cb3c773c2b7b2a3a482d569de977fd0e961f6e7c00583"
 dependencies = [
  "find-msvc-tools",
  "jobserver",
@@ -847,9 +827,9 @@ dependencies = [
 
 [[package]]
 name = "cfg-expr"
-version = "0.20.5"
+version = "0.20.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21be0e1ce6cdb2ee7fff840f922fb04ead349e5cfb1e750b769132d44ce04720"
+checksum = "78cef5b5a1a6827c7322ae2a636368a573006b27cfa76c7ebd53e834daeaab6a"
 dependencies = [
  "smallvec",
  "target-lexicon",
@@ -878,9 +858,9 @@ dependencies = [
 
 [[package]]
 name = "chrono"
-version = "0.4.42"
+version = "0.4.43"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "145052bdd345b87320e369255277e3fb5152762ad123a901ef5c262dd38fe8d2"
+checksum = "fac4744fb15ae8337dc853fee7fb3f4e48c0fbaa23d0afe49c447b4fab126118"
 dependencies = [
  "iana-time-zone",
  "num-traits",
@@ -971,7 +951,7 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0fa961b519f0b462e3a3b4a34b64d119eeaca1d59af726fe450bbba07a9fc0a1"
 dependencies = [
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -981,7 +961,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4ef0193218d365c251b5b9297f9911a908a8ddd2ebd3a36cc5d0ef0f63aee9e"
 dependencies = [
  "heapless 0.9.2",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -1029,9 +1009,9 @@ dependencies = [
 
 [[package]]
 name = "comfy-table"
-version = "7.2.1"
+version = "7.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b03b7db8e0b4b2fdad6c551e634134e99ec000e5c8c3b6856c65e8bbaded7a3b"
+checksum = "958c5d6ecf1f214b4c2bbbbf6ab9523a864bd136dcf71a7e8904799acfe1ad47"
 dependencies = [
  "crossterm",
  "unicode-segmentation",
@@ -1042,10 +1022,10 @@ dependencies = [
 name = "common"
 version = "0.1.0"
 dependencies = [
- "bincode 2.0.1",
  "bitcode",
  "bytemuck",
  "crossbeam",
+ "cu-bincode",
  "embedded_common",
  "nalgebra",
  "once_cell",
@@ -1169,7 +1149,7 @@ dependencies = [
  "petgraph 0.8.3",
  "ron 0.11.0",
  "serde",
- "svg",
+ "svg 0.17.0",
 ]
 
 [[package]]
@@ -1207,7 +1187,6 @@ checksum = "8ec610d8f49840a5b376c69663b6369e71f4b34484b9b2eb29fb918d92516cb9"
 dependencies = [
  "bare-metal",
  "bitfield",
- "critical-section",
  "embedded-hal",
  "volatile-register",
 ]
@@ -1235,12 +1214,6 @@ checksum = "9481c1c90cbf2ac953f07c8d4a58aa3945c425b7185c9154d67a65e4230da511"
 dependencies = [
  "cfg-if",
 ]
-
-[[package]]
-name = "critical-section"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "790eea4361631c5e7d22598ecd5723ff611904e3344ce8720784c93e3d83d40b"
 
 [[package]]
 name = "cros-codecs"
@@ -1359,14 +1332,14 @@ dependencies = [
 
 [[package]]
 name = "cu-apriltag"
-version = "0.11.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#7e195326e4a8b1939c014b992d6ee2263032b44e"
+version = "0.12.0"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=merge_test#65cd6d72dc416a22ae4741420d7ae84b0831fee4"
 dependencies = [
  "apriltag",
  "apriltag-nalgebra",
  "apriltag-sys",
  "arrayvec",
- "bincode 2.0.1",
+ "cu-bincode",
  "cu-sensor-payloads",
  "cu-spatial-payloads",
  "cu29",
@@ -1374,13 +1347,33 @@ dependencies = [
 ]
 
 [[package]]
-name = "cu-gstreamer"
-version = "0.11.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#7e195326e4a8b1939c014b992d6ee2263032b44e"
+name = "cu-bincode"
+version = "2.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1eda67fee472a107a33d58e018ed99987426aabb7e0a8a4f0e545df82ebbbf88"
 dependencies = [
- "bincode 2.0.1",
+ "cu-bincode-derive",
+ "serde",
+ "unty",
+]
+
+[[package]]
+name = "cu-bincode-derive"
+version = "2.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6ab3b62cf42324786e79e3634b4ab811a2750237071db5f999b3ba7c436e2dc"
+dependencies = [
+ "virtue",
+]
+
+[[package]]
+name = "cu-gstreamer"
+version = "0.12.0"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=merge_test#65cd6d72dc416a22ae4741420d7ae84b0831fee4"
+dependencies = [
  "cfg_aliases",
  "circular-buffer",
+ "cu-bincode",
  "cu29",
  "gstreamer",
  "gstreamer-app",
@@ -1390,10 +1383,10 @@ dependencies = [
 
 [[package]]
 name = "cu-sensor-payloads"
-version = "0.11.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#7e195326e4a8b1939c014b992d6ee2263032b44e"
+version = "0.12.0"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=merge_test#65cd6d72dc416a22ae4741420d7ae84b0831fee4"
 dependencies = [
- "bincode 2.0.1",
+ "cu-bincode",
  "cu29",
  "cu29-clock",
  "cu29-soa-derive",
@@ -1404,11 +1397,11 @@ dependencies = [
 
 [[package]]
 name = "cu-spatial-payloads"
-version = "0.11.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#7e195326e4a8b1939c014b992d6ee2263032b44e"
+version = "0.12.0"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=merge_test#65cd6d72dc416a22ae4741420d7ae84b0831fee4"
 dependencies = [
- "bincode 2.0.1",
- "glam 0.30.10",
+ "cu-bincode",
+ "glam 0.31.0",
  "nalgebra",
  "serde",
  "uom",
@@ -1416,11 +1409,11 @@ dependencies = [
 
 [[package]]
 name = "cu29"
-version = "0.11.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#7e195326e4a8b1939c014b992d6ee2263032b44e"
+version = "0.12.0"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=merge_test#65cd6d72dc416a22ae4741420d7ae84b0831fee4"
 dependencies = [
- "bincode 2.0.1",
  "ctrlc",
+ "cu-bincode",
  "cu29-clock",
  "cu29-derive",
  "cu29-intern-strs",
@@ -1437,19 +1430,19 @@ dependencies = [
 
 [[package]]
 name = "cu29-clock"
-version = "0.11.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#7e195326e4a8b1939c014b992d6ee2263032b44e"
+version = "0.12.0"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=merge_test#65cd6d72dc416a22ae4741420d7ae84b0831fee4"
 dependencies = [
- "bincode 2.0.1",
  "cortex-m",
+ "cu-bincode",
  "portable-atomic",
  "serde",
 ]
 
 [[package]]
 name = "cu29-derive"
-version = "0.11.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#7e195326e4a8b1939c014b992d6ee2263032b44e"
+version = "0.12.0"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=merge_test#65cd6d72dc416a22ae4741420d7ae84b0831fee4"
 dependencies = [
  "convert_case 0.10.0",
  "cu29-runtime",
@@ -1465,12 +1458,13 @@ dependencies = [
 
 [[package]]
 name = "cu29-export"
-version = "0.11.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#7e195326e4a8b1939c014b992d6ee2263032b44e"
+version = "0.12.0"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=merge_test#65cd6d72dc416a22ae4741420d7ae84b0831fee4"
 dependencies = [
- "bincode 2.0.1",
  "clap",
+ "cu-bincode",
  "cu29",
+ "cu29-clock",
  "cu29-intern-strs",
  "num-format",
  "serde",
@@ -1479,8 +1473,8 @@ dependencies = [
 
 [[package]]
 name = "cu29-helpers"
-version = "0.11.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#7e195326e4a8b1939c014b992d6ee2263032b44e"
+version = "0.12.0"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=merge_test#65cd6d72dc416a22ae4741420d7ae84b0831fee4"
 dependencies = [
  "cu29-clock",
  "cu29-log",
@@ -1493,20 +1487,20 @@ dependencies = [
 
 [[package]]
 name = "cu29-intern-strs"
-version = "0.11.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#7e195326e4a8b1939c014b992d6ee2263032b44e"
+version = "0.12.0"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=merge_test#65cd6d72dc416a22ae4741420d7ae84b0831fee4"
 dependencies = [
  "anyhow",
- "bincode 2.0.1",
+ "cu-bincode",
  "fs2",
 ]
 
 [[package]]
 name = "cu29-log"
-version = "0.11.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#7e195326e4a8b1939c014b992d6ee2263032b44e"
+version = "0.12.0"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=merge_test#65cd6d72dc416a22ae4741420d7ae84b0831fee4"
 dependencies = [
- "bincode 2.0.1",
+ "cu-bincode",
  "cu29-clock",
  "cu29-traits",
  "cu29-value",
@@ -1517,11 +1511,12 @@ dependencies = [
 
 [[package]]
 name = "cu29-log-derive"
-version = "0.11.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#7e195326e4a8b1939c014b992d6ee2263032b44e"
+version = "0.12.0"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=merge_test#65cd6d72dc416a22ae4741420d7ae84b0831fee4"
 dependencies = [
  "cu29-intern-strs",
  "cu29-log",
+ "proc-macro-crate",
  "proc-macro2",
  "quote",
  "syn 2.0.114",
@@ -1529,10 +1524,10 @@ dependencies = [
 
 [[package]]
 name = "cu29-log-runtime"
-version = "0.11.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#7e195326e4a8b1939c014b992d6ee2263032b44e"
+version = "0.12.0"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=merge_test#65cd6d72dc416a22ae4741420d7ae84b0831fee4"
 dependencies = [
- "bincode 2.0.1",
+ "cu-bincode",
  "cu29-clock",
  "cu29-log",
  "cu29-traits",
@@ -1543,13 +1538,13 @@ dependencies = [
 
 [[package]]
 name = "cu29-runtime"
-version = "0.11.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#7e195326e4a8b1939c014b992d6ee2263032b44e"
+version = "0.12.0"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=merge_test#65cd6d72dc416a22ae4741420d7ae84b0831fee4"
 dependencies = [
  "arrayvec",
- "bincode 2.0.1",
  "clap",
  "compact_str",
+ "cu-bincode",
  "cu29-clock",
  "cu29-log",
  "cu29-log-derive",
@@ -1560,6 +1555,7 @@ dependencies = [
  "erased-serde",
  "hashbrown 0.16.1",
  "html-escape",
+ "layout-rs",
  "libm",
  "object-pool",
  "paste",
@@ -1568,15 +1564,17 @@ dependencies = [
  "ron 0.12.0",
  "serde",
  "serde_derive",
+ "serde_json",
  "smallvec",
  "spin",
+ "svg 0.18.0",
  "tempfile",
 ]
 
 [[package]]
 name = "cu29-soa-derive"
-version = "0.11.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#7e195326e4a8b1939c014b992d6ee2263032b44e"
+version = "0.12.0"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=merge_test#65cd6d72dc416a22ae4741420d7ae84b0831fee4"
 dependencies = [
  "quote",
  "syn 2.0.114",
@@ -1585,11 +1583,11 @@ dependencies = [
 
 [[package]]
 name = "cu29-traits"
-version = "0.11.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#7e195326e4a8b1939c014b992d6ee2263032b44e"
+version = "0.12.0"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=merge_test#65cd6d72dc416a22ae4741420d7ae84b0831fee4"
 dependencies = [
- "bincode 2.0.1",
  "compact_str",
+ "cu-bincode",
  "cu29-clock",
  "erased-serde",
  "serde",
@@ -1597,10 +1595,10 @@ dependencies = [
 
 [[package]]
 name = "cu29-unifiedlog"
-version = "0.11.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#7e195326e4a8b1939c014b992d6ee2263032b44e"
+version = "0.12.0"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=merge_test#65cd6d72dc416a22ae4741420d7ae84b0831fee4"
 dependencies = [
- "bincode 2.0.1",
+ "cu-bincode",
  "cu29-traits",
  "memmap2",
  "page_size",
@@ -1609,10 +1607,10 @@ dependencies = [
 
 [[package]]
 name = "cu29-value"
-version = "0.11.0"
-source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=master#7e195326e4a8b1939c014b992d6ee2263032b44e"
+version = "0.12.0"
+source = "git+https://github.com/matthewashton-k/copper-rs.git?branch=merge_test#65cd6d72dc416a22ae4741420d7ae84b0831fee4"
 dependencies = [
- "bincode 2.0.1",
+ "cu-bincode",
  "cu29-clock",
  "ordered-float",
  "serde",
@@ -1803,7 +1801,7 @@ checksum = "edd0f118536f44f5ccd48bcb8b111bdc3de888b58c74639dfb034a357d0f206d"
 name = "embedded_common"
 version = "0.1.0"
 dependencies = [
- "bincode 2.0.1",
+ "cu-bincode",
  "serde",
 ]
 
@@ -1932,15 +1930,15 @@ dependencies = [
 
 [[package]]
 name = "find-msvc-tools"
-version = "0.1.7"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f449e6c6c08c865631d4890cfacf252b3d396c9bcc83adb6623cdb02a8336c41"
+checksum = "8591b0bcc8a98a64310a2fae1bb3e9b8564dd10e381e6e28010fde8e8e8568db"
 
 [[package]]
 name = "fixed"
-version = "1.29.0"
+version = "1.30.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "707070ccf8c4173548210893a0186e29c266901b71ed20cd9e2ca0193dfe95c3"
+checksum = "c566da967934c6c7ee0458a9773de9b2a685bd2ce26a3b28ddfc740e640182f5"
 dependencies = [
  "az",
  "bytemuck",
@@ -2319,6 +2317,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19fc433e8437a212d1b6f1e68c7824af3aed907da60afa994e7f542d18d12aa9"
 
 [[package]]
+name = "glam"
+version = "0.31.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "74a4d85559e2637d3d839438b5b3d75c31e655276f9544d72475c36b92fabbed"
+
+[[package]]
 name = "glib"
 version = "0.21.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2594,7 +2598,7 @@ dependencies = [
  "pastey",
  "pin-project-lite",
  "smallvec",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -2924,11 +2928,12 @@ dependencies = [
 name = "iceoryx-types"
 version = "0.1.0"
 dependencies = [
- "bincode 2.0.1",
  "common",
+ "cu-bincode",
  "iceoryx2",
  "nalgebra",
  "serde",
+ "serde-big-array",
 ]
 
 [[package]]
@@ -3643,9 +3648,9 @@ checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 name = "lunabase-lib"
 version = "0.1.0"
 dependencies = [
- "bincode 2.0.1",
  "common",
  "crossbeam-channel",
+ "cu-bincode",
  "godot",
  "quic",
 ]
@@ -3655,7 +3660,6 @@ name = "lunabot-cu"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bincode 2.0.1",
  "bitcode",
  "bonsai-bt",
  "bytemuck",
@@ -3667,6 +3671,7 @@ dependencies = [
  "crossbeam",
  "crossbeam-channel",
  "cu-apriltag",
+ "cu-bincode",
  "cu-gstreamer",
  "cu-sensor-payloads",
  "cu-spatial-payloads",
@@ -3691,6 +3696,7 @@ dependencies = [
  "rerun",
  "ron 0.12.0",
  "serde",
+ "serde-big-array",
  "simple-icp",
  "simple-motion",
  "tasker",
@@ -3909,7 +3915,7 @@ dependencies = [
  "once_cell",
  "rustc-hash 1.1.0",
  "spirv",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "unicode-ident",
 ]
 
@@ -4333,9 +4339,9 @@ dependencies = [
 
 [[package]]
 name = "openssl-probe"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f50d9b3dabb09ecd771ad0aa242ca6894994c130308ca3d7684634df8037391"
+checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
 
 [[package]]
 name = "option-ext"
@@ -4691,9 +4697,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.105"
+version = "1.0.106"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "535d180e0ecab6268a3e718bb9fd44db66bbbc256257165fc699dadf70d16fe7"
+checksum = "8fd00f0bb2e90d81d1044c2b32617f68fcb9fa3bb7640c23e9c748e53fb30934"
 dependencies = [
  "unicode-ident",
 ]
@@ -4754,8 +4760,8 @@ dependencies = [
 name = "quic"
 version = "0.1.0"
 dependencies = [
- "bincode 2.0.1",
  "cobs 0.5.0",
+ "cu-bincode",
  "quinn",
  "rcgen",
  "tasker",
@@ -4785,7 +4791,7 @@ dependencies = [
  "rustc-hash 2.1.1",
  "rustls",
  "socket2",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tokio",
  "tracing",
  "web-time",
@@ -4808,7 +4814,7 @@ dependencies = [
  "rustls-pki-types",
  "rustls-platform-verifier",
  "slab",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tinyvec",
  "tracing",
  "web-time",
@@ -4830,9 +4836,9 @@ dependencies = [
 
 [[package]]
 name = "quote"
-version = "1.0.43"
+version = "1.0.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc74d9a594b72ae6656596548f56f667211f8a97b3d4c3d467150794690dc40a"
+checksum = "21b2ebcf727b7760c461f091f9f0f539b77b8e87f2fd88131e7f1b433b3cece4"
 dependencies = [
  "proc-macro2",
 ]
@@ -4859,7 +4865,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6db2770f06117d490610c7488547d543617b21bfa07796d7a12f6f1bd53850d1"
 dependencies = [
  "rand_chacha",
- "rand_core 0.9.4",
+ "rand_core 0.9.5",
 ]
 
 [[package]]
@@ -4869,7 +4875,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d3022b5f1df60f26e1ffddd6c66e8aa15de382ae63b3a0c1bfc0e4d3e3f325cb"
 dependencies = [
  "ppv-lite86",
- "rand_core 0.9.4",
+ "rand_core 0.9.5",
 ]
 
 [[package]]
@@ -4880,9 +4886,9 @@ checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 
 [[package]]
 name = "rand_core"
-version = "0.9.4"
+version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4f1b3bc831f92381018fd9c6350b917c7b21f1eed35a65a51900e0e55a3d7afa"
+checksum = "76afc826de14238e6e8c374ddcc1fa19e374fd8dd986b0d2af0d02377261d83c"
 dependencies = [
  "getrandom 0.3.4",
 ]
@@ -4927,9 +4933,9 @@ dependencies = [
 
 [[package]]
 name = "rcgen"
-version = "0.14.6"
+version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ec0a99f2de91c3cddc84b37e7db80e4d96b743e05607f647eb236fc0455907f"
+checksum = "10b99e0098aa4082912d4c649628623db6aba77335e4f4569ff5083a6448b32e"
 dependencies = [
  "pem",
  "ring",
@@ -4955,7 +4961,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "url",
  "uuid",
  "web-sys",
@@ -4969,7 +4975,7 @@ checksum = "e4f8bc4e5242bd9f749093e50a2b98ad9a432159c9c334518cf6bb0de949622d"
 dependencies = [
  "arrow",
  "re_arrow_util",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -5011,7 +5017,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tiny_http",
  "tokio",
  "tonic",
@@ -5104,7 +5110,7 @@ dependencies = [
  "re_tracing",
  "re_tuid",
  "re_types_core",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tracing",
 ]
 
@@ -5134,7 +5140,7 @@ dependencies = [
  "re_types_core",
  "saturating_cast",
  "tap",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "web-time",
 ]
 
@@ -5168,7 +5174,7 @@ dependencies = [
  "re_types_core",
  "re_uri",
  "saturating_cast",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "web-time",
 ]
 
@@ -5206,7 +5212,7 @@ dependencies = [
  "re_sorbet",
  "re_tracing",
  "re_uri",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-stream",
  "tonic",
@@ -5290,7 +5296,7 @@ dependencies = [
  "re_smart_channel",
  "re_sorbet",
  "re_tracing",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-stream",
  "tracing",
@@ -5326,7 +5332,7 @@ dependencies = [
  "re_types_core",
  "serde",
  "static_assertions",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "typenum",
  "uuid",
  "web-time",
@@ -5390,7 +5396,7 @@ dependencies = [
  "re_tuid",
  "re_types_core",
  "serde",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tonic",
  "tonic-prost",
  "tower",
@@ -5423,7 +5429,7 @@ dependencies = [
  "re_tracing",
  "re_types_core",
  "seq-macro",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -5446,7 +5452,7 @@ dependencies = [
  "re_smart_channel",
  "re_uri",
  "serde",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-stream",
  "tonic",
@@ -5486,7 +5492,7 @@ dependencies = [
  "re_tracing",
  "re_types",
  "re_uri",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -5500,7 +5506,7 @@ dependencies = [
  "re_tracing",
  "re_uri",
  "serde",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "web-time",
 ]
 
@@ -5520,7 +5526,7 @@ dependencies = [
  "re_tuid",
  "re_types_core",
  "semver 1.0.27",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tracing",
  "web-time",
 ]
@@ -5599,7 +5605,7 @@ dependencies = [
  "re_tracing",
  "re_types_core",
  "smallvec",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "uuid",
 ]
 
@@ -5624,7 +5630,7 @@ dependencies = [
  "re_tracing",
  "re_tuid",
  "serde",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -5636,7 +5642,7 @@ dependencies = [
  "re_log_types",
  "re_tuid",
  "serde",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "url",
 ]
 
@@ -5666,7 +5672,7 @@ dependencies = [
  "re_tracing",
  "saturating_cast",
  "smallvec",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",
@@ -5729,7 +5735,7 @@ checksum = "a4e608c6638b9c18977b00b475ac1f28d14e84b27d8d42f70e0bf1e3dec127ac"
 dependencies = [
  "getrandom 0.2.17",
  "libredox",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -5875,9 +5881,9 @@ dependencies = [
 
 [[package]]
 name = "rustc-demangle"
-version = "0.1.26"
+version = "0.1.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "56f7d92ca342cea22a06f2121d944b4fd82af56988c270852495420f961d4ace"
+checksum = "b50b8869d9fc858ce7266cce0194bd74df58b9d0e3f6df3a9fc8eb470d95c09d"
 
 [[package]]
 name = "rustc-hash"
@@ -5960,9 +5966,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-pki-types"
-version = "1.13.2"
+version = "1.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "21e6f2ab2928ca4291b86736a8bd920a277a399bba1589409d72154ff87c1282"
+checksum = "be040f8b0a225e40375822a563fa9524378b9d63112f53e19ffff34df5d33fdd"
 dependencies = [
  "web-time",
  "zeroize",
@@ -5997,9 +6003,9 @@ checksum = "f87165f0995f63a9fbeea62b64d10b4d9d8e78ec6d7d51fb2125fda7bb36788f"
 
 [[package]]
 name = "rustls-webpki"
-version = "0.103.8"
+version = "0.103.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ffdfa2f5286e2247234e03f680868ac2815974dc39e00ea15adc445d0aafe52"
+checksum = "d7df23109aa6c1567d1c575b9952556388da57401e4ace1d15f79eedad0d8f53"
 dependencies = [
  "ring",
  "rustls-pki-types",
@@ -6119,6 +6125,15 @@ checksum = "9a8e94ea7f378bd32cbbd37198a4a91436180c5bb472411e48b5ec2e2124ae9e"
 dependencies = [
  "serde_core",
  "serde_derive",
+]
+
+[[package]]
+name = "serde-big-array"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "11fc7cc2c76d73e0f27ee52abbd64eec84d46f370c88371120433196934e4b7f"
+dependencies = [
+ "serde",
 ]
 
 [[package]]
@@ -6335,9 +6350,9 @@ dependencies = [
 
 [[package]]
 name = "socket2"
-version = "0.6.1"
+version = "0.6.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "17129e116933cf371d018bb80ae557e889637989d8638274fb25622827b03881"
+checksum = "86f4aa3ad99f2088c990dfa82d367e19cb29268ed67c574d10d0a4bfe71f07e0"
 dependencies = [
  "libc",
  "windows-sys 0.60.2",
@@ -6398,6 +6413,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "700efb40f3f559c23c18b446e8ed62b08b56b2bb3197b36d57e0470b4102779e"
 
 [[package]]
+name = "svg"
+version = "0.18.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "94afda9cd163c04f6bee8b4bf2501c91548deae308373c436f36aeff3cf3c4a3"
+
+[[package]]
 name = "syn"
 version = "1.0.109"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6442,7 +6463,7 @@ version = "5.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "656b45c05d95a5704399aeef6bd0ddec7b2b3531b7c9e900abbf7c4d2190c925"
 dependencies = [
- "bincode 1.3.3",
+ "bincode",
  "flate2",
  "fnv",
  "once_cell",
@@ -6452,7 +6473,7 @@ dependencies = [
  "serde",
  "serde_derive",
  "serde_json",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "walkdir",
  "yaml-rust",
 ]
@@ -6549,11 +6570,11 @@ dependencies = [
 
 [[package]]
 name = "thiserror"
-version = "2.0.17"
+version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f63587ca0f12b72a0600bcba1d40081f830876000bb46dd2337a3051618f4fc8"
+checksum = "4288b5bcbc7920c07a1149a35cf9590a2aa808e0bc1eafaade0b80947865fbc4"
 dependencies = [
- "thiserror-impl 2.0.17",
+ "thiserror-impl 2.0.18",
 ]
 
 [[package]]
@@ -6569,9 +6590,9 @@ dependencies = [
 
 [[package]]
 name = "thiserror-impl"
-version = "2.0.17"
+version = "2.0.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3ff15c8ecd7de3849db632e14d18d2571fa09dfc5ed93479bc4485c7a517c913"
+checksum = "ebc4ee7f67670e9b64d05fa4253e753e016c6c95ff35b89b7941d6b856dec1d5"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -6580,9 +6601,9 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.44"
+version = "0.3.45"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91e7d9e3bb61134e77bde20dd4825b97c010155709965fedf0f49bb138e52a9d"
+checksum = "f9e442fc33d7fdb45aa9bfeb312c095964abdf596f7567261062b2a7107aaabd"
 dependencies = [
  "deranged",
  "itoa",
@@ -6590,22 +6611,22 @@ dependencies = [
  "num-conv",
  "num_threads",
  "powerfmt",
- "serde",
+ "serde_core",
  "time-core",
  "time-macros",
 ]
 
 [[package]]
 name = "time-core"
-version = "0.1.6"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "40868e7c1d2f0b8d73e4a8c7f0ff63af4f6d19be117e90bd73eb1d62cf831c6b"
+checksum = "8b36ee98fd31ec7426d599183e8fe26932a8dc1fb76ddb6214d05493377d34ca"
 
 [[package]]
 name = "time-macros"
-version = "0.2.24"
+version = "0.2.25"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30cfb0125f12d9c277f35663a0a33f8c30190f4e4574868a330595412d34ebf3"
+checksum = "71e552d1249bf61ac2a52db88179fd0673def1e1ad8243a00d9ec9ed71fee3dd"
 dependencies = [
  "num-conv",
  "time-core",
@@ -6908,7 +6929,7 @@ dependencies = [
  "httparse",
  "js-sys",
  "pin-project",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tonic",
  "tower-service",
  "wasm-bindgen",
@@ -7037,7 +7058,7 @@ version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4064ed685c487dbc25bd3f0e9548f2e34bab9d18cefc700f9ec2dba74ba1138e"
 dependencies = [
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -7090,9 +7111,9 @@ checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
 
 [[package]]
 name = "unty"
-version = "0.0.4"
+version = "0.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6d49784317cd0d1ee7ec5c716dd598ec5b4483ea832a2dced265471cc0f690ae"
+checksum = "7dbe8d477efbc6c70a1dea1f9f1e0482168983a9147dee6b3a619f666f3aeac6"
 
 [[package]]
 name = "uom"
@@ -7212,9 +7233,9 @@ dependencies = [
 
 [[package]]
 name = "virtue"
-version = "0.0.18"
+version = "0.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "051eb1abcf10076295e815102942cc58f9d5e3b4560e46e53c21e8ff6f3af7b1"
+checksum = "e2063ed945650e9080bcfa2b56cbde318efe1347a3cf06882e23e2f124183e88"
 
 [[package]]
 name = "void"
@@ -7258,9 +7279,9 @@ checksum = "ccf3ec651a847eb01de73ccad15eb7d99f80485de043efb2f370cd654f4ea44b"
 
 [[package]]
 name = "wasip2"
-version = "1.0.1+wasi-0.2.4"
+version = "1.0.2+wasi-0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0562428422c63773dad2c345a1882263bbf4d65cf3f42e90921f787ef5ad58e7"
+checksum = "9517f9239f02c069db75e65f174b3da828fe5f5b945c4dd26bd25d89c03ebcf5"
 dependencies = [
  "wit-bindgen",
 ]
@@ -7461,7 +7482,7 @@ dependencies = [
  "raw-window-handle",
  "rustc-hash 1.1.0",
  "smallvec",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "wgpu-core-deps-apple",
  "wgpu-core-deps-emscripten",
  "wgpu-core-deps-windows-linux-android",
@@ -7537,7 +7558,7 @@ dependencies = [
  "raw-window-handle",
  "renderdoc-sys",
  "smallvec",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "wasm-bindgen",
  "web-sys",
  "wgpu-types",
@@ -7555,7 +7576,7 @@ dependencies = [
  "bytemuck",
  "js-sys",
  "log",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "web-sys",
 ]
 
@@ -7564,13 +7585,13 @@ name = "wgsl-pcl"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "bincode 2.0.1",
  "bytemuck",
+ "cu-bincode",
  "futures",
  "nalgebra",
  "pollster",
  "serde",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "wgpu",
 ]
 
@@ -8065,9 +8086,9 @@ dependencies = [
 
 [[package]]
 name = "wit-bindgen"
-version = "0.46.0"
+version = "0.51.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f17a85883d4e6d00e8a97c586de764dabcc06133f7f1d55dce5cdc070ad7fe59"
+checksum = "d7249219f66ced02969388cf2bb044a09756a083d0fab1e566056b04d9fbcaa5"
 
 [[package]]
 name = "writeable"
@@ -8100,7 +8121,7 @@ dependencies = [
  "oid-registry",
  "ring",
  "rusticata-macros",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "time",
 ]
 
@@ -8233,6 +8254,6 @@ dependencies = [
 
 [[package]]
 name = "zmij"
-version = "1.0.13"
+version = "1.0.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac93432f5b761b22864c774aac244fa5c0fd877678a4c37ebf6cf42208f9c9ec"
+checksum = "dfcd145825aace48cff44a8844de64bf75feec3080e0aa5cdbde72961ae51a65"

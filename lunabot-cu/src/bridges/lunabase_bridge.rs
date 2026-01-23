@@ -37,6 +37,7 @@ impl CuBridge for Lunabase {
     type Tx = ToLunabaseChannel;
 
     type Rx = FromLunabaseChannel;
+    type Resources<'r> = ();
 
     #[cfg(feature = "resim")]
     fn new(
@@ -47,6 +48,8 @@ impl CuBridge for Lunabase {
         _rx_channels: &[cu29::prelude::BridgeChannelConfig<
             <Self::Rx as cu29::prelude::BridgeChannelSet>::Id,
         >],
+        _resources: Self::Resources<'_>
+
     ) -> cu29::CuResult<Self>
     where
         Self: Sized,
@@ -63,6 +66,7 @@ impl CuBridge for Lunabase {
         _rx_channels: &[cu29::prelude::BridgeChannelConfig<
             <Self::Rx as cu29::prelude::BridgeChannelSet>::Id,
         >],
+        _resources: Self::Resources<'_>
     ) -> cu29::CuResult<Self>
     where
         Self: Sized,
@@ -70,7 +74,7 @@ impl CuBridge for Lunabase {
         use cu29::CuError;
 
         let max_pong_delay = if let Some(cfg) = config {
-            Duration::from_millis(cfg.get("max_pong_delay_ms").unwrap_or(1000))
+            Duration::from_millis(cfg.get("max_pong_delay_ms").unwrap().unwrap_or(1000))
         } else {
             Duration::from_millis(1000)
         };
@@ -119,7 +123,7 @@ impl CuBridge for Lunabase {
         use common::{FromLunabot, LUNABOT_STAGE};
 
         let heartbeat =
-            bincode::encode_to_vec(LUNABOT_STAGE.load(), bincode::config::standard()).unwrap();
+            cu_bincode::encode_to_vec(LUNABOT_STAGE.load(), cu_bincode::config::standard()).unwrap();
         self.connection.server.set_keep_alive_msg(&heartbeat);
 
         if let Some(errored_tasks) = ERRORED_TASKS.get()
@@ -212,7 +216,7 @@ impl CuBridge for Lunabase {
 
             // Send heartbeat and robot state (moved from send method since send might not be called)
             let heartbeat =
-                bincode::encode_to_vec(LUNABOT_STAGE.load(), bincode::config::standard()).unwrap();
+                cu_bincode::encode_to_vec(LUNABOT_STAGE.load(), cu_bincode::config::standard()).unwrap();
             self.connection.server.set_keep_alive_msg(&heartbeat);
 
             // Send errored tasks periodically

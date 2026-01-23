@@ -3,6 +3,7 @@ use crate::utils::udev_poll;
 use core::f32;
 use crossbeam::{atomic::AtomicCell, utils::Backoff};
 use cu29::{config::Value, prelude::*};
+use ron::de::SpannedError;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -55,11 +56,14 @@ pub struct VescPair {
     pub command_both: bool,
 }
 
-impl From<Value> for VescPair {
-    fn from(value: Value) -> Self {
+impl TryFrom<Value> for VescPair {
+    type Error = ConfigError;
+    fn try_from(value: Value) -> Result<Self, ConfigError> {
         // unwrapping here is bad but I cant be bothered to handle it right now
         // this will panic at the very beginning of the program if the value is not a valid VescPair
-        ron::from_str(&value.to_string()).unwrap()
+        ron::from_str(&value.to_string()).map_err(|e| ConfigError {
+            message: e.to_string()
+        })
     }
 }
 

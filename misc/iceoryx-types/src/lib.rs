@@ -15,3 +15,6 @@ pub use sim::*;
 pub mod production;
 #[cfg(all(feature = "production", not(all(feature="sim", feature="resim"))))]
 pub use production::*;
+
+
+extern crate cu_bincode as bincode;

@@ -42,8 +42,9 @@ impl<const N: usize> Freezable for CuAutoGStreamer<N> {}
 impl<const N: usize> CuTask for CuAutoGStreamer<N> {
     type Input<'m> = input_msg!(NewDevice);
     type Output<'m> = output_msg!(CuGstBuffer);
+    type Resources<'r> = ();
 
-    fn new(cfg: Option<&ComponentConfig>) -> CuResult<Self> {
+    fn new(cfg: Option<&ComponentConfig>, _resources: Self::Resources<'_>) -> CuResult<Self> {
         if !gstreamer::INITIALIZED.load(std::sync::atomic::Ordering::SeqCst) {
             gstreamer::init()
                 .map_err(|e| CuError::new_with_cause("Failed to initialise gstreamer", e))?;
@@ -53,16 +54,16 @@ impl<const N: usize> CuTask for CuAutoGStreamer<N> {
 
         Ok(Self {
             desired_port: cfg
-                .get::<String>("device_port")
+                .get::<String>("device_port")?
                 .ok_or("'device_port' missing from config")?,
             camera_id: cfg
-                .get::<String>("camera_id")
+                .get::<String>("camera_id")?
                 .ok_or("'camera_id' missing from config")?,
             pipeline_template: cfg
-                .get::<String>("pipeline")
+                .get::<String>("pipeline")?
                 .ok_or("'pipeline' missing from config")?,
             caps_str: cfg
-                .get::<String>("caps")
+                .get::<String>("caps")?
                 .ok_or("'caps' missing from config")?,
             pipeline: None,
             appsink: None,
@@ -209,7 +210,7 @@ impl<const N: usize> CuAutoGStreamer<N> {
 pub struct CuAutoGStreamer<const N: usize> {}
 
 #[cfg(any(not(target_os = "linux"), feature = "resim", feature = "sim"))]
-#[derive(Debug, Clone, bincode::Encode, bincode::Decode, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, cu_bincode::Encode, cu_bincode::Decode, Serialize, Deserialize, Default)]
 pub struct CuGstBuffer {}
 
 #[cfg(any(not(target_os = "linux"), feature = "resim", feature = "sim"))]
@@ -219,8 +220,9 @@ impl<const N: usize> Freezable for CuAutoGStreamer<N> {}
 impl<const N: usize> CuTask for CuAutoGStreamer<N> {
     type Input<'m> = input_msg!(NewDevice);
     type Output<'m> = output_msg!(CuGstBuffer);
+    type Resources<'r> = ();
 
-    fn new(_cfg: Option<&ComponentConfig>) -> CuResult<Self> {
+    fn new(_cfg: Option<&ComponentConfig>, _resources: Self::Resources<'_>) -> CuResult<Self> {
         Ok(Self {})
     }
 

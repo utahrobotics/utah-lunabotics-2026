@@ -10,5 +10,5 @@ nalgebra.workspace = true
 once_cell = "1.19"
 crossbeam.workspace = true
 embedded_common = { path = "../embedded_common" }
-bincode.workspace = true
+cu-bincode.workspace = true
 serde.workspace = true

@@ -58,7 +58,7 @@ required-features = ["sim"]
 
 # copper
 cu29.workspace = true
-bincode.workspace = true
+cu-bincode.workspace = true
 cu29-helpers.workspace = true
 cu29-export = { workspace = true, optional = true }
 # cu_cursiveconsolemon.workspace = true
@@ -89,6 +89,7 @@ embedded_common = { path = "../embedded_common", features = ["std"] }
 
 # RON deserialization at runtime
 ron.workspace = true
+serde-big-array.workspace = true
 
 # misc
 simple-motion = { path = "../misc/simple-motion" }

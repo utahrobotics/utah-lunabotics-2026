@@ -65,6 +65,8 @@ const POSE_MEAS_DIM: usize = 6;
 /// Velocity measurement dimension  
 const VEL_MEAS_DIM: usize = 6;
 
+// These oncelocks must only be set in the new() function
+
 /// Process noise for position (grows with time)
 static PROCESS_NOISE_POSITION: OnceLock<f64> = OnceLock::new();
 
@@ -346,51 +348,47 @@ impl CuTask for Localizer {
         Vec<AprilTagMeasurement>, // AprilTag detections - global reference
         T265Msg         // T265 pose - for velocity extraction
     );
+    type Resources<'r> = ();
 
     type Output<'m> = output_msg!(FromLunabot);
 
-    fn new(config: Option<&cu29::prelude::ComponentConfig>) -> cu29::CuResult<Self>
+    fn new(config: Option<&cu29::prelude::ComponentConfig>,_resources: Self::Resources<'_>) -> cu29::CuResult<Self>
     where
         Self: Sized,
     {
         // load up values from config
         let process_noise_position = config
             .unwrap()
-            .get::<f64>("process_noise_position")
+            .get::<f64>("process_noise_position").expect("failed to deserialize")
             .expect("please supply process noise position");
 
         let process_noise_velocity = config
             .unwrap()
-            .get::<f64>("process_noise_velocity")
+            .get::<f64>("process_noise_velocity").expect("failed to deserialize")
             .expect("please supply process noise velocity");
         let process_noise_orientation = config
             .unwrap()
-            .get::<f64>("process_noise_orientation")
+            .get::<f64>("process_noise_orientation").expect("failed to deserialize")
             .expect("please supply process noise orientation");
 
         let process_noise_angular_vel = config
             .unwrap()
-            .get::<f64>("process_noise_angular_velocity")
+            .get::<f64>("process_noise_angular_velocity").expect("failed to deserialize")
             .expect("please supply process noise angular velocity");
 
         let initial_covariance = config
             .unwrap()
             .get::<f64>("initial_covariance")
+            .expect("failed to deserialize")
             .expect("please supply initial covariance");
         PROCESS_NOISE_POSITION
-            .set(process_noise_position)
-            .map_err(|e| CuError::new_with_cause("process noise position already set", e))?;
+            .set(process_noise_position).expect("failed to set oncelock");
         PROCESS_NOISE_VELOCITY
-            .set(process_noise_velocity)
-            .map_err(|e| CuError::new_with_cause("process noise velocity already set", e))?;
+            .set(process_noise_velocity).expect("failed to set oncelock");
         PROCESS_NOISE_ORIENTATION
-            .set(process_noise_orientation)
-            .map_err(|e| CuError::new_with_cause("process noise orientation already set", e))?;
+            .set(process_noise_orientation).expect("failed to set oncelock");
         PROCESS_NOISE_ANGULAR_VEL
-            .set(process_noise_angular_vel)
-            .map_err(|e| {
-                CuError::new_with_cause("process noise angular velocity already set", e)
-            })?;
+            .set(process_noise_angular_vel).expect("failed to set oncelock");
 
         // Initial state: all zeros
         let initial_state = StateVec::zeros();

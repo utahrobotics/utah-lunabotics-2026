@@ -40,10 +40,11 @@ impl Freezable for PointCloudIceoryxReceiver {}
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 impl CuSrcTask for PointCloudIceoryxReceiver {
     type Output<'m> = output_msg!(IceoryxPointCloud);
+    type Resources<'r> = ();
 
-    fn new(config: Option<&ComponentConfig>) -> CuResult<Self> {
+    fn new(config: Option<&ComponentConfig>, _resources: Self::Resources<'_>) -> CuResult<Self> {
         let service_str = config
-            .and_then(|c| c.get::<String>("service"))
+            .and_then(|c| c.get::<String>("service").expect("failed to deserialize"))
             .unwrap_or_else(|| "unilidar/cloud_full".to_string());
 
         let service_name = ServiceName::new(&service_str).map_err(|e| {
@@ -153,8 +154,9 @@ impl CuSrcTask for PointCloudIceoryxReceiver {
 #[cfg(any(feature = "resim", feature = "sim"))]
 impl CuSrcTask for PointCloudIceoryxReceiver {
     type Output<'m> = output_msg!(IceoryxPointCloud);
+    type Resources<'r> = ();
 
-    fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
+    fn new(_config: Option<&ComponentConfig>,_resources: Self::Resources<'_>) -> CuResult<Self> {
         Ok(Self {
             l2_node: ROBOT_STATE
                 .get()

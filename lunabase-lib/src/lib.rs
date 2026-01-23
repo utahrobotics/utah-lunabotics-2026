@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
-use bincode::error::DecodeError;
+use cu_bincode::error::DecodeError;
 use common::{FromLunabase, FromLunabot, LunabotStage, Steering};
 use godot::prelude::*;
 use quic::QuicClient;
@@ -68,7 +68,7 @@ impl INode for LunabaseConnection {
                 self.base_mut().emit_signal("packet_received", &[]);
 
                 let reported_lunabot_stage: Result<(LunabotStage, usize), DecodeError> =
-                    bincode::borrow_decode_from_slice(&encoded_stage, bincode::config::standard());
+                    cu_bincode::borrow_decode_from_slice(&encoded_stage, cu_bincode::config::standard());
 
                 if let Ok((stage, _)) = reported_lunabot_stage {
                     if stage != self.current_stage {
