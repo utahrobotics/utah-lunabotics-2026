@@ -101,7 +101,7 @@
       <body name="depth_cam_mount">
         <camera name="front_depth_camera"
           mode="fixed"
-          pos="1.26 -0.22 0.25"
+          pos="1.0 0.0 0.25"
           euler="0 -62 90"
           resolution="640 480"
           focalpixel="383 383"
