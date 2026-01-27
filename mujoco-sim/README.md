@@ -18,6 +18,15 @@ Additionally, starting the simulation this way launches the code for the lunabot
 
 * Run the simulation by calling ```make sim```, this command may re build the entire project because mujoco requires using a different linker.
 
+
+**You will also need the lunabase running to be able to control the robot:**
+1. install godot https://godotengine.org/
+2. build the gdext by navigating to lunabase-lib and running ```cargo build```
+3. navigate to ```godot/new-lunabase```
+4. launch godot editor with ```godot project.godot```
+5. click one of the buttons in the top right corner to lanch the MainControl.tscn scene.
+
+
 **What to use this option for:** Testing autonomy, testing manual control through the lunabase.
 
 ### Option 2: Without lunabot 
