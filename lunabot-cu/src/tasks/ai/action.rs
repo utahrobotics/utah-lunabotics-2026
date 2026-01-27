@@ -10,7 +10,7 @@ use crate::{
         jobs::{find_path_job, follow_path_job},
     },
 };
-static PATHFINDING_GOAL: [f32; 2] = [2.490662524, 0.72606992];
+static PATHFINDING_GOAL: [f32; 2] = [6.0662524, 3.0606992];
 static MAX_ACCEPTABLE_GRADIENT: f32 = 0.3;
 
 #[derive(Clone, Debug, Copy)]

@@ -1,5 +1,7 @@
 # MuJoCo Simulation
 
+*HINT: if you disable task logging the sim will run smoother*
+
 ## Setup
 1. Follow the installation instructions [here](https://mujoco-rs.readthedocs.io/en/v2.0.x/installation.html#static-linking) to build mujoco for static linking. (you may have to leave off the release flag on the make step)
 
