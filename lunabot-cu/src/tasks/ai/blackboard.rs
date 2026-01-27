@@ -38,9 +38,6 @@ pub struct LunabotBlackboard {
     /// but for autonomy we can't know that
     pub outgoing_steering_msg: Option<Steering>,
 
-    /// when the user clicks continue mission in lunabase, the stage stored here is what the bot wil continue with
-    pub last_mission: LunabotStage,
-
     pub current_mission: LunabotStage,
 
     pub yielded: bool,
@@ -63,8 +60,6 @@ impl Default for LunabotBlackboard {
 
             outgoing_actuator_msg_queue: VecDeque::new(),
             outgoing_steering_msg: Some(Steering::new(0.0, 0.0, 0.0)),
-            // when the user clicks continue mission for the first time, we move to manual
-            last_mission: LunabotStage::Manual,
             current_mission: LunabotStage::SoftStop,
             latest_local_map: None,
             last_lift: None,
@@ -94,20 +89,15 @@ impl LunabotBlackboard {
                 self.last_steering = Some(*steering);
             }
             common::FromLunabase::Navigate(destination) => {
-                self.last_mission = LunabotStage::Autonomy;
                 self.current_mission = LunabotStage::Autonomy;
                 LUNABOT_STAGE.store(LunabotStage::Autonomy);
                 self.navigate_destination = Some(*destination);
             }
             common::FromLunabase::DigDump(..) => {
-                self.last_mission = LunabotStage::Autonomy;
                 self.current_mission = LunabotStage::Autonomy;
                 LUNABOT_STAGE.store(LunabotStage::Autonomy);
             }
-
-            // for now if the user cancels autonomy we dump them back into manual on continue mission
             common::FromLunabase::SoftStop => {
-                self.last_mission = LunabotStage::Manual;
                 self.current_mission = LunabotStage::SoftStop;
                 LUNABOT_STAGE.store(LunabotStage::SoftStop);
             }
@@ -115,9 +105,9 @@ impl LunabotBlackboard {
                 self.current_mission = LunabotStage::SoftStop;
                 LUNABOT_STAGE.store(LunabotStage::SoftStop);
             }
-            common::FromLunabase::ContinueMission => {
-                LUNABOT_STAGE.store(self.last_mission);
-                self.current_mission = self.last_mission;
+            common::FromLunabase::Manual => {
+                self.current_mission = LunabotStage::Manual;
+                LUNABOT_STAGE.store(LunabotStage::Manual);
             }
             _ => {}
         }

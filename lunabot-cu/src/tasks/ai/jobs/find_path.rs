@@ -1,6 +1,6 @@
 use nalgebra::Vector2;
 use rerun::Vec2D;
-use tasker::tokio::sync::{mpsc, watch};
+use tasker::tokio::{ sync::{mpsc, watch}};
 
 use crate::{
     pathfinding::field_dstar::find_path_dstar,

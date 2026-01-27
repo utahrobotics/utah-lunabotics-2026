@@ -240,7 +240,6 @@ impl LunabotAction {
             }
             LunabotAction::SetStage(stage) => {
                 println!("Setting stage to {:?}", stage);
-                blackboard.last_mission = LunabotStage::Manual;
                 blackboard.current_mission = *stage;
                 blackboard.path_follower = None;
                 LUNABOT_STAGE.store(*stage);

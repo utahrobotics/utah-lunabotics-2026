@@ -7,6 +7,7 @@ use crate::tasks::ai::{
     },
 };
 
+/// the root of the behavior tree
 pub fn teleop_behavior() -> Behavior<LunabotAction> {
     Behavior::While(
         Box::new(WaitForever),

@@ -244,12 +244,13 @@ impl LunabaseConnection {
         }
     }
 
+    /// continue mission means manual
     #[func]
     fn send_continue_mission(&self) {
         if let Some(ref client) = self.client {
-            match client.send(FromLunabase::ContinueMission) {
+            match client.send(FromLunabase::Manual) {
                 Ok(_) => {
-                    godot_print!("Sent ContinueMission command");
+                    godot_print!("Sent Manual command");
                 }
                 Err(e) => {
                     godot_warn!("Failed to send continue mission packet: {e}");

@@ -175,7 +175,7 @@ impl TryFrom<u8> for LunabotStage {
     bincode::Encode, bincode::Decode, Debug, Encode, Decode, Clone, Copy, PartialEq, Serialize, Deserialize
 )] 
 pub enum FromLunabase {
-    ContinueMission,
+    Manual,
     /// Skid steer message, 1,1 is full speed forward, -1,-1 is full speed back
     Steering(Steering),
     /// Move lift actuators, positive up, negative down  
@@ -224,7 +224,7 @@ impl FromLunabase {
 
     pub fn write_code_sheet(mut w: impl Write) -> std::io::Result<()> {
         // FromLunabase::Pong.write_code(&mut w)?;
-        FromLunabase::ContinueMission.write_code(&mut w)?;
+        FromLunabase::Manual.write_code(&mut w)?;
         FromLunabase::Steering(Steering::default()).write_code(&mut w)?;
         FromLunabase::SoftStop.write_code(&mut w)?;
         Ok(())

@@ -23,7 +23,6 @@ pub fn navigate_behavior() -> Behavior<LunabotAction> {
 fn set_stage(stage: common::LunabotStage) -> Behavior<LunabotAction> {
     Sequence(vec![
         Action(LunabotAction::SetStage(stage)),
-        // might eventuall yneed something here
     ])
 }
 
