@@ -51,7 +51,6 @@ pub struct LunabotBlackboard {
     pub path_finder: Option<Job<Vec<Vector2<f32>>>>,
     /// the calculated path from the path finder job
     pub calculated_path: Option<Vec<Vector2<f32>>>,
-    pub global_map: OccupancyGrid,
 }
 
 impl Default for LunabotBlackboard {
@@ -76,7 +75,6 @@ impl Default for LunabotBlackboard {
             navigate_destination: None,
             yielded: false,
             path_follower: None,
-            global_map: OccupancyGrid::default(),
         }
     }
 }

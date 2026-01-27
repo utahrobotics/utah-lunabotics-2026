@@ -118,12 +118,11 @@ impl LunabotAction {
             },
             LunabotAction::None => Success,
             LunabotAction::IsObstacleMapReady => {
-                // if blackboard.latest_obstacle_map.is_some() {
-                //     Success
-                // } else {
-                //     Failure
-                // }
-                Success
+                if blackboard.latest_local_map.is_some() {
+                    Success
+                } else {
+                    Failure
+                }
             }
             LunabotAction::IsInOccupiedCell => todo!(),
             LunabotAction::IsInFreeCell => todo!(),
