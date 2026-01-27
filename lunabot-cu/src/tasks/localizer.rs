@@ -23,7 +23,7 @@
 ///!  
 ///!  
 ///! ## Process noise
-///! How much you don't trust your motion model. lower noise = motion model trusted more than sensors
+///! How much you don't trust your motion model. higher noise = motion model trusted more than sensors
 ///!
 use std::sync::OnceLock;
 
