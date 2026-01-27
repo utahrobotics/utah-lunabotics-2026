@@ -48,6 +48,7 @@ impl CuTask for LunabotAi {
         Ok(())
     }
 
+    /// drains the outgoing steering and actuator command queues, updates the blackboard with Inputs, ticks the behavior tree
     fn process<'i, 'o>(
         &mut self,
         clock: &cu29::prelude::RobotClock,
