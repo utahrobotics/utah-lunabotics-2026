@@ -44,16 +44,16 @@ LunabotAction::IsObstacleMapReady => {
 ```
 
 
-Instead if you have an action that will run for a long time it should be an asychronous, easily cancelable Job, more on that later.
+Instead if you have an action that will run for a long time it should be an asynchronous, easily cancelable Job, more on that later.
 
-2. Zero-tick logic is weird. If an action immediately returns Success, then in the eyes of the behavior tree no time has passed. Each tick of bt is  greedy so you can end up with situations where an action gets called over and over in an infinite loop because the bt doesnt know to re check a condition because *technically* no time has passed. If infinite greedy 0-tick logic becomes a problem you can use the LunabotAction::Yeild.
+2. Zero-tick logic is weird. If an action immediately returns Success, then in the eyes of the behavior tree no time has passed. Each tick of bt is  greedy so you can end up with situations where an action gets called over and over in an infinite loop because the bt doesn't know to re check a condition because *technically* no time has passed. If infinite greedy 0-tick logic becomes a problem you can use the LunabotAction::Yield.
 
 
 ### Long running Jobs
 
-Theoretically we could implement all the autonomy purely with a behaviortree where all the actions are extremely simple unit blocks like set steering, but that would be really annoying, hence the long running job concept.
+Theoretically we could implement all the autonomy purely with a bt where all the actions are extremely simple unit blocks like set steering, but that would be really annoying, hence the long running job concept.
 <br>
-**Long running jobs are al tored in ai/jobs**
+**Long running jobs are all stored in ai/jobs**
 <br>
 
 Long running actions are created with the ```Job::spawn``` method where you pass an async ```Future```, and the resulting struct has helper methods for polling the jobs status, and getting any output information. The long running job's status (Success, Running, or Failure) is determined by the tokio::watch channel, and the outputs are also a thread channel.
@@ -75,7 +75,7 @@ pub fn forward_for(seconds: f32) -> Job<Steering>{
                 output_tx.send(Steering::new(1.0, 1.0, 1200.0)).await.ok();
                 // add a little sleep to avoid backpressure
                 tokio::time::sleep(Duration::from_millis(20)).await;
-                // we could update the status here but it isnt actually nescessary because our initial value was running
+                // we could update the status here but it isnt actually necessary because our initial value was running
                 status_tx.send(Running).ok();
             }
         }).await;
@@ -119,8 +119,8 @@ that code will start a new async path follower if the old one has exited, and if
 
 One must be careful to avoid spamming too many steering messages or they will not be consumed fast enough.
 
-### You dont always need a long running job: 
-A common pattern is to have something that runs for a certain ammount of time, which can be achieved with the tokio::select! macro as shown in the hardcoded forward above, but you can easily achieve similar things just using normal behaviors and actions:
+### You don't always need a long running job: 
+A common pattern is to have something that runs for a certain amount of time, which can be achieved with the tokio::select! macro as shown in the hardcoded forward above, but you can easily achieve similar things just using normal behaviors and actions:
 
 ```rust
 pub fn hardcoded_forward() -> Behavior<LunabotAction> {
