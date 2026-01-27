@@ -5,29 +5,32 @@
 
 
 ## Behaviors
-*stored in ai/behaviors* <br>
-Should not contain actual action implementations, only functions that return a ```Behavior<LunabotAction>```.
-
-**teleop_behavior() creates the root of the behavior tree, and everything branches from there.**
+* located at ai/behaviors
+* Should not contain actual action implementations, only functions that return a ```Behavior<LunabotAction>```.
+* **teleop_behavior() creates the root of the behavior tree, and everything branches from there.**
 
 ### The Big 3
 
-1. Manual <br>
+1. **Manual** <br>
 Sets motors and actuators to whatever the lunabase says.
-2. Autonomy <br>
+2. **Autonomy** <br>
 Contains behaviors for navigate, dig, and dump operations. (or at least it eventually will)
-3. Software Stop <br>
+3. **Software Stop** <br>
 Continuously commands motors and actuators to set speeds to 0, the starting state of the robot and usually where you get dumped if something goes wrong.
 
 <br>
-These 3 branches are activated from the teleop_behavior based on the ```IsSoftStop,IsAutonomy,IsManual``` actions which check the ```current_mission``` field of the bt which gets updated if the lunabase asks to switch modes, or if the mode is manually switched with the ```SetStage``` action.
+
+These 3 branches are activated from the teleop_behavior based on the ```IsSoftStop IsAutonomy IsManual``` actions which check the ```current_mission``` field of the bt which gets updated if the lunabase asks to switch modes, or if the mode is manually switched with the ```SetStage``` action. 
+
 
 ### Helper behaviors
+* located at ai/behaviors/helper_nodes.rs
+
 I have taken inspiration from [nav2](https://docs.nav2.org/behavior_trees/overview/nav2_specific_nodes.html)'s behavior trees and implemented some helper nodes for autonomy that will be useful. 
-(currently just a retry node but more to come if we need them).
+_(currently just a retry node but more to come if we need them)._
 
 ## Actions
-
+* located in ai/action.rs
 ### A Few Caveats
 1. Each action when polled needs to return instantly, you should not make a complicated synchronous action that takes a while to run.
 
@@ -50,13 +53,13 @@ Instead if you have an action that will run for a long time it should be an asyn
 
 
 ### Long running Jobs
+* located in ai/jobs
+* long running Jobs are launched by actions in ```actions.rs```
 
 Theoretically we could implement all the autonomy purely with a bt where all the actions are extremely simple unit blocks like set steering, but that would be really annoying, hence the long running job concept.
 <br>
-**Long running jobs are all stored in ai/jobs**
-<br>
 
-Long running actions are created with the ```Job::spawn``` method where you pass an async ```Future```, and the resulting struct has helper methods for polling the jobs status, and getting any output information. The long running job's status (Success, Running, or Failure) is determined by the tokio::watch channel, and the outputs are also a thread channel.
+Long running actions are created with the ```Job::spawn``` method where you pass an async ```Future```, and the resulting struct has helper methods for polling the jobs status, and getting any output information. The long running job's status (Success, Running, or Failure) is determined by a tokio::watch channel, and the outputs are also a thread channel like so:
 
 
 ```rust
