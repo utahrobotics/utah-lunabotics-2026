@@ -52,7 +52,7 @@ Instead if you have an action that will run for a long time it should be an asyn
 2. Zero-tick logic is weird. If an action immediately returns Success, then in the eyes of the behavior tree no time has passed. Each tick of bt is  greedy so you can end up with situations where an action gets called over and over in an infinite loop because the bt doesn't know to re check a condition because *technically* no time has passed. If infinite greedy 0-tick logic becomes a problem you can use the LunabotAction::Yield.
 
 
-### Long running Jobs
+## Long running Jobs
 * located in ai/jobs
 * long running Jobs are launched by actions in ```actions.rs```
 
