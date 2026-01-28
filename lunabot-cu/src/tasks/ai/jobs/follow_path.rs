@@ -38,11 +38,11 @@ pub fn follow_path_job(
                 let error = dot - robot_pos;
 
                 let path: Vec<Vector2<f32>> = vec![ // Temp hardcoded path
-                    Vector2::new(0.0, 1.0),
+                    Vector2::new(1.0, 1.0),
                     Vector2::new(2.0, 1.0),
-                    Vector2::new(2.0, 3.0),
-                    Vector2::new(0.0, 3.0),
-                    Vector2::new(0.0, -1.0), // Part of hacky way to end path // I don't remember what this hacky way is
+                    Vector2::new(2.0, -1.0),
+                    Vector2::new(0.0, -1.0),
+                    Vector2::new(0.0, 1.0), // Part of hacky way to end path // I don't remember what this hacky way is
                 ]; // TODO get path
 
                 let dt: f32 = 0.05; // TODO determine or fix dt
