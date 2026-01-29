@@ -21,6 +21,8 @@ extern crate cu_bincode as bincode;
     Serialize,
     Deserialize
 )]
+
+/// Final RPM = (left_or_right) * weight
 pub struct Steering {
     left: i8,
     right: i8,
