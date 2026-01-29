@@ -68,6 +68,7 @@ impl Steering {
 
     } */
 
+    /// left and right are clamped to -1, 1
     pub fn new(mut left: f64, mut right: f64, weight: f64) -> Self {
         left = left.max(-1.0).min(1.0);
         right = right.max(-1.0).min(1.0);
