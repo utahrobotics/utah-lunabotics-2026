@@ -7,8 +7,9 @@ use std::{
     sync::Arc,
 };
 
-use bincode::{Decode, Encode};
 use cobs::{CobsDecoderOwned};
+extern crate cu_bincode as bincode;
+use bincode::{Decode, Encode};
 use quinn::{
     Connection, Endpoint, RecvStream, SendStream, crypto::rustls::QuicClientConfig, rustls,
 };
@@ -234,7 +235,7 @@ async fn send_keep_alive(
     connection: &Connection,
     packet: KeepAlivePacket,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let bytes = bincode::encode_to_vec(packet, bincode::config::standard())?;
+    let bytes = cu_bincode::encode_to_vec(packet, cu_bincode::config::standard())?;
     connection.send_datagram(bytes.into())?;
     Ok(())
 }
@@ -244,7 +245,7 @@ async fn recv_keep_alive(
 ) -> Result<KeepAlivePacket, Box<dyn std::error::Error + Send + Sync>> {
     let datagram = connection.read_datagram().await?;
     let packet: KeepAlivePacket =
-        bincode::decode_from_slice(&datagram, bincode::config::standard())?.0;
+        cu_bincode::decode_from_slice(&datagram, cu_bincode::config::standard())?.0;
     Ok(packet)
 }
 
@@ -654,7 +655,7 @@ fn recv_common<Msg: Encode + Decode<()>>(
     {
         let mut shared_lock = shared.lock();
         if let Some(msg_bytes) = shared_lock.message_queue.pop_front() {
-            return Ok(bincode::decode_from_slice(&msg_bytes, bincode::config::standard())?.0);
+            return Ok(cu_bincode::decode_from_slice(&msg_bytes, cu_bincode::config::standard())?.0);
         }
     }
 
@@ -696,7 +697,7 @@ fn recv_common<Msg: Encode + Decode<()>>(
 
         let mut shared_lock = shared.lock();
         if let Some(msg_bytes) = shared_lock.message_queue.pop_front() {
-            Ok(bincode::decode_from_slice(&msg_bytes, bincode::config::standard())?.0)
+            Ok(cu_bincode::decode_from_slice(&msg_bytes, cu_bincode::config::standard())?.0)
         } else {
             Err(Box::new(std::io::Error::other("No message received")))
         }
@@ -712,7 +713,7 @@ fn send_common<Msg: Encode + Decode<()>>(
     shared: &Arc<Mutex<InnerSharedWriter>>,
     packet: Msg,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let bytes = bincode::encode_to_vec(packet, bincode::config::standard())?;
+    let bytes = cu_bincode::encode_to_vec(packet, cu_bincode::config::standard())?;
     
     // Take ownership of send_stream to prevent it from being replaced during send
     let mut send_stream = shared.lock().send_stream.take()

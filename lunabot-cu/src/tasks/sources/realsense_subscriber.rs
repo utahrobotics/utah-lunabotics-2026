@@ -30,13 +30,14 @@ impl Freezable for RealsenseSubscriber {}
 
 impl CuSrcTask for RealsenseSubscriber {
     type Output<'m> = output_msg!((Option<IceoryxDepthFrame<DEPTH_FRAME_SIZE>>, Option<ImuMsg>));
+    type Resources<'r> = ();
 
-    fn new(config: Option<&cu29::prelude::ComponentConfig>) -> cu29::CuResult<Self>
+    fn new(config: Option<&cu29::prelude::ComponentConfig>, _resources: Self::Resources<'_>) -> cu29::CuResult<Self>
     where
         Self: Sized,
     {
         let serial_num = config
-            .and_then(|c| c.get::<String>("serial_num"))
+            .and_then(|c| c.get::<String>("serial_num").expect("failed to deserialize"))
             .unwrap_or_else(|| "realsense/depth".to_string());
         let depth_service_str = format!("realsense/{serial_num}/depth");
         let imu_service_str = format!("realsense/{serial_num}/imu");
@@ -129,8 +130,9 @@ impl CuSrcTask for RealsenseSubscriber {
 #[cfg(any(feature = "resim", feature = "sim"))]
 impl CuSrcTask for RealsenseSubscriber {
     type Output<'m> = output_msg!((Option<IceoryxDepthFrame<DEPTH_FRAME_SIZE>>, Option<ImuMsg>));
+    type Resources<'r> = ();
 
-    fn new(_config: Option<&cu29::prelude::ComponentConfig>) -> cu29::CuResult<Self>
+    fn new(_config: Option<&cu29::prelude::ComponentConfig>, _resources: Self::Resources<'_>) -> cu29::CuResult<Self>
     where
         Self: Sized,
     {

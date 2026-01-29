@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="ControlSchemeResource" load_steps=14 format=3 uid="uid://ct30wqsr155vy"]
+[gd_resource type="Resource" script_class="ControlSchemeResource" load_steps=13 format=3 uid="uid://ct30wqsr155vy"]
 
 [ext_resource type="Script" uid="uid://cojf71u62eagl" path="res://Systems/ControlSchemes/scheme_resource.gd" id="1_drseg"]
 
@@ -9,13 +9,13 @@ unicode = 92
 
 [sub_resource type="InputEventKey" id="InputEventKey_drseg"]
 device = -1
-keycode = 90
-unicode = 122
+keycode = 67
+unicode = 99
 
 [sub_resource type="InputEventKey" id="InputEventKey_gwh4k"]
 device = -1
-keycode = 67
-unicode = 99
+keycode = 90
+unicode = 122
 
 [sub_resource type="InputEventKey" id="InputEventKey_statr"]
 device = -1
@@ -30,15 +30,10 @@ keycode = 4194322
 device = -1
 keycode = 4194320
 
-[sub_resource type="InputEventKey" id="InputEventKey_hiu01"]
+[sub_resource type="InputEventKey" id="InputEventKey_mop5c"]
 device = -1
 keycode = 81
 unicode = 113
-
-[sub_resource type="InputEventKey" id="InputEventKey_mop5c"]
-device = -1
-keycode = 69
-unicode = 101
 
 [sub_resource type="InputEventKey" id="InputEventKey_yu8fg"]
 device = -1
@@ -69,7 +64,6 @@ move_forward = Array[InputEvent]([SubResource("InputEventKey_l5e1i")])
 move_backward = Array[InputEvent]([SubResource("InputEventKey_yu8fg")])
 continue_mission = Array[InputEvent]([SubResource("InputEventKey_statr")])
 lift_up = Array[InputEvent]([SubResource("InputEventKey_mop5c")])
-lift_down = Array[InputEvent]([SubResource("InputEventKey_hiu01")])
 bucket_up = Array[InputEvent]([SubResource("InputEventKey_gwh4k")])
 bucket_down = Array[InputEvent]([SubResource("InputEventKey_drseg")])
 autonomy = Array[InputEvent]([SubResource("InputEventKey_vuwor")])

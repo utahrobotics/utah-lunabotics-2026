@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
-use bincode::error::DecodeError;
+use cu_bincode::error::DecodeError;
 use common::{FromLunabase, FromLunabot, LunabotStage, Steering};
 use godot::prelude::*;
 use quic::QuicClient;
@@ -30,6 +30,10 @@ struct LunabaseConnection {
 
     errored_tasks: Arc<Mutex<HashMap<String, String>>>,
     current_weight: f64,
+    global_position: Arc<Mutex<[f32; 3]>>,
+    orientation: Arc<Mutex<[f32; 4]>>,
+   // velocity_base: Arc<Mutex<[f32;3]>>,
+   // acceleration_base: Arc<Mutex<[f32;3]>>,
 }
 
 #[godot_api]
@@ -44,6 +48,11 @@ impl INode for LunabaseConnection {
             last_packet_time: Instant::now(),
             current_stage: LunabotStage::SoftStop,
             current_weight: 1250.0,
+            global_position: Arc::new(Mutex::new([0.0; 3])),
+            orientation: Arc::new(Mutex::new([0.0; 4])),
+           // velocity_base: Arc::new(Mutex::new([0.0;3])),
+            // acceleration_base: Arc::new(Mutex::new([0.0;3])),
+
         }
     }
 
@@ -59,7 +68,7 @@ impl INode for LunabaseConnection {
                 self.base_mut().emit_signal("packet_received", &[]);
 
                 let reported_lunabot_stage: Result<(LunabotStage, usize), DecodeError> =
-                    bincode::borrow_decode_from_slice(&encoded_stage, bincode::config::standard());
+                    cu_bincode::borrow_decode_from_slice(&encoded_stage, cu_bincode::config::standard());
 
                 if let Ok((stage, _)) = reported_lunabot_stage {
                     if stage != self.current_stage {
@@ -99,12 +108,32 @@ impl LunabaseConnection {
                 Ok(client) => {
                     let cleint_c = client.clone();
                     let errored_tasks = self.errored_tasks.clone();
+                    let global_position = self.global_position.clone();
+                    let orientation = self.orientation.clone();
+                   // let velocity_base = self.velocity_base.clone();
+                   //let acceleration_base = self.acceleration_base.clone();
                     let recv_thread = std::thread::spawn(move || {
                         loop {
                             match cleint_c.recv() {
                                 Ok(msg) => match msg {
-                                    FromLunabot::RobotIsometry { .. } => {}
+                                    FromLunabot::RobotIsometry { origin, quat } => {
+                                        if let Ok(mut pos) = global_position.lock() {
+                                            *pos = origin;
+                                        }
+                                        if let Ok(mut rotation) = orientation.lock() {
+                                            *rotation = quat;
+                                        }
+                                    }
                                     FromLunabot::ArmAngles { .. } => {}
+                                    //FromLunabot::RobotMotion {velocity,acceleration} => {
+                                    //    if let Ok(mut velo) = velocity_base.lock(){
+                                    //     *velo = velocity;
+                                    //    }
+                                    //    if let Ok(mut acel) = acceleration_base.lock(){
+                                    //     *acel = acceleration;
+                                    //    }
+
+                                    // }
                                     FromLunabot::ErroredTasks(hash_map) => {
                                         if let Ok(mut guard) = errored_tasks.lock() {
                                             *guard = hash_map;
@@ -215,12 +244,13 @@ impl LunabaseConnection {
         }
     }
 
+    /// continue mission means manual
     #[func]
     fn send_continue_mission(&self) {
         if let Some(ref client) = self.client {
-            match client.send(FromLunabase::ContinueMission) {
+            match client.send(FromLunabase::Manual) {
                 Ok(_) => {
-                    godot_print!("Sent ContinueMission command");
+                    godot_print!("Sent Manual command");
                 }
                 Err(e) => {
                     godot_warn!("Failed to send continue mission packet: {e}");
@@ -276,4 +306,57 @@ impl LunabaseConnection {
 
         self.current_weight
     }
+    #[func]
+    fn get_orientation(&mut self) -> PackedFloat32Array {
+        let mut values_sent = PackedFloat32Array::new();
+        if let Ok(orientation_values) = self.orientation.lock() {
+            values_sent.clear();
+            values_sent.push(orientation_values[0]);
+            values_sent.push(orientation_values[1]);
+            values_sent.push(orientation_values[2]);
+            values_sent.push(orientation_values[3]);
+           
+        }
+        
+       
+        values_sent
+    }
+    #[func]
+    fn get_location(&mut self) -> PackedFloat32Array {
+        let mut values_sent = PackedFloat32Array::new();
+        if let Ok(position) = self.global_position.lock() {
+            values_sent.clear();
+            values_sent.push(position[0]);
+            values_sent.push(position[1]);
+            values_sent.push(position[2]);
+           
+        }
+        
+        
+        values_sent
+       
+    }
+    // #[func]
+    // fn get_velocity(&mut self) -> PackedFloat32Array {
+    //     let mut values_sent = PackedFloat32Array::new();
+    //     if let Ok(velo) = self.velocity_base.lock() {
+    //         values_sent.clear();
+    //         values_sent.push(velo[0]);
+    //         values_sent.push(velo[1]);
+    //         values_sent.push(velo[2]);
+    //     }
+    //     values_sent
+    // }
+
+    // #[func]
+    // fn get_acceleration(&mut self) -> PackedFloat32Array{
+    //    let mut values_sent = PackedFloat32Array::new();
+    //    if let Ok(accel ) = self.acceleration_base.lock(){
+    //      values_sent.clear();
+    //      values_sent.push(accel[0]);
+    //      values_sent.push(accel[1]);
+    //      values_sent.push(accel[2]);
+    //    }
+    //    values_sent
+    // }
 }

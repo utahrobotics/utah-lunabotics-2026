@@ -9,13 +9,13 @@ unicode = 92
 
 [sub_resource type="InputEventKey" id="InputEventKey_awo36"]
 device = -1
-keycode = 90
-unicode = 122
+keycode = 67
+unicode = 99
 
 [sub_resource type="InputEventKey" id="InputEventKey_5b6ri"]
 device = -1
-keycode = 81
-unicode = 113
+keycode = 90
+unicode = 122
 
 [sub_resource type="InputEventKey" id="InputEventKey_statr"]
 device = -1
@@ -32,11 +32,13 @@ keycode = 4194320
 
 [sub_resource type="InputEventKey" id="InputEventKey_gtglt"]
 device = -1
-keycode = 4194322
+keycode = 69
+unicode = 101
 
 [sub_resource type="InputEventKey" id="InputEventKey_f5r7n"]
 device = -1
-keycode = 4194320
+keycode = 81
+unicode = 113
 
 [sub_resource type="InputEventKey" id="InputEventKey_yu8fg"]
 device = -1

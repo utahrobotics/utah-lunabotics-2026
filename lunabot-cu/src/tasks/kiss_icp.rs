@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use bincode::{Decode, Encode};
+use cu_bincode::{Decode, Encode};
 use cu_spatial_payloads::EncodableIsometry;
 use cu29::{
     CuResult,
@@ -12,9 +12,12 @@ use cu29::{
 
 use iceoryx_types::IceoryxPointCloud;
 use nalgebra::{Isometry3, SMatrix, SVector};
+use serde::Deserialize;
 use simple_icp::{config::Config, icp_pipeline::IcpPipeline};
 
 use crate::{ROBOT_STATE, rerun_viz::RECORDER};
+
+use serde_big_array::BigArray;
 
 pub struct KissIcp {
     pipeline: simple_icp::icp_pipeline::IcpPipeline,
@@ -28,11 +31,11 @@ pub struct KissIcp {
     pub min_reflectivity: f32,
 }
 
-#[derive(Clone, Copy, Debug, Encode, Decode, Serialize)]
+#[derive(Clone, Copy, Debug, Encode, Decode, Serialize, Deserialize)]
 #[repr(C)]
 pub struct IcpMeasurement {
     pub pose: EncodableIsometry,
-    #[serde(serialize_with = "<[_]>::serialize")]
+    #[serde(with = "BigArray")]
     pub variance: [f64; 36],
 }
 
@@ -50,71 +53,72 @@ impl Freezable for KissIcp {}
 impl CuTask for KissIcp {
     type Input<'m> = input_msg!(IceoryxPointCloud);
     type Output<'m> = output_msg!(IcpMeasurement);
+    type Resources<'r> = ();
 
-    fn new(config: Option<&ComponentConfig>) -> CuResult<Self>
+    fn new(config: Option<&ComponentConfig>, _resources: Self::Resources<'_>) -> CuResult<Self>
     where
         Self: Sized,
     {
         let voxel_size = config
-            .and_then(|c| c.get::<f64>("voxel_size"))
+            .and_then(|c| c.get::<f64>("voxel_size").expect("failed to deserialize"))
             .unwrap_or(0.5) as f32;
 
         let min_reflectivity = config
-            .and_then(|c| c.get::<f64>("min_reflectivity"))
+            .and_then(|c| c.get::<f64>("min_reflectivity").expect("failed to deserialize"))
             .unwrap_or(150.) as f32;
         let max_range = config
-            .and_then(|c| c.get::<f64>("max_range"))
+            .and_then(|c| c.get::<f64>("max_range").expect("failed to deserialize"))
             .unwrap_or(100.0) as f32;
         let min_range = config
-            .and_then(|c| c.get::<f64>("min_range"))
+            .and_then(|c| c.get::<f64>("min_range").expect("failed to deserialize"))
             .unwrap_or(5.0) as f32;
         let max_points_per_voxel = config
-            .and_then(|c| c.get::<i32>("max_points_per_voxel"))
+            .and_then(|c| c.get::<i32>("max_points_per_voxel").expect("failed to deserialize"))
             .unwrap_or(20) as u16;
         let initial_threshold = config
-            .and_then(|c| c.get::<f64>("initial_threshold"))
+            .and_then(|c| c.get::<f64>("initial_threshold").expect("failed to deserialize"))
             .unwrap_or(2.0);
         let min_motion_th = config
-            .and_then(|c| c.get::<f64>("min_motion_th"))
+            .and_then(|c| c.get::<f64>("min_motion_th").expect("failed to deserialize"))
             .unwrap_or(0.1);
         let enable_deskewing = config
-            .and_then(|c| c.get::<bool>("enable_deskewing"))
+            .and_then(|c| c.get::<bool>("enable_deskewing").expect("failed to deserialize"))
             .unwrap_or(true);
         let max_num_iterations = config
-            .and_then(|c| c.get::<i32>("max_num_iteration"))
+            .and_then(|c| c.get::<i32>("max_num_iteration").expect("failed to deserialize"))
             .unwrap_or(500) as u16;
         let convergence_criterion = config
-            .and_then(|c| c.get::<f64>("convergence_criterion"))
+            .and_then(|c| c.get::<f64>("convergence_criterion").expect("failed to deserialize"))
             .unwrap_or(0.0001);
         let max_num_threads = config
-            .and_then(|c| c.get::<i32>("max_num_threads"))
+            .and_then(|c| c.get::<i32>("max_num_threads").expect("failed to deserialize"))
             .unwrap_or(4) as u8;
 
         let max_accumulation = config
-            .and_then(|c| c.get::<i32>("max_accumulation"))
+            .and_then(|c| c.get::<i32>("max_accumulation").expect("failed to deserialize"))
             .unwrap_or(2) as usize;
 
-        let max_point_age = config.and_then(|c| c.get::<f64>("max_point_age_seconds"));
+        let max_point_age = config.and_then(|c| c.get::<f64>("max_point_age_seconds").expect("failed to deserialize"));
 
         let max_angle_between_poses = config
-            .and_then(|c| c.get::<f64>("max_angle_between_poses"))
+            .and_then(|c| c.get::<f64>("max_angle_between_poses").expect("failed to deserialize"))
             .unwrap_or(0.10472); // 6 degrees in radians
 
         let max_distance_between_poses = config
-            .and_then(|c| c.get::<f64>("max_distance_between_poses"))
+            .and_then(|c| c.get::<f64>("max_distance_between_poses").expect("failed to deserialize"))
             .unwrap_or(0.05);
 
         // time betwene poses collected for deskewing
         let time_between_pose_collections = config
-            .and_then(|c| c.get::<u32>("time_between_pose_collections_ms"))
+            .and_then(|c| c.get::<u32>("time_between_pose_collections_ms").expect("failed to deserialize"))
             .unwrap_or(2);
 
         let position_variance = config
-            .and_then(|c| c.get::<f64>("position_variance"))
+            .and_then(|c| c.get::<f64>("position_variance").expect("failed to deserialize"))
             .unwrap_or(0.10472);
 
         let orientation_variance = config
-            .and_then(|c| c.get::<f64>("orientation_variance"))
+            .and_then(|c| c.get::<f64>("orientation_variance").expect("failed to deserialize"))
             .unwrap_or(0.001);
 
         let config = Config {

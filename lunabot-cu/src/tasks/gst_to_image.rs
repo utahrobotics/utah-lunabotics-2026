@@ -135,16 +135,17 @@ impl Freezable for GstToImage {}
 impl CuTask for GstToImage {
     type Input<'m> = input_msg!(CuGstBuffer);
     type Output<'m> = output_msg!(CuImage<Vec<u8>>);
+    type Resources<'r> = ();
 
-    fn new(config: Option<&ComponentConfig>) -> CuResult<Self>
+    fn new(config: Option<&ComponentConfig>, _resources: Self::Resources<'_>) -> CuResult<Self>
     where
         Self: Sized,
     {
         let config = config.expect("No config provided");
-        let width = config.get::<u32>("width").expect("No width provided");
-        let height = config.get::<u32>("height").expect("No height provided");
+        let width = config.get::<u32>("width")?.expect("No width provided");
+        let height = config.get::<u32>("height")?.expect("No height provided");
         let block_radius = config
-            .get::<u32>("block_radius")
+            .get::<u32>("block_radius")?
             .expect("No block_radius provided");
 
         let pool =
@@ -190,7 +191,7 @@ impl CuTask for GstToImage {
         {
             let mut dst = handle
                 .lock()
-                .map_err(|e| CuError::new_with_cause("Failed to lock buffer", e))?;
+                .map_err(|e| CuError::new_with_cause("Failed to lock buffer", std::io::Error::other(e.to_string())))?;
             let dst = dst.deref_mut().deref_mut();
 
             integral_image(src, &mut self.integral_img, self.width, self.height);
@@ -233,8 +234,9 @@ impl Freezable for GstToImage {}
 impl CuTask for GstToImage {
     type Input<'m> = input_msg!(CuGstBuffer);
     type Output<'m> = output_msg!(CuImage<Vec<u8>>);
+    type Resources<'r> = ();
 
-    fn new(_config: Option<&ComponentConfig>) -> CuResult<Self>
+    fn new(_config: Option<&ComponentConfig>, _resources: Self::Resources<'_>) -> CuResult<Self>
     where
         Self: Sized,
     {

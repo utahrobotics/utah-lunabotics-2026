@@ -42,13 +42,13 @@ mod prod_impl {
         // input is the actuator command as bytes
         // the reason this is a tuple is a hack to get around the fact that copper doesnt support one task
         // having multiple outputs in the same way it does multiple inputs
-        type Input<'m> = input_msg!((
-            Option<common::Steering>, // ignore steering in this task
-            Option<embedded_common::ActuatorCommand>
-        ));
+        type Input<'m> = input_msg!(
+            embedded_common::ActuatorCommand
+        );
         type Output<'m> = output_msg!(FromPicoV3);
+        type Resources<'r> = ();
 
-        fn new(_config: Option<&ComponentConfig>) -> CuResult<Self>
+        fn new(_config: Option<&ComponentConfig>, _resources: Self::Resources<'_>) -> CuResult<Self>
         where
             Self: Sized,
         {
@@ -219,7 +219,7 @@ mod prod_impl {
             input: &Self::Input<'i>,
             output: &mut Self::Output<'o>,
         ) -> CuResult<()> {
-            if let Some((_, Some(actuator_cmd))) = input.payload()
+            if let Some(actuator_cmd) = input.payload()
                 && let Some(ref mut writer) = self.serial_port_writer
             {
                 let _ = get_tokio_handle().block_on(async {
@@ -341,13 +341,11 @@ mod resim_impl {
         // input is the actuator command as bytes
         // ActuatorCommand doesn't implement Serialize or Decode due to being no_std
         // the reason this is a tuple is a hack to get around the fact that copper doesnt support one task having multiple outputs in the same way it does multiple inputs
-        type Input<'m> = input_msg!((
-            Option<common::Steering>, // ignore steering in this task
-            Option<embedded_common::ActuatorCommand>
-        ));
+        type Input<'m> = input_msg!(embedded_common::ActuatorCommand);
         // output is the FromPicoV3 struct serialized as bytes
         type Output<'m> = output_msg!(FromPicoV3);
-        fn new(_config: Option<&ComponentConfig>) -> CuResult<Self>
+        type Resources<'r> = ();
+        fn new(_config: Option<&ComponentConfig>, _resources: Self::Resources<'_>) -> CuResult<Self>
         where
             Self: Sized,
         {

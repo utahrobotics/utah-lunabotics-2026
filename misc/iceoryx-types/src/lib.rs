@@ -5,11 +5,16 @@
 //! Keeping the same memory layout allows zero-copy transfer between the
 //! languages.
 
+#[cfg(all(any(feature = "sim", feature = "resim"), not(feature = "production")))]
 pub mod sim;
 
-#[cfg(any(feature = "sim", feature = "resim"))]
+#[cfg(all(any(feature = "sim", feature = "resim"), not(feature = "production")))]
 pub use sim::*;
 
+#[cfg(all(feature = "production", not(all(feature="sim", feature="resim"))))]
 pub mod production;
-#[cfg(feature = "production")]
+#[cfg(all(feature = "production", not(all(feature="sim", feature="resim"))))]
 pub use production::*;
+
+
+extern crate cu_bincode as bincode;

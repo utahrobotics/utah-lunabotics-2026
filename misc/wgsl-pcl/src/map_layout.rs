@@ -2,10 +2,13 @@ use crate::gpu_types::GpuType;
 use crate::size::StaticSize;
 use bytemuck::{bytes_of, bytes_of_mut};
 use serde::{Deserialize, Serialize};
+use bincode::{Encode, Decode};
+
 
 /// All units are in meters
 /// Struct is 16-byte aligned for WGPU compatibility
-#[derive(Clone, Copy, Debug, Serialize, Deserialize, bincode::Encode, bincode::Decode)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Encode, Decode)]
 #[repr(C)]
 #[repr(align(16))]
 pub struct MapLayout {

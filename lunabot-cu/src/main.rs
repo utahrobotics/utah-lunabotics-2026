@@ -25,6 +25,7 @@ use std::thread::sleep;
 use std::time::Duration;
 
 use robot_state::RobotState;
+extern crate cu_bincode as bincode;
 
 const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 

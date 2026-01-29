@@ -52,13 +52,13 @@
             ),
             run_in_sim: false
         ),
-
+        // subscribes to 6dof messages from the intel T265 camera
         (
             id: "t265_subscriber",
             type: "crate::tasks::sources::T265Subscriber",
             config: {
                 "serial_num": "929122111514",
-                "camera_node": "upper_depth_camera_t265",
+                "camera_node": "T265_right",
                 "node": "T265_right",
                 "t265_velocity_variance": 1.0,
                 "t265_angular_velocity_variance": 1.0,
@@ -68,8 +68,7 @@
             ),
             run_in_sim: false
         ),
-        // takes depth frames and imu information from the realsense subscriber and uses obstacle detection to create an occupancy grid
-        // the size of the arena
+        // takes depth frames and imu information from the realsense subscriber and uses a compute shader pipeline to estimate a local and global map of obstacles
         (
             id:"occupancy_grid_pipeline",
             type: "crate::tasks::OccupancyGridTask",
@@ -129,7 +128,7 @@
                 "max_num_threads": 10,
                 "convergence_criterion": 0.0001,
                 "max_num_iterations": 500,
-                "max_accumulation": 2,
+                "max_accumulation": 1,
                 "max_point_age_seconds": 30.0,
                 "min_reflectivity": 0.0,
 
@@ -167,22 +166,7 @@
         // receives messages from the ai_source and tells the motors to move accordingly
         (
             id:"motor_ctrl", type:"crate::tasks::sinks::MotorController", config:{
-                "speed_multiplier": 1500,
-                "vesc_pairs": [
-                    // yes having these as strings is janky but it works
-                    "VescPair(
-                        id1: 75,
-                        id2: 110,
-                        mask1: Right,
-                        mask2: Right
-                    )",
-                    "VescPair(
-                        id1: 63,
-                        id2: 74,
-                        mask1: Left,
-                        mask2: Left
-                    )"
-                ]
+                "speed_multiplier": 1500
             },
             run_in_sim: false,
         ),
@@ -210,13 +194,14 @@
         // copper doesn't support multiple outputs on a single task so for now we just put them in a tuple and ignore one side
         (src:"realsense_subscriber",          dst:"occupancy_grid_pipeline", msg:"(Option<iceoryx_types::IceoryxDepthFrame<307200>>, Option<iceoryx_types::ImuMsg>)"),
         (src:"occupancy_grid_pipeline",       dst:"new_ai",                  msg:"crate::tasks::OccupancyGrid"),
-        (src:"new_ai",                        dst:"motor_ctrl",              msg:"(Option<common::Steering>, Option<embedded_common::ActuatorCommand>)"),
-        (src:"new_ai",                        dst:"v3_pico",                 msg:"(Option<common::Steering>, Option<embedded_common::ActuatorCommand>)"),
+        (src:"new_ai",                        dst:"motor_ctrl",              msg:"common::Steering"),
+        (src:"new_ai",                        dst:"v3_pico",                 msg:"embedded_common::ActuatorCommand"),
         (src:"v3_pico",                       dst:"localizer",               msg:"embedded_common::FromPicoV3"),
         (src:"detection_handler",             dst: "localizer",              msg:"Vec<crate::tasks::AprilTagMeasurement>"),
         (src:"t265_subscriber",               dst:"localizer",               msg:"crate::tasks::sources::T265Msg"),
     ],
-    
+
+    // comms to lunabase software
     bridges: [
         (
             id: "lunabase_bridge",
@@ -255,11 +240,11 @@
             path:"camera_configs/camera_template_gstreamer.ron",
             params:{
                 "id":"side",
-                "port":"pci-0000:00:14.0-usb-0:1:1.0",
-                "fx":667.0,
-                "fy":667.0,
-                "cx":960.84,
-                "cy":600.819,
+                "port":"pci-0000:00:14.0-usb-0:5.4:1.0",
+                "fx":1023.70,
+                "fy":1023.70,
+                "cx":1076.93,
+                "cy":669.95,
                 "width":1920,
                 "height":1200,
                 "udp_host":"127.0.0.1",
@@ -286,6 +271,7 @@
     // monitor:(type:"cu_consolemon::CuConsoleMon"),
     monitor: (type:"simple_monitor::SimpleMonitor"),
     logging:(
+    // if true, each output payload of each will be logged unless a task opts out
         enable_task_logging: true,
         section_size_mib:100,
     ),

@@ -1,8 +1,9 @@
-use bincode::Encode;
+use cu_bincode::Encode;
 use cu29::cutask::Freezable;
 use cu29::prelude::*;
 use nalgebra::Isometry3;
 use rayon::{ThreadPool, ThreadPoolBuilder};
+use serde::Deserialize;
 use std::fmt::Debug;
 use std::io;
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
@@ -47,7 +48,7 @@ pub struct OccupancyGridTask {
     _min_grad_for_obstacle: f32,
 }
 
-#[derive(Serialize, Encode, bincode::Decode, Clone, Debug)]
+#[derive(Serialize, Encode, cu_bincode::Decode, Clone, Debug, Deserialize)]
 pub struct OccupancyGrid {
     /// the layout describes the size and resolution of the map
     /// the layout is not sufficient to interpret the map data alone, the origin field is also needed
@@ -228,6 +229,7 @@ impl Freezable for OccupancyGridTask {}
 impl CuTask for OccupancyGridTask {
     type Input<'m> = input_msg!((Option<IceoryxDepthFrame<DEPTH_FRAME_SIZE>>, Option<ImuMsg>));
     type Output<'m> = output_msg!(OccupancyGrid);
+    type Resources<'r> = ();
 
     fn start(&mut self, _clock: &RobotClock) -> CuResult<()> {
         let center = [
@@ -253,102 +255,102 @@ impl CuTask for OccupancyGridTask {
         Ok(())
     }
 
-    fn new(config: Option<&cu29::prelude::ComponentConfig>) -> cu29::CuResult<Self>
+    fn new(config: Option<&cu29::prelude::ComponentConfig>, _resources: Self::Resources<'_>) -> cu29::CuResult<Self>
     where
         Self: Sized,
     {
         if !is_gpu_initialized() {
-            init_gpu_blocking().map_err(|e| CuError::new_with_cause("failed to init gpu", &*e))?;
+            init_gpu_blocking().map_err(|e| CuError::new_with_cause("failed to init gpu", std::io::Error::other(e)))?;
         }
         let camera_name = config
-            .and_then(|c| c.get::<String>("camera_node"))
+            .and_then(|c| c.get::<String>("camera_node").expect("failed to deserialize"))
             .unwrap_or_else(|| "upper_depth_camera".to_string());
 
         let focal_length_px = config
-            .and_then(|c| c.get::<f64>("focal_length"))
+            .and_then(|c| c.get::<f64>("focal_length").expect("failed to deserialize"))
             .expect("specify focal length") as f32;
 
         let ppx = config
-            .and_then(|c| c.get::<f64>("ppx"))
+            .and_then(|c| c.get::<f64>("ppx").expect("failed to deserialize"))
             .expect("specify depth format ppx") as f32;
         let ppy = config
-            .and_then(|c| c.get::<f64>("ppy"))
+            .and_then(|c| c.get::<f64>("ppy").expect("failed to deserialize"))
             .expect("specify depth format ppy") as f32;
 
         let max_x = config
-            .and_then(|c| c.get::<f64>("heightmap_max_x"))
+            .and_then(|c| c.get::<f64>("heightmap_max_x").expect("failed to deserialize"))
             .unwrap_or(5.0) as f32;
         let max_y = config
-            .and_then(|c| c.get::<f64>("heightmap_max_y"))
+            .and_then(|c| c.get::<f64>("heightmap_max_y").expect("failed to deserialize"))
             .unwrap_or(5.0) as f32;
         let min_x = config
-            .and_then(|c| c.get::<f64>("heightmap_min_x"))
+            .and_then(|c| c.get::<f64>("heightmap_min_x").expect("failed to deserialize"))
             .unwrap_or(-5.0) as f32;
         let min_y = config
-            .and_then(|c| c.get::<f64>("heightmap_min_y"))
+            .and_then(|c| c.get::<f64>("heightmap_min_y").expect("failed to deserialize"))
             .unwrap_or(-5.0) as f32;
 
         let cell_size = config
-            .and_then(|c| c.get::<f64>("heightmap_cell_size"))
+            .and_then(|c| c.get::<f64>("heightmap_cell_size").expect("failed to deserialize"))
             .unwrap_or(0.1) as f32;
 
         let bilateral_filter_kernel_radius = config
-            .and_then(|c| c.get::<u64>("bilateral_filter_kernel_radius"))
+            .and_then(|c| c.get::<u64>("bilateral_filter_kernel_radius").expect("failed to deserialize"))
             .unwrap_or(5) as u32;
         let bilateral_filter_sigma_spatial = config
-            .and_then(|c| c.get::<f64>("bilateral_filter_sigma_spatial"))
+            .and_then(|c| c.get::<f64>("bilateral_filter_sigma_spatial").expect("failed to deserialize"))
             .unwrap_or(0.7) as f32;
         let bilateral_filter_sigma_range = config
-            .and_then(|c| c.get::<f64>("bilateral_filter_sigma_range"))
+            .and_then(|c| c.get::<f64>("bilateral_filter_sigma_range").expect("failed to deserialize"))
             .unwrap_or(0.1) as f32;
         let outlier_filter_kernel_radius = config
-            .and_then(|c| c.get::<u64>("outlier_filter_kernel_radius"))
+            .and_then(|c| c.get::<u64>("outlier_filter_kernel_radius").expect("failed to deserialize"))
             .unwrap_or(2) as u32;
         let outlier_filter_std_dev_threshold = config
-            .and_then(|c| c.get::<f64>("outlier_filter_std_dev_threshold"))
+            .and_then(|c| c.get::<f64>("outlier_filter_std_dev_threshold").expect("failed to deserialize"))
             .unwrap_or(2.0) as f32;
 
         let outlier_filter_max_unknown_neighbors_ratio = config
-            .and_then(|c| c.get::<f64>("outlier_filter_max_unknown_neighbors_ratio "))
+            .and_then(|c| c.get::<f64>("outlier_filter_max_unknown_neighbors_ratio ").expect("failed to deserialize"))
             .unwrap_or(0.5) as f32;
 
         let gradient_filter_kernel_radius = config
-            .and_then(|c| c.get::<u64>("gradient_filter_kernel_radius"))
+            .and_then(|c| c.get::<u64>("gradient_filter_kernel_radius").expect("failed to deserialize"))
             .unwrap_or(2) as u32;
 
         let gaussian_blur_kernel_radius = config
-            .and_then(|c| c.get::<u64>("gaussian_blur_kernel_radius"))
+            .and_then(|c| c.get::<u64>("gaussian_blur_kernel_radius").expect("failed to deserialize"))
             .unwrap_or(5) as u32;
 
         let gaussian_sigma_spatial = config
-            .and_then(|c| c.get::<f64>("gaussian_sigma_spatial"))
+            .and_then(|c| c.get::<f64>("gaussian_sigma_spatial").expect("failed to deserialize"))
             .unwrap_or(6.0) as f32;
 
         let min_depth = config
-            .and_then(|c| c.get::<f64>("min_depth"))
+            .and_then(|c| c.get::<f64>("min_depth").expect("failed to deserialize"))
             .unwrap_or(0.3) as f32;
 
         let max_depth = config
-            .and_then(|c| c.get::<f64>("max_depth"))
+            .and_then(|c| c.get::<f64>("max_depth").expect("failed to deserialize"))
             .unwrap_or(3.0) as f32;
 
         let robot_radius_meters = config
-            .and_then(|c| c.get::<f64>("robot_radius_meters"))
+            .and_then(|c| c.get::<f64>("robot_radius_meters").expect("failed to deserialize"))
             .unwrap_or(0.3) as f32;
 
         let obstacle_gradient_threshold = config
-            .and_then(|c| c.get::<f64>("obstacle_gradient_threshold"))
+            .and_then(|c| c.get::<f64>("obstacle_gradient_threshold").expect("failed to deserialize"))
             .unwrap_or(0.2) as f32;
 
         // use bilateral by default, fall back on gaussian
         let use_bilateral = config
-            .and_then(|c| c.get::<bool>("use_bilateral_filter"))
+            .and_then(|c| c.get::<bool>("use_bilateral_filter").expect("failed to deserialize"))
             .unwrap_or(true);
         let clear_affected_cells_enabled = config
-            .and_then(|c| c.get::<bool>("clear_affected_cells"))
+            .and_then(|c| c.get::<bool>("clear_affected_cells").expect("failed to deserialize"))
             .unwrap_or(true);
         let min_distance_to_clear = config
-            .and_then(|c| c.get::<f64>("min_distance_to_clear"))
+            .and_then(|c| c.get::<f64>("min_distance_to_clear").expect("failed to deserialize"))
             .unwrap_or(0.8) as f32;
         let clear_affected_cells = if clear_affected_cells_enabled {
             Some(ClearAffectedCellsOptions {
@@ -359,10 +361,10 @@ impl CuTask for OccupancyGridTask {
         };
 
         let max_distance_traveled_before_reset = config
-            .and_then(|c| c.get::<f64>("max_distance_traveled_before_reset"))
+            .and_then(|c| c.get::<f64>("max_distance_traveled_before_reset").expect("failed to deserialize"))
             .unwrap_or(2.0);
         let max_radians_rotated_before_reset = config
-            .and_then(|c| c.get::<f64>("max_radians_rotated_before_reset"))
+            .and_then(|c| c.get::<f64>("max_radians_rotated_before_reset").expect("failed to deserialize"))
             .unwrap_or(std::f64::consts::PI / 4.0);
 
         let camera_node = ROBOT_STATE
@@ -429,7 +431,7 @@ impl CuTask for OccupancyGridTask {
                 clear_affected_cells,
             )
             .map_err(|e| {
-                CuError::new_with_cause("failed to create depth to pcl and height pipeline", &e)
+                CuError::new_with_cause("failed to create depth to pcl and height pipeline", e)
             })?,
         ));
 
@@ -490,7 +492,7 @@ impl CuTask for OccupancyGridTask {
 
                 self.append_local_to_global(&grid, &mut *write_guard)
                     .map_err(|e| {
-                        CuError::new_with_cause("failed to append local map to global", e)
+                        CuError::new_with_cause("failed to append local map to global", std::io::Error::other(e))
                     })?;
 
                 self.rolling_map_start_position = camera_isometry;
@@ -626,7 +628,7 @@ impl OccupancyGridTask {
         &mut self,
         local: &OccupancyGrid,
         global_map: &mut OccupancyGrid,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         for x in 0..local.cells_x() {
             for y in 0..local.cells_y() {
                 // cell_to_world now returns world coordinates (already includes local map's origin)

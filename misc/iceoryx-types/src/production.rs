@@ -1,12 +1,14 @@
-#![cfg(any(feature = "production"))]
+#[cfg(all(feature = "production", not(all(feature="sim", feature="resim"))))]
+
 use bincode::{Decode, Encode};
 
 use iceoryx2::prelude::ZeroCopySend;
 use nalgebra::Point3;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+use serde_big_array::BigArray;
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, Encode, Decode, ZeroCopySend, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Encode, Decode, ZeroCopySend, Serialize, Deserialize)]
 #[type_name("PointXYZIR")]
 pub struct PointXYZIR {
     pub x: f32,
@@ -18,9 +20,9 @@ pub struct PointXYZIR {
 }
 
 #[repr(C)]
-#[derive(Clone, Debug, ZeroCopySend, Encode, Decode, Serialize)]
+#[derive(Clone, Debug, ZeroCopySend, Encode, Decode, Serialize, Deserialize)]
 pub struct IceoryxDepthFrame<const SIZE: usize> {
-    #[serde(serialize_with = "<[_]>::serialize")]
+    #[serde(with = "BigArray")]
     pub depths: [u16; SIZE],
     pub depth_scale: f32,
     pub focal_len: (f32, f32),
@@ -41,12 +43,12 @@ impl<const SIZE: usize> Default for IceoryxDepthFrame<SIZE> {
 pub const MAX_POINT_CLOUD_POINTS: usize = 10000;
 
 #[repr(C)]
-#[derive(Clone, Debug, ZeroCopySend, Encode, Decode, Serialize)]
+#[derive(Clone, Debug, ZeroCopySend, Encode, Decode, Serialize, Deserialize)]
 #[type_name("IceoryxPointCloud")]
 pub struct IceoryxPointCloud {
     pub is_last: bool,
     pub publish_count: u64,
-    #[serde(serialize_with = "<[_]>::serialize")]
+    #[serde(with = "BigArray")]
     pub points: [PointXYZIR; MAX_POINT_CLOUD_POINTS],
 }
 
@@ -111,7 +113,7 @@ impl PointCloudAccumulator {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, Encode, Decode, ZeroCopySend, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Encode, Decode, ZeroCopySend, Serialize, Deserialize)]
 #[type_name("ImuMsg")]
 pub struct ImuMsg {
     pub quaternion: [f32; 4],
@@ -120,7 +122,7 @@ pub struct ImuMsg {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, Encode, Decode, ZeroCopySend, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Encode, Decode, ZeroCopySend, Serialize, Deserialize)]
 #[type_name("PoseMsg")]
 pub struct PoseMsg {
     /// position in meters
@@ -132,7 +134,7 @@ pub struct PoseMsg {
 }
 
 #[derive(
-    Clone, Copy, Debug, Encode, Decode, ZeroCopySend, Serialize, PartialEq, Eq, PartialOrd, Ord,
+    Clone, Copy, Debug, Encode, Decode, ZeroCopySend, Serialize, PartialEq, Eq, PartialOrd, Ord, Deserialize
 )]
 #[repr(C)]
 pub enum T265Confidence {
