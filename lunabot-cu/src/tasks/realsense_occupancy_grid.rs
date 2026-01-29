@@ -576,7 +576,7 @@ impl CuTask for OccupancyGridTask {
                         );
                         let _ = logger.recorder.log(
                             "realsense/pcl",
-                            &Points3D::new(point_cloud.iter().map(|p| [p.x, p.y, p.z])),
+                            &Points3D::new(point_cloud.iter().map(|p| [p.x + request.origin.0, p.y + request.origin.1, p.z])),
                         );
 
                         let pipeline_guard = pipeline.lock().unwrap();
