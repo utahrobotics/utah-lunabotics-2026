@@ -7,7 +7,7 @@ var actor: Node
 
 @export var deadzone: float = 0.2
 
-@onready var speed_slider = $"../SpeedMultiplierSlider"
+@onready var speed_slider = $"../VBoxContainer/MainContent/HBoxContainer/RightColumn/SpeedControl/MarginContainer/VBox/SpeedMultiplierSlider"
 
 var command_recorder: CommandRecorder
 
