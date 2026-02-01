@@ -113,6 +113,8 @@ impl MotorRef {
         self.speed_multiplier.store(multiplier);
     }
 
+    /// Final RPM = (left_or_right) * weight
+    /// weight is the same thing as speed multiplier
     pub fn set_speed(&self, left: f32, right: f32) {
         self.speeds.store(Some((left, right)));
     }

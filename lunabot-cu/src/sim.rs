@@ -164,8 +164,9 @@ fn sim_callback(
             if let Some(steering) = input.payload() {
                 let (left, right) = steering.get_left_and_right();
                 let speed_mult = steering.get_weight();
-                let left = (left * speed_mult) * 0.022;
-                let right = (right * speed_mult) * 0.022;
+                // FIXME: probably shouldn't just put a magic number
+                let left = (left * speed_mult) * 0.042;
+                let right = (right * speed_mult) * 0.042;
                 // left vesc
                 data.actuator("motor_fl").unwrap().view_mut(data).ctrl[0] = left;
                 data.actuator("motor_bl").unwrap().view_mut(data).ctrl[0] = left;

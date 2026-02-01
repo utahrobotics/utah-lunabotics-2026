@@ -2,31 +2,29 @@ extends Control
 
 @onready var connection: Node = $LunabaseConnection
 @onready var controller: LunabaseHumanController = $LunabaseHumanController
-@onready var ip_input: LineEdit = $VBoxContainer/TopPanel/IPInput
-@onready var connect_button: Button = $VBoxContainer/TopPanel/ConnectButton
-@onready var packet_label: Label = $VBoxContainer/TopPanel/PacketLabel
-@onready var stage_label: Label = $VBoxContainer/TopPanel/StageLabel
-@onready var soft_stop_button: Button = $VBoxContainer/BottomPanel/SoftStopButton
-@onready var manual_button: Button = $VBoxContainer/BottomPanel/ManualButton
-@onready var autonomous_button: Button = $VBoxContainer/BottomPanel/AutonomousButton
-@onready var errored_tasks_label: Label = $VBoxContainer/CenterContainer/HBoxContainer/ErroredTasksPanel/MarginContainer/ScrollContainer/VBox/ErroredTasksLabel
-@onready var speed_label: Label = $VBoxContainer/TopPanel/SpeedLabel
-@onready var speed_slider: HSlider = $SpeedMultiplierSlider
-@onready var location_label: Label = $VBoxContainer/TopPanel/Spacer/location_label
-@onready var orientation_label: Label = $OrientationLabel
-@onready var PitchAndRollGUI: Control = $VBoxContainer/CenterContainer/UIAttitude
-
+@onready var ip_input: LineEdit = $VBoxContainer/TopBar/MarginContainer/TopPanel/ConnectionGroup/IPInput
+@onready var connect_button: Button = $VBoxContainer/TopBar/MarginContainer/TopPanel/ConnectionGroup/ConnectButton
+@onready var packet_label: Label = $VBoxContainer/TopBar/MarginContainer/TopPanel/StatusGroup/PacketLabel
+@onready var stage_label: Label = $VBoxContainer/TopBar/MarginContainer/TopPanel/StatusGroup/StageLabel
+@onready var soft_stop_button: Button = $VBoxContainer/BottomBar/MarginContainer/BottomPanel/SoftStopButton
+@onready var manual_button: Button = $VBoxContainer/BottomBar/MarginContainer/BottomPanel/ManualButton
+@onready var autonomous_button: Button = $VBoxContainer/BottomBar/MarginContainer/BottomPanel/AutonomousButton
+@onready var errored_tasks_label: Label = $VBoxContainer/MainContent/HBoxContainer/LeftColumn/ErrorsPanel/MarginContainer/VBox/ScrollContainer/ErroredTasksLabel
+@onready var speed_label: Label = $VBoxContainer/TopBar/MarginContainer/TopPanel/StatusGroup/SpeedLabel
+@onready var speed_slider: HSlider = $VBoxContainer/MainContent/HBoxContainer/RightColumn/SpeedControl/MarginContainer/VBox/SpeedMultiplierSlider
+@onready var location_label: Label = $VBoxContainer/TopBar/MarginContainer/TopPanel/StatusGroup/location_label
+@onready var orientation_label: Label = $VBoxContainer/MainContent/HBoxContainer/CenterColumn/OrientationPanel/MarginContainer/OrientationLabel
+@onready var PitchAndRollGUI: Control = $VBoxContainer/MainContent/HBoxContainer/CenterColumn/AttitudeContainer/UIAttitude
 var command_recorder: CommandRecorder
 
 #Speed Slider
 
-var set_weight:= SetSpeedMultiplier.new()
+var set_weight := SetSpeedMultiplier.new()
 var weight: float
 
 #location label
 
-var get_location:= GetLocation.new()
-
+var get_location := GetLocation.new()
 
 
 # Should match the LunabotStage enum in the Rust extension
@@ -52,7 +50,6 @@ func _ready() -> void:
 	
 	PitchAndRollGUI.set_conn(connection)
 	
-
 
 func _process(delta: float) -> void:
 	var ms_since_packet: int = connection.get_ms_since_last_packet()
@@ -90,8 +87,6 @@ func _process(delta: float) -> void:
 			stage_label.modulate = Color.CYAN
 			
 	
-	
-	
 	#location  maybe temporary 
 	var location = connection.get_location()
 	location_label.text = "location: [%.2f, %.2f, %.2f]" % [location[0], location[1], location[2]]
@@ -113,8 +108,6 @@ func _process(delta: float) -> void:
 		errored_tasks_label.text = error_text.strip_edges()
 		
 	
-
-
 func _on_stage_changed(stage: int) -> void:
 	print("Stage changed to: ", stage)
 
@@ -151,4 +144,3 @@ func _on_speed_multiplier_slider_value_changed(value: float) -> void:
 
 	# Update UI
 	speed_label.text = "SpeedMultiplier set to " + str(new_weight)
-	

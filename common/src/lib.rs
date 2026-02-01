@@ -21,6 +21,8 @@ extern crate cu_bincode as bincode;
     Serialize,
     Deserialize
 )]
+
+/// Final RPM = (left_or_right) * weight
 pub struct Steering {
     left: i8,
     right: i8,
@@ -66,6 +68,7 @@ impl Steering {
 
     } */
 
+    /// left and right are clamped to -1, 1
     pub fn new(mut left: f64, mut right: f64, weight: f64) -> Self {
         left = left.max(-1.0).min(1.0);
         right = right.max(-1.0).min(1.0);
@@ -134,7 +137,7 @@ pub struct IMUReading {
     pub acceleration: [f64; 3],
 }
 
-use std::{collections::HashMap, io::Write};
+use std::collections::HashMap;
 
 use bitcode::{Decode, Encode};
 use embedded_common::{Actuator, ActuatorCommand};
@@ -213,23 +216,6 @@ impl Default for FromLunabase {
 }
 
 impl FromLunabase {
-    fn write_code(&self, mut w: impl Write) -> std::io::Result<()> {
-        let bytes = bitcode::encode(self);
-        write!(w, "{self:?} = 0x")?;
-        for b in bytes {
-            write!(w, "{b:x}")?;
-        }
-        writeln!(w, "")
-    }
-
-    pub fn write_code_sheet(mut w: impl Write) -> std::io::Result<()> {
-        // FromLunabase::Pong.write_code(&mut w)?;
-        FromLunabase::Manual.write_code(&mut w)?;
-        FromLunabase::Steering(Steering::default()).write_code(&mut w)?;
-        FromLunabase::SoftStop.write_code(&mut w)?;
-        Ok(())
-    }
-
     pub fn set_lift_actuator(mut speed: f64) -> Self {
         speed = speed.clamp(-1.0, 1.0);
         let speed = if speed < 0.0 {
