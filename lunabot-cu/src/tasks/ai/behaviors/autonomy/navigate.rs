@@ -5,26 +5,17 @@ use crate::tasks::ai::action::LunabotAction;
 
 pub fn navigate_behavior() -> Behavior<LunabotAction> {
     While(
-        // Box::new(Action(LunabotAction::IsAutonomy)), // this is autonomy node is technically redundant
-        // vec![Sequence(vec![
-        //     // one extra yield to avoid busy looping, in case the stage was set in the same tick
-        //     Action(LunabotAction::Yield),
-        //     Action(LunabotAction::IsObstacleMapReady),
-        //     Action(LunabotAction::CalculatePath),
-        //     If(
-        //         Box::new(Action(LunabotAction::FollowPath)),
-        //         Box::new(set_stage(common::LunabotStage::Manual)),
-        //         Box::new(set_stage(common::LunabotStage::SoftStop)),
-        //     ),
-        // ])],
         Box::new(Action(LunabotAction::IsAutonomy)), // this is autonomy node is technically redundant
         vec![Sequence(vec![
+            // one extra yield to avoid busy looping, in case the stage was set in the same tick
+            Action(LunabotAction::Yield),
+            Action(LunabotAction::CalculatePath),
             If(
                 Box::new(Action(LunabotAction::FollowPath)),
                 Box::new(set_stage(common::LunabotStage::Manual)),
                 Box::new(set_stage(common::LunabotStage::SoftStop)),
             ),
-        ])],
+        ])]
     )
 }
 

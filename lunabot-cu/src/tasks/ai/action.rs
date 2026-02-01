@@ -10,7 +10,7 @@ use crate::{
         jobs::{find_path_job, follow_path_job},
     },
 };
-static PATHFINDING_GOAL: [f32; 2] = [6.0662524, 3.0606992];
+static PATHFINDING_GOAL: [f32; 2] = [5.843524, 1.4796992];
 static MAX_ACCEPTABLE_GRADIENT: f32 = 0.3;
 
 #[derive(Clone, Debug, Copy)]
@@ -31,9 +31,6 @@ pub enum LunabotAction {
     IsAutonomy,
     IsManual,
     None,
-
-    // autonomy related things
-    IsObstacleMapReady,
 
     /// if the robot is in an occupied cell, we should first pathfind to the nearest free cell (if a free cell is within some range)
     IsInOccupiedCell,
@@ -117,13 +114,6 @@ impl LunabotAction {
                 _ => Success,
             },
             LunabotAction::None => Success,
-            LunabotAction::IsObstacleMapReady => {
-                if blackboard.latest_local_map.is_some() {
-                    Success
-                } else {
-                    Failure
-                }
-            }
             LunabotAction::IsInOccupiedCell => todo!(),
             LunabotAction::IsInFreeCell => todo!(),
             LunabotAction::IsInUnknownCell => todo!(),
@@ -142,11 +132,9 @@ impl LunabotAction {
 
                     // Get destination from blackboard, or use default PATHFINDING_GOAL
                     // PATHFINDING_GOAL is just for testing for now.
-                    let end = if let Some((x, y)) = blackboard.navigate_destination {
-                        Vector2::new(x, y)
-                    } else {
-                        Vector2::new(PATHFINDING_GOAL[0], PATHFINDING_GOAL[1])
-                    };
+                    let end = 
+                        Vector2::new(PATHFINDING_GOAL[0], PATHFINDING_GOAL[1]);
+
 
                     // Check if we already have a path finder job running
                     if let Some(ref mut path_finder) = blackboard.path_finder {
@@ -210,7 +198,7 @@ impl LunabotAction {
                     status
                 } else {
                     // Use the calculated path from CalculatePath action
-                    if let Some(path) = Some(vec![])/*blackboard.calculated_path.take()*/ {
+                    if let Some(path) = blackboard.calculated_path.take() {
                         println!("Starting new follow path job with {} waypoints", path.len());
                         let mut follower_job =
                             follow_path_job(5.0, ROBOT_STATE.get().unwrap().kinematic_root, path);
