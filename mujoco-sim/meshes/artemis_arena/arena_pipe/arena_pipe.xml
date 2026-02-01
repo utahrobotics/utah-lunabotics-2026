@@ -16,7 +16,7 @@
     <mesh file="arena_pipe_collision_11.obj" />
   </asset>
   <worldbody>
-    <body name="arena_pipe" pos = "0 0 1.2">
+    <body name="arena_pipe" pos = "3.5 2.6 1.2">
       <geom material="DefaultMaterialPipe" mesh="arena_pipe" class="visual" />
       <geom mesh="arena_pipe_collision_0"
         rgba="0.026884331388189908 0.7752970316150581 0.8036047120818102 1" class="collision" />

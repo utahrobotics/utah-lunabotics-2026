@@ -11,9 +11,10 @@ use tasker::tokio::{
 use crate::tasks::ai::jobs::Job;
 
 // Distance between wheels, in m
-const WHEEL_BASE_SIZE: f32 = 0.6; // TODO fill in
-const MAX_DOT_SPEED: f32 = 3.0; // In m/s
-const DOT_SPEED_FACTOR: f32 = 1.0; // In m/s // TODO test and adjust
+const WHEEL_BASE_SIZE: f32 = 0.6 * 5.0; // TODO fill in
+const FOLLOW_SPEED_FACTOR: f32 = 0.15;
+const MAX_DOT_SPEED: f32 = 0.2; // In m/s
+const DOT_SPEED_FACTOR: f32 = 0.005; // In m/s // TODO test and adjust
 
 /// follows path ~~fails if the robot fails to move significantly in stuck_timeout_secs~~ (TODO)
 /// also could fail if this job is cancelled
@@ -28,6 +29,7 @@ pub fn follow_path_job(
         async move {
             // The current target on the path being followed. Will move along the path continuously.
             let mut dot: Vector2<f32> = chain.get_global_isometry().translation.vector.xy().cast();
+            let mut print_accumulator: f32 = 0.0; // FOR DEBUG USE
             loop {
                 let _robot_isometry = chain.get_global_isometry();
                 // Flatten and set up
@@ -36,11 +38,11 @@ pub fn follow_path_job(
                 let error = dot - robot_pos;
 
                 let path: Vec<Vector2<f32>> = vec![ // Temp hardcoded path
-                    Vector2::new(0.0, 0.0),
-                    Vector2::new(5.0, 1.0),
-                    Vector2::new(6.0, 5.0),
-                    Vector2::new(4.0, 3.0),
-                    Vector2::new(-1.0, -1.0), // Part of hacky way to end path
+                    Vector2::new(1.0, 1.0),
+                    Vector2::new(2.0, 1.0),
+                    Vector2::new(2.0, -1.0),
+                    Vector2::new(0.0, -1.0),
+                    Vector2::new(0.0, 1.0), // Part of hacky way to end path // I don't remember what this hacky way is
                 ]; // TODO get path
 
                 let dt: f32 = 0.05; // TODO determine or fix dt
@@ -80,18 +82,32 @@ pub fn follow_path_job(
                 let angle_difference = error_angle - robot_angle;
                 let radius = target_distance / (2.0 * angle_difference.sin()); // Check if this has a sign error
 
+                print_accumulator += dt; // DEBUG
                 // Only move if the dot is far enough away
                 let steering = if error.norm_squared() > 0.1 {
                     //   Radius is proportional to the ratio of velocity to angular velocity:
                     //   https://www.desmos.com/calculator/f7grn652s4
-                    let velocity = 1.0; // will be fixed by normalization // currently always goes max speed
+                    // TODO Fix problems with dot being behind bot
+                    let velocity = FOLLOW_SPEED_FACTOR * target_distance; // will be fixed by normalization // currently always goes max speed
                     let turning = velocity * WHEEL_BASE_SIZE * 0.5 / radius;
+
+                    // DEBUG
+                    if print_accumulator > 1.0 {
+                        println!("Robot: ({}, {})\t Dot: ({}, {})\t Error: {}\t Control: (^ = {}, <-> = {})", 
+                            robot_pos.x, robot_pos.y, 
+                            dot.x, dot.y, 
+                            target_distance,
+                            velocity, 
+                            turning
+                        );
+                        print_accumulator = 0.0;
+                    }
+
                     Steering::new_ik(velocity as f64, turning as f64, 5000.0)
                 } else {
                     Steering::new(0.0, 0.0, 5000.0)
                 };
 
-                println!("Robot: {}\t Dot: {}", robot_pos, dot);
 
                 let _ = output_tx.send(steering).await;
                 tokio::time::sleep(Duration::from_secs_f32(dt)).await;
@@ -118,7 +134,7 @@ fn distance_to_segment(point: Vector2<f32>, segment: (Vector2<f32>, Vector2<f32>
     if dist_along_segment > 0.0 || dist_along_segment < segment_vec.norm() {
         // a X v = |a| |b| cos(theta), but length of line segment shouldn't matter,
         // so divide by |b|.
-        return segment_vec.cross(&point_from_start).norm() / segment_vec.norm();
+        return vector_2_cross(segment_vec, point_from_start) / segment_vec.norm();
     }
 
     return start_point_dist.min(end_point_dist);
@@ -133,4 +149,8 @@ fn project_and_move_point_on_segment(point: Vector2<f32>, segment: (Vector2<f32>
     // Use a dot product to project the given point onto the segment
     let projection_distance = point_from_start.dot(&segment_vec.normalize());
     return (projection_distance + movement) * segment_vec.normalize() + segment.0;
+}
+
+fn vector_2_cross(a: Vector2<f32>, b: Vector2<f32>) -> f32 {
+    return a.x * b.y - a.y * b.x;
 }

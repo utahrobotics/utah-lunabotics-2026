@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 mod constants;
 pub mod ports;
 pub use constants::*;
+extern crate cu_bincode as bincode;
 
 #[repr(C)]
 #[derive(
@@ -18,6 +19,7 @@ pub use constants::*;
     Pod,
     Zeroable,
     Serialize,
+    Deserialize
 )]
 pub struct Steering {
     left: i8,
@@ -170,10 +172,10 @@ impl TryFrom<u8> for LunabotStage {
 }
 
 #[derive(
-    bincode::Encode, bincode::Decode, Debug, Encode, Decode, Clone, Copy, PartialEq, Serialize,
-)]
+    bincode::Encode, bincode::Decode, Debug, Encode, Decode, Clone, Copy, PartialEq, Serialize, Deserialize
+)] 
 pub enum FromLunabase {
-    ContinueMission,
+    Manual,
     /// Skid steer message, 1,1 is full speed forward, -1,-1 is full speed back
     Steering(Steering),
     /// Move lift actuators, positive up, negative down  
@@ -222,7 +224,7 @@ impl FromLunabase {
 
     pub fn write_code_sheet(mut w: impl Write) -> std::io::Result<()> {
         // FromLunabase::Pong.write_code(&mut w)?;
-        FromLunabase::ContinueMission.write_code(&mut w)?;
+        FromLunabase::Manual.write_code(&mut w)?;
         FromLunabase::Steering(Steering::default()).write_code(&mut w)?;
         FromLunabase::SoftStop.write_code(&mut w)?;
         Ok(())
@@ -304,6 +306,10 @@ pub enum FromLunabot {
         hinge: f32,
         bucket: f32,
     },
+    // RobotMotion {
+    //     velocity:[f32;3],
+    //     acceleration: [f32;3],
+    // },
     ErroredTasks(HashMap<String, String>),
 }
 

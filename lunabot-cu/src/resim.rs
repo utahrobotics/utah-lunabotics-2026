@@ -21,6 +21,7 @@ use robot_state::RobotState;
 use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock, RwLock};
+extern crate cu_bincode as bincode;
 
 const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 

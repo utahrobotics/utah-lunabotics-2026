@@ -1,5 +1,6 @@
 use std::{collections::VecDeque, time::Duration};
 
+use crate::ROBOT_STATE;
 #[cfg(not(feature = "resim"))]
 use crate::comms::LunabaseConnection;
 use common::{FromLunabase, FromLunabot};
@@ -36,6 +37,7 @@ impl CuBridge for Lunabase {
     type Tx = ToLunabaseChannel;
 
     type Rx = FromLunabaseChannel;
+    type Resources<'r> = ();
 
     #[cfg(feature = "resim")]
     fn new(
@@ -46,6 +48,8 @@ impl CuBridge for Lunabase {
         _rx_channels: &[cu29::prelude::BridgeChannelConfig<
             <Self::Rx as cu29::prelude::BridgeChannelSet>::Id,
         >],
+        _resources: Self::Resources<'_>
+
     ) -> cu29::CuResult<Self>
     where
         Self: Sized,
@@ -62,6 +66,7 @@ impl CuBridge for Lunabase {
         _rx_channels: &[cu29::prelude::BridgeChannelConfig<
             <Self::Rx as cu29::prelude::BridgeChannelSet>::Id,
         >],
+        _resources: Self::Resources<'_>
     ) -> cu29::CuResult<Self>
     where
         Self: Sized,
@@ -69,7 +74,7 @@ impl CuBridge for Lunabase {
         use cu29::CuError;
 
         let max_pong_delay = if let Some(cfg) = config {
-            Duration::from_millis(cfg.get("max_pong_delay_ms").unwrap_or(1000))
+            Duration::from_millis(cfg.get("max_pong_delay_ms").unwrap().unwrap_or(1000))
         } else {
             Duration::from_millis(1000)
         };
@@ -118,7 +123,7 @@ impl CuBridge for Lunabase {
         use common::{FromLunabot, LUNABOT_STAGE};
 
         let heartbeat =
-            bincode::encode_to_vec(LUNABOT_STAGE.load(), bincode::config::standard()).unwrap();
+            cu_bincode::encode_to_vec(LUNABOT_STAGE.load(), cu_bincode::config::standard()).unwrap();
         self.connection.server.set_keep_alive_msg(&heartbeat);
 
         if let Some(errored_tasks) = ERRORED_TASKS.get()
@@ -142,11 +147,49 @@ impl CuBridge for Lunabase {
             if let Some(lunabot_msg) = (payload as &dyn std::any::Any).downcast_ref::<FromLunabot>()
             {
                 // you will probably want to rate limit how often the iso gets sent over for bandwidth reasons
+
+                use core::f32;
                 if let Err(e) = self.connection.try_send(lunabot_msg.clone()) {
                     eprintln!("Failed to send message to Lunabase: {}", e);
                 }
-            } else {
-                eprintln!("Payload is not FromLunabot type");
+                // send FromLunabot packets here :)
+                let isometries = ROBOT_STATE
+                    .get()
+                    .unwrap()
+                    .kinematic_root
+                    .get_global_isometry();
+                let position = isometries.translation.vector.cast::<f32>().data.0[0];
+
+                let orientation = isometries.rotation.as_vector().cast::<f32>().data.0[0];
+
+                if let Err(e) = self.connection.try_send(FromLunabot::RobotIsometry {
+                    origin: (position),
+                    quat: (orientation),
+                }) {
+                    eprintln!("cannot send isometries to lunabase: {}", e);
+                }
+                // let velo = ROBOT_STATE.get().unwrap().get_velocity();
+
+                // let accel = ROBOT_STATE.get().unwrap().get_acceleration();
+
+                // let velof32 = [
+                //     velo[0] as f32, 
+                //     velo[1] as f32, 
+                //     velo[2] as f32
+                // ];
+                // let accelf32 = [
+                //     accel[0] as f32,
+                //     accel[1] as f32,
+                //     accel[2] as f32,
+                // ];
+                // if let Err(e) = self.connection.try_send(FromLunabot::RobotMotion { 
+                //     velocity: (velof32),
+                //     acceleration: (accelf32)
+                //  }){
+                //     eprintln!("cannot send motion to lunabase{}" , e);
+                //  }
+
+
             }
         }
 
@@ -173,7 +216,7 @@ impl CuBridge for Lunabase {
 
             // Send heartbeat and robot state (moved from send method since send might not be called)
             let heartbeat =
-                bincode::encode_to_vec(LUNABOT_STAGE.load(), bincode::config::standard()).unwrap();
+                cu_bincode::encode_to_vec(LUNABOT_STAGE.load(), cu_bincode::config::standard()).unwrap();
             self.connection.server.set_keep_alive_msg(&heartbeat);
 
             // Send errored tasks periodically

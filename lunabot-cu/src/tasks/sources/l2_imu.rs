@@ -1,4 +1,5 @@
-use bincode::{Decode, Encode};
+use cu_bincode::{Decode, Encode};
+use serde_big_array::BigArray;
 use cu29::cutask::CuMsg;
 use cu29::{
     CuError, CuResult,
@@ -18,7 +19,7 @@ use iceoryx2::prelude::*;
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use iceoryx2::service::port_factory::publish_subscribe::PortFactory;
 use nalgebra::{SMatrix, SVector};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::ROBOT_STATE;
 use iceoryx_types::ImuMsg;
@@ -41,13 +42,13 @@ pub struct ImuIceoryxReceiver {
     gravity_magnitude: f64,
 }
 
-#[derive(Clone, Copy, Debug, Encode, Decode, Serialize)]
+#[derive(Clone, Copy, Debug, Encode, Decode, Serialize, Deserialize)]
 #[repr(C)]
 pub struct ImuMeasurement {
     pub acceleration: [f64; 3],
     pub orientation: [f64; 3],
     pub angular_velocity: [f64; 3],
-    #[serde(serialize_with = "<[_]>::serialize")]
+    #[serde(with = "BigArray")]
     pub variance: [f64; 81],
 }
 
@@ -66,10 +67,11 @@ impl Freezable for ImuIceoryxReceiver {}
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 impl CuSrcTask for ImuIceoryxReceiver {
     type Output<'m> = output_msg!(ImuMeasurement);
+    type Resources<'r> = ();
 
-    fn new(config: Option<&ComponentConfig>) -> CuResult<Self> {
+    fn new(config: Option<&ComponentConfig>, _resources: Self::Resources<'_>) -> CuResult<Self> {
         let service_str = config
-            .and_then(|c| c.get::<String>("service"))
+            .and_then(|c| c.get::<String>("service").expect("failed to deserialize"))
             .unwrap_or_else(|| "unilidar/imu".to_string());
 
         let service_name = ServiceName::new(&service_str)
@@ -248,8 +250,9 @@ impl CuSrcTask for ImuIceoryxReceiver {
 #[cfg(any(feature = "resim", feature = "sim"))]
 impl CuSrcTask for ImuIceoryxReceiver {
     type Output<'m> = output_msg!(ImuMsg);
+    type Resources<'r> = ();
 
-    fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
+    fn new(_config: Option<&ComponentConfig>, _resources: Self::Resources<'_>) -> CuResult<Self> {
         let diagonal = SVector::<f64, 9>::from_column_slice(&[
             0.05 as f64, // Acceleration variance
             0.05 as f64,

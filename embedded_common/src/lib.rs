@@ -4,6 +4,12 @@ use core::ops::Not;
 
 pub const IMU_READING_DELAY_MS: u64 = 10;
 
+
+#[cfg(feature="std")]
+extern crate cu_bincode as bincode;
+
+
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[repr(u8)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]

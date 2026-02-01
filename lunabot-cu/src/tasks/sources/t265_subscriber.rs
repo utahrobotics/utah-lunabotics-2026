@@ -1,4 +1,4 @@
-use bincode::{Decode, Encode};
+use cu_bincode::{Decode, Encode};
 use cu_spatial_payloads::EncodableIsometry;
 use cu29::{
     cutask::{CuSrcTask, Freezable},
@@ -13,6 +13,7 @@ use iceoryx2::{
     service::ipc,
 };
 use nalgebra::{Isometry3, UnitQuaternion, Vector3};
+use serde::Deserialize;
 use simple_motion::StaticNode;
 
 use crate::ROBOT_STATE;
@@ -35,7 +36,7 @@ pub struct T265Subscriber {
     angular_velocity_variance: f64,
 }
 
-#[derive(Encode, Decode, Clone, Copy, Serialize, Debug)]
+#[derive(Encode, Decode, Clone, Copy, Serialize, Debug, Deserialize)]
 pub struct T265Msg {
     pub pose: EncodableIsometry,
     pub velocity_variance: f64,
@@ -57,18 +58,19 @@ impl Freezable for T265Subscriber {}
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 impl CuSrcTask for T265Subscriber {
     type Output<'m> = output_msg!(T265Msg);
+    type Resources<'r> = ();
 
-    fn new(config: Option<&cu29::prelude::ComponentConfig>) -> cu29::CuResult<Self>
+    fn new(config: Option<&cu29::prelude::ComponentConfig>, _resources: Self::Resources<'_>) -> cu29::CuResult<Self>
     where
         Self: Sized,
     {
         let serial_num = config
-            .and_then(|c| c.get::<String>("serial_num"))
+            .and_then(|c| c.get::<String>("serial_num").expect("failed to deserialize"))
             .unwrap_or_else(|| "realsense/t265".to_string());
         let pose_service_str = format!("realsense/{serial_num}/pose");
 
         let node_name: String = config
-            .and_then(|c| c.get::<String>("node"))
+            .and_then(|c| c.get::<String>("node").expect("failed to deserialize"))
             .expect("must provide node name in chain");
 
         let pose_service_name = ServiceName::new(&pose_service_str)
@@ -100,11 +102,11 @@ impl CuSrcTask for T265Subscriber {
             .expect("node not found in chain");
 
         let velocity_variance = config
-            .and_then(|c| c.get::<f64>("t265_velocity_variance"))
+            .and_then(|c| c.get::<f64>("t265_velocity_variance").expect("failed to deserialize"))
             .unwrap_or(1.0);
 
         let angular_velocity_variance = config
-            .and_then(|c| c.get::<f64>("t265_angular_velocity_variance"))
+            .and_then(|c| c.get::<f64>("t265_angular_velocity_variance").expect("failed to deserialize"))
             .unwrap_or(1.0);
 
         Ok(Self {
@@ -219,7 +221,8 @@ impl CuSrcTask for T265Subscriber {
 #[cfg(any(feature = "resim", feature = "sim"))]
 impl CuSrcTask for T265Subscriber {
     type Output<'m> = output_msg!(PoseMsg);
-    fn new(config: Option<&cu29::prelude::ComponentConfig>) -> cu29::CuResult<Self>
+    type Resources<'r> = ();
+    fn new(config: Option<&cu29::prelude::ComponentConfig>, _resources: Self::Resources<'_>) -> cu29::CuResult<Self>
     where
         Self: Sized,
     {

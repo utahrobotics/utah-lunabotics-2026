@@ -10,7 +10,7 @@ use crate::{
         jobs::{find_path_job, follow_path_job},
     },
 };
-static PATHFINDING_GOAL: [f32; 2] = [2.490662524, 0.72606992];
+static PATHFINDING_GOAL: [f32; 2] = [6.0662524, 3.0606992];
 static MAX_ACCEPTABLE_GRADIENT: f32 = 0.3;
 
 #[derive(Clone, Debug, Copy)]
@@ -118,12 +118,11 @@ impl LunabotAction {
             },
             LunabotAction::None => Success,
             LunabotAction::IsObstacleMapReady => {
-                // if blackboard.latest_obstacle_map.is_some() {
-                //     Success
-                // } else {
-                //     Failure
-                // }
-                Success
+                if blackboard.latest_local_map.is_some() {
+                    Success
+                } else {
+                    Failure
+                }
             }
             LunabotAction::IsInOccupiedCell => todo!(),
             LunabotAction::IsInFreeCell => todo!(),
@@ -211,7 +210,7 @@ impl LunabotAction {
                     status
                 } else {
                     // Use the calculated path from CalculatePath action
-                    if let Some(path) = blackboard.calculated_path.take() {
+                    if let Some(path) = Some(vec![])/*blackboard.calculated_path.take()*/ {
                         println!("Starting new follow path job with {} waypoints", path.len());
                         let mut follower_job =
                             follow_path_job(5.0, ROBOT_STATE.get().unwrap().kinematic_root, path);
@@ -241,7 +240,6 @@ impl LunabotAction {
             }
             LunabotAction::SetStage(stage) => {
                 println!("Setting stage to {:?}", stage);
-                blackboard.last_mission = LunabotStage::Manual;
                 blackboard.current_mission = *stage;
                 blackboard.path_follower = None;
                 LUNABOT_STAGE.store(*stage);

@@ -25,9 +25,10 @@ impl CuTask for LunabotAi {
     type Input<'m> = input_msg!('m, FromLunabase, OccupancyGrid);
 
     // (Steering, ActuatorCommand)
-    type Output<'m> = output_msg!((Option<Steering>, Option<ActuatorCommand>));
+    type Output<'m> = (CuMsg<Steering>, CuMsg<ActuatorCommand>);
+    type Resources<'r> = ();
 
-    fn new(_config: Option<&cu29::prelude::ComponentConfig>) -> cu29::CuResult<Self>
+    fn new(_config: Option<&cu29::prelude::ComponentConfig>, _resources: Self::Resources<'_>) -> cu29::CuResult<Self>
     where
         Self: Sized,
     {
@@ -47,6 +48,7 @@ impl CuTask for LunabotAi {
         Ok(())
     }
 
+    /// drains the outgoing steering and actuator command queues, updates the blackboard with Inputs, ticks the behavior tree
     fn process<'i, 'o>(
         &mut self,
         clock: &cu29::prelude::RobotClock,
@@ -67,25 +69,18 @@ impl CuTask for LunabotAi {
         self.bt
             .tick(&e, &mut |args, blackboard| args.action.handle(blackboard));
         self.last_tick_nanos = clock.now().into();
-        let mut payload = (None, None);
         if let Some(actuator_cmd) = self
             .bt
             .blackboard_mut()
             .outgoing_actuator_msg_queue
             .pop_front()
         {
-            payload.1 = Some(actuator_cmd);
+            output.1.set_payload(actuator_cmd);
         }
         if let Some(steering_cmd) = self.bt.blackboard_mut().outgoing_steering_msg.take() {
-            payload.0 = Some(steering_cmd);
+            output.0.set_payload(steering_cmd);
         }
-        if payload.0.is_some() || payload.1.is_some() {
-            output.set_payload(payload);
-            return Ok(());
-        } else {
-            output.clear_payload();
-        }
-
         Ok(())
     }
+    
 }

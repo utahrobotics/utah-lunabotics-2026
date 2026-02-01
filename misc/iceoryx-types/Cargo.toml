@@ -10,8 +10,9 @@ resim = []
 production = ["iceoryx2"]
 
 [dependencies]
+serde-big-array.workspace = true
 iceoryx2 = { workspace = true, optional = true }
-bincode = { version = "=2.0.1", features = ["derive", "serde"] }
+cu-bincode.workspace = true
 serde = { version = "1", features = ["derive"] }
 nalgebra.workspace = true
 common.workspace = true

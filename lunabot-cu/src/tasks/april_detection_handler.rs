@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 use std::f64::consts::PI;
+use serde_big_array::BigArray;
 
-use bincode::{Decode, Encode};
+use cu_bincode::{Decode, Encode};
 use cu_apriltag::AprilTagDetections;
 use cu_spatial_payloads::EncodableIsometry;
 use cu29::cutask::CuMsg;
@@ -99,12 +100,12 @@ pub struct AprilDetectionHandler {
     max_distance: f64
 }
 
-#[derive(Clone, Copy, Debug, Encode, Decode, Serialize)]
+#[derive(Clone, Copy, Debug, Encode, Decode, Serialize, Deserialize)]
 #[repr(C)]
 pub struct AprilTagMeasurement {
     /// Estimated isometry of the robot base
     pub estimated_isometry: EncodableIsometry,
-    #[serde(serialize_with = "<[_]>::serialize")]
+    #[serde(with = "BigArray")]
     pub variance: [f64; 36]
 }
 
@@ -128,10 +129,12 @@ impl CuTask for AprilDetectionHandler {
     );
     // camera_id, estimated isometry of camera
     type Output<'m> = output_msg!(Vec<AprilTagMeasurement>);
+    type Resources<'r> = ();
 
-    fn new(config: Option<&ComponentConfig>) -> CuResult<Self> {
+
+    fn new(config: Option<&ComponentConfig>, _resources: Self::Resources<'_>) -> CuResult<Self> {
         let known_tags = load_known_apriltag_isometries()?;
-        let max_distance = config.expect("provide a config for apriltag handler").get("max_distance").unwrap_or(1.0);
+        let max_distance = config.expect("provide a config for apriltag handler").get("max_distance").expect("failed to deserialize").unwrap_or(1.0);
 
         Ok(Self { known_tags, max_distance })
     }
@@ -257,6 +260,7 @@ impl CuTask for AprilDetectionHandler {
     fn stop(&mut self, _clock: &RobotClock) -> CuResult<()> {
         Ok(())
     }
+    
 }
 
 impl AprilDetectionHandler {

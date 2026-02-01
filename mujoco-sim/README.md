@@ -1,7 +1,9 @@
 # MuJoCo Simulation
 
+*HINT: if you disable task logging the sim will run smoother*
+
 ## Setup
-1. Follow the installation instructions [here](https://mujoco-rs.readthedocs.io/en/v2.0.x/installation.html#static-linking) to build mujoco for static linking, except replace the two cmake commands listed there with this:
+1. Follow the installation instructions [here](https://mujoco-rs.readthedocs.io/en/v2.0.x/installation.html#static-linking) to build mujoco for static linking. (you may have to leave off the release flag on the make step)
 
 2. Ensure that the correct environment variables are set to point to the mujoco library, e.g. ```export MUJOCO_STATIC_LINK_DIR=/home/matthew_a/mujoco-rs/mujoco/build/lib```
 
@@ -18,6 +20,15 @@ Additionally, starting the simulation this way launches the code for the lunabot
 
 * Run the simulation by calling ```make sim```, this command may re build the entire project because mujoco requires using a different linker.
 
+
+**You will also need the lunabase running to be able to control the robot:**
+1. install godot https://godotengine.org/
+2. build the gdext by navigating to lunabase-lib and running ```cargo build```
+3. navigate to ```godot/new-lunabase```
+4. launch godot editor with ```godot project.godot```
+5. click one of the buttons in the top right corner to lanch the MainControl.tscn scene.
+
+
 **What to use this option for:** Testing autonomy, testing manual control through the lunabase.
 
 ### Option 2: Without lunabot 
@@ -33,6 +44,22 @@ This option simply loads the artemis_arena.xml scene into the mujoco simulator w
 ## Tooling
 
 1. [obj2mjcf](https://github.com/kevinzakka/obj2mjcf)
+    - Used to convert .obj mesh files into mujoco compatible xml and mesh files for importing into the scene.
+    - Install instructions: 
+      - For macOS:
+        * Make sure mujoco is installed and added to your PATH.
+        * Install `pipx` - `brew install pipx`
+        * Clone the repo and cd into it
+        * Set environment variables - MUJOCO_PATH=`/Applications/MuJoCo.app/Contents/Frameworks` and MUJOCO_PLUGIN_PATH=`/Applications/MuJoCo.app/Contents/MacOS/mujoco_plugin`
+        * Run `pipx install .`
+      - For Windows: 
+        * Make sure MuJoCo is installed and `simulate` is in your PATH. 
+        * Make sure cmake is installed. 
+        * Make sure you are using Python 3.12. 
+        * Install the package manager [Scoop](https://scoop.sh/)
+        * In a new terminal session install `pipx`- `scoop install pipx` and `pipx ensurepath`.
+        * Set environment variables - You can do this through PowerShell or system settings. Set `MUJOCO_PATH` and `MUJOCO_PLUGIN_PATH` to point to `Program Files/mujoco/bin` (or wherever you have installed MuJoCo).
+        * Install - `pipx install obj2mjcf`. 
 
 ## Development 
 

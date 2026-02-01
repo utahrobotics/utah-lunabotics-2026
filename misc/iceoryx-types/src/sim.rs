@@ -1,11 +1,12 @@
 //! feature flagged so that we dont need the iceoryx2 dependency when we are resiming
 
-#![cfg(any(feature = "resim", feature = "sim"))]
+#[cfg(all(any(feature = "sim", feature = "resim"), not(feature = "production")))]
 use bincode::{Decode, Encode};
 use nalgebra::Point3;
-use serde::Serialize;
+use serde::{Serialize, Deserialize};
+use serde_big_array::BigArray;
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, Encode, Decode, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Encode, Decode, Serialize, Deserialize)]
 pub struct PointXYZIR {
     pub x: f32,
     pub y: f32,
@@ -16,10 +17,9 @@ pub struct PointXYZIR {
 }
 
 #[repr(C)]
-#[derive(Clone, Debug, Encode, Decode, Serialize)]
+#[derive(Clone, Debug, Encode, Decode, Serialize, Deserialize)]
 pub struct IceoryxDepthFrame<const SIZE: usize> {
-    #[serde(serialize_with = "<[_]>::serialize")]
-    pub depths: [u16; SIZE],
+    #[serde(with = "BigArray")]    pub depths: [u16; SIZE],
     pub depth_scale: f32,
     pub focal_len: (f32, f32),
 }
@@ -39,11 +39,11 @@ impl<const SIZE: usize> Default for IceoryxDepthFrame<SIZE> {
 pub const MAX_POINT_CLOUD_POINTS: usize = 10000;
 
 #[repr(C)]
-#[derive(Clone, Debug, Encode, Decode, Serialize)]
+#[derive(Clone, Debug, Encode, Decode, Serialize, Deserialize)]
 pub struct IceoryxPointCloud {
     pub is_last: bool,
     pub publish_count: u64,
-    #[serde(serialize_with = "<[_]>::serialize")]
+    #[serde(with = "BigArray")]
     pub points: [PointXYZIR; MAX_POINT_CLOUD_POINTS],
 }
 
@@ -108,7 +108,7 @@ impl PointCloudAccumulator {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, Encode, Decode, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Encode, Decode, Serialize, Deserialize)]
 pub struct ImuMsg {
     pub quaternion: [f32; 4],
     pub angular_velocity: [f32; 3],
@@ -116,7 +116,7 @@ pub struct ImuMsg {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, Encode, Decode, Serialize)]
+#[derive(Clone, Copy, Debug, Default, Encode, Decode, Serialize, Deserialize)]
 pub struct PoseMsg {
     /// position in meters
     pub position: [f32; 3],
@@ -125,7 +125,7 @@ pub struct PoseMsg {
     pub confidence: T265Confidence,
 }
 
-#[derive(Clone, Copy, Debug, Encode, Decode, Serialize)]
+#[derive(Clone, Copy, Debug, Encode, Decode, Serialize, Deserialize)]
 #[repr(C)]
 pub enum T265Confidence {
     Low,

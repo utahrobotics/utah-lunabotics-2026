@@ -88,7 +88,7 @@ right_wheel={
 }
 increment_speed={
 "deadzone": 0.2,
-"events": []
+"events": [null]
 }
 decrement_speed={
 "deadzone": 0.2,

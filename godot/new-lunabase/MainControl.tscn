@@ -1,8 +1,10 @@
-[gd_scene load_steps=4 format=3 uid="uid://cxqk5j2vp8obb"]
+[gd_scene load_steps=6 format=3 uid="uid://cxqk5j2vp8obb"]
 
 [ext_resource type="Script" uid="uid://lfb3k4n5gotg" path="res://MainControl.gd" id="1"]
 [ext_resource type="Script" uid="uid://cyolsda2lojye" path="res://Systems/CommandPattern/Controllers/LunabaseHumanController.gd" id="2"]
 [ext_resource type="Texture2D" uid="uid://c3b2y3ky1m03k" path="res://Assets/icons/USR-Icon.png" id="3_w6ul0"]
+[ext_resource type="PackedScene" uid="uid://dhg4sb4ifrvh8" path="res://GUI/PitchAndRollProposal/Testing/FlightSim/UIAttitude/UIAttitude.tscn" id="4_3r4oj"]
+[ext_resource type="PackedScene" uid="uid://d0gs2f7n7wdhm" path="res://newWindow.tscn" id="5_33q4t"]
 
 [node name="MainControl" type="Control"]
 layout_mode = 3
@@ -44,6 +46,12 @@ text = "Connect"
 [node name="Spacer" type="Control" parent="VBoxContainer/TopPanel"]
 layout_mode = 2
 size_flags_horizontal = 3
+
+[node name="location_label" type="Label" parent="VBoxContainer/TopPanel/Spacer"]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 23.0
+text = "location:unknown"
 
 [node name="PacketLabel" type="Label" parent="VBoxContainer/TopPanel"]
 layout_mode = 2
@@ -134,6 +142,16 @@ text = "No errors"
 horizontal_alignment = 1
 autowrap_mode = 2
 
+[node name="UIAttitude" parent="VBoxContainer/CenterContainer" instance=ExtResource("4_3r4oj")]
+custom_minimum_size = Vector2(100, -200)
+layout_mode = 2
+
+[node name="TextureRect" type="TextureRect" parent="VBoxContainer/CenterContainer"]
+layout_mode = 2
+
+[node name="TextureRect2" type="TextureRect" parent="VBoxContainer/CenterContainer"]
+layout_mode = 2
+
 [node name="BottomPanel" type="HBoxContainer" parent="VBoxContainer"]
 layout_mode = 2
 theme_override_constants/separation = 20
@@ -162,19 +180,37 @@ actor_path = NodePath("../LunabaseConnection")
 
 [node name="SpeedMultiplierSlider" type="HSlider" parent="."]
 layout_mode = 1
-anchors_preset = -1
-anchor_right = 0.263
-anchor_bottom = 0.025
-offset_left = 755.0
-offset_top = 21.0
-offset_right = 689.0239
-offset_bottom = 57.8
+anchors_preset = 5
+anchor_left = 0.5
+anchor_right = 0.5
+offset_left = -145.0
+offset_top = 26.0
+offset_right = 145.0
+offset_bottom = 73.0
+grow_horizontal = 2
 max_value = 7000.0
 
-[node name="BackgroundImage" type="Sprite2D" parent="."]
-show_behind_parent = true
-position = Vector2(66.40618, 588.619)
-scale = Vector2(0.087393455, 0.07955249)
+[node name="OrientationLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 453.0
+offset_top = 529.0
+offset_right = 612.0
+offset_bottom = 580.0
+text = "Orientation:Unkown"
+
+[node name="Node2D" parent="." instance=ExtResource("5_33q4t")]
+physics_interpolation_mode = 0
+position = Vector2i(8, 13)
+
+[node name="TextureRect" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_top = -156.0
+offset_right = 172.0
+grow_vertical = 0
 texture = ExtResource("3_w6ul0")
+expand_mode = 2
 
 [connection signal="value_changed" from="SpeedMultiplierSlider" to="." method="_on_speed_multiplier_slider_value_changed"]

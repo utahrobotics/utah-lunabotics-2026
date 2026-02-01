@@ -1,4 +1,4 @@
-use bincode::{Decode, Encode};
+use cu_bincode::{Decode, Encode};
 use cu29::cutask::CuMsg;
 use cu29::prelude::*;
 use cu29::{
@@ -39,8 +39,9 @@ impl Freezable for UdevMonitor {}
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 impl CuSrcTask for UdevMonitor {
     type Output<'m> = output_msg!(NewDevice);
+    type Resources<'r> = ();
 
-    fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
+    fn new(_config: Option<&ComponentConfig>, _resources: Self::Resources<'_>) -> CuResult<Self> {
         Ok(Self {
             monitor_socket: None,
             initial_enumerated: Vec::new(),
@@ -195,8 +196,9 @@ impl Freezable for UdevMonitor {}
 #[cfg(any(not(target_os = "linux"), feature = "resim", feature = "sim"))]
 impl CuSrcTask for UdevMonitor {
     type Output<'m> = output_msg!(NewDevice);
+    type Resources<'r> = ();
 
-    fn new(_config: Option<&ComponentConfig>) -> CuResult<Self>
+    fn new(_config: Option<&ComponentConfig>, _resources: Self::Resources<'_>) -> CuResult<Self>
     where
         Self: Sized,
     {
