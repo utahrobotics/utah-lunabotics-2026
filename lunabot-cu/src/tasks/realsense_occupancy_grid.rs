@@ -306,6 +306,36 @@ impl CuTask for OccupancyGridTask {
                     &rerun::Boxes3D::from_centers_and_half_sizes(vec![center], vec![half_size]),
                 )
                 .unwrap();
+
+            // Log permanent obstacles to Rerun TODO for testing, remove later
+            if let Some(global_map) = GLOBAL_MAP.get() {
+                if let Ok(grid) = global_map.read() {
+                    let mut points = vec![];
+                    let mut colors = vec![];
+                    for cell_y in 0..grid.cells_y() {
+                        for cell_x in 0..grid.cells_x() {
+                            let idx = cell_x + cell_y * grid.cells_x();
+                            if idx < grid.gradient_map.len() {
+                                let gradient = grid.gradient_map[idx];
+                                if gradient > 5.0 {  // Only show permanent obstacles
+                                    if let Ok((world_x, world_y)) = grid.cell_to_world(cell_x, cell_y) {
+                                        points.push([world_x, world_y]);
+                                        colors.push([255, 0, 255]);  // Bright magenta 
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    let colors_len = colors.len(); //appease the borrowchecker
+                    if !points.is_empty() {
+                        logger.recorder.log(
+                            "realsense/permanent_obstacles",
+                            &Points2D::new(points).with_colors(colors),
+                        ).unwrap();
+                        println!("[OccupancyGrid] Logged {} permanent obstacle cells to Rerun", colors_len);
+                    }
+                }
+            }
         }
 
         Ok(())
@@ -504,7 +534,7 @@ impl CuTask for OccupancyGridTask {
                 origin: (0.0, 0.0),
             };
 
-            // TODO : temporary for testing verification 
+            // Load and paint arena obstacles
             if let Some(obstacles) = load_arena_obstacles() {
                 println!("[OccupancyGrid] Loaded arena obstacles:");
                 println!("  - Walls: {}", obstacles.walls.len());
@@ -512,10 +542,37 @@ impl CuTask for OccupancyGridTask {
                 println!("  - Boulders: {}", obstacles.boulders.len());
                 println!("  - Craters: {}", obstacles.craters.len());
 
-                // TODO paint obstacles into map
-                // grid.paint_permanent_obstacles(&obstacles);
+                grid.paint_permanent_obstacles(&obstacles);
+                println!("[OccupancyGrid] Painted {} permanent obstacles into global map",
+                    obstacles.pillars.len() + obstacles.boulders.len() + obstacles.craters.len());
+
+                // // Log obstacles to Rerun immediately
+                // if let Some(logger) = RECORDER.get() {
+                //     let mut points = vec![];
+                //     let mut colors = vec![];
+                //     for cell_y in 0..grid.cells_y() {
+                //         for cell_x in 0..grid.cells_x() {
+                //             let idx = cell_x + cell_y * grid.cells_x();
+                //             if idx < grid.gradient_map.len() {
+                //                 let gradient = grid.gradient_map[idx];
+                //                 if gradient > 5.0 {  // Only show permanent obstacles
+                //                     if let Ok((world_x, world_y)) = grid.cell_to_world(cell_x, cell_y) {
+                //                         points.push([world_x, world_y]);
+                //                         colors.push([255, 0, 255]);  // Bright magenta
+                //                     }
+                //                 }
+                //             }
+                //         }
+                //     }
+                //     let colors_len = colors.len(); //appease the borrowchecker
+                //     let _ = logger.recorder.log(
+                //         "realsense/permanent_obstacles",
+                //         &Points2D::new(points).with_colors(colors),
+                //     );
+                //     println!("[OccupancyGrid] logged {} permanent obstacles to Rerun", colors_len);
+                // }
             } else {
-                println!("[OccupancyGrid] No arena obstacles loaded (sim running without arena arg?)");
+                println!("[OccupancyGrid] No arena obstacles loaded");
             }
 
             Arc::new(RwLock::new(grid))
