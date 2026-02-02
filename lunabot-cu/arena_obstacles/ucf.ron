@@ -1,0 +1,29 @@
+
+(
+    walls: [],
+
+    // Central support column 
+    // Defined as (center_x, center_y, radius) in meters
+    pillars: [
+        // TODO: Verify central column position 
+        (3.5, 2.6, 0.2),  
+    ],
+
+    // Boulder obstacles 
+    // Specs: Minimum 3 boulders, 30-40 cm diameter 
+    boulders: [
+        // TODO: Update with actual boulder positions 
+        (2.0, 2.5, 0.17),  
+        (5.0, 3.5, 0.19),  
+        (4.0, 1.0, 0.16),  
+    ],
+
+    // Defined as (center_x, center_y, radius) in meters
+    // Specs: Minimum 3 craters, up to 40-50 cm width 
+    craters: [
+        // TODO: Update with actual crater positions from  competition round
+        (3.0, 4.5, 0.23),  
+        (6.0, 2.0, 0.21),  
+        (1.5, 3.5, 0.24), 
+    ],
+)
