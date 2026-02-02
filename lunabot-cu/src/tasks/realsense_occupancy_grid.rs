@@ -212,6 +212,43 @@ impl OccupancyGrid {
         let local_y = self.layout.min_y + (cell_y as f32 + 0.5) * self.layout.cell_size;
         Ok((local_x + self.origin.0, local_y + self.origin.1))
     }
+
+    // permanent obstacles that should not be overwritten by sensor data
+    fn paint_permanent_obstacles(&mut self, obstacles: &ArenaObstacles) {
+        const PERMANENT_GRADIENT: f32 = 10.0;  // gradient value marks permanent 
+
+        // for &(min_x, min_y, max_x, max_y) in &obstacles.walls {
+        //     if let (Ok((x1, y1)), Ok((x2, y2))) =
+        //         (self.world_to_cell(min_x, min_y), self.world_to_cell(max_x, max_y))
+        //     {
+        //         for x in x1..=x2 {
+        //             for y in y1..=y2 {
+        //                 let _ = self.set_gradient_at(x, y, PERMANENT_GRADIENT);
+        //             }
+        //         }
+        //     }
+        // }
+
+        // Paint circular obstacles (pillars, boulders, craters)
+        let all_circles = obstacles.pillars.iter()
+            .chain(obstacles.boulders.iter())
+            .chain(obstacles.craters.iter());
+
+        for &(cx, cy, radius) in all_circles {
+            if let Ok((center_x, center_y)) = self.world_to_cell(cx, cy) {
+                let radius_cells = (radius / self.layout.cell_size).ceil() as isize;
+                for dx in -radius_cells..=radius_cells {
+                    for dy in -radius_cells..=radius_cells {
+                        if dx * dx + dy * dy <= radius_cells * radius_cells {
+                            let x = (center_x as isize + dx).max(0) as usize;
+                            let y = (center_y as isize + dy).max(0) as usize;
+                            let _ = self.set_gradient_at(x, y, PERMANENT_GRADIENT);
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl Default for OccupancyGrid {
@@ -222,6 +259,25 @@ impl Default for OccupancyGrid {
             origin: (0.0, 0.0),
         }
     }
+}
+
+/// Arena obstacle configuration
+#[derive(Deserialize, Debug)]
+struct ArenaObstacles {
+    walls: Vec<(f32, f32, f32, f32)>,  // (min_x, min_y, max_x, max_y)
+    pillars: Vec<(f32, f32, f32)>,     // (center_x, center_y, radius)
+    boulders: Vec<(f32, f32, f32)>,    // (center_x, center_y, radius)
+    craters: Vec<(f32, f32, f32)>,     // (center_x, center_y, radius)
+}
+
+// Take command line args to load obstacle
+fn load_arena_obstacles() -> Option<ArenaObstacles> {
+    let arena = std::env::args()
+        .find(|arg| arg == "artemis" || arg == "ucf")?;
+
+    let path = format!("arena_obstacles/{}.ron", arena);
+    let contents = std::fs::read_to_string(&path).ok()?;
+    ron::de::from_str(&contents).ok()
 }
 
 impl Freezable for OccupancyGridTask {}
@@ -442,11 +498,27 @@ impl CuTask for OccupancyGridTask {
                 .map_err(|e| CuError::new_with_cause("failed to create thread pool", e))?,
         );
         GLOBAL_MAP.get_or_init(|| {
-            Arc::new(RwLock::new(OccupancyGrid {
+            let mut grid = OccupancyGrid {
                 layout: global_layout.clone(),
                 gradient_map: vec![f32::MIN; global_layout.cells_x() * global_layout.cells_y()],
                 origin: (0.0, 0.0),
-            }))
+            };
+
+            // TODO : temporary for testing verification 
+            if let Some(obstacles) = load_arena_obstacles() {
+                println!("[OccupancyGrid] Loaded arena obstacles:");
+                println!("  - Walls: {}", obstacles.walls.len());
+                println!("  - Pillars: {}", obstacles.pillars.len());
+                println!("  - Boulders: {}", obstacles.boulders.len());
+                println!("  - Craters: {}", obstacles.craters.len());
+
+                // TODO paint obstacles into map
+                // grid.paint_permanent_obstacles(&obstacles);
+            } else {
+                println!("[OccupancyGrid] No arena obstacles loaded (sim running without arena arg?)");
+            }
+
+            Arc::new(RwLock::new(grid))
         });
 
         Ok(Self {
