@@ -227,7 +227,7 @@ pub fn enumerate_motors(vesc_ids: VescIDs, speed_multiplier: f32) -> &'static Mo
                     return;
                 };
                 let Some(vendor) = vendor_cstr.to_str() else {
-                    warning!("Failed to parse vendor of device {path_str}");
+                    eprintln!("Failed to parse vendor of device {path_str}");
                     return;
                 };
                 if vendor != "STMicroelectronics" {
@@ -237,11 +237,11 @@ pub fn enumerate_motors(vesc_ids: VescIDs, speed_multiplier: f32) -> &'static Mo
                     return;
                 };
                 let Some(serial) = serial_cstr.to_str() else {
-                    warning!("Failed to parse serial of device {path_str}");
+                    eprintln!("Failed to parse serial of device {path_str}");
                     return;
                 };
                 if serial != "STMicroelectronics_ChibiOS_RT_Virtual_COM_Port_304" {
-                    warning!("Ignoring device {path_str} with serial {serial}");
+                    eprintln!("Ignoring device {path_str} with serial {serial}");
                     return;
                 }
                 let _ = tx.send(path_str.into());
@@ -281,7 +281,7 @@ impl MotorTask {
             };
         }
         if let Err(e) = motor_port.set_exclusive(true) {
-            warning!(
+            eprintln!(
                 "Failed to set motor port {} exclusive: {}",
                 &path_str,
                 e.to_string()
@@ -400,9 +400,9 @@ impl MotorTask {
                 }
                 break;
             }
-            info!("Opened motor {} and {}", master_can_id, can_id);
+            println!("Opened motor {} and {}", master_can_id, can_id);
         } else {
-            info!("Opened motor {}", master_can_id);
+            println!("Opened motor {}", master_can_id);
         }
 
         let master_mask = *self.vesc_ids.motor_masks.get(&master_can_id).unwrap();
@@ -468,14 +468,14 @@ impl MotorTask {
                     continue;
                 };
                 if values.temp_mos > 70.0 {
-                    warning!(
+                    eprintln!(
                         "TEMPERATURE WARNING {} => {:.1} °C",
                         values.vesc_id,
                         values.temp_mos
                     );
                 }
                 if values.v_in < 24.0 {
-                    warning!("LOW VOLT WARNING {} => {:.1}", values.vesc_id, values.v_in);
+                    eprintln!("LOW VOLT WARNING {} => {:.1}", values.vesc_id, values.v_in);
                 }
                 self.motor_ref
                     .latest_telemetry
@@ -533,10 +533,10 @@ impl MotorTask {
                         .unwrap()
                         .insert(values.vesc_id, values);
                     if values.temp_mos > 70.0 {
-                        warning!("TEMPERATURE WARNING {can_id} => {:.1} °C", values.temp_mos);
+                        eprintln!("TEMPERATURE WARNING {can_id} => {:.1} °C", values.temp_mos);
                     }
                     if values.v_in < 24.0 {
-                        warning!("LOW VOLT WARNING {can_id} => {:.1}", values.v_in);
+                        eprintln!("LOW VOLT WARNING {can_id} => {:.1}", values.v_in);
                     }
                 }
             }
