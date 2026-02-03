@@ -11,9 +11,9 @@ use tasker::tokio::{
 use crate::tasks::ai::jobs::Job;
 
 // Distance between wheels, in m
-const WHEEL_BASE_SIZE: f32 = 0.6 * 5.0; // TODO fill in
+const WHEEL_BASE_SIZE: f32 = 0.6 * 2.5; // TODO fill in
 const FOLLOW_SPEED_FACTOR: f32 = 0.15;
-const MAX_DOT_SPEED: f32 = 0.2; // In m/s
+const MAX_DOT_SPEED: f32 = 0.1; // In m/s
 const DOT_SPEED_FACTOR: f32 = 0.005; // In m/s // TODO test and adjust
 
 /// follows path ~~fails if the robot fails to move significantly in stuck_timeout_secs~~ (TODO)
@@ -88,15 +88,15 @@ pub fn follow_path_job(
                     //   Radius is proportional to the ratio of velocity to angular velocity:
                     //   https://www.desmos.com/calculator/f7grn652s4
                     // TODO Fix problems with dot being behind bot
-                    let velocity = FOLLOW_SPEED_FACTOR * target_distance; // will be fixed by normalization // currently always goes max speed
+                    let velocity = FOLLOW_SPEED_FACTOR * target_distance; // will be fixed by normalization
                     let turning = velocity * WHEEL_BASE_SIZE * 0.5 / radius;
 
                     // DEBUG
                     if print_accumulator > 1.0 {
-                        println!("Robot: ({}, {})\t Dot: ({}, {})\t Error: {}\t Control: (^ = {}, <-> = {})", 
+                        println!("Robot: ({:<4}, {:<4})\t Dot: ({:<4}, {:<4})\t Error: ({:<4}, {:<4})\t Control: (^ = {:<4}, <-> = {:<4})", 
                             robot_pos.x, robot_pos.y, 
                             dot.x, dot.y, 
-                            target_distance,
+                            error.x, error.y,
                             velocity, 
                             turning
                         );
