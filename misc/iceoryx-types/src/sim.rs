@@ -123,6 +123,7 @@ pub struct PoseMsg {
     /// orientation quaternion (w, x, y, z)
     pub quaternion: [f32; 4],
     pub confidence: T265Confidence,
+    pub serial_num: u64,
 }
 
 #[derive(Clone, Copy, Debug, Encode, Decode, Serialize, Deserialize)]

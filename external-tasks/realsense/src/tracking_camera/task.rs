@@ -103,10 +103,16 @@ pub fn enumerate_tracking_cameras(serial_numbers: &[&str]) {
                                 create_pose_frame_publisher(&node, &pose.device_id)
                             });
 
+                        let Ok(serial_num) = pose.device_id.parse::<u64>() else {
+                            eprintln!("serial {} was not a valid u64", pose.device_id);
+                            continue;
+                        };
+
                         let pose_msg = PoseMsg {
                             position: pose.translation,
                             quaternion: pose.rotation,
                             confidence: convert_confidence(pose.tracker_confidence),
+                            serial_num
                         };
                         if let Err(e) = publisher.send_copy(pose_msg) {
                             eprintln!(

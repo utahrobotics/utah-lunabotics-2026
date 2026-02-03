@@ -1,2 +1,8 @@
 build --cxxopt=-std=c++17
 build --host_cxxopt=-std=c++17
+
+# Enable C++ toolchain resolution for rules_rust
+build --incompatible_enable_cc_toolchain_resolution
+
+# Disable bzlmod, use WORKSPACE
+common --enable_bzlmod=false

@@ -6,7 +6,7 @@ use crossbeam::atomic::AtomicCell;
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use mio::{Events, Interest, Poll, Token};
 use nalgebra::{
-    Quaternion, RealField, SimdRealField, UnitQuaternion, UnitVector3, Vector2, Vector3,
+    Isometry3, Quaternion, RealField, SimdRealField, UnitQuaternion, UnitVector3, Vector2, Vector3
 };
 
 use common::Steering;
@@ -114,6 +114,32 @@ where
             * dt
             / (F::one() + F::one()),
     )
+}
+
+/// Transform velocity from sensor frame to base frame
+/// 
+/// # Arguments
+/// * `sensor_linear_vel` - Linear velocity in sensor frame
+/// * `sensor_angular_vel` - Angular velocity in sensor frame  
+/// * `base_to_sensor` - Transform from base to sensor (will be inverted internally)
+///
+/// # Returns
+/// Tuple of (base_linear_vel, base_angular_vel)
+pub fn transform_sensor_velocity_to_base(
+    sensor_linear_vel: Vector3<f64>,
+    sensor_angular_vel: Vector3<f64>,
+    base_to_sensor: &Isometry3<f64>,
+) -> (Vector3<f64>, Vector3<f64>) {
+    let sensor_to_base = base_to_sensor.inverse();
+    let sensor_offset = base_to_sensor.translation.vector;
+    
+    // Sensor has extra velocity due to rotation: v_sensor = v_base + ω × r
+    // So: v_base = v_sensor - ω × r
+    let base_linear_vel = sensor_to_base.rotation * sensor_linear_vel 
+        - sensor_to_base.rotation * sensor_angular_vel.cross(&sensor_offset);
+    let base_angular_vel = sensor_to_base.rotation * sensor_angular_vel;
+    
+    (base_linear_vel, base_angular_vel)
 }
 
 /// Converts the given angular velocity to a quaternion rotation for `dt` seconds.

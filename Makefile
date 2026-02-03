@@ -1,6 +1,6 @@
 # Bazel build configuration
 BAZEL_BUILD_FLAGS = --sandbox_debug --verbose_failures --spawn_strategy=standalone
-RUST_TOOLCHAIN_VERSION = 1.81.0
+RUST_TOOLCHAIN_VERSION = 1.83.0
 UNILIDAR_DIR = unilidar_iceoryx_publisher
 
 # Build the unilidar_publisher with Bazel and run the main cargo project

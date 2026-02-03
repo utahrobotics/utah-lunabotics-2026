@@ -16,15 +16,13 @@ use nalgebra::{Isometry3, UnitQuaternion, Vector3};
 use serde::Deserialize;
 use simple_motion::StaticNode;
 
-use crate::ROBOT_STATE;
 
 pub struct T265Subscriber {
     last_seen: u64,
     /// subscribes to pose frames published by the realsense external task (T265)
     #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     pose_subscriber: Subscriber<ipc::Service, PoseMsg, ()>,
-    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
-    node: StaticNode,
+
     /// Initial yaw offset captured on first pose to align T265's arbitrary tracking frame with world
     #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     initial_yaw_offset: Option<f32>,
@@ -36,11 +34,12 @@ pub struct T265Subscriber {
     angular_velocity_variance: f64,
 }
 
-#[derive(Encode, Decode, Clone, Copy, Serialize, Debug, Deserialize)]
+#[derive(Encode, Decode, Clone, Serialize, Debug, Deserialize)]
 pub struct T265Msg {
     pub pose: EncodableIsometry,
     pub velocity_variance: f64,
     pub angular_velocity_variance: f64,
+    pub node_name: String,
 }
 
 impl Default for T265Msg {
@@ -49,6 +48,7 @@ impl Default for T265Msg {
             pose: EncodableIsometry::default(),
             velocity_variance: 1.0,
             angular_velocity_variance: 1.0,
+            node_name: "t265".to_string(),
         }
     }
 }
@@ -68,10 +68,6 @@ impl CuSrcTask for T265Subscriber {
             .and_then(|c| c.get::<String>("serial_num").expect("failed to deserialize"))
             .unwrap_or_else(|| "realsense/t265".to_string());
         let pose_service_str = format!("realsense/{serial_num}/pose");
-
-        let node_name: String = config
-            .and_then(|c| c.get::<String>("node").expect("failed to deserialize"))
-            .expect("must provide node name in chain");
 
         let pose_service_name = ServiceName::new(&pose_service_str)
             .map_err(|e| CuError::new_with_cause("invalid service name", e))?;
@@ -94,12 +90,6 @@ impl CuSrcTask for T265Subscriber {
             .buffer_size(19)
             .create()
             .map_err(|e| CuError::new_with_cause("subscriber creation error", e))?;
-        let t265_node = ROBOT_STATE
-            .get()
-            .expect("root node should be defined")
-            .kinematic_root
-            .get_node_with_name(&node_name)
-            .expect("node not found in chain");
 
         let velocity_variance = config
             .and_then(|c| c.get::<f64>("t265_velocity_variance").expect("failed to deserialize"))
@@ -112,7 +102,6 @@ impl CuSrcTask for T265Subscriber {
         Ok(Self {
             last_seen: 0,
             pose_subscriber,
-            node: t265_node,
             initial_yaw_offset: None,
             velocity_variance,
             angular_velocity_variance,
@@ -142,6 +131,7 @@ impl CuSrcTask for T265Subscriber {
             position,
             quaternion,
             confidence,
+            serial_num
         }) = output
         {
             // T265 to robot coordinate frame
@@ -160,13 +150,11 @@ impl CuSrcTask for T265Subscriber {
 
             let t265_pose = Isometry3::from_parts(t265_translation.into(), t265_rotation);
 
-            let base_to_t265 = self.node.get_isometry_from_base().cast::<f32>();
 
-            let robot_pose = t265_pose * base_to_t265.inverse();
 
             // t264 starts with a basically arbitrary "twist" error
             if self.initial_yaw_offset.is_none() {
-                let initial_yaw = robot_pose.rotation.euler_angles().2;
+                let initial_yaw = t265_pose.rotation.euler_angles().2;
                 self.initial_yaw_offset = Some(initial_yaw);
             }
 
@@ -177,7 +165,7 @@ impl CuSrcTask for T265Subscriber {
             );
 
             let corrected_robot_pose =
-                yaw_correction * Isometry3::from_parts(robot_pose.translation, robot_pose.rotation);
+                yaw_correction * Isometry3::from_parts(t265_pose.translation, t265_pose.rotation);
 
             let (velocity_variance, angular_velocity_variance) =
                 if confidence == T265Confidence::High {
@@ -203,6 +191,7 @@ impl CuSrcTask for T265Subscriber {
                 pose: EncodableIsometry::from_na(&corrected_robot_pose.cast::<f64>()),
                 velocity_variance: velocity_variance,
                 angular_velocity_variance: angular_velocity_variance,
+                node_name: serial_num.to_string(),
             };
             new_msg.set_payload(payload);
         }

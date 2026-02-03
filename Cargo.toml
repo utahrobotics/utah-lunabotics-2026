@@ -38,7 +38,7 @@ cu29-runtime = { git = "https://github.com/matthewashton-k/copper-rs.git", branc
 cu-gstreamer = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "merge_test", package = "cu-gstreamer", features = [
     "gst",
 ] }
-iceoryx2 = { version = "0.7.0" }
+iceoryx2 = { version = "0.8.1" }
 crossbeam = "0.8"
 crossbeam-channel = "0.5"
 
