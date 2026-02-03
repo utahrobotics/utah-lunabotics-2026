@@ -20,9 +20,9 @@ use crate::ROBOT_STATE;
 use crate::rerun_viz::RECORDER;
 
 
-const LATERAL_VARIANCE_MODIFIER: f64 = 0.001;
-const DEPTH_VARIENCE_MODIFIER: f64 = 0.005;
-const ANGULAR_VARIANCE_MODIFIER: f64 = 0.005;
+const LATERAL_VARIANCE_MODIFIER: f64 = 0.5;
+const DEPTH_VARIENCE_MODIFIER: f64 = 0.5;
+const ANGULAR_VARIANCE_MODIFIER: f64 = 0.5;
 
 
 /// Data definition that mirrors the contents of a `.ron` apriltag isometry file.

@@ -13,6 +13,10 @@ use crate::{
 /// Uses D* to navigate from start to end
 /// prioritizes the local map as the source of ultimate truth, but falls back to the global map if a cell is unknown locally
 /// Eventually may need to take in multiple local maps from different realsense devices
+/// if the robot start postion is in an unknown or obstacle, itll find its way out of that area first by searching around with flood_fill_escape to find a near free space and then start from there instead
+/// FAILS IF: 
+/// 1. the goal is in an obstacle or unknown
+/// 2. there isnt a path to be found from start to end
 pub fn find_path_job(
     latest_local_map: OccupancyGrid,
     start: Vector2<f32>,

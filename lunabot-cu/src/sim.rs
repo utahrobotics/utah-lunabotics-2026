@@ -164,6 +164,7 @@ fn sim_callback(
             if let Some(steering) = input.payload() {
                 let (left, right) = steering.get_left_and_right();
                 let speed_mult = steering.get_weight();
+                // FIXME: probably shouldn't just put a magic number
                 let left = (left * speed_mult) * 0.022;
                 let right = (right * speed_mult) * 0.022;
                 // left vesc
@@ -190,7 +191,7 @@ fn sim_callback(
                 .unwrap()
                 .as_nanos() as u64;
 
-            let output_interval_ns = 1_000_000_000 / 20; // output at 20 Hz
+            let output_interval_ns = 1_000_000_000 / 15; // output at 20 Hz
             let last_output_time = LAST_OUTPUT_TIME.get_or_init(|| AtomicU64::new(0));
 
             let last = last_output_time.load(Ordering::Relaxed);

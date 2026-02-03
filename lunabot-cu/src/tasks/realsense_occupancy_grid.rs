@@ -19,7 +19,7 @@ use wgsl_pcl::map_layout::MapLayout;
 use wgsl_pcl::wgsl_setup::{get_device, init_gpu_blocking, is_gpu_initialized};
 
 use crate::ROBOT_STATE;
-use crate::rerun_viz::RECORDER;
+use crate::rerun_viz::{RECORDER, ROBOT_STRUCTURE};
 use crate::tasks::{DEPTH_FRAME_HEIGHT, DEPTH_FRAME_SIZE, DEPTH_FRAME_WIDTH};
 
 pub static GLOBAL_MAP: OnceLock<Arc<RwLock<OccupancyGrid>>> = OnceLock::new();
@@ -574,10 +574,13 @@ impl CuTask for OccupancyGridTask {
                             .with_meter(1.0 / request.depth_scale)
                             .with_depth_range([0.0, 2.0 / request.depth_scale as f64]),
                         );
-                        let _ = logger.recorder.log(
-                            "realsense/pcl",
-                            &Points3D::new(point_cloud.iter().map(|p| [p.x, p.y, p.z])),
-                        );
+                        let _ =
+                            logger.recorder.log(
+                                "obstacle_mapper/pcl",
+                                &Points3D::new(point_cloud.iter().map(|p| {
+                                    [p.x + request.origin.0, p.y + request.origin.1, p.z]
+                                })),
+                            );
 
                         let pipeline_guard = pipeline.lock().unwrap();
 
@@ -679,7 +682,7 @@ impl OccupancyGridTask {
                 }
             }
             let _ = logger.recorder.log(
-                "realsense/global_obstacle_map",
+                "obstacle_mapper/global_obstacle_map",
                 &Points2D::new(global_obstacle_map_points).with_colors(global_obstacle_map_colors),
             );
         }
@@ -727,7 +730,7 @@ fn log_map(
     }
 
     let _ = logger.recorder.log(
-        "realsense/local_obstacle_map",
+        "obstacle_mapper/local_obstacle_map",
         &Points2D::new(local_obstacle_points).with_colors(local_obstacle_colors),
     );
 
@@ -755,7 +758,7 @@ fn log_map(
         }
     }
     let _ = logger.recorder.log(
-        "realsense/raw_height_map",
+        "obstacle_mapper/raw_height_map",
         &Points3D::new(raw_height_points).with_colors(raw_height_colors),
     );
 
@@ -784,7 +787,7 @@ fn log_map(
         }
     }
     let _ = logger.recorder.log(
-        "realsense/gradient_map",
+        "obstacle_mapper/gradient_map",
         &Points3D::new(gradient_points).with_colors(gradient_colors),
     );
 
@@ -812,7 +815,7 @@ fn log_map(
         }
     }
     let _ = logger.recorder.log(
-        "realsense/blur_filtered_height_map",
+        "obstacle_mapper/blur_filtered_height_map",
         &Points3D::new(blur_height_points).with_colors(blur_height_colors),
     );
 }

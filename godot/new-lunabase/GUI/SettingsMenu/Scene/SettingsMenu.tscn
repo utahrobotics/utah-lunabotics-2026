@@ -21,13 +21,13 @@ script = ExtResource("1_c6bo6")
 
 [node name="Panel" type="Panel" parent="SettingsMenu"]
 visible = false
-mouse_filter = 2
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_hgbih")
 
 [node name="ScrollContainer" type="ScrollContainer" parent="SettingsMenu/Panel"]
@@ -61,13 +61,17 @@ offset_bottom = -88.0
 [node name="SettingsButton" type="Button" parent="SettingsMenu"]
 z_index = 10
 z_as_relative = false
-layout_mode = 0
-offset_left = 9.0
-offset_top = 392.0
-offset_right = 127.0
-offset_bottom = 423.0
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 1.0
+anchor_top = 0.08800001
+anchor_right = 1.0
+anchor_bottom = 0.08800001
+offset_left = -166.0
+offset_top = 297.0
+offset_right = -48.0
+offset_bottom = 328.0
 toggle_mode = true
-mouse_filter = 0
 text = "Settings Panel"
 
 [connection signal="toggled" from="SettingsMenu/SettingsButton" to="SettingsMenu" method="_on_settings_button_toggled"]

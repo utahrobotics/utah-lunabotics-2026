@@ -30,7 +30,7 @@
         {
             "name": Some("cam_side"),
             "origin": [0.20, 0.2, 0.0],
-            "euler": [0.0, 0.0, 90.0]
+            "euler": [0.0, 0.0, -90.0]
         },
         {
             "name": Some("low_right_camera"),
