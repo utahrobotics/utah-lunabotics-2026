@@ -39,6 +39,8 @@ mod prod_impl {
         /// Message queue read from the pico
         from_pico: Arc<&'static ArrayQueue<FromPicoV3>>,
         last_reading: Instant,
+        /// prevents us from powercycling a bajillion times in a row
+        last_powercycle: Instant,
     }
 
     impl Freezable for V3PicoTask {}
@@ -153,7 +155,8 @@ mod prod_impl {
                 is_broken: None,
                 from_pico,
                 serial_port_writer: None,
-                last_reading: Instant::now()
+                last_reading: Instant::now(),
+                last_powercycle: Instant::now()
             })
         }
 
@@ -261,7 +264,6 @@ mod prod_impl {
             if let Some(ref is_broken) = self.is_broken
                 && *is_broken.borrow()
             {
-                eprintln!("Pico broken, powercycling");
                 self.powercycle_ioctl();
                 return Err(CuError::new_with_cause(
                     "Error reading form pico",
@@ -327,18 +329,21 @@ mod prod_impl {
     impl V3PicoTask {
 
         /// install this binary from misc/usb-reset
-        fn powercycle_ioctl(&self) {
-            get_tokio_handle().spawn(async {
-                match std::process::Command::new("usb-reset")
-                    .arg("v3pico").spawn() {
-                        Ok(_) => {
-                        },
-                        Err(e) => {
-                            println!("Ioctl failed: {e}");
-                        },
-                    }
-              
-            });
+        fn powercycle_ioctl(&mut self) {
+            if self.last_powercycle.elapsed().as_secs() > 1 {
+                eprintln!("Pico broken, powercycling");
+                get_tokio_handle().spawn(async {
+                    match std::process::Command::new("usb-reset")
+                        .arg("v3pico").spawn() {
+                            Ok(_) => {
+                            },
+                            Err(e) => {
+                                println!("Ioctl failed: {e}");
+                            },
+                        }
+                });
+                self.last_powercycle = Instant::now();
+            }
         }
     }
 }
