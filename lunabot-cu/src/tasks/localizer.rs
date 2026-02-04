@@ -52,10 +52,7 @@ struct T265SensorState {
     prev_pose: Isometry3<f64>,
     /// Previous timestamp
     prev_time: CuTime,
-    /// Transform from this sensor's frame to ICP frame
-    to_icp: Option<Isometry3<f64>>,
-    /// Transform from this sensor's frame to global frame
-    to_global: Option<Isometry3<f64>>,
+
 }
 
 fn step_function(state: StateVec, input: InputVec) -> StepReturn<f64, STATE_DIM> {
@@ -353,11 +350,6 @@ impl CuTask for Localizer {
                         println!("First AprilTag seen - global reference established");
                     }
 
-                    // Update all T265 sensors' to_global transforms
-                    for (_, sensor_state) in self.t265_sensors.iter_mut() {
-                        sensor_state.to_global = Some(compute_frame_offset(&sensor_state.prev_pose, &global_pose));
-                    }
-
                     // Update ICP-to-global offset if we have a recent ICP pose
                     if let Some(raw_icp) = &self.last_raw_icp_pose {
                         self.icp_to_global = Some(compute_frame_offset(raw_icp, &global_pose));
@@ -439,11 +431,6 @@ impl CuTask for Localizer {
                 let offset = self.icp_to_global.unwrap_or(Isometry3::identity());
                 let global_icp_pose = offset * raw_icp_pose;
                 
-                // Update all T265 sensors' to_icp transforms
-                for (_, sensor_state) in self.t265_sensors.iter_mut() {
-                    sensor_state.to_icp = Some(compute_frame_offset(&sensor_state.prev_pose, &global_icp_pose));
-                }
-
                 if let Some(logger) = RECORDER.get() {
                     let _ = logger.recorder.log(
                         "localizer/icp_global",
@@ -500,9 +487,7 @@ impl CuTask for Localizer {
                     println!("New T265 sensor detected: {}", node_name);
                     T265SensorState {
                         prev_pose: current_t265_raw,
-                        prev_time: now,
-                        to_icp: None,
-                        to_global: None,
+                        prev_time: now
                     }
                 });
 
