@@ -133,11 +133,13 @@ pub fn transform_sensor_velocity_to_base(
     let sensor_to_base = base_to_sensor.inverse();
     let sensor_offset = base_to_sensor.translation.vector;
     
-    // Sensor has extra velocity due to rotation: v_sensor = v_base + ω × r
-    // So: v_base = v_sensor - ω × r
-    let base_linear_vel = sensor_to_base.rotation * sensor_linear_vel 
-        - sensor_to_base.rotation * sensor_angular_vel.cross(&sensor_offset);
+    // Transform angular velocity to base frame first
     let base_angular_vel = sensor_to_base.rotation * sensor_angular_vel;
+    
+    // v_sensor = v_base + ω_base × r
+    // So: v_base = R * v_sensor - ω_base × r  (both ω and r now in base frame)
+    let base_linear_vel = sensor_to_base.rotation * sensor_linear_vel 
+        - base_angular_vel.cross(&sensor_offset);
     
     (base_linear_vel, base_angular_vel)
 }

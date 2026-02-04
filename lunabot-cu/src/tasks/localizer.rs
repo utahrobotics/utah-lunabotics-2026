@@ -521,15 +521,12 @@ impl CuTask for Localizer {
                             sensor_angular_vel,
                             &base_to_t265,
                         );
+                        let state = self.ekf.state();
+                        let orientation_error = Vector3::new(state[6], state[7], state[8]);
+                        let current_orientation = compose_error(&self.reference_quaternion, &orientation_error);
 
-                        // Apply global frame rotation if available
-                        let t265_offset = sensor_state
-                            .to_icp
-                            .or(sensor_state.to_global)
-                            .unwrap_or(Isometry3::identity());
-                        
-                        let global_linear_vel = t265_offset.rotation * base_linear_vel;
-                        let global_angular_vel = t265_offset.rotation * base_angular_vel;
+                        let global_linear_vel = current_orientation * base_linear_vel;
+                        let global_angular_vel = current_orientation * base_angular_vel;
 
                         let angular_speed = global_angular_vel.magnitude();
                         let linear_speed = global_linear_vel.magnitude();
@@ -629,6 +626,7 @@ impl CuTask for Localizer {
                         state[5] as f32,
                     )]),
                 );
+                
                 let _ = logger.recorder.log(
                     "kalman_state/angular_velocity",
                     &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(
