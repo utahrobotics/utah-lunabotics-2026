@@ -36,7 +36,9 @@ const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 
 pub static ROBOT_STATE: OnceLock<RobotState> = OnceLock::new();
 
-pub static TARGET_HZ: usize = 1000; // MUST BE THE SAME AS THE TARGET HZ IN COPPERCONFIG.RON
+pub static COPPER_HZ: usize = 1000; // MUST BE THE SAME AS THE TARGET HZ IN COPPERCONFIG.RON
+pub static PHYSICS_HZ: usize = 100;
+pub static RENDER_HZ: usize = 60;
 
 #[copper_runtime(config = "copperconfig.ron", sim_mode = true)]
 struct LunabotApplication {}
@@ -191,7 +193,7 @@ fn sim_callback(
                 .unwrap()
                 .as_nanos() as u64;
 
-            let output_interval_ns = 1_000_000_000 / 15; // output at 20 Hz
+            let output_interval_ns = 1_000_000_000 / 10; // output at 10 Hz
             let last_output_time = LAST_OUTPUT_TIME.get_or_init(|| AtomicU64::new(0));
 
             let last = last_output_time.load(Ordering::Relaxed);
@@ -453,34 +455,56 @@ fn main() {
         let _ = rec.recorder.log("actual_depth_camera_pose", &axes);
     }
 
-    let target_duration = std::time::Duration::from_nanos(1_000_000_000 / TARGET_HZ as u64);
-    let mut last_time = std::time::Instant::now();
-    let start = std::time::Instant::now();
-    let mut counter = 0;
-    while viewer.running() {
-        counter += 1;
-        robot_clock_mock.set_value(start.elapsed().as_nanos() as u64);
-        {
-            let mut sim_cb =
-                |step: default::SimStep| -> SimOverride { sim_callback(step, data, &mut renderer) };
+    let copper_steps_per_physics = COPPER_HZ / PHYSICS_HZ;
+    let physics_steps_per_copper = PHYSICS_HZ / COPPER_HZ;
+    let render_interval_ns = 1_000_000_000u64 / RENDER_HZ as u64;
 
-            application
-                .run_one_iteration(&mut sim_cb)
-                .expect("failed to run copper list iteration");
+    let loop_hz = COPPER_HZ.max(PHYSICS_HZ);
+    let loop_duration = std::time::Duration::from_nanos(1_000_000_000 / loop_hz as u64);
+
+    let mut last_render_time = std::time::Instant::now();
+    let mut copper_accumulator = 0usize;
+    let mut physics_accumulator = 0usize;
+    
+    let start = std::time::Instant::now();
+
+    while viewer.running() {
+        let loop_start = std::time::Instant::now();
+        robot_clock_mock.set_value(start.elapsed().as_nanos() as u64);
+
+
+        physics_accumulator += PHYSICS_HZ;
+        let run_physics = physics_accumulator >= COPPER_HZ;
+        if run_physics {
+            physics_accumulator -= COPPER_HZ;
         }
-        let elapsed = last_time.elapsed();
-        data.step();
-        if elapsed < target_duration {
-            std::thread::sleep(target_duration - elapsed);
+
+        let mut sim_cb = |step: default::SimStep| -> SimOverride {
+            sim_callback(step, data, &mut renderer)
+        };
+        application
+            .run_one_iteration(&mut sim_cb)
+            .expect("failed to run copper iteration");
+        
+
+        // Step physics
+        if run_physics {
+            data.step();
         }
-        // we don't need to sync and render at TARGET_HZ, only step the simulation
-        if counter == 20 {
+
+        // Render at RENDER_HZ
+        if last_render_time.elapsed().as_nanos() as u64 >= render_interval_ns {
             viewer.sync();
             renderer.sync(data);
             viewer.render(true);
-            counter = 0;
+            last_render_time = std::time::Instant::now();
         }
-        last_time = std::time::Instant::now();
+
+        // Rate limiting
+        let elapsed = loop_start.elapsed();
+        if elapsed < loop_duration {
+            std::thread::sleep(loop_duration - elapsed);
+        }
     }
 
     debug!("End of log replay.");
@@ -506,9 +530,8 @@ fn set_up_mujoco() -> (
         );
     }));
 
-    let timestep = 1.0 / (TARGET_HZ as f64);
-    // speed up the simulation by a little
-    // timestep *= 1.6;
+    let timestep = 1.0 / (PHYSICS_HZ as f64);
+
     model.opt_mut().timestep = timestep;
 
     model.opt_mut().disableflags |= MjtDisableBit::mjDSBL_NATIVECCD as i32;
