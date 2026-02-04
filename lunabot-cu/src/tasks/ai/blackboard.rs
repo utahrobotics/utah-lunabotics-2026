@@ -48,6 +48,9 @@ pub struct LunabotBlackboard {
     pub path_finder: Option<Job<Vec<Vector2<f32>>>>,
     /// the calculated path from the path finder job
     pub calculated_path: Option<Vec<Vector2<f32>>>,
+
+    /// high inclination on the pitch/roll axis
+    pub is_high_inclination: bool,
 }
 
 impl Default for LunabotBlackboard {
@@ -70,6 +73,7 @@ impl Default for LunabotBlackboard {
             navigate_destination: None,
             yielded: false,
             path_follower: None,
+            is_high_inclination: false,
         }
     }
 }

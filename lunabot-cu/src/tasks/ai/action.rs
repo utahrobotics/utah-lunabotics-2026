@@ -12,6 +12,8 @@ use crate::{
 };
 static PATHFINDING_GOAL: [f32; 2] = [5.843524, 1.4796992];
 static MAX_ACCEPTABLE_GRADIENT: f32 = 0.3;
+/// we'll call ~15 degrees the threshold ig
+static HIGH_INCLINATION_THRESHOLD: f64 = 0.26;
 
 #[derive(Clone, Debug, Copy)]
 pub enum LunabotAction {
@@ -47,6 +49,9 @@ pub enum LunabotAction {
 
     /// Cancels long running jobs like pathfinding and path following
     CancelJobs,
+
+    /// Tracks the robot's inclination (pitch/roll) and updates the blackboard
+    TrackInclination,
 }
 
 impl LunabotAction {
@@ -240,6 +245,13 @@ impl LunabotAction {
                 if let Some(ref mut pathfollower) = blackboard.path_follower {
                     pathfollower.cancel();
                 }
+                Success
+            }
+            LunabotAction::TrackInclination => {
+                let rotation = blackboard.kinematic_root.get_global_isometry().rotation;
+                let (roll, pitch, _yaw) = rotation.euler_angles();
+                blackboard.is_high_inclination =
+                    roll.abs() > HIGH_INCLINATION_THRESHOLD || pitch.abs() > HIGH_INCLINATION_THRESHOLD;
                 Success
             }
         };
