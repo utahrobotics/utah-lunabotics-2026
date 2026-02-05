@@ -484,7 +484,6 @@ impl CuTask for Localizer {
 
                 // Get or create sensor state
                 let sensor_state = self.t265_sensors.entry(node_name.clone()).or_insert_with(|| {
-                    println!("New T265 sensor detected: {}", node_name);
                     T265SensorState {
                         prev_pose: current_t265_raw,
                         prev_time: now
@@ -595,7 +594,7 @@ impl CuTask for Localizer {
                 let state = self.ekf.state();
 
                 let _ = logger.recorder.log(
-                    "kalman_state/velocity",
+                    "localizer/velocity",
                     &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(
                         state[3] as f32,
                         state[4] as f32,
@@ -604,7 +603,7 @@ impl CuTask for Localizer {
                 );
                 
                 let _ = logger.recorder.log(
-                    "kalman_state/angular_velocity",
+                    "localizer/angular_velocity",
                     &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(
                         state[9] as f32,
                         state[10] as f32,

@@ -55,16 +55,6 @@ pub struct VescPair {
     pub command_both: bool,
 }
 
-impl TryFrom<Value> for VescPair {
-    type Error = ConfigError;
-    fn try_from(value: Value) -> Result<Self, ConfigError> {
-        // unwrapping here is bad but I cant be bothered to handle it right now
-        // this will panic at the very beginning of the program if the value is not a valid VescPair
-        ron::from_str(&value.to_string()).map_err(|e| ConfigError {
-            message: e.to_string()
-        })
-    }
-}
 
 fn default_command_both() -> bool {
     true

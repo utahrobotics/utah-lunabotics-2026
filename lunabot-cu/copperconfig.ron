@@ -118,7 +118,7 @@
             config:{
                 "voxel_size": .7,
                 "max_range": 10.0,
-                "min_range": 0.5,
+                "min_range": 1.5,
                 "max_points_per_voxel": 200,
                 "initial_threshold": 2.0,
                 "min_motion_th": 0.2,
@@ -157,8 +157,7 @@
 
                 "initial_covariance": 100.0,
             },
-            // task does not get stubbed out in sim mode
-            run_in_sim: true,
+
         ),
 
         // receives messages from the ai_source and tells the motors to move accordingly
