@@ -66,8 +66,9 @@ fn default_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::OccupancyGridPipeline(_) => SimOverride::ExecuteByRuntime,
         default::SimStep::NewAi(_) => SimOverride::ExecuteByRuntime,
         default::SimStep::Localizer(_) => SimOverride::ExecutedBySim,
-        default::SimStep::LunabaseBridgeRxFromLunabaseRx(_) => SimOverride::ExecuteByRuntime,
-        default::SimStep::LunabaseBridgeTxToLunabase(_) => SimOverride::ExecuteByRuntime,
+        default::SimStep::LunabaseBridgeRxFromLunabaseRx{..} => SimOverride::ExecuteByRuntime,
+        default::SimStep::LunabaseBridgeTxToLunabase{..} => SimOverride::ExecuteByRuntime,
+        default::SimStep::LunabaseBridgeBridge{..} => SimOverride::ExecuteByRuntime,
         default::SimStep::__Phantom(_) => SimOverride::ExecutedBySim,
     }
 }
@@ -385,8 +386,9 @@ fn sim_callback(
             SimOverride::ExecutedBySim
         }
         default::SimStep::Localizer(..) => SimOverride::ExecutedBySim,
-        default::SimStep::LunabaseBridgeRxFromLunabaseRx(_) => SimOverride::ExecuteByRuntime,
-        default::SimStep::LunabaseBridgeTxToLunabase(_) => SimOverride::ExecuteByRuntime,
+        default::SimStep::LunabaseBridgeRxFromLunabaseRx{..} => SimOverride::ExecuteByRuntime,
+        default::SimStep::LunabaseBridgeTxToLunabase{..} => SimOverride::ExecuteByRuntime,
+        default::SimStep::LunabaseBridgeBridge{..} => SimOverride::ExecuteByRuntime,
 
         default::SimStep::__Phantom(_) => SimOverride::ExecutedBySim,
     }
