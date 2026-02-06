@@ -1,3 +1,21 @@
+/// Summary:
+/// Converts z16 depth images to a 2d occupancy grid/obstacle map using a series of compute shaders.
+/// 
+/// Steps:
+/// 
+/// 1. Uses known camera extrinsics and intrinsics to convert a depth image to a point cloud.
+/// 2. Creates a height map by othographically projecting point cloud onto a grid of height map cells, where the value of each cell will be equal to the maximum z value ofthe points projected onto the cell.
+/// 2. Removes statistical outliers from the newly created height map.
+/// 3. Uses either gaussian or bilateral filtering to reduce noise in the map.
+/// 4. Computes the avg gradient between k neighbors in the height map, disregarding cells with too many unknown neighbors.
+/// 5. Marks gradients over a certain value as obstacles.
+/// 6. Expands the obstacles to be > robot_radius.
+/// 
+/// Notes:
+/// 
+/// The height map is smaller than the size of the arena to save memory, so the shaders operate on a local map around the robot, 
+/// and the local map is registered into the global map periodically, then cleared.
+
 use cu_bincode::Encode;
 use cu29::cutask::Freezable;
 use cu29::prelude::*;
@@ -574,13 +592,13 @@ impl CuTask for OccupancyGridTask {
                             .with_meter(1.0 / request.depth_scale)
                             .with_depth_range([0.0, 2.0 / request.depth_scale as f64]),
                         );
-                        // let _ =
-                        //     logger.recorder.log(
-                        //         "obstacle_mapper/pcl",
-                        //         &Points3D::new(point_cloud.iter().map(|p| {
-                        //             [p.x + request.origin.0, p.y + request.origin.1, p.z]
-                        //         })),
-                        //     );
+                        let _ =
+                            logger.recorder.log(
+                                "obstacle_mapper/pcl",
+                                &Points3D::new(point_cloud.iter().map(|p| {
+                                    [p.x + request.origin.0, p.y + request.origin.1, p.z]
+                                })),
+                            );
 
                         let pipeline_guard = pipeline.lock().unwrap();
 
@@ -786,10 +804,10 @@ fn log_map(
             }
         }
     }
-    // let _ = logger.recorder.log(
-    //     "obstacle_mapper/gradient_map",
-    //     &Points3D::new(gradient_points).with_colors(gradient_colors),
-    // );
+    let _ = logger.recorder.log(
+        "obstacle_mapper/gradient_map",
+        &Points3D::new(gradient_points).with_colors(gradient_colors),
+    );
 
     // Log blur filtered height map
     let mut blur_height_points = Vec::new();
