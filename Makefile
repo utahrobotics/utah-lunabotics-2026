@@ -1,6 +1,6 @@
 # Bazel build configuration
 BAZEL_BUILD_FLAGS = --sandbox_debug --verbose_failures --spawn_strategy=standalone
-RUST_TOOLCHAIN_VERSION = 1.81.0
+RUST_TOOLCHAIN_VERSION = 1.83.0
 UNILIDAR_DIR = unilidar_iceoryx_publisher
 
 # Build the unilidar_publisher with Bazel and run the main cargo project
@@ -23,7 +23,7 @@ resim:
 
 # Run the MuJoCo Simulation. Must include "ucf" or "artemis" as an env variable for it to load
 sim:
-	cd lunabot-cu && RUSTFLAGS="-C linker-features=-lld" cargo run --release --bin lunabot-sim --features sim ${SIM_ARENA}
+	cd lunabot-cu && cargo run --release --bin lunabot-sim --features sim ${SIM_ARENA}
 
 # Clean build and sync, then build everything
 clean-build: clean sync
@@ -57,6 +57,9 @@ clear-simlogs:
 
 clear-logs:
 	rm lunabot-cu/logs/*
+
+clear-iceoryx2:
+	rm -r /tmp/iceoryx2; rm -r /dev/shm/iox2_*; rm -rf /dev/shm/*iceoryx*
 
 validate-config:
 	cargo run --release -p copperconfig-validator -- -c lunabot-cu/copperconfig.ron

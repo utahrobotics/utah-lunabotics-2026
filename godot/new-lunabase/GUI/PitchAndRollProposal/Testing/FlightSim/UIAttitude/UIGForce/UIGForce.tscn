@@ -1,0 +1,174 @@
+[gd_scene load_steps=7 format=3 uid="uid://cgb7rkgiyj7ts"]
+
+[ext_resource type="Script" path="res://example/ui/UIGForce/UIGForce.gd" id="1"]
+[ext_resource type="Texture2D" uid="uid://btekexp2jh7kq" path="res://GUI/PitchAndRollProposal/Testing/FlightSim/UIAttitude/panel_bg9.png" id="2"]
+[ext_resource type="Texture2D" uid="uid://ba1q1fbp0drn8" path="res://GUI/PitchAndRollProposal/Testing/FlightSim/UIAttitude/back_bg9.png" id="3"]
+[ext_resource type="Texture2D" uid="uid://drtlaesfdwfor" path="res://GUI/PitchAndRollProposal/Testing/FlightSim/UIAttitude/back_fg9.png" id="4"]
+[ext_resource type="FontFile" path="res://example/fonts/Pixel.ttf" id="5"]
+
+[sub_resource type="FontFile" id="1"]
+fallbacks = Array[Font]([ExtResource("5")])
+cache/0/16/0/ascent = 0.0
+cache/0/16/0/descent = 0.0
+cache/0/16/0/underline_position = 0.0
+cache/0/16/0/underline_thickness = 0.0
+cache/0/16/0/scale = 1.0
+cache/0/16/0/kerning_overrides/16/0 = Vector2(0, 0)
+
+[node name="UIGForce" type="Control"]
+layout_mode = 3
+anchors_preset = 0
+offset_right = 48.0
+offset_bottom = 128.0
+script = ExtResource("1")
+
+[node name="Panel" type="NinePatchRect" parent="."]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+texture = ExtResource("2")
+patch_margin_left = 12
+patch_margin_top = 12
+patch_margin_right = 12
+patch_margin_bottom = 12
+
+[node name="Label" type="Label" parent="Panel"]
+layout_mode = 0
+offset_left = 4.0
+offset_top = 5.0
+offset_right = 43.0
+offset_bottom = 19.0
+theme_override_font_sizes/font_size = 10
+text = "g"
+horizontal_alignment = 1
+
+[node name="Bar" type="TextureProgressBar" parent="Panel"]
+layout_mode = 0
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -15.0
+offset_top = -39.0
+offset_right = -3.0
+offset_bottom = 54.0
+min_value = -1.0
+max_value = 4.0
+step = 0.01
+value = 3.0
+fill_mode = 3
+nine_patch_stretch = true
+stretch_margin_left = 4
+stretch_margin_top = 4
+stretch_margin_right = 4
+stretch_margin_bottom = 4
+texture_under = ExtResource("3")
+texture_progress = ExtResource("4")
+tint_progress = Color(0.407843, 0.592157, 0.6, 1)
+
+[node name="Markm1g" type="ColorRect" parent="Panel"]
+layout_mode = 0
+offset_left = 22.0
+offset_top = 116.0
+offset_right = 30.0
+offset_bottom = 118.0
+color = Color(1, 0.580392, 0.466667, 1)
+
+[node name="Label" type="Label" parent="Panel/Markm1g"]
+layout_mode = 0
+offset_left = 8.0
+offset_top = -3.0
+offset_right = 21.0
+offset_bottom = 10.0
+theme_override_colors/font_color = Color(0.501961, 0.501961, 0.623529, 1)
+theme_override_fonts/font = SubResource("1")
+text = "-1"
+
+[node name="Mark0g" type="ColorRect" parent="Panel"]
+layout_mode = 0
+offset_left = 22.0
+offset_top = 98.0
+offset_right = 30.0
+offset_bottom = 100.0
+color = Color(1, 0.929412, 0.466667, 1)
+
+[node name="Label" type="Label" parent="Panel/Mark0g"]
+layout_mode = 0
+offset_left = 8.0
+offset_top = -3.0
+offset_right = 21.0
+offset_bottom = 10.0
+theme_override_colors/font_color = Color(0.501961, 0.501961, 0.623529, 1)
+theme_override_fonts/font = SubResource("1")
+text = "0"
+
+[node name="Mark1g" type="ColorRect" parent="Panel"]
+layout_mode = 0
+offset_left = 22.0
+offset_top = 80.0
+offset_right = 30.0
+offset_bottom = 82.0
+
+[node name="Label" type="Label" parent="Panel/Mark1g"]
+layout_mode = 0
+offset_left = 8.0
+offset_top = -3.0
+offset_right = 21.0
+offset_bottom = 10.0
+theme_override_colors/font_color = Color(0.501961, 0.501961, 0.623529, 1)
+theme_override_fonts/font = SubResource("1")
+text = "1"
+
+[node name="Mark2g" type="ColorRect" parent="Panel"]
+layout_mode = 0
+offset_left = 22.0
+offset_top = 61.0
+offset_right = 30.0
+offset_bottom = 63.0
+color = Color(1, 0.929412, 0.466667, 1)
+
+[node name="Label" type="Label" parent="Panel/Mark2g"]
+layout_mode = 0
+offset_left = 8.0
+offset_top = -3.0
+offset_right = 21.0
+offset_bottom = 10.0
+theme_override_colors/font_color = Color(0.501961, 0.501961, 0.623529, 1)
+theme_override_fonts/font = SubResource("1")
+text = "2"
+
+[node name="Mark3g" type="ColorRect" parent="Panel"]
+layout_mode = 0
+offset_left = 22.0
+offset_top = 42.0
+offset_right = 30.0
+offset_bottom = 44.0
+color = Color(1, 0.580392, 0.466667, 1)
+
+[node name="Label" type="Label" parent="Panel/Mark3g"]
+layout_mode = 0
+offset_left = 8.0
+offset_top = -3.0
+offset_right = 21.0
+offset_bottom = 10.0
+theme_override_colors/font_color = Color(0.501961, 0.501961, 0.623529, 1)
+theme_override_fonts/font = SubResource("1")
+text = "3"
+
+[node name="Mark4g" type="ColorRect" parent="Panel"]
+layout_mode = 0
+offset_left = 22.0
+offset_top = 24.0
+offset_right = 30.0
+offset_bottom = 26.0
+color = Color(1, 0.211765, 0.211765, 1)
+
+[node name="Label" type="Label" parent="Panel/Mark4g"]
+layout_mode = 0
+offset_left = 8.0
+offset_top = -3.0
+offset_right = 21.0
+offset_bottom = 10.0
+theme_override_colors/font_color = Color(0.501961, 0.501961, 0.623529, 1)
+theme_override_fonts/font = SubResource("1")
+text = "4"

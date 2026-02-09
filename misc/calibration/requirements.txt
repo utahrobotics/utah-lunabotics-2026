@@ -1,0 +1,4 @@
+rerun-sdk[all]
+scipy
+numpy
+pandas

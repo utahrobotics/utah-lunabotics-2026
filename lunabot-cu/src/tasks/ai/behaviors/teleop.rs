@@ -7,10 +7,12 @@ use crate::tasks::ai::{
     },
 };
 
+/// the root of the behavior tree
 pub fn teleop_behavior() -> Behavior<LunabotAction> {
     Behavior::While(
         Box::new(WaitForever),
         vec![Sequence(vec![
+            Action(LunabotAction::Yield),
             AlwaysSucceed(Box::new(soft_stop_behavior())),
             AlwaysSucceed(Box::new(manual_ctrl_behavior())),
             AlwaysSucceed(Box::new(autonomy_main())),

@@ -2,24 +2,34 @@
 pub mod comms;
 pub mod rerun_viz;
 
+pub mod bridges;
+pub mod pathfinding;
+pub mod robot_state;
 pub mod simple_monitor;
 pub mod tasks;
 pub mod utils;
 
+use crossbeam::atomic::AtomicCell;
 use crossbeam_channel::{Receiver, Sender};
 use cu29::prelude::*;
 use cu29_export::copperlists_reader;
 use cu29_helpers::basic_copper_setup;
 use embedded_common::{ActuatorCommand, FromPicoV3};
+use nalgebra::{SMatrix, SVector};
+use rerun_viz::{Level, RECORDER};
+use robot_state::RobotState;
 use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock, RwLock};
+
+use crate::default::SimStep;
+extern crate cu_bincode as bincode;
 
 const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 
-pub static ROOT_NODE: OnceLock<StaticNode> = OnceLock::new();
+pub static ROBOT_STATE: OnceLock<RobotState> = OnceLock::new();
 
-pub static TARGET_HZ: usize = 100000; // MUST BE THE SAME AS THE TARGET HZ IN COPPERCONFIG.RON
+pub static TARGET_HZ: usize = 1000; // MUST BE THE SAME AS THE TARGET HZ IN COPPERCONFIG.RON
 
 #[copper_runtime(config = "copperconfig.ron", sim_mode = true)]
 struct LunabotApplication {}
@@ -41,7 +51,6 @@ fn default_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::DetectorCamSide(_) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamLaptopFront(_) => SimOverride::ExecutedBySim,
         default::SimStep::RealsenseSubscriber(_) => SimOverride::ExecutedBySim,
-        default::SimStep::Lunabase(_) => SimOverride::ExecutedBySim,
         default::SimStep::T265Subscriber(_) => SimOverride::ExecutedBySim,
         _ => SimOverride::ExecuteByRuntime,
     }
@@ -54,7 +63,7 @@ fn run_one_copperlist(
 ) {
     let msgs = &copper_list.msgs;
     let now = msgs
-        .get_lunabase_output()
+        .get_t_265_subscriber_output()
         .metadata()
         .process_time()
         .start
@@ -78,11 +87,29 @@ fn run_one_copperlist(
             default::SimStep::GstConvertBack(..) => SimOverride::ExecutedBySim,
             default::SimStep::GstConvertSide(..) => SimOverride::ExecutedBySim,
             default::SimStep::GstConvertLaptopFront(..) => SimOverride::ExecutedBySim,
-            default::SimStep::T265Subscriber(_) => SimOverride::ExecutedBySim,
 
             default::SimStep::L2Pointcloud(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_l_2_pointcloud_output().clone();
                 output.tov = robot_clock.now().into();
+                if let Some(sample) = output.payload() {
+                    let mut positions = Vec::new();
+                    let mut colors = Vec::new();
+                    for point in sample.points.iter() {
+                        positions.push([point.x as f32, point.y as f32, point.z as f32]);
+                        colors.push([0, 255, 0]);
+                    }
+                    if RECORDER.get().is_some() && RECORDER.get().unwrap().level == Level::All {
+                        if let Err(e) = RECORDER.get().unwrap().recorder.log(
+                            format!("kiss_icp/local/cloud"),
+                            &rerun::Points3D::new(positions)
+                                .with_colors(colors)
+                                .with_radii([0.02f32]),
+                        ) {
+                            warning!("Failed to log accumulated map to Rerun: {}", e.to_string());
+                        }
+                    }
+                }
+
                 SimOverride::ExecutedBySim
             }
             default::SimStep::L2Pointcloud(..) => SimOverride::ExecutedBySim,
@@ -129,16 +156,30 @@ fn run_one_copperlist(
                 output.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
-            default::SimStep::RealsenseSubscriber(..) => SimOverride::ExecutedBySim,
-            default::SimStep::Lunabase(CuTaskCallbackState::Process(_, output)) => {
-                *output = msgs.get_lunabase_output().clone();
+            default::SimStep::T265Subscriber(CuTaskCallbackState::Process(_, output)) => {
+                *output = msgs.get_t_265_subscriber_output().clone();
                 output.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
-            default::SimStep::Lunabase(..) => SimOverride::ExecutedBySim,
+            default::SimStep::T265Subscriber(..) => SimOverride::ExecutedBySim,
+            default::SimStep::RealsenseSubscriber(..) => SimOverride::ExecutedBySim,
             default::SimStep::DetectorCamLaptopFront(..) => SimOverride::ExecutedBySim,
+            default::SimStep::LunabaseBridgeRxFromLunabaseRx { channel, msg } => {
+                *msg = msgs.get_lunabase_bridge_rx_from_lunabase_rx().clone();
+                msg.tov = robot_clock.now().into();
+                SimOverride::ExecutedBySim
+            }
+            default::SimStep::LunabaseBridgeRxFromLunabaseRx{..} => SimOverride::ExecutedBySim,
 
-            // May want to temporarily add override for obstacle map recv until lidar simulation works
+            default::SimStep::LunabaseBridgeBridge(..) => SimOverride::ExecutedBySim,
+            default::SimStep::LunabaseBridgeTxToLunabase {..} => SimOverride::ExecutedBySim,
+
+            default::SimStep::NewAi(..) => SimOverride::ExecuteByRuntime,
+            default::SimStep::DetectionHandler(..) => SimOverride::ExecuteByRuntime,
+            default::SimStep::L2KissIcp(..) => SimOverride::ExecuteByRuntime,
+            default::SimStep::OccupancyGridPipeline(..) => SimOverride::ExecuteByRuntime,
+            default::SimStep::Localizer(..) => SimOverride::ExecuteByRuntime,
+            default::SimStep::__Phantom(..) => SimOverride::ExecuteByRuntime,
             _ => SimOverride::ExecuteByRuntime,
         }
     };
@@ -188,7 +229,15 @@ fn main() {
             .expect("Failed to parse robot chain");
 
             let robot_chain = ChainBuilder::from(robot_chain).finish_static();
-            let _ = ROOT_NODE.set(robot_chain);
+            let _ = ROBOT_STATE.set(RobotState {
+                kinematic_root: robot_chain,
+                kalman_state: Arc::new(AtomicCell::new(Some(SVector::<f64, 12>::from_element(
+                    0.0,
+                )))),
+                kalman_variances: Arc::new(AtomicCell::new(Some(
+                    SMatrix::<f64, 12, 12>::from_diagonal_element(1E64),
+                ))),
+            });
 
             let mut application = LunabotApplicationBuilder::new()
                 .with_sim_callback(&mut default_callback)

@@ -2,11 +2,10 @@ use crate::depth_camera::DepthCameraTask;
 use fxhash::FxHashMap;
 use realsense_rust::{
     config::{Config, ConfigurationError},
-    device::{self, Device},
-    kind::{Rs2CameraInfo, Rs2Format, Rs2ProductLine, Rs2StreamKind},
+    kind::{Rs2CameraInfo, Rs2Format, Rs2StreamKind},
     pipeline::{ActivePipeline, InactivePipeline},
 };
-use std::{collections::HashSet, sync::mpsc::SyncSender, thread, time::Duration};
+use std::sync::mpsc::SyncSender;
 
 /// waits for a realsense to be plugged in and then starts a depth camera task that will publish depth frames
 pub fn enumerate_depth_cameras(serial_numbers: &[&str]) {
@@ -46,17 +45,17 @@ pub fn enumerate_depth_cameras(serial_numbers: &[&str]) {
     std::thread::Builder::new()
         .stack_size(16 * 1024 * 1024)
         .spawn(move || loop {
+            let device_hub = match context.create_device_hub() {
+                Ok(x) => x,
+                Err(_e) => {
+                    eprintln!("Failed to create RealSense DeviceHub: {_e}");
+                    return;
+                }
+            };
             let Ok(target_serial) = init_rx.recv() else {
                 break;
             };
             loop {
-                let device_hub = match context.create_device_hub() {
-                    Ok(x) => x,
-                    Err(_e) => {
-                        eprintln!("Failed to create RealSense DeviceHub: {_e}");
-                        return;
-                    }
-                };
                 let device = match device_hub.wait_for_device() {
                     Ok(x) => x,
                     Err(_e) => {
@@ -117,18 +116,14 @@ pub fn enumerate_depth_cameras(serial_numbers: &[&str]) {
                     eprintln!("Failed to disable all streams: {}", e);
                     continue;
                 }
-                let Some(prod_line) = device.info(Rs2CameraInfo::ProductLine) else {
+                let Some(_prod_line) = device.info(Rs2CameraInfo::ProductLine) else {
                     continue;
                 };
-                if prod_line.to_string_lossy().to_string() == "T200".to_string() {
-                    println!("enabling t265 streams");
-                    enable_t265_streams(&mut config);
-                } else {
-                    enable_d455_streams(&mut config);
-                }
+
+                let _ = enable_d455_streams(&mut config);
+
                 // https://gitlab.com/tangram-vision/oss/realsense-rust/-/issues/29
-                drop(device);
-                drop(device_hub);
+
                 let pipeline = match InactivePipeline::try_from(&context) {
                     Ok(x) => x,
                     Err(e) => {
@@ -157,10 +152,5 @@ pub fn enumerate_depth_cameras(serial_numbers: &[&str]) {
 fn enable_d455_streams(config: &mut Config) -> Result<(), ConfigurationError> {
     config.enable_stream(Rs2StreamKind::Depth, None, 640, 480, Rs2Format::Z16, 30)?;
     config.enable_stream(Rs2StreamKind::Accel, None, 0, 0, Rs2Format::Any, 0)?;
-    Ok(())
-}
-
-fn enable_t265_streams(config: &mut Config) -> Result<(), ConfigurationError> {
-    config.enable_stream(Rs2StreamKind::Pose, None, 0, 0, Rs2Format::Any, 0)?;
     Ok(())
 }

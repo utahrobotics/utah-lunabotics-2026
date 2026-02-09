@@ -51,8 +51,8 @@ impl LunabaseConnection {
                             // break;
                         }
                     }
-                    Err(e) => {
-                        eprintln!("Failed to receive message from server: {}", e);
+                    Err(_) => {
+                        // eprintln!("Failed to receive message from server: {}", e);
                         std::thread::sleep(Duration::from_millis(10));
                     }
                 }
@@ -77,8 +77,8 @@ impl LunabaseConnection {
                 // send the message via the server_c1
                 match rx_outgoing.recv() {
                     Ok(msg) => {
-                        if let Err(e) = server_c2.send(msg) {
-                            eprintln!("Failed to send message via server: {}", e);
+                        if let Err(_) = server_c2.send(msg) {
+                            // eprintln!("Failed to send message via server: {}", e);
                         }
                     }
                     Err(e) => {

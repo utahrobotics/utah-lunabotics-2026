@@ -1,6 +1,6 @@
 [gd_scene load_steps=9 format=3 uid="uid://cvi4g2l0j0cfx"]
 
-[ext_resource type="Script" uid="uid://b5ucvi7ati7td" path="res://Systems/ControlSchemes/scheme_controller.gd" id="1_5gcoj"]
+[ext_resource type="Script" uid="uid://b5ucvi7ati7td" path="res://Systems/ControlSchemes/schemes/scheme_controller.gd" id="1_5gcoj"]
 [ext_resource type="Script" uid="uid://cojf71u62eagl" path="res://Systems/ControlSchemes/scheme_resource.gd" id="2_2e8s8"]
 [ext_resource type="Script" uid="uid://c1wi4dr3ntdsc" path="res://Systems/ControlSchemes/testing/test_script.gd" id="3_gvyrl"]
 

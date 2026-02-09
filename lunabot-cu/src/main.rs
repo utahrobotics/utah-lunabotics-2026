@@ -6,22 +6,30 @@ mod motors;
 
 pub mod rerun_viz;
 
+pub mod bridges;
+pub mod pathfinding;
+pub mod robot_state;
 pub mod simple_monitor;
 pub mod tasks;
 pub mod utils;
 
+use crossbeam::atomic::AtomicCell;
 use cu29::prelude::*;
 use cu29_helpers::basic_copper_setup;
 use launcher::ProcessCommand;
-use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
+use nalgebra::{SMatrix, SVector};
+use simple_motion::{ChainBuilder, NodeSerde};
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 use std::thread::sleep;
 use std::time::Duration;
 
+use robot_state::RobotState;
+extern crate cu_bincode as bincode;
+
 const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 
-pub static ROOT_NODE: OnceLock<StaticNode> = OnceLock::new();
+pub static ROBOT_STATE: OnceLock<RobotState> = OnceLock::new();
 
 #[copper_runtime(config = "copperconfig.ron")]
 struct LunabotApplication {}
@@ -44,7 +52,7 @@ fn main() {
 
     // rerun_viz::init_rerun(rerun_viz::RerunViz::Grpc(
     //     rerun_viz::Level::All,
-    //     "192.168.0.108".to_string(),
+    //     "127.0.0.1".to_string(),
     // ))
     // .expect("Failed to initialize rerun viz.");
     rerun_viz::init_rerun(rerun_viz::RerunViz::Viz(rerun_viz::Level::All))
@@ -58,7 +66,13 @@ fn main() {
     .expect("Failed to parse robot chain");
 
     let robot_chain = ChainBuilder::from(robot_chain).finish_static();
-    let _ = ROOT_NODE.set(robot_chain);
+    let _ = ROBOT_STATE.set(RobotState {
+        kinematic_root: robot_chain,
+        kalman_state: Arc::new(AtomicCell::new(Some(SVector::<f64, 12>::from_element(0.0)))),
+        kalman_variances: Arc::new(AtomicCell::new(Some(
+            SMatrix::<f64, 12, 12>::from_diagonal_element(1E64),
+        ))),
+    });
 
     let mut application = LunabotApplicationBuilder::new()
         .with_context(&copper_ctx)

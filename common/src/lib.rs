@@ -1,9 +1,10 @@
 #![feature(f16)]
 use bytemuck::{Pod, Zeroable};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 mod constants;
 pub mod ports;
 pub use constants::*;
+extern crate cu_bincode as bincode;
 
 #[repr(C)]
 #[derive(
@@ -18,7 +19,10 @@ pub use constants::*;
     Pod,
     Zeroable,
     Serialize,
+    Deserialize
 )]
+
+/// Final RPM = (left_or_right) * weight
 pub struct Steering {
     left: i8,
     right: i8,
@@ -64,6 +68,7 @@ impl Steering {
 
     } */
 
+    /// left and right are clamped to -1, 1
     pub fn new(mut left: f64, mut right: f64, weight: f64) -> Self {
         left = left.max(-1.0).min(1.0);
         right = right.max(-1.0).min(1.0);
@@ -86,6 +91,38 @@ impl Steering {
             weight,
         }
     }
+
+    /// Creates a new steering command from speed, angular velocity, and weight,
+    /// rather than just left and right.
+    /// 
+    /// ### Details
+    /// Inputs are normalized and then passed along to the regular `new`. The
+    /// ratio between speed and turning is maintained, thereby preserving
+    /// the turning radius.
+    /// Some relevant math: https://www.desmos.com/calculator/qgav8qt6ep
+    /// 
+    /// ### Arguments
+    /// * `speed` - \[-1.0, 1.0\] - How fast the robot should try to move forward,
+    ///   in percent of max speed.
+    /// * `turning` - \[-1.0, 1.0\] - How fast the robot should try to turn,
+    ///   in percent of max angular velocity. Positive is CCW.
+    pub fn new_ik(speed: f64, turning: f64, weight: f64) -> Self {
+        let left = speed - turning;
+        let right = speed + turning;
+
+        // Normalize
+        if left > 1.0 || left < -1.0 || right > 1.0 || right < -1.0 {
+            // Divide by larger, guaranteeing the smaller ends up in the box,
+            // and the larger is on the edge
+            if left.abs() > right.abs() {
+                return Steering::new(left / left.abs(), right / left.abs(), weight)
+            } else {
+                return Steering::new(left / right.abs(), right / right.abs(), weight)
+            }
+        }
+
+        return Steering::new(left, right, weight)
+    }
 }
 
 impl Default for Steering {
@@ -100,7 +137,7 @@ pub struct IMUReading {
     pub acceleration: [f64; 3],
 }
 
-use std::{collections::HashMap, io::Write};
+use std::collections::HashMap;
 
 use bitcode::{Decode, Encode};
 use embedded_common::{Actuator, ActuatorCommand};
@@ -138,10 +175,10 @@ impl TryFrom<u8> for LunabotStage {
 }
 
 #[derive(
-    bincode::Encode, bincode::Decode, Debug, Encode, Decode, Clone, Copy, PartialEq, Serialize,
-)]
+    bincode::Encode, bincode::Decode, Debug, Encode, Decode, Clone, Copy, PartialEq, Serialize, Deserialize
+)] 
 pub enum FromLunabase {
-    ContinueMission,
+    Manual,
     /// Skid steer message, 1,1 is full speed forward, -1,-1 is full speed back
     Steering(Steering),
     /// Move lift actuators, positive up, negative down  
@@ -179,27 +216,6 @@ impl Default for FromLunabase {
 }
 
 impl FromLunabase {
-    fn write_code(&self, mut w: impl Write) -> std::io::Result<()> {
-        let bytes = bitcode::encode(self);
-        write!(w, "{self:?} = 0x")?;
-        for b in bytes {
-            write!(w, "{b:x}")?;
-        }
-        writeln!(w, "")
-    }
-
-    pub fn write_code_sheet(mut w: impl Write) -> std::io::Result<()> {
-        // FromLunabase::Pong.write_code(&mut w)?;
-        FromLunabase::ContinueMission.write_code(&mut w)?;
-        FromLunabase::Steering(Steering::default()).write_code(&mut w)?;
-        FromLunabase::SoftStop.write_code(&mut w)?;
-        Ok(())
-    }
-
-    pub fn lift_shake() -> Self {
-        FromLunabase::LiftShake
-    }
-
     pub fn set_lift_actuator(mut speed: f64) -> Self {
         speed = speed.clamp(-1.0, 1.0);
         let speed = if speed < 0.0 {
@@ -255,7 +271,16 @@ impl FromLunabase {
     }
 }
 
-#[derive(Debug, bitcode::Encode, bitcode::Decode, Clone, bincode::Encode, bincode::Decode)]
+#[derive(
+    Debug,
+    bitcode::Encode,
+    bitcode::Decode,
+    Clone,
+    bincode::Encode,
+    bincode::Decode,
+    Serialize,
+    Deserialize,
+)]
 pub enum FromLunabot {
     /// Reports the robots pose
     RobotIsometry {
@@ -267,5 +292,15 @@ pub enum FromLunabot {
         hinge: f32,
         bucket: f32,
     },
+    // RobotMotion {
+    //     velocity:[f32;3],
+    //     acceleration: [f32;3],
+    // },
     ErroredTasks(HashMap<String, String>),
+}
+
+impl Default for FromLunabot {
+    fn default() -> Self {
+        Self::ErroredTasks(HashMap::new())
+    }
 }

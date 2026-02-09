@@ -22,7 +22,8 @@ SettingsMenu="*res://GUI/SettingsMenu/Scene/SettingsMenu.tscn"
 
 [display]
 
-window/size/viewport_width=1000
+window/size/viewport_width=1200
+window/size/viewport_height=700
 
 [file_customization]
 
@@ -88,7 +89,7 @@ right_wheel={
 }
 increment_speed={
 "deadzone": 0.2,
-"events": []
+"events": [null]
 }
 decrement_speed={
 "deadzone": 0.2,

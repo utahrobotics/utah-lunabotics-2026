@@ -3,9 +3,16 @@ name = "iceoryx-types"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+sim = []
+resim = []
+
+production = ["iceoryx2"]
+
 [dependencies]
-iceoryx2.workspace = true
-bincode = { version = "=2.0.1", features = ["derive", "serde"] }
+serde-big-array.workspace = true
+iceoryx2 = { workspace = true, optional = true }
+cu-bincode.workspace = true
 serde = { version = "1", features = ["derive"] }
 nalgebra.workspace = true
 common.workspace = true

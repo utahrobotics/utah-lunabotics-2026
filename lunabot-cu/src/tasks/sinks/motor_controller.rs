@@ -7,8 +7,6 @@ use cu29::{
 };
 
 use common::Steering;
-#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
-use embedded_common::ActuatorCommand;
 
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use crate::motors::{MotorRef, VescIDs, VescPair, enumerate_motors};
@@ -17,7 +15,7 @@ use crate::motors::{MotorRef, VescIDs, VescPair, enumerate_motors};
 
 pub struct MotorController {
     motor_ref: &'static MotorRef,
-    prev_speed_multi: f32,/*  */
+    prev_speed_multi: f32, /*  */
 }
 
 impl Freezable for MotorController {}
@@ -25,16 +23,22 @@ impl Freezable for MotorController {}
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 impl CuSinkTask for MotorController {
     // steering, actuators (just ignore the actuators here for now)
-    type Input<'m> = input_msg!((Option<Steering>, Option<ActuatorCommand>));
+    type Input<'m> = input_msg!(Steering);
+    type Resources<'r> = ();
 
-    fn new(config: Option<&ComponentConfig>) -> CuResult<Self> {
+    fn new(config: Option<&ComponentConfig>, _resources: Self::Resources<'_>) -> CuResult<Self> {
         let motor_ref;
-        let mut prev_speed_multi: f32;
+        let prev_speed_multi: f32;
+
+        // waiting until copper supports 
+        let vesc_pairs = vec![
+            VescPair { id1: 75, id2: 110, mask1: crate::motors::MotorMask::Right, mask2: crate::motors::MotorMask::Right, command_both: true },
+            VescPair { id1: 63, id2: 74, mask1: crate::motors::MotorMask::Left, mask2: crate::motors::MotorMask::Left, command_both: true }
+        ];
         if let Some(config) = config
-            && let Some(vesc_pairs) = config.get::<Vec<VescPair>>("vesc_pairs")
         {
             let mut vesc_ids = VescIDs::default();
-            let speed_multiplier = config.get::<f64>("speed_multiplier").unwrap_or(2000.) as f32;
+            let speed_multiplier = config.get::<f64>("speed_multiplier").expect("failed to deserialize").unwrap_or(2000.) as f32;
             prev_speed_multi = speed_multiplier;
             for VescPair {
                 id1,
@@ -76,18 +80,15 @@ impl CuSinkTask for MotorController {
         Ok(())
     }
 
-
     fn process(&mut self, _clock: &RobotClock, input: &Self::Input<'_>) -> CuResult<()> {
-        if let Some(payload) = input.payload() {
-            if let Some(steering) = &payload.0 {
-                let new_weight:f32 = steering.get_weight() as f32;
-                if (new_weight - self.prev_speed_multi).abs() > 0.0001 {
-                    self.prev_speed_multi = new_weight;
-                    self.motor_ref.set_speed_multiplier(new_weight);
-                }
-                let (left, right) = steering.get_left_and_right();
-                self.motor_ref.set_speed(left as f32, right as f32);
+        if let Some(steering) = input.payload() {
+            let new_weight: f32 = steering.get_weight() as f32;
+            if (new_weight - self.prev_speed_multi).abs() > 0.0001 {
+                self.prev_speed_multi = new_weight;
+                self.motor_ref.set_speed_multiplier(new_weight);
             }
+            let (left, right) = steering.get_left_and_right();
+            self.motor_ref.set_speed(left as f32, right as f32);
         }
 
         if let Some(telemetry) = self.motor_ref.get_latest_telemetry() {
@@ -111,11 +112,11 @@ impl CuSinkTask for MotorController {
 pub struct MotorController;
 
 #[cfg(any(not(target_os = "linux"), feature = "resim", feature = "sim"))]
-#[cfg(any(not(target_os = "linux"), feature = "resim", feature = "sim"))]
 
 impl CuSinkTask for MotorController {
-    type Input<'m> = input_msg!((Option<Steering>, Option<[u8; 5]>));
-    fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
+    type Input<'m> = input_msg!(Steering);
+    type Resources<'r> = ();
+    fn new(_config: Option<&ComponentConfig>, _resources: Self::Resources<'_>) -> CuResult<Self> {
         Ok(Self {})
     }
 

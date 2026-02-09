@@ -1,9 +1,6 @@
-use bonsai_bt::Behavior::{self, Action, If, While};
+use bonsai_bt::Behavior::{self, Action, While};
 
-use crate::tasks::ai::{
-    action::LunabotAction,
-    behaviors::autonomy::navigate::{self, navigate_behavior},
-};
+use crate::tasks::ai::{action::LunabotAction, behaviors::autonomy::navigate::navigate_behavior};
 
 pub fn autonomy_main() -> Behavior<LunabotAction> {
     While(

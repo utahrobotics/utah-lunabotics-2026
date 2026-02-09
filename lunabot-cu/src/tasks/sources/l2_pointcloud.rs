@@ -1,4 +1,4 @@
-use crate::ROOT_NODE;
+use crate::ROBOT_STATE;
 use crate::rerun_viz::{Level, RECORDER};
 use cu29::cutask::CuMsg;
 use cu29::{
@@ -40,10 +40,11 @@ impl Freezable for PointCloudIceoryxReceiver {}
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 impl CuSrcTask for PointCloudIceoryxReceiver {
     type Output<'m> = output_msg!(IceoryxPointCloud);
+    type Resources<'r> = ();
 
-    fn new(config: Option<&ComponentConfig>) -> CuResult<Self> {
+    fn new(config: Option<&ComponentConfig>, _resources: Self::Resources<'_>) -> CuResult<Self> {
         let service_str = config
-            .and_then(|c| c.get::<String>("service"))
+            .and_then(|c| c.get::<String>("service").expect("failed to deserialize"))
             .unwrap_or_else(|| "unilidar/cloud_full".to_string());
 
         let service_name = ServiceName::new(&service_str).map_err(|e| {
@@ -59,9 +60,10 @@ impl CuSrcTask for PointCloudIceoryxReceiver {
             node,
             service: None,
             subscriber: None,
-            l2_node: ROOT_NODE
+            l2_node: ROBOT_STATE
                 .get()
                 .unwrap()
+                .kinematic_root
                 .get_node_with_name("l2_front")
                 .unwrap()
                 .clone(),
@@ -120,7 +122,7 @@ impl CuSrcTask for PointCloudIceoryxReceiver {
             }
             if RECORDER.get().is_some() && RECORDER.get().unwrap().level == Level::All {
                 if let Err(e) = RECORDER.get().unwrap().recorder.log(
-                    "l2_pcl",
+                    format!("kiss_icp/local/cloud"),
                     &rerun::Points3D::new(positions)
                         .with_colors(colors)
                         .with_radii([0.02f32]),
@@ -152,12 +154,14 @@ impl CuSrcTask for PointCloudIceoryxReceiver {
 #[cfg(any(feature = "resim", feature = "sim"))]
 impl CuSrcTask for PointCloudIceoryxReceiver {
     type Output<'m> = output_msg!(IceoryxPointCloud);
+    type Resources<'r> = ();
 
-    fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
+    fn new(_config: Option<&ComponentConfig>,_resources: Self::Resources<'_>) -> CuResult<Self> {
         Ok(Self {
-            l2_node: ROOT_NODE
+            l2_node: ROBOT_STATE
                 .get()
                 .unwrap()
+                .kinematic_root
                 .get_node_with_name("l2_front")
                 .unwrap()
                 .clone(),

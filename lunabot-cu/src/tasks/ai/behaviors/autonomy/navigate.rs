@@ -1,4 +1,4 @@
-use bonsai_bt::Behavior::{self, Action, If, Invert, Sequence, While};
+use bonsai_bt::Behavior::{self, Action, If, Sequence, While};
 use common::Steering;
 
 use crate::tasks::ai::action::LunabotAction;
@@ -9,21 +9,19 @@ pub fn navigate_behavior() -> Behavior<LunabotAction> {
         vec![Sequence(vec![
             // one extra yield to avoid busy looping, in case the stage was set in the same tick
             Action(LunabotAction::Yield),
-            Action(LunabotAction::IsObstacleMapReady),
             Action(LunabotAction::CalculatePath),
             If(
                 Box::new(Action(LunabotAction::FollowPath)),
                 Box::new(set_stage(common::LunabotStage::Manual)),
                 Box::new(set_stage(common::LunabotStage::SoftStop)),
             ),
-        ])],
+        ])]
     )
 }
 
 fn set_stage(stage: common::LunabotStage) -> Behavior<LunabotAction> {
     Sequence(vec![
         Action(LunabotAction::SetStage(stage)),
-        // might eventuall yneed something here
     ])
 }
 

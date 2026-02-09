@@ -18,7 +18,7 @@ use std::sync::OnceLock;
 use std::thread::sleep;
 use std::time::Duration;
 
-pub static ROOT_NODE: OnceLock<StaticNode> = OnceLock::new();
+pub static ROBOT_STATE: OnceLock<RobotState> = OnceLock::new();
 const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 
 // This will create the CuMsgs that is specific to your copper project.

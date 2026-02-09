@@ -3,8 +3,6 @@ resolver = "3"
 members = [
     "misc/simple-motion",
     "misc/tasker",
-    "misc/thalassic",
-    "misc/gputter",
     "misc/iceoryx-types",
     "misc/launcher",
     "misc/vesc-translator",
@@ -14,18 +12,21 @@ members = [
     "misc/copperconfig-validator",
     "external-tasks/realsense",
     "lunabase-lib",
-    "misc/quic", "misc/auto-start",
+    "misc/quic",
+    "misc/auto-start",
+    "misc/wgsl-pcl",
 ]
 exclude = ["misc/usb-reset"]
 # Shared dependencies across workspace members
 [workspace.dependencies]
 cu29 = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu29", features = [
     "log-level-info",
+    "std",
     "log-level-error",
 ] }
 cu29-export = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu29-export" }
 
-bincode = { version = "2", features = ["derive", "serde"] }
+cu-bincode = { version = "2.0.2", features = ["derive", "serde"] }
 cu29-helpers = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu29-helpers" }
 cu-apriltag = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu-apriltag" }
 # cu-consolemon = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu-consolemon" }
@@ -37,20 +38,22 @@ cu29-runtime = { git = "https://github.com/matthewashton-k/copper-rs.git", branc
 cu-gstreamer = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu-gstreamer", features = [
     "gst",
 ] }
-iceoryx2 = { version = "0.7.0" }
+iceoryx2 = { version = "0.8.1" }
 crossbeam = "0.8"
 crossbeam-channel = "0.5"
 
 
 toml = "0.9.5"
 bitcode = "0.6.7"
+serde-big-array = "0.5.1"
+
 
 nalgebra = { version = "0.34.0", features = [
     "serde-serialize",
     "convert-bytemuck",
 ] }
 
-ron = { version = "0.11.0", features = ["indexmap"] }
+ron = { version = "0.12.0", features = ["indexmap"] }
 fxhash = "0.2.1"
 indexmap = "2.9.0"
 tokio = { version = "1", features = ["full"] }
@@ -59,6 +62,8 @@ bytemuck = { version = "1", features = ["derive", "extern_crate_alloc"] }
 anyhow = "1"
 unfmt = "0.2.2"
 serde = { version = "1", features = ["derive"] }
+thiserror = "2.0.17"
+
 
 tokio-serial = "5.4.5"
 tokio-util = "0.7.16"

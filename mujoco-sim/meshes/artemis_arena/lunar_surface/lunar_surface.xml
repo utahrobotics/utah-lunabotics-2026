@@ -9,7 +9,7 @@
   </asset>
 
   <worldbody>
-    <body name="lunar_surface" pos="0 0 -1.2">
+    <body name="lunar_surface" pos="3.5 2.6 0">
       <geom material="DefaultMaterialLunarSurface1"
         mesh="lunar_surface"
         class="visual" />
@@ -18,7 +18,7 @@
         type="hfield"
         hfield="lunar_terrain"
         pos="0 0 -0.32"
-        class="collision"  solimp="0.8"/>
+        class="collision"  priority="10" solimp="0.0 0.9 0.2 0.8 5"  solref="0.1 1"  friction="1.5 0.005 0.6"/>
     </body>
   </worldbody>
 </mujoco>

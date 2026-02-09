@@ -1,19 +1,29 @@
 use std::collections::HashMap;
 use std::f64::consts::PI;
+use serde_big_array::BigArray;
 
+use cu_bincode::{Decode, Encode};
 use cu_apriltag::AprilTagDetections;
+use cu_spatial_payloads::EncodableIsometry;
 use cu29::cutask::CuMsg;
 use cu29::{
     CuResult, clock::RobotClock, config::ComponentConfig, cutask::Freezable, input_msg, prelude::*,
 };
 
-use cu_spatial_payloads::EncodableIsometry;
+use nalgebra::{SMatrix, SVector};
 use ron::de::from_str as ron_from_str;
 use serde::Deserialize;
 use std::fs;
 use std::path::Path;
 
+use crate::ROBOT_STATE;
 use crate::rerun_viz::RECORDER;
+
+
+const LATERAL_VARIANCE_MODIFIER: f64 = 0.5;
+const DEPTH_VARIENCE_MODIFIER: f64 = 0.5;
+const ANGULAR_VARIANCE_MODIFIER: f64 = 0.5;
+
 
 /// Data definition that mirrors the contents of a `.ron` apriltag isometry file.
 /// The field names are intentionally kept simple so that we can be flexible with
@@ -87,6 +97,25 @@ fn load_known_apriltag_isometries() -> CuResult<HashMap<usize, Isometry3<f64>>> 
 #[derive(Default)]
 pub struct AprilDetectionHandler {
     known_tags: HashMap<usize, Isometry3<f64>>,
+    max_distance: f64
+}
+
+#[derive(Clone, Copy, Debug, Encode, Decode, Serialize, Deserialize)]
+#[repr(C)]
+pub struct AprilTagMeasurement {
+    /// Estimated isometry of the robot base
+    pub estimated_isometry: EncodableIsometry,
+    #[serde(with = "BigArray")]
+    pub variance: [f64; 36]
+}
+
+impl Default for AprilTagMeasurement {
+    fn default() -> Self {
+        Self {
+            estimated_isometry: EncodableIsometry::default(),
+            variance: [0.0; 36]
+        }
+    }
 }
 
 impl Freezable for AprilDetectionHandler {}
@@ -99,11 +128,15 @@ impl CuTask for AprilDetectionHandler {
         &'m input_msg!(AprilTagDetections),
     );
     // camera_id, estimated isometry of camera
-    type Output<'m> = output_msg!(Box<HashMap<String, EncodableIsometry>>);
+    type Output<'m> = output_msg!(Vec<AprilTagMeasurement>);
+    type Resources<'r> = ();
 
-    fn new(_config: Option<&ComponentConfig>) -> CuResult<Self> {
+
+    fn new(config: Option<&ComponentConfig>, _resources: Self::Resources<'_>) -> CuResult<Self> {
         let known_tags = load_known_apriltag_isometries()?;
-        Ok(Self { known_tags })
+        let max_distance = config.expect("provide a config for apriltag handler").get("max_distance").expect("failed to deserialize").unwrap_or(1.0);
+
+        Ok(Self { known_tags, max_distance })
     }
 
     fn process(
@@ -115,36 +148,99 @@ impl CuTask for AprilDetectionHandler {
         output.clear_payload();
         let (input1, input2, input3) = input;
 
-        let mut result_map = HashMap::new();
+        let mut result_vec: Vec<AprilTagMeasurement> = Vec::new();
 
-        if let Some(dets) = input1.payload() {
-            let camera_id = dets.camera_id.as_ref().clone();
-            let tags = self.cu_detections_to_tag_observations(dets, &camera_id);
-            if !tags.is_empty() {
-                let observer_iso = self.estimate_observer_isometry_from_observations(&tags)?;
-                result_map.insert(camera_id, EncodableIsometry::from_na(&observer_iso));
+        for particular_input in [input1, input2, input3] {
+            if let Some(dets) = particular_input.payload() {
+                let camera_id = dets.camera_id.as_ref().clone();
+                for observation in self.cu_detections_to_tag_observations(dets, &camera_id) {
+                    let distrust = observation.decision_margin * observation.decision_margin;
+                    let Some(isometry) = observation.get_isometry_of_observer() else {
+                        eprintln!("tag observed by unknown camera. (make sure the camera node is correct and defined in the chain");
+                        continue;
+                    };
+                    if observation.tag_local_isometry.translation.vector.magnitude() > self.max_distance {
+                        // println!("ignored > max distance");
+                        continue;
+                    }
+
+
+                    // Translational
+                    let position_state: SVector<f64, 3> = isometry.translation.vector;
+
+                    // Make covariance matrix. The eigenvalues associated with eigenvectors of 
+                    // a covarience matrix describe its variance in the directions of those eigenvectors.
+                    // So, a matrix is constructed from orthogonal eigenvectors, and chosen eigenvalues
+                    // This is done with the technique found here (https://math.stackexchange.com/questions/1261462/how-to-reconstruct-a-symmetric-matrix-given-the-eigenvalues-and-eigenvectors)
+                    let lateral_vector_1 = position_state.cross(&SVector::<f64, 3>::new(0.0, 0.0, 1.0));
+                    let lateral_vector_2 = position_state.cross(&lateral_vector_1);
+
+                    let translational_eigenvector_matrix = SMatrix::<f64, 3, 3>::from_columns(&[position_state, lateral_vector_1, lateral_vector_2]);
+
+                    let translational_eigenvalue_matrix = SMatrix::<f64, 3, 3>::from_diagonal(&SVector::<f64, 3>::new(
+                        DEPTH_VARIENCE_MODIFIER, 
+                        LATERAL_VARIANCE_MODIFIER, 
+                        LATERAL_VARIANCE_MODIFIER
+                    ));
+
+                    let position_base_covariance_matrix = 
+                        translational_eigenvector_matrix * 
+                        translational_eigenvalue_matrix * 
+                        translational_eigenvector_matrix.try_inverse().expect("April tag eigenvector matrix was not invertable. Likely a cross product edge case.")
+                    ;
+
+                    // Angular
+                    let orientation_state = 
+                        isometry.rotation.axis()
+                            .and_then(|vec| Some(vec.into_inner()))
+                            .unwrap_or(SVector::<f64, 3>::zeros())
+                        * isometry.rotation.angle()
+                    ;
+
+                    let orientation_base_covarience_matrix = SMatrix::<f64, 3, 3>::from_diagonal(&SVector::<f64, 3>::new(
+                        ANGULAR_VARIANCE_MODIFIER,
+                        ANGULAR_VARIANCE_MODIFIER,
+                        ANGULAR_VARIANCE_MODIFIER
+                    ));
+
+                    // Combination and final prep
+                    let position = [
+                        position_state.x, 
+                        position_state.y,
+                        position_state.z,
+                    ];
+                    let orientation = [
+                        orientation_state.x,
+                        orientation_state.y,
+                        orientation_state.z,
+                    ];
+
+                    let mut combined_covariance = [0.0; 36];
+
+                    for i in 0..3 {
+                        for j in 0..3 {
+                            combined_covariance[6*i + j] = position_base_covariance_matrix[3*i + j] * distrust as f64;
+                        }
+                    }
+
+                    for i in 0..3 {
+                        for j in 0..3 {
+                            combined_covariance[6*(i+3) + (j+3)] = orientation_base_covarience_matrix[3*i + j] * distrust as f64;
+                        }
+                    }
+
+                    result_vec.push(AprilTagMeasurement { 
+                        estimated_isometry: EncodableIsometry::from_na(
+                            &Isometry3::from_parts(position.into(), 
+                            UnitQuaternion::from_scaled_axis(orientation.into()))), 
+                        variance: combined_covariance
+                    });
+                }
             }
         }
-
-        if let Some(dets) = input2.payload() {
-            let camera_id = dets.camera_id.as_ref().clone();
-            let tags = self.cu_detections_to_tag_observations(dets, &camera_id);
-            if !tags.is_empty() {
-                let observer_iso = self.estimate_observer_isometry_from_observations(&tags)?;
-                result_map.insert(camera_id, EncodableIsometry::from_na(&observer_iso));
-            }
-        }
-
-        if let Some(dets) = input3.payload() {
-            let camera_id = dets.camera_id.as_ref().clone();
-            let tags = self.cu_detections_to_tag_observations(dets, &camera_id);
-            if !tags.is_empty() {
-                let observer_iso = self.estimate_observer_isometry_from_observations(&tags)?;
-                result_map.insert(camera_id, EncodableIsometry::from_na(&observer_iso));
-            }
-        }
-        if !result_map.is_empty() {
-            output.set_payload(Box::new(result_map));
+        
+        if !result_vec.is_empty() {
+            output.set_payload(result_vec);
         }
         Ok(())
     }
@@ -164,6 +260,7 @@ impl CuTask for AprilDetectionHandler {
     fn stop(&mut self, _clock: &RobotClock) -> CuResult<()> {
         Ok(())
     }
+    
 }
 
 impl AprilDetectionHandler {
@@ -192,44 +289,6 @@ impl AprilDetectionHandler {
         Isometry3::from_parts(physics_translation.into(), physics_rotation)
     }
 
-    /// estimates the observers isometry from each observation individually, and then averages them all together
-    /// additionally logs the tags known global coords to rerun with a timestamp so we know the tag has been seen recently.
-    /// filters out tags that are more than 3m away
-    fn estimate_observer_isometry_from_observations(
-        &self,
-        observations: &[TagObservation],
-    ) -> CuResult<Isometry3<f64>> {
-        let mut observer_isometries = Vec::new();
-
-        for observation in observations {
-            let isometry_of_observer = observation.get_isometry_of_observer();
-
-            if isometry_of_observer
-                .translation
-                .vector
-                .metric_distance(&observation.tag_global_isometry.translation.vector)
-                > 3.0
-            {
-                println!(
-                    "apriltag too far away, distance: {}",
-                    isometry_of_observer
-                        .translation
-                        .vector
-                        .metric_distance(&observation.tag_global_isometry.translation.vector)
-                );
-                continue;
-            }
-            observer_isometries.push(isometry_of_observer);
-        }
-
-        if observer_isometries.is_empty() {
-            return Err("No valid tag observations".into());
-        }
-
-        let combined = combine_isometries(&observer_isometries);
-
-        Ok(combined)
-    }
 
     fn cu_detections_to_tag_observations(
         &self,
@@ -239,6 +298,7 @@ impl AprilDetectionHandler {
         let mut apriltags = Vec::new();
         for (id, pose, _) in dets.filtered_by_decision_margin(60.0) {
             if !self.known_tags.contains_key(&id) {
+                eprintln!("apriltag {id} seen but not defined in list of known apriltags");
                 continue;
             }
 
@@ -303,98 +363,13 @@ impl AprilDetectionHandler {
     }
 }
 
-/// Helper to combine a list of isometries by averaging translation and quaternion
-fn combine_isometries(isometries: &[Isometry3<f64>]) -> Isometry3<f64> {
-    if isometries.is_empty() {
-        return Isometry3::identity();
-    }
-    if isometries.len() == 1 {
-        return isometries[0];
-    }
 
-    let mut sum_translation = Vector3::zeros();
-    for isometry in isometries {
-        sum_translation += isometry.translation.vector;
-    }
-    let mean_translation = sum_translation / isometries.len() as f64;
-
-    let mean_rotation = average_quaternions(
-        &isometries
-            .iter()
-            .map(|iso| iso.rotation)
-            .collect::<Vec<_>>(),
-    );
-
-    Isometry3::from_parts(Translation3::from(mean_translation), mean_rotation)
-}
-
-/// This method converts quaternions to rotation matrices, averages them, and converts back
-fn average_quaternions(quaternions: &[UnitQuaternion<f64>]) -> UnitQuaternion<f64> {
-    if quaternions.is_empty() {
-        return UnitQuaternion::identity();
-    }
-    if quaternions.len() == 1 {
-        return quaternions[0];
-    }
-
-    let mut sum_matrix = nalgebra::Matrix3::zeros();
-    for quat in quaternions {
-        sum_matrix += quat.to_rotation_matrix().matrix();
-    }
-    sum_matrix /= quaternions.len() as f64;
-
-    let svd = sum_matrix.svd(true, true);
-    if let (Some(u), Some(v_t)) = (svd.u, svd.v_t) {
-        let mut rotation_matrix = u * v_t;
-        if rotation_matrix.determinant() < 0.0 {
-            let mut u_corrected = u;
-            u_corrected.set_column(2, &(-u.column(2)));
-            rotation_matrix = u_corrected * v_t;
-        }
-
-        UnitQuaternion::from_rotation_matrix(&nalgebra::Rotation3::from_matrix_unchecked(
-            rotation_matrix,
-        ))
-    } else {
-        // Fallback to component averaging if SVD fails
-        average_quaternions_component_based(quaternions)
-    }
-}
-
-/// Fallback quaternion averaging using component-based approach
-/// This handles the quaternion double-cover issue (q and -q represent the same rotation)
-fn average_quaternions_component_based(quaternions: &[UnitQuaternion<f64>]) -> UnitQuaternion<f64> {
-    if quaternions.is_empty() {
-        return UnitQuaternion::identity();
-    }
-    if quaternions.len() == 1 {
-        return quaternions[0];
-    }
-
-    // Use the first quaternion as reference for handling double-cover
-    let reference = quaternions[0];
-    let mut sum = reference.coords;
-
-    for quat in &quaternions[1..] {
-        // Handle quaternion double-cover: choose the quaternion representation
-        let quat_coords = if reference.coords.dot(&quat.coords) >= 0.0 {
-            quat.coords
-        } else {
-            -quat.coords
-        };
-        sum += quat_coords;
-    }
-
-    // Average and normalize
-    let mean_coords = sum / quaternions.len() as f64;
-    UnitQuaternion::new_normalize(nalgebra::Quaternion::from(mean_coords))
-}
 
 use nalgebra::{
-    Isometry3, Matrix3, Matrix4, Quaternion, Rotation, Rotation3, Translation3, UnitQuaternion,
-    UnitVector3, Vector3,
+    Isometry3, Rotation3, UnitQuaternion,
+    Vector3,
 };
-use rerun::{Archetype, Arrows3D, Boxes3D, Vector3D};
+use rerun::{Boxes3D};
 
 /// An observation of the global orientation and position
 /// of the camera that observed an apriltag.
@@ -428,12 +403,27 @@ impl std::fmt::Debug for TagObservation {
 }
 
 impl TagObservation {
-    pub fn get_isometry_of_observer(&self) -> Isometry3<f64> {
+    /// Computes T_world_base: the robot base pose in arena/world coordinates.
+    /// Uses: world tag position * (tag observation)^-1 * (camera mount)^-1
+    /// Returns None if camera node doesn't exist.
+    pub fn get_isometry_of_observer(&self) -> Option<Isometry3<f64>> {
+        let camera_node = ROBOT_STATE.get()?.kinematic_root.get_node_with_name(&self.camera_id)?;
+
+        // inverse of the camera isometry relative to robot base
+        let camera_isometry_inverse = camera_node.get_isometry_from_base().inverse();
+
+
+        // tag local isometry is the observed location of the tag as if the camera was always at 0,0,0 facing forward
         let inv_rotation = self.tag_local_isometry.rotation.inverse();
-        self.tag_global_isometry
+
+        // this should be the isometry of the camera relative to the apriltags position.
+        let isometry_of_observer_in_camera_frame = self.tag_global_isometry
             * Isometry3::from_parts(
                 (inv_rotation * -self.tag_local_isometry.translation.vector).into(),
                 inv_rotation,
-            )
+            );
+        
+        // this should be the position of the robot base
+        Some(isometry_of_observer_in_camera_frame * camera_isometry_inverse)
     }
 }

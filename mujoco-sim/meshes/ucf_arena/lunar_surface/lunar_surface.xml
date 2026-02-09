@@ -183,7 +183,7 @@
     <mesh file="lunar_surface_collision_178.obj"/>
   </asset>
   <worldbody>
-    <body name="lunar_surface" pos="-2.6 4.5 -1.4">
+    <body name="lunar_surface" pos="-0.4 -2.59 0" euler="0 0 90 ">
       <geom mesh="lunar_surface" class="visual"/>
       <geom mesh="lunar_surface_collision_0" rgba="0.7402892448490246 0.5108973568050268 0.9755014953270393 1" class="collision"/>
       <geom mesh="lunar_surface_collision_1" rgba="0.9170332834800548 0.8637227759788206 0.45906501801541 1" class="collision"/>

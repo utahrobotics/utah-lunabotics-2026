@@ -1,0 +1,20 @@
+[gd_scene load_steps=2 format=3 uid="uid://buo5ncrpuluwh"]
+
+[ext_resource type="Texture2D" uid="uid://b8fyvsigu0r8h" path="res://Assets/Maps/Screenshot From 2026-01-14 21-57-20.png" id="1_87x0i"]
+
+[node name="Map" type="Control"]
+layout_mode = 3
+anchor_right = 0.095000006
+anchor_bottom = 0.10700001
+offset_right = -95.00001
+offset_bottom = -69.336006
+
+[node name="Lunabot" type="Node2D" parent="."]
+
+[node name="Panel" type="TextureRect" parent="."]
+layout_mode = 0
+offset_left = -29.0
+offset_top = 39.0
+offset_right = 1022.0
+offset_bottom = 814.0
+texture = ExtResource("1_87x0i")

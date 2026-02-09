@@ -15,55 +15,11 @@ http_archive(
 load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
 bazel_skylib_workspace()
 
-# Load maybe from bazel_skylib
-load("@bazel_skylib//lib:versions.bzl", "versions")
-load("@bazel_skylib//lib:dicts.bzl", "dicts")
-
-# Load rules_cc (needed for rules_rust)
-http_archive(
-    name = "rules_cc",
-    sha256 = "2037875b9a4456dce4a79d112a8ae885bbc4aad968e6587dca6e64f3a0900cdf",
-    strip_prefix = "rules_cc-0.0.9",
-    urls = ["https://github.com/bazelbuild/rules_cc/releases/download/0.0.9/rules_cc-0.0.9.tar.gz"],
-)
-
-load("@rules_cc//cc:repositories.bzl", "rules_cc_dependencies")
-rules_cc_dependencies()
-
-# Load iceoryx2 rules
-ICEORYX2_VERSION = "0.7.0"
-
-http_archive(
-    name = "iceoryx2",
-    sha256 = "f61d3d4b3998cf8dac3250cc27d206d36508ccff52010763169daad1cd8d9bc7",
-    strip_prefix = "iceoryx2-{}".format(ICEORYX2_VERSION),
-    urls = [
-        "https://github.com/eclipse-iceoryx/iceoryx2/archive/v{}.tar.gz".format(ICEORYX2_VERSION),
-    ],
-)
-
-# Load iceoryx rules
-ICEORYX_VERSION = "2.95.5"
-
-http_archive(
-    name = "iceoryx",
-    sha256 = "b68d0603ca39a852db5d12d8e83b0c7b560acdbe8d4cbcdfca1a07ada433bdd5",
-    strip_prefix = "iceoryx-{}".format(ICEORYX_VERSION),
-    url = "https://github.com/eclipse-iceoryx/iceoryx/archive/v{}.tar.gz".format(ICEORYX_VERSION),
-)
-
-load("@iceoryx//bazel:load_repositories.bzl", "load_repositories")
-load_repositories()
-
-load("@iceoryx//bazel:setup_repositories.bzl", "setup_repositories")
-setup_repositories()
-
-# Load Rust rules
-# Use v0.26 to support bazel v6.2
+# Load Rust rules FIRST - let it manage rules_cc
 http_archive(
     name = "rules_rust",
-    sha256 = "9d04e658878d23f4b00163a72da3db03ddb451273eb347df7d7c50838d698f49",
-    urls = ["https://github.com/bazelbuild/rules_rust/releases/download/0.26.0/rules_rust-v0.26.0.tar.gz"],
+    sha256 = "962075c164a603f43fb4a3d19615ab91e41bcd0581c8da2f70a1aef27381fe53",
+    urls = ["https://github.com/bazelbuild/rules_rust/releases/download/0.58.0/rules_rust-0.58.0.tar.gz"],
 )
 
 load("@rules_rust//rust:repositories.bzl", "rules_rust_dependencies", "rust_register_toolchains")
@@ -72,7 +28,7 @@ rules_rust_dependencies()
 rust_register_toolchains(
     edition = "2021",
     versions = [
-        "1.81.0"
+        "1.83.0"
     ],
 )
 
@@ -106,6 +62,34 @@ crate_universe_dependencies()
 
 load("@rules_rust//crate_universe:defs.bzl", "crates_repository")
 
+# Load iceoryx2 rules
+ICEORYX2_VERSION = "0.8.1"
+
+http_archive(
+    name = "iceoryx2",
+    sha256 = "203bbd2f984a21cc59732b259337d2a890afbaaf2295150fecc842e504eb1740",
+    strip_prefix = "iceoryx2-{}".format(ICEORYX2_VERSION),
+    urls = [
+        "https://github.com/eclipse-iceoryx/iceoryx2/archive/v{}.tar.gz".format(ICEORYX2_VERSION),
+    ],
+)
+
+# Load iceoryx rules
+ICEORYX_VERSION = "2.95.5"
+
+http_archive(
+    name = "iceoryx",
+    sha256 = "b68d0603ca39a852db5d12d8e83b0c7b560acdbe8d4cbcdfca1a07ada433bdd5",
+    strip_prefix = "iceoryx-{}".format(ICEORYX_VERSION),
+    url = "https://github.com/eclipse-iceoryx/iceoryx/archive/v{}.tar.gz".format(ICEORYX_VERSION),
+)
+
+load("@iceoryx//bazel:load_repositories.bzl", "load_repositories")
+load_repositories()
+
+load("@iceoryx//bazel:setup_repositories.bzl", "setup_repositories")
+setup_repositories()
+
 crates_repository(
     name = "crate_index",
     cargo_lockfile = "@iceoryx2//:Cargo.lock",
@@ -123,7 +107,6 @@ crates_repository(
         "@iceoryx2//:iceoryx2-bb/elementary/Cargo.toml",
         "@iceoryx2//:iceoryx2-bb/elementary-traits/Cargo.toml",
         "@iceoryx2//:iceoryx2-bb/lock-free/Cargo.toml",
-        "@iceoryx2//:iceoryx2-bb/log/Cargo.toml",
         "@iceoryx2//:iceoryx2-bb/memory/Cargo.toml",
         "@iceoryx2//:iceoryx2-bb/posix/Cargo.toml",
         "@iceoryx2//:iceoryx2-bb/system-types/Cargo.toml",
@@ -140,9 +123,22 @@ crates_repository(
         "@iceoryx2//:iceoryx2-pal/posix/Cargo.toml",
         "@iceoryx2//:iceoryx2-pal/testing/Cargo.toml",
         "@iceoryx2//:iceoryx2-services/discovery/Cargo.toml",
-        "@iceoryx2//:iceoryx2-tunnels/end-to-end-testing/Cargo.toml",
-        "@iceoryx2//:iceoryx2-tunnels/zenoh/Cargo.toml",
-        "@iceoryx2//:iceoryx2-userland/record-and-replay/Cargo.toml"
+        "@iceoryx2//:iceoryx2-userland/record-and-replay/Cargo.toml",
+        "@iceoryx2//:component-tests/rust/Cargo.toml",
+        "@iceoryx2//:iceoryx2-bb/concurrency/Cargo.toml",
+        "@iceoryx2//:iceoryx2-bb/conformance-test-macros/Cargo.toml",
+        "@iceoryx2//:iceoryx2-bb/linux/Cargo.toml",
+        "@iceoryx2//:iceoryx2-cal/conformance-tests/Cargo.toml",
+        "@iceoryx2//:iceoryx2-log/log/Cargo.toml",
+        "@iceoryx2//:iceoryx2-log/loggers/Cargo.toml",
+        "@iceoryx2//:iceoryx2-log/types/Cargo.toml",
+        "@iceoryx2//:iceoryx2-pal/os-api/Cargo.toml",
+        "@iceoryx2//:iceoryx2-tunnel/backend/Cargo.toml",
+        "@iceoryx2//:iceoryx2-tunnel/conformance-tests/Cargo.toml",
+        "@iceoryx2//:iceoryx2-tunnel/end-to-end-tests/Cargo.toml",
+        "@iceoryx2//:iceoryx2-tunnel/tunnel/Cargo.toml",
+        "@iceoryx2//:iceoryx2-tunnel/zenoh/Cargo.toml",
+        "@iceoryx2//:iceoryx2/conformance-tests/Cargo.toml",
     ],
 )
 

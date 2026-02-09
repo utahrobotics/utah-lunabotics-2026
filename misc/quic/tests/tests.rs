@@ -1,4 +1,4 @@
-use bincode::{Decode, Encode};
+use cu_bincode::{Decode, Encode};
 use quic::{QuicClient, QuicServer};
 use std::{net::SocketAddr, str::FromStr, thread, time::Duration};
 

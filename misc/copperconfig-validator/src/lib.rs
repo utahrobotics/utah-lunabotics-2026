@@ -138,6 +138,28 @@ pub struct IncludesConfig {
     pub missions: Option<Vec<String>>,
 }
 
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum BridgeChannel {
+    Rx { id: String },
+    Tx { id: String },
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct Bridge {
+    pub id: String,
+
+    #[serde(rename = "type")]
+    pub type_: String,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub config: Option<ComponentConfig>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub run_in_sim: Option<bool>,
+
+    pub channels: Vec<BridgeChannel>,
+}
+
 #[derive(Serialize, Deserialize, Default, Debug)]
 struct CuConfigRepresentation {
     tasks: Option<Vec<Node>>,
@@ -147,6 +169,7 @@ struct CuConfigRepresentation {
     runtime: Option<RuntimeConfig>,
     missions: Option<Vec<MissionsConfig>>,
     includes: Option<Vec<IncludesConfig>>,
+    bridges: Option<Vec<Bridge>>,
 }
 
 pub type ValidationGraph = StableDiGraph<Node, Cnx, u32>;
@@ -370,6 +393,20 @@ impl ConfigValidator {
                         result.missions = Some(missions);
                     }
                 }
+
+                if let Some(included_bridges) = included_representation.bridges {
+                    if result.bridges.is_none() {
+                        result.bridges = Some(included_bridges);
+                    } else {
+                        let mut bridges = result.bridges.take().unwrap();
+                        for included_bridge in included_bridges {
+                            if !bridges.iter().any(|b| b.id == included_bridge.id) {
+                                bridges.push(included_bridge);
+                            }
+                        }
+                        result.bridges = Some(bridges);
+                    }
+                }
             }
         }
 
@@ -435,6 +472,31 @@ impl ConfigValidator {
             }
         }
 
+        // Add bridge channels as synthetic nodes
+        if let Some(bridges) = &config.bridges {
+            for bridge in bridges {
+                for channel in &bridge.channels {
+                    let (channel_id, channel_type) = match channel {
+                        BridgeChannel::Rx { id } => (format!("{}/{}", bridge.id, id), "Rx"),
+                        BridgeChannel::Tx { id } => (format!("{}/{}", bridge.id, id), "Tx"),
+                    };
+
+                    let synthetic_node = Node {
+                        id: channel_id.clone(),
+                        type_: Some(format!("Bridge {} Channel", channel_type)),
+                        config: None,
+                        missions: None,
+                        background: None,
+                        run_in_sim: bridge.run_in_sim,
+                        logging: None,
+                    };
+
+                    let idx = graph.add_node(synthetic_node);
+                    node_map.insert(channel_id, idx);
+                }
+            }
+        }
+
         if let Some(connections) = &config.cnx {
             for cnx in connections {
                 if let Some(mid) = mission_id {
@@ -471,7 +533,7 @@ impl ConfigValidator {
         graph: &ValidationGraph,
         mission_id: Option<&str>,
     ) -> ValidationResult<()> {
-        let mission_str = mission_id
+        let _mission_str = mission_id
             .map(|m| format!(" (mission: {})", m))
             .unwrap_or_default();
 

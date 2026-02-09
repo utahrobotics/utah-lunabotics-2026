@@ -2,15 +2,21 @@ use std::collections::VecDeque;
 
 use common::{FromLunabase, LUNABOT_STAGE, LunabotStage, Steering};
 use embedded_common::ActuatorCommand;
-use iceoryx_types::IceoryxOccupancyGrid;
+use nalgebra::Vector2;
 use simple_motion::StaticNode;
 
-use crate::{ROOT_NODE, tasks::ai::jobs::Job};
+use crate::{
+    ROBOT_STATE,
+    tasks::{OccupancyGrid, ai::jobs::Job},
+};
 
 #[derive(Debug)]
 pub struct LunabotBlackboard {
-    pub root_node: StaticNode,
-    pub latest_obstacle_map: Option<IceoryxOccupancyGrid>,
+    /// Keeps track of the position of all parts of the robot
+    pub kinematic_root: StaticNode,
+
+    /// TODO fill out this comment
+    pub latest_local_map: Option<OccupancyGrid>,
 
     /// stores the last lift actuator message received from lunabase
     pub last_lift: Option<i8>,
@@ -32,29 +38,34 @@ pub struct LunabotBlackboard {
     /// but for autonomy we can't know that
     pub outgoing_steering_msg: Option<Steering>,
 
-    /// when the user clicks continue mission in lunabase, the stage stored here is what the bot wil continue with
-    pub last_mission: LunabotStage,
-
     pub current_mission: LunabotStage,
 
     pub yielded: bool,
 
     /// if a path following long running task is going, the job will be stored here
     pub path_follower: Option<Job<Steering>>,
+    /// if a path finding job is running, it will be stored here
+    pub path_finder: Option<Job<Vec<Vector2<f32>>>>,
+    /// the calculated path from the path finder job
+    pub calculated_path: Option<Vec<Vector2<f32>>>,
 }
 
 impl Default for LunabotBlackboard {
     fn default() -> Self {
         Self {
-            root_node: *ROOT_NODE.get().expect("ROOT_NODE not initialized"), // we should always have the root node, and if not then we might as well abort
+            kinematic_root: ROBOT_STATE
+                .get()
+                .expect("ROBOT_STATE not initialized")
+                .kinematic_root, // we should always have the root node, and if not then we might as well abort
+
             outgoing_actuator_msg_queue: VecDeque::new(),
             outgoing_steering_msg: Some(Steering::new(0.0, 0.0, 0.0)),
-            // when the user clicks continue mission for the first time, we move to manual
-            last_mission: LunabotStage::Manual,
             current_mission: LunabotStage::SoftStop,
-            latest_obstacle_map: None,
+            latest_local_map: None,
             last_lift: None,
             last_bucket: None,
+            path_finder: None,
+            calculated_path: None,
             last_steering: None,
             navigate_destination: None,
             yielded: false,
@@ -78,20 +89,15 @@ impl LunabotBlackboard {
                 self.last_steering = Some(*steering);
             }
             common::FromLunabase::Navigate(destination) => {
-                self.last_mission = LunabotStage::Autonomy;
                 self.current_mission = LunabotStage::Autonomy;
                 LUNABOT_STAGE.store(LunabotStage::Autonomy);
                 self.navigate_destination = Some(*destination);
             }
             common::FromLunabase::DigDump(..) => {
-                self.last_mission = LunabotStage::Autonomy;
                 self.current_mission = LunabotStage::Autonomy;
                 LUNABOT_STAGE.store(LunabotStage::Autonomy);
             }
-
-            // for now if the user cancels autonomy we dump them back into manual on continue mission
             common::FromLunabase::SoftStop => {
-                self.last_mission = LunabotStage::Manual;
                 self.current_mission = LunabotStage::SoftStop;
                 LUNABOT_STAGE.store(LunabotStage::SoftStop);
             }
@@ -99,9 +105,9 @@ impl LunabotBlackboard {
                 self.current_mission = LunabotStage::SoftStop;
                 LUNABOT_STAGE.store(LunabotStage::SoftStop);
             }
-            common::FromLunabase::ContinueMission => {
-                LUNABOT_STAGE.store(self.last_mission);
-                self.current_mission = self.last_mission;
+            common::FromLunabase::Manual => {
+                self.current_mission = LunabotStage::Manual;
+                LUNABOT_STAGE.store(LunabotStage::Manual);
             }
             _ => {}
         }

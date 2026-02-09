@@ -9,13 +9,14 @@ production = []
 
 [dependencies]
 realsense-rust = { version = "=1.1.0", features = ["buildtime-bindgen"] }
+t265-rs ={ git = "https://github.com/utahrobotics/t265-rs.git" }
 iceoryx2 = { workspace = true }
 nalgebra.workspace = true
 fxhash.workspace = true
 parking_lot.workspace = true
 
 # Dependencies from misc crates
-iceoryx-types = { path = "../../misc/iceoryx-types" }
+iceoryx-types = { path = "../../misc/iceoryx-types", features = ["production"] }
 
 crossbeam.workspace = true
 common.workspace = true
