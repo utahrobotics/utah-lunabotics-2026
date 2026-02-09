@@ -20,3 +20,41 @@ Example: If you're working on a GUI component, it should live in its own folder 
 # Other considerations
 
 As of now I am using the Compatibility renderer for speed. This choice is open to discussion. Feel free to propose changes to this readme.
+
+# Building for Android
+
+### install cargo ndk
+
+```
+cargo install cargo-ndk
+```
+
+### Then install the android target
+
+for example
+
+```
+rustup target add aarch64-linux-android
+```
+
+### Then set up the environment variables for
+
+- ANDROID_HOME
+- ANDROID_NDK_HOME
+
+### Then build the Gdextension library by running
+
+```
+cargo ndk -t aarch64-linux-android build --release
+```
+
+### Set up Godot Export
+
+In the Godot Editor go to Project -> Export 
+
+You will then need to make sure you have a correct Android sdk export template and jdk. The Godot editor should guide you through this process. 
+
+You can then export the apk and install it on the android device
+
+
+

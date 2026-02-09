@@ -12,3 +12,7 @@ macos.debug =            "res://../../target/debug/liblunabase_lib.dylib"
 macos.release =          "res://../../target/release/liblunabase_lib.dylib"
 macos.debug.arm64 =      "res://../../target/debug/liblunabase_lib.dylib"
 macos.release.arm64 =    "res://../../target/release/liblunabase_lib.dylib"
+
+android.debug.arm64 = "res://../../target/aarch64-linux-android/release/liblunabase_lib.so"
+android.release.arm64 = "res://../../target/aarch64-linux-android/release/liblunabase_lib.so"
+
