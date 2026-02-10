@@ -3,8 +3,9 @@
     "free_euler": [0.0, 0.0, 0.0], 
     "children": [
         {
-            "name": Some("T265_right"),
-            "origin": [0.10,0.20,0.0],
+            //t265
+            "name": Some("929122111514"),
+            "origin": [0.065,0.20,0.0],
             "euler": [180.0,0.0,90.0],
 
         },
@@ -19,7 +20,7 @@
         },
         {
             "name": Some("upper_depth_camera"),
-            "origin": [0.86, 0.0, 0.35],
+            "origin": [0.89, 0.0, 0.31],
             "euler": [0.0, 28.0, 0.0]
         },
         {
@@ -29,8 +30,8 @@
         },
         {
             "name": Some("cam_side"),
-            "origin": [0.20, 0.2, 0.0],
-            "euler": [0.0, 0.0, 90.0]
+            "origin": [0.155, 0.245, 0.0],
+            "euler": [0.0, 0.0, -90.0]
         },
         {
             "name": Some("low_right_camera"),

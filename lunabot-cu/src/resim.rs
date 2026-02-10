@@ -21,6 +21,8 @@ use robot_state::RobotState;
 use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, OnceLock, RwLock};
+
+use crate::default::SimStep;
 extern crate cu_bincode as bincode;
 
 const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
@@ -159,23 +161,25 @@ fn run_one_copperlist(
                 output.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
+            default::SimStep::T265Subscriber(..) => SimOverride::ExecutedBySim,
             default::SimStep::RealsenseSubscriber(..) => SimOverride::ExecutedBySim,
-
             default::SimStep::DetectorCamLaptopFront(..) => SimOverride::ExecutedBySim,
-
-            default::SimStep::LunabaseBridgeRxFromLunabaseRx(CuTaskCallbackState::Process(
-                _,
-                output,
-            )) => {
-                *output = msgs
-                    .get_lunabase_bridge_rx_from_lunabase_rx_output()
-                    .clone();
-
-                output.tov = robot_clock.now().into();
+            default::SimStep::LunabaseBridgeRxFromLunabaseRx { channel, msg } => {
+                *msg = msgs.get_lunabase_bridge_rx_from_lunabase_rx().clone();
+                msg.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
-            default::SimStep::LunabaseBridgeRxFromLunabaseRx(..) => SimOverride::ExecutedBySim,
-            // May want to temporarily add override for obstacle map recv until lidar simulation works
+            default::SimStep::LunabaseBridgeRxFromLunabaseRx{..} => SimOverride::ExecutedBySim,
+
+            default::SimStep::LunabaseBridgeBridge(..) => SimOverride::ExecutedBySim,
+            default::SimStep::LunabaseBridgeTxToLunabase {..} => SimOverride::ExecutedBySim,
+
+            default::SimStep::NewAi(..) => SimOverride::ExecuteByRuntime,
+            default::SimStep::DetectionHandler(..) => SimOverride::ExecuteByRuntime,
+            default::SimStep::L2KissIcp(..) => SimOverride::ExecuteByRuntime,
+            default::SimStep::OccupancyGridPipeline(..) => SimOverride::ExecuteByRuntime,
+            default::SimStep::Localizer(..) => SimOverride::ExecuteByRuntime,
+            default::SimStep::__Phantom(..) => SimOverride::ExecuteByRuntime,
             _ => SimOverride::ExecuteByRuntime,
         }
     };

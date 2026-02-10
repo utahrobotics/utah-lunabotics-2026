@@ -6,7 +6,7 @@
 #include "example.h"           // Unitree SDK helper utilities
 #include "imu_point_types.hpp" // ImuMsg & PointXYZIR structures
 
-#include "iox/duration.hpp"
+#include "iox2/bb/duration.hpp"
 #include "iox2/log.hpp"
 #include "iox2/node.hpp"
 #include "iox2/sample_mut.hpp"
@@ -23,7 +23,7 @@
 
 using namespace iox2;
 
-constexpr iox::units::Duration CYCLE_TIME = iox::units::Duration::fromMilliseconds(10);
+constexpr iox2::bb::Duration CYCLE_TIME = iox2::bb::Duration::from_millis(10);
 
 constexpr int ACCUMULATION_COUNT = 1;
 constexpr time_t WARMUP_DURATION_SECONDS = 3;
@@ -163,24 +163,58 @@ int main()
 
     // ---------------------- iceoryx2 setup -----------------------
     set_log_level_from_env_or(LogLevel::Fatal);
-    auto node = NodeBuilder().create<ServiceType::Ipc>().expect("node creation");
+    auto node_result = NodeBuilder().create<ServiceType::Ipc>();
+    if (!node_result.has_value()) {
+        std::cerr << "Failed to create node" << std::endl;
+        return -1;
+    }
+    auto node = std::move(node_result.value());
 
     // IMU service
-    auto imu_service = node.service_builder(ServiceName::create("unilidar/imu").expect("name"))
-                           .publish_subscribe<ImuMsg>()
-                           .enable_safe_overflow(true)
-                           .open_or_create()
-                           .expect("imu service");
+    auto imu_service_name = ServiceName::create("unilidar/imu");
+    if (!imu_service_name.has_value()) {
+        std::cerr << "Failed to create IMU service name" << std::endl;
+        return -1;
+    }
+    auto imu_service_result = node.service_builder(imu_service_name.value())
+                                  .publish_subscribe<ImuMsg>()
+                                  .enable_safe_overflow(true)
+                                  .open_or_create();
+    if (!imu_service_result.has_value()) {
+        std::cerr << "Failed to create IMU service" << std::endl;
+        return -1;
+    }
+    auto imu_service = std::move(imu_service_result.value());
 
     // Point service
-    auto point_service = node.service_builder(ServiceName::create("unilidar/cloud_full").expect("name"))
-                             .publish_subscribe<IceoryxPointCloud>()
-                             .enable_safe_overflow(true)
-                             .open_or_create()
-                             .expect("cloud");
+    auto point_service_name = ServiceName::create("unilidar/cloud_full");
+    if (!point_service_name.has_value()) {
+        std::cerr << "Failed to create point cloud service name" << std::endl;
+        return -1;
+    }
+    auto point_service_result = node.service_builder(point_service_name.value())
+                                    .publish_subscribe<IceoryxPointCloud>()
+                                    .enable_safe_overflow(true)
+                                    .open_or_create();
+    if (!point_service_result.has_value()) {
+        std::cerr << "Failed to create point cloud service" << std::endl;
+        return -1;
+    }
+    auto point_service = std::move(point_service_result.value());
 
-    auto imu_publisher = imu_service.publisher_builder().create().expect("imu publisher");
-    auto cloud_publisher = point_service.publisher_builder().create().expect("cloud publisher");
+    auto imu_publisher_result = imu_service.publisher_builder().create();
+    if (!imu_publisher_result.has_value()) {
+        std::cerr << "Failed to create IMU publisher" << std::endl;
+        return -1;
+    }
+    auto imu_publisher = std::move(imu_publisher_result.value());
+
+    auto cloud_publisher_result = point_service.publisher_builder().create();
+    if (!cloud_publisher_result.has_value()) {
+        std::cerr << "Failed to create cloud publisher" << std::endl;
+        return -1;
+    }
+    auto cloud_publisher = std::move(cloud_publisher_result.value());
 
     // ---------------------- Processing loop ----------------------
     LidarImuData imu_raw;
@@ -201,9 +235,17 @@ int main()
                 std::copy(std::begin(imu_raw.quaternion), std::end(imu_raw.quaternion), std::begin(msg.quaternion));
                 std::copy(std::begin(imu_raw.angular_velocity), std::end(imu_raw.angular_velocity), std::begin(msg.angular_velocity));
                 std::copy(std::begin(imu_raw.linear_acceleration), std::end(imu_raw.linear_acceleration), std::begin(msg.linear_acceleration));
-                auto sample = imu_publisher.loan_uninit().expect("imu loan");
+                auto sample_result = imu_publisher.loan_uninit();
+                if (!sample_result.has_value()) {
+                    std::cerr << "Failed to loan IMU sample" << std::endl;
+                    break;
+                }
+                auto sample = std::move(sample_result.value());
                 auto initialized = sample.write_payload(msg);
-                send(std::move(initialized)).expect("imu send");
+                auto send_result = send(std::move(initialized));
+                if (!send_result.has_value()) {
+                    std::cerr << "Failed to send IMU sample" << std::endl;
+                }
             }
             break;
         }
@@ -217,9 +259,18 @@ int main()
                     {
                         IceoryxPointCloud cloud = toIceoryxPointCloud(accumulator.accumulated_points);
 
-                        auto sample = cloud_publisher.loan_uninit().expect("cloud loan");
+                        auto sample_result = cloud_publisher.loan_uninit();
+                        if (!sample_result.has_value()) {
+                            std::cerr << "Failed to loan cloud sample" << std::endl;
+                            accumulator.reset();
+                            break;
+                        }
+                        auto sample = std::move(sample_result.value());
                         auto initialized = sample.write_payload(cloud);
-                        send(std::move(initialized)).expect("cloud send");
+                        auto send_result = send(std::move(initialized));
+                        if (!send_result.has_value()) {
+                            std::cerr << "Failed to send cloud sample" << std::endl;
+                        }
 
                         accumulator.reset();
                     }

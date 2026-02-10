@@ -19,26 +19,26 @@ members = [
 exclude = ["misc/usb-reset"]
 # Shared dependencies across workspace members
 [workspace.dependencies]
-cu29 = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "merge_test", package = "cu29", features = [
+cu29 = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu29", features = [
     "log-level-info",
     "std",
     "log-level-error",
 ] }
-cu29-export = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "merge_test", package = "cu29-export" }
+cu29-export = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu29-export" }
 
 cu-bincode = { version = "2.0.2", features = ["derive", "serde"] }
-cu29-helpers = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "merge_test", package = "cu29-helpers" }
-cu-apriltag = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "merge_test", package = "cu-apriltag" }
+cu29-helpers = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu29-helpers" }
+cu-apriltag = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu-apriltag" }
 # cu-consolemon = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu-consolemon" }
-cu-sensor-payloads = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "merge_test", package = "cu-sensor-payloads" }
-cu-spatial-payloads = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "merge_test", package = "cu-spatial-payloads", features = [
+cu-sensor-payloads = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu-sensor-payloads" }
+cu-spatial-payloads = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu-spatial-payloads", features = [
     "nalgebra",
 ] }
-cu29-runtime = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "merge_test", package = "cu29-runtime" }
-cu-gstreamer = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "merge_test", package = "cu-gstreamer", features = [
+cu29-runtime = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu29-runtime" }
+cu-gstreamer = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu-gstreamer", features = [
     "gst",
 ] }
-iceoryx2 = { version = "0.7.0" }
+iceoryx2 = { version = "0.8.1" }
 crossbeam = "0.8"
 crossbeam-channel = "0.5"
 

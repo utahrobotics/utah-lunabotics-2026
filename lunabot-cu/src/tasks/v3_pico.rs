@@ -1,10 +1,12 @@
 #[cfg(feature = "production")]
 mod prod_impl {
     use std::sync::Arc;
+    use std::sync::OnceLock;
     use std::time::Duration;
 
     use crate::utils::CobsCodec;
     use crate::utils::udev_poll;
+    use crossbeam::atomic::AtomicCell;
     use crossbeam::queue::ArrayQueue;
     use crossbeam_channel::Receiver;
     use cu29::prelude::*;
@@ -25,6 +27,8 @@ mod prod_impl {
     use udev::EventType;
     use udev::MonitorBuilder;
     use udev::Udev;
+    use std::time::Instant;
+    pub static LAST_RESET: OnceLock<AtomicCell<Instant>> = OnceLock::new();
 
     pub struct V3PicoTask {
         /// when a v3 pico is connected, it's serial port will be available on this rx
@@ -34,6 +38,9 @@ mod prod_impl {
 
         /// Message queue read from the pico
         from_pico: Arc<&'static ArrayQueue<FromPicoV3>>,
+        last_reading: Instant,
+        /// prevents us from powercycling a bajillion times in a row
+        last_powercycle: Instant,
     }
 
     impl Freezable for V3PicoTask {}
@@ -57,21 +64,21 @@ mod prod_impl {
                 let mut monitor = match MonitorBuilder::new() {
                     Ok(x) => x,
                     Err(e) => {
-                        error!("Failed to create udev monitor: {}", e.to_string());
+                        eprintln!("Failed to create udev monitor: {}", e.to_string());
                         return;
                     }
                 };
                 monitor = match monitor.match_subsystem("tty") {
                     Ok(x) => x,
                     Err(e) => {
-                        error!("Failed to set match-subsystem filter: {}", e.to_string());
+                        eprintln!("Failed to set match-subsystem filter: {}", e.to_string());
                         return;
                     }
                 };
                 let listener = match monitor.listen() {
                     Ok(x) => x,
                     Err(e) => {
-                        error!("Failed to listen for udev events: {}", e.to_string());
+                        eprintln!("Failed to listen for udev events: {}", e.to_string());
                         return;
                     }
                 };
@@ -80,25 +87,25 @@ mod prod_impl {
                     let udev = match Udev::new() {
                         Ok(x) => x,
                         Err(e) => {
-                            error!("Failed to create udev context: {}", e.to_string());
+                            eprintln!("Failed to create udev context: {}", e.to_string());
                             return;
                         }
                     };
                     match udev::Enumerator::with_udev(udev) {
                         Ok(x) => x,
                         Err(e) => {
-                            error!("Failed to create udev enumerator: {}", e.to_string());
+                            eprintln!("Failed to create udev enumerator: {}", e.to_string());
                             return;
                         }
                     }
                 };
                 if let Err(e) = enumerator.match_subsystem("tty") {
-                    error!("Failed to set match-subsystem filter: {}", e.to_string());
+                    eprintln!("Failed to set match-subsystem filter: {}", e.to_string());
                 }
                 let devices = match enumerator.scan_devices() {
                     Ok(x) => x,
                     Err(e) => {
-                        error!("Failed to scan devices: {}", e.to_string());
+                        eprintln!("Failed to scan devices: {}", e.to_string());
                         return;
                     }
                 };
@@ -122,19 +129,20 @@ mod prod_impl {
                             return;
                         };
                         let Some(serial) = serial_cstr.to_str() else {
-                            warning!("Failed to parse serial of device {}", path_str);
+                            eprintln!("Failed to parse serial of device {}", path_str);
                             return;
                         };
                         match serial.strip_prefix("USR_V3PICO_") {
                             Some(_) => {
                                 if path_tx.send(path.to_string_lossy().to_string()).is_err() {
-                                    warning!("Couldn't send controller path");
+                                    eprintln!("Couldn't send controller path");
                                 }
+                                println!("[Info] Opened pico");
                             }
                             None if serial == "USR_V3PICO" => {
-                                warning!(
+                                println!(
                                     "Actuator controller at path {} has no serial number",
-                                    path
+                                    path.to_string_lossy()
                                 );
                             }
                             None => {} // Device doesn't match, silently ignore
@@ -147,6 +155,8 @@ mod prod_impl {
                 is_broken: None,
                 from_pico,
                 serial_port_writer: None,
+                last_reading: Instant::now(),
+                last_powercycle: Instant::now()
             })
         }
 
@@ -165,7 +175,7 @@ mod prod_impl {
                 {
                     Ok(mut x) => {
                         if let Err(e) = x.set_exclusive(true) {
-                            warning!(
+                            eprintln!(
                                 "Failed to set V3Pico controller port {} exclusive: {}",
                                 path_str,
                                 e.to_string()
@@ -187,7 +197,7 @@ mod prod_impl {
             });
             if port.is_none() {
                 return Err(CuError::new_with_cause(
-                    "fialed to open port",
+                    "failed to open port",
                     std::io::Error::other("failed to open port"),
                 ));
             }
@@ -237,10 +247,14 @@ mod prod_impl {
             }
             if let Some(reading) = self.from_pico.pop() {
                 output.set_payload(reading);
+                self.last_reading = Instant::now();
             } else {
                 output.clear_payload();
             }
 
+            if self.last_reading.elapsed().as_millis() > 1000 {
+                return Err(CuError::new_with_cause("Pico Unresponsive", std::io::Error::other("Pico Unresponsive")));
+            }
             Ok(())
         }
 
@@ -250,8 +264,7 @@ mod prod_impl {
             if let Some(ref is_broken) = self.is_broken
                 && *is_broken.borrow()
             {
-                error!("Pico broken");
-                let _ = powercycle_ioctl();
+                self.powercycle_ioctl();
                 return Err(CuError::new_with_cause(
                     "Error reading form pico",
                     std::io::Error::other("is broken signal received"),
@@ -277,50 +290,61 @@ mod prod_impl {
                 tokio::time::sleep(std::time::Duration::from_millis(IMU_READING_DELAY_MS - 1))
                     .await;
                 let Ok(reading) = timeout(Duration::from_millis(200), reader.next()).await else {
-                    error!("Pico has become unresponsive.");
+                    eprintln!("Pico has become unresponsive.");
                     let _ = is_broken_tx.send(true);
                     break;
                 };
                 if let Some(Err(e)) = reading {
                     let _ = is_broken_tx.send(true);
-                    error!("failed to read from pico: {}", e.to_string());
+                    eprintln!("failed to read from pico: {}", e.to_string());
                     break;
                 }
                 if let None = reading {
                     no_reading_count += 1;
                     if no_reading_count <= 5 {
                         let _ = is_broken_tx.send(true);
-                        error!("Pico has become unresponsive. (no reading count)");
+                        eprintln!("Pico has become unresponsive. (no reading count)");
                         break;
                     }
                     continue;
                 }
                 let reading = reading.unwrap().unwrap();
                 let Ok(reading) = reading.try_into() else {
-                    warning!("not 105 bytes");
+                    eprintln!("not 105 bytes");
                     continue;
                 };
                 let Ok(reading) = FromPicoV3::deserialize(reading) else {
-                    error!("Failed to deserialize message from picov3 serial port");
+                    eprintln!("Failed to deserialize message from picov3 serial port");
                     let _ = is_broken_tx.send(true);
                     break;
                 };
                 if let Err(_) = from_pico.push(reading) {
-                    error!("From Pico queue full, dropping reading");
+                    eprintln!("From Pico queue full, dropping reading");
                     // is_broken_tx.send(true).unwrap();
                     break;
                 }
             }
         })
     }
+    impl V3PicoTask {
 
-    /// install this binary from misc/usb-reset
-    fn powercycle_ioctl() -> Result<(), std::io::Error> {
-        let _ = std::process::Command::new("usb-reset")
-            .arg("v3pico")
-            .spawn()?;
-        std::thread::sleep(Duration::from_secs_f32(0.02));
-        Ok(())
+        /// install this binary from misc/usb-reset
+        fn powercycle_ioctl(&mut self) {
+            if self.last_powercycle.elapsed().as_secs() > 1 {
+                eprintln!("Pico broken, powercycling");
+                get_tokio_handle().spawn(async {
+                    match std::process::Command::new("usb-reset")
+                        .arg("v3pico").spawn() {
+                            Ok(_) => {
+                            },
+                            Err(e) => {
+                                println!("Ioctl failed: {e}");
+                            },
+                        }
+                });
+                self.last_powercycle = Instant::now();
+            }
+        }
     }
 }
 

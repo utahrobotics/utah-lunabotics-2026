@@ -15,7 +15,59 @@ http_archive(
 load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
 bazel_skylib_workspace()
 
-# Load Rust rules FIRST - let it manage rules_cc
+# Load maybe from bazel_skylib
+load("@bazel_skylib//lib:versions.bzl", "versions")
+load("@bazel_skylib//lib:dicts.bzl", "dicts")
+
+# Load protobuf (required by rules_cc 0.1.1+)
+http_archive(
+    name = "com_google_protobuf",
+    sha256 = "1535151efbc7893f38b0578e83cac584f2819974f065698976989ec71c1af84a",
+    strip_prefix = "protobuf-27.3",
+    urls = ["https://github.com/protocolbuffers/protobuf/archive/v27.3.tar.gz"],
+)
+
+# Load rules_cc (needed for rules_rust 0.58+)
+http_archive(
+    name = "rules_cc",
+    sha256 = "712d77868b3152dd618c4d64faaddefcc5965f90f5de6e6dd1d5ddcd0be82d42",
+    strip_prefix = "rules_cc-0.1.1",
+    urls = ["https://github.com/bazelbuild/rules_cc/releases/download/0.1.1/rules_cc-0.1.1.tar.gz"],
+)
+
+load("@rules_cc//cc:repositories.bzl", "rules_cc_dependencies")
+rules_cc_dependencies()
+
+# Load iceoryx2 rules
+ICEORYX2_VERSION = "0.8.1"
+
+http_archive(
+    name = "iceoryx2",
+    sha256 = "203bbd2f984a21cc59732b259337d2a890afbaaf2295150fecc842e504eb1740",
+    strip_prefix = "iceoryx2-{}".format(ICEORYX2_VERSION),
+    urls = [
+        "https://github.com/eclipse-iceoryx/iceoryx2/archive/v{}.tar.gz".format(ICEORYX2_VERSION),
+    ],
+)
+
+# Load iceoryx rules
+ICEORYX_VERSION = "2.95.5"
+
+http_archive(
+    name = "iceoryx",
+    sha256 = "b68d0603ca39a852db5d12d8e83b0c7b560acdbe8d4cbcdfca1a07ada433bdd5",
+    strip_prefix = "iceoryx-{}".format(ICEORYX_VERSION),
+    url = "https://github.com/eclipse-iceoryx/iceoryx/archive/v{}.tar.gz".format(ICEORYX_VERSION),
+)
+
+load("@iceoryx//bazel:load_repositories.bzl", "load_repositories")
+load_repositories()
+
+load("@iceoryx//bazel:setup_repositories.bzl", "setup_repositories")
+setup_repositories()
+
+# Load Rust rules
+# Must match iceoryx2 v0.8.1 requirements
 http_archive(
     name = "rules_rust",
     sha256 = "962075c164a603f43fb4a3d19615ab91e41bcd0581c8da2f70a1aef27381fe53",
@@ -61,34 +113,6 @@ load("@rules_rust//crate_universe:repositories.bzl", "crate_universe_dependencie
 crate_universe_dependencies()
 
 load("@rules_rust//crate_universe:defs.bzl", "crates_repository")
-
-# Load iceoryx2 rules
-ICEORYX2_VERSION = "0.8.1"
-
-http_archive(
-    name = "iceoryx2",
-    sha256 = "203bbd2f984a21cc59732b259337d2a890afbaaf2295150fecc842e504eb1740",
-    strip_prefix = "iceoryx2-{}".format(ICEORYX2_VERSION),
-    urls = [
-        "https://github.com/eclipse-iceoryx/iceoryx2/archive/v{}.tar.gz".format(ICEORYX2_VERSION),
-    ],
-)
-
-# Load iceoryx rules
-ICEORYX_VERSION = "2.95.5"
-
-http_archive(
-    name = "iceoryx",
-    sha256 = "b68d0603ca39a852db5d12d8e83b0c7b560acdbe8d4cbcdfca1a07ada433bdd5",
-    strip_prefix = "iceoryx-{}".format(ICEORYX_VERSION),
-    url = "https://github.com/eclipse-iceoryx/iceoryx/archive/v{}.tar.gz".format(ICEORYX_VERSION),
-)
-
-load("@iceoryx//bazel:load_repositories.bzl", "load_repositories")
-load_repositories()
-
-load("@iceoryx//bazel:setup_repositories.bzl", "setup_repositories")
-setup_repositories()
 
 crates_repository(
     name = "crate_index",

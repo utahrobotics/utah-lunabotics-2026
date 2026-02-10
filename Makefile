@@ -1,17 +1,22 @@
 # Bazel build configuration
 BAZEL_BUILD_FLAGS = --sandbox_debug --verbose_failures --spawn_strategy=standalone
-RUST_TOOLCHAIN_VERSION = 1.81.0
+RUST_TOOLCHAIN_VERSION = 1.83.0
 UNILIDAR_DIR = unilidar_iceoryx_publisher
+PERF = false
+
+# Conditional cargo command: use samply for profiling when PERF=true
+CARGO_CMD = $(shell if [ "$(PERF)" = "true" ]; then echo "cargo samply --profile release"; else echo "cargo run --release"; fi)
+CARGO_CMD_DEBUG = $(shell if [ "$(PERF)" = "true" ]; then echo "cargo samply"; else echo "cargo run"; fi)
 
 # Build the unilidar_publisher with Bazel and run the main cargo project
 prod:
 	cd $(UNILIDAR_DIR) && RULES_RUST_TOOLCHAIN_VERSION=$(RUST_TOOLCHAIN_VERSION) bazel build //:unilidar_publisher $(BAZEL_BUILD_FLAGS)
-	cd lunabot-cu && cargo run --release --features production
+	cd lunabot-cu && $(CARGO_CMD) --features production
 
 # Build the unilidar_publisher with Bazel and run the main cargo project in debug mode
 debug:
 	cd $(UNILIDAR_DIR) && RULES_RUST_TOOLCHAIN_VERSION=$(RUST_TOOLCHAIN_VERSION) bazel build //:unilidar_publisher $(BAZEL_BUILD_FLAGS)
-	cd lunabot-cu && cargo run --features production
+	cd lunabot-cu && $(CARGO_CMD_DEBUG) --features production
 
 # Sync Bazel dependencies (useful to run before first build or when dependencies change)
 sync:
@@ -19,11 +24,15 @@ sync:
 
 # run re-simulation
 resim:
-	cd lunabot-cu && cargo run --release --bin lunabot-resim --features resim
+	cd lunabot-cu && $(CARGO_CMD) --bin lunabot-resim --features resim
 
 # Run the MuJoCo Simulation. Must include "ucf" or "artemis" as an env variable for it to load
 sim:
-	cd lunabot-cu && cargo run --release --bin lunabot-sim --features sim ${SIM_ARENA}
+ifeq ($(PERF),true)
+	cd lunabot-cu && $(CARGO_CMD) --bin lunabot-sim --features sim -- ${SIM_ARENA}
+else
+	cd lunabot-cu && $(CARGO_CMD) --bin lunabot-sim --features sim ${SIM_ARENA}
+endif
 
 # Clean build and sync, then build everything
 clean-build: clean sync
@@ -92,13 +101,18 @@ help:
 	@echo "  clean             - Clean Bazel build artifacts"
 	@echo "  kill              - Kill any lunabot sub processes that may still be running"
 	@echo "  help              - Show this help message"
-	@echo "  resim			   - Run re-simulation from logs/lunabot.copper"
-	@echo "  clear-logs        - Removes all unified logs from the simulation"
+	@echo "  resim             - Run re-simulation from logs/lunabot.copper"
+	@echo "  clear-simlogs     - Removes all unified logs from the simulation"
 	@echo "  clear-logs        - Removes all copper unified logs"
 	@echo "  sim               - Runs the Mujoco simulation"
 	@echo "  build-lunabase    - Builds the lunabase library"
 	@echo "  edit-lunabase     - Opens the lunabase Godot project after building the lunabase library"
 	@echo "  autostart         - Runs the Lunabot control panel on port 8080"
+	@echo ""
+	@echo "Profiling:"
+	@echo "  Set PERF=true to profile with cargo-samply (opens flamegraph in browser)"
+	@echo "  Example: make sim PERF=true SIM_ARENA=ucf"
+	@echo "  Example: make prod PERF=true"
 
 
 .PHONY: prod debug sync clean-build build-publisher discover-cameras check clean help

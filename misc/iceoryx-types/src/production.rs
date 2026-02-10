@@ -122,7 +122,7 @@ pub struct ImuMsg {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, Default, Encode, Decode, ZeroCopySend, Serialize, Deserialize)]
+#[derive(Clone, Debug, Copy, Default, Encode, Decode, ZeroCopySend, Serialize, Deserialize)]
 #[type_name("PoseMsg")]
 pub struct PoseMsg {
     /// position in meters
@@ -131,6 +131,7 @@ pub struct PoseMsg {
     pub quaternion: [f32; 4],
 
     pub confidence: T265Confidence,
+    pub serial_num: u64,
 }
 
 #[derive(
