@@ -215,19 +215,20 @@ impl OccupancyGrid {
 
     // permanent obstacles that should not be overwritten by sensor data
     fn paint_permanent_obstacles(&mut self, obstacles: &ArenaObstacles) {
-        const PERMANENT_GRADIENT: f32 = 10.0;  // gradient value marks permanent 
+        const PERMANENT_GRADIENT: f32 = 10.0;  // gradient value marks permanent
 
-        // for &(min_x, min_y, max_x, max_y) in &obstacles.walls {
-        //     if let (Ok((x1, y1)), Ok((x2, y2))) =
-        //         (self.world_to_cell(min_x, min_y), self.world_to_cell(max_x, max_y))
-        //     {
-        //         for x in x1..=x2 {
-        //             for y in y1..=y2 {
-        //                 let _ = self.set_gradient_at(x, y, PERMANENT_GRADIENT);
-        //             }
-        //         }
-        //     }
-        // }
+        // Paint rectangular walls
+        for &(min_x, min_y, max_x, max_y) in &obstacles.walls {
+            if let (Ok((x1, y1)), Ok((x2, y2))) =
+                (self.world_to_cell(min_x, min_y), self.world_to_cell(max_x, max_y))
+            {
+                for x in x1..=x2 {
+                    for y in y1..=y2 {
+                        let _ = self.set_gradient_at(x, y, PERMANENT_GRADIENT);
+                    }
+                }
+            }
+        }
 
         // Paint circular obstacles (pillars, boulders, craters)
         let all_circles = obstacles.pillars.iter()
@@ -328,7 +329,7 @@ impl CuTask for OccupancyGridTask {
                     }
                     let colors_len = colors.len(); //appease the borrowchecker
                     if !points.is_empty() {
-                        logger.recorder.log(
+                        logger.recorder.log_static(
                             "realsense/permanent_obstacles",
                             &Points2D::new(points).with_colors(colors),
                         ).unwrap();
@@ -777,7 +778,18 @@ impl OccupancyGridTask {
                 let Ok((gx, gy)) = global_map.world_to_cell(world_coords.0, world_coords.1) else {
                     continue;
                 };
-                global_map.set_gradient_at(gx, gy, gradient)?;
+
+                // Protect permanent obstacles from being overwritten by sensor data
+                // Permanent obstacles use gradient=10.0, sensor data uses ~0-3
+                const PERMANENT_THRESHOLD: f32 = 5.0;
+                if let Ok(Some(existing)) = global_map.gradient_at(gx, gy) {
+                    if existing < PERMANENT_THRESHOLD {
+                        global_map.set_gradient_at(gx, gy, gradient)?;
+                    }
+                } else {
+                    // Cell is unmapped (f32::MIN), safe to update
+                    global_map.set_gradient_at(gx, gy, gradient)?;
+                }
             }
         }
 
