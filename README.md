@@ -194,6 +194,11 @@ Package Manager: [Chocolatey](https://chocolatey.org/install). Follow the instru
 make discover-cameras
 ```
 
+## Profiling
+
+1. Install [samply](https://crates.io/crates/cargo-samply) 
+2. run ```make sim PERF=true``` or ```make prod PERF=true``` to profile. 
+
 # Trouble Shooting
 List of common problems and how to fix them can be found [here](https://github.com/utahrobotics/utah-lunabotics-2026/blob/main/TROUBLESHOOTING.md)
 
