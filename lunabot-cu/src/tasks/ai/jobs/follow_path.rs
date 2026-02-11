@@ -4,7 +4,6 @@ use crate::rerun_viz;
 use crate::rerun_viz::RECORDER;
 use common::Steering;
 use nalgebra::Vector2;
-use rerun::Archetype;
 use simple_motion::StaticNode;
 use tasker::tokio::{
     self,
@@ -15,27 +14,31 @@ use crate::tasks::ai::jobs::Job;
 
 /// Distance between wheels, in m. Used for calculating the turning circle.
 const WHEEL_BASE_SIZE: f32 = 0.6; // TODO Find real numbers
-/// Adjustment to sharpness of turns. Higher values result in sharper turns,
-/// deviating from the theoretical circle to the target point.
-const TURNING_RATIO_ADJUSTMENT: f32 = 15.0;
-/// How fast the robot should move when following the dot. Error in position
-/// is also considered.
-const FOLLOW_SPEED_FACTOR: f32 = 0.25;
+/// Default value for adjustment to sharpness of turns. Higher values result in
+/// sharper turns, deviating from the theoretical circle to the target point.
+const DEFAULT_TURNING_RATIO_ADJUSTMENT: f32 = 15.0;
+/// How fast the robot should move when following the dot by default. Error in
+/// position is also considered.
+const DEFAULT_FOLLOW_SPEED_FACTOR: f32 = 0.25;
 /// If the robot is closer to the dot than this distance, it will not move 
 /// towards the dot, to avoid wild spinning from the tiny distances involved.
 const MIN_FOLLOW_DISTANCE: f32 = 0.1;
-/// The maximum speed at which the dot will move along the given path. Provides
-/// a cap for the inverse square law used to determine dot speed. In m/s.
-const MAX_DOT_SPEED: f32 = 0.75;
-/// How fast the dot will move when the robot is 1 meter away. In m/s. The dot
-/// follows an inverse square law with robot distance.
-const DOT_SPEED_FACTOR: f32 = 0.35;
+/// The maximum speed at which the dot will move along the given path, as a
+/// factor of the follow speed factor. Provides a cap for the inverse square
+/// law used to determine dot speed. Dimensionless, but operates on m/s.
+const MAX_DOT_SPEED_FACTOR: f32 = 2.5;
+/// How fast the dot will move when the robot is 1 meter away by default. In m/s. 
+/// The dot follows an inverse square law with robot distance.
+const DEFAULT_DOT_SPEED_FACTOR: f32 = 0.35;
 /// If the robot is closer to the goal than this distance, it will zero steering
-/// and end the job.
-const COMPLETION_DISTANCE: f32 = 0.25;
+/// and end the job by default.
+const DEFAULT_COMPLETION_DISTANCE: f32 = 0.25;
 /// If the robot moves slower than this, it is considered stuck and the job
-/// will fail if it stays like this for too long.
-const STUCK_SPEED: f32 = 0.15;
+/// will fail if it stays like this for too long by default.
+const DEFAULT_STUCK_SPEED: f32 = 0.15;
+/// How long the robot must be moving slower than a given threshold to be considered
+/// stuck and fail the job by default.
+const DEFAULT_STUCK_TIMEOUT: f32 = 5.0;
 /// How long each loop of the controller should be.
 const DT: f32 = 0.05;
 
@@ -50,6 +53,24 @@ const DT: f32 = 0.05;
 /// * Robot fails to move significantly in stuck_timeout_secs.
 /// * Job is canceled.
 /// 
+/// ## Parameters
+/// * `chain` - The kinematic chain which will be used to get robot position.
+/// * `path` - The list of 2D points used to define the path to follow.
+/// * `turning_ratio_adjustment` - An adjustment factor on turning speed, for
+///     when sharper turning is desired.
+/// * `follow_speed_factor` - How fast the robot should try to move when the
+///     dot is one meter away. Robot speed follows an inverse law with distance
+///     to dot. (in m/s).
+/// * `dot_speed_factor` - How fast the dot should try to move when the
+///     robot is one meter away. Dot speed follows an inverse square law with
+///     distance to robot. (in m/s).
+/// * `completion_distance` - If the robot is closer to the endpoint than this,
+///     it is considered done and the job succeeds. (in m)
+/// * `stuck_speed` - If the robot is moving slower than this, it is considered
+///     stuck, and will fail out of the job if it stays like that for too long. (in m/s).
+/// * `stuck_timeout_secs` - If the robot stays at too slow of a speed for this long
+///     (continuously), it will fail out of the job. (in s).
+/// 
 /// ## Details
 /// A traditional pursuit controller has been adapted in two ways:
 /// * Adapted to non-holonomic control.
@@ -63,10 +84,23 @@ const DT: f32 = 0.05;
 /// Additionally, the dot moves faster when the robot is closer, according to an
 /// inverse square law.
 pub fn follow_path_job(
-    stuck_timeout_secs: f32,
-    chain: StaticNode,
-    path: Vec<Vector2<f32>>,
+    chain:                    StaticNode,
+    path:                     Vec<Vector2<f32>>,
+    turning_ratio_adjustment: impl Into<Option<f32>>,
+    follow_speed_factor:      impl Into<Option<f32>>,
+    dot_speed_factor:         impl Into<Option<f32>>,
+    completion_distance:      impl Into<Option<f32>>,
+    stuck_speed:              impl Into<Option<f32>>,
+    stuck_timeout_secs:       impl Into<Option<f32>>,
 ) -> Job<Steering> {
+    // Unwrap all the parameters to allow defaults
+    let turning_ratio_adjustment = turning_ratio_adjustment.into().unwrap_or(DEFAULT_TURNING_RATIO_ADJUSTMENT);
+    let follow_speed_factor      = follow_speed_factor     .into().unwrap_or(DEFAULT_FOLLOW_SPEED_FACTOR);
+    let dot_speed_factor         = dot_speed_factor        .into().unwrap_or(DEFAULT_DOT_SPEED_FACTOR);
+    let completion_distance      = completion_distance     .into().unwrap_or(DEFAULT_COMPLETION_DISTANCE);
+    let stuck_speed              = stuck_speed             .into().unwrap_or(DEFAULT_STUCK_SPEED);
+    let stuck_timeout_secs       = stuck_timeout_secs      .into().unwrap_or(DEFAULT_STUCK_TIMEOUT);
+
     let (status_tx, status_rx) = watch::channel(bonsai_bt::Status::Running);
     let (output_tx, output_rx) = mpsc::channel(5);
     Job::spawn(
@@ -100,7 +134,7 @@ pub fn follow_path_job(
                 let error = dot - robot_pos;
 
                 // Check if stuck
-                if (robot_pos - previous_robot_pos).norm_squared() / (DT*DT) < STUCK_SPEED*STUCK_SPEED {
+                if (robot_pos - previous_robot_pos).norm_squared() / (DT*DT) < stuck_speed*stuck_speed {
                     stuck_timer += DT;
                     // DEBUG
                     //println!("Follower stuck! Count at {:.3}", stuck_timer);
@@ -113,7 +147,7 @@ pub fn follow_path_job(
                 }
 
                 // In m/s. Moves faster when robot is closer, by inverse square law.
-                let dot_speed = (DOT_SPEED_FACTOR / error.norm_squared()).min(MAX_DOT_SPEED);
+                let dot_speed = (dot_speed_factor / error.norm_squared()).min(MAX_DOT_SPEED_FACTOR * follow_speed_factor);
 
                 // Update dot location
                 dot_distance += DT * dot_speed;
@@ -137,8 +171,8 @@ pub fn follow_path_job(
                     //   Radius is proportional to the ratio of velocity to angular velocity:
                     //   https://www.desmos.com/calculator/f7grn652s4
                     // TODO Fix problems with dot being behind bot
-                    let velocity = FOLLOW_SPEED_FACTOR * target_distance; // will be fixed by normalization
-                    let turning = velocity * WHEEL_BASE_SIZE * TURNING_RATIO_ADJUSTMENT * 0.5 / radius;
+                    let velocity = follow_speed_factor * target_distance; // will be fixed by normalization
+                    let turning = velocity * WHEEL_BASE_SIZE * turning_ratio_adjustment * 0.5 / radius;
 
                     Steering::new_ik(velocity as f64, turning as f64, 5000.0)
                 } else {
@@ -150,7 +184,7 @@ pub fn follow_path_job(
                 // Prepare for next cycle
                 previous_robot_pos = robot_pos;
 
-                if dot_distance > path_parameter_boundaries[path.len() - 1] && error.norm_squared() < COMPLETION_DISTANCE * COMPLETION_DISTANCE {
+                if dot_distance > path_parameter_boundaries[path.len() - 1] && error.norm_squared() < completion_distance*completion_distance {
                     let _ = output_tx.send(steering).await;
                     let _ = status_tx.send(bonsai_bt::Status::Success);
                     break bonsai_bt::Status::Success
