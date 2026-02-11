@@ -1,5 +1,7 @@
-use std::{f32::{self}, time::Duration};
+use std::{f32::{self, consts::FRAC_PI_2}, time::Duration};
 
+use crate::rerun_viz;
+use crate::rerun_viz::RECORDER;
 use common::Steering;
 use nalgebra::Vector2;
 use simple_motion::StaticNode;
@@ -12,22 +14,33 @@ use crate::tasks::ai::jobs::Job;
 
 /// Distance between wheels, in m. Used for calculating the turning circle.
 const WHEEL_BASE_SIZE: f32 = 0.6; // TODO Find real numbers
-/// Adjustment to sharpness of turns. Higher values result in sharper turns,
-/// deviating from the theoretical circle to the target point.
-const TURNING_RATIO_ADJUSTMENT: f32 = 15.0;
-/// How fast the robot should move when following the dot. Error in position
-/// is also considered.
-const FOLLOW_SPEED_FACTOR: f32 = 0.25;
-/// A minimum value for how fast the robot can move in pursuit, to try and ensure
-/// it will actually reach its destination, instead of getting stuck when its
-/// follow speed is reduced greatly from proximity to the dot.
-const FOLLOW_SPEED_MIN: f32 = 0.15;
-/// The maximum speed at which the dot will move along the given path. Provides
-/// a cap for the inverse law used to determine dot speed. In m/s.
-const MAX_DOT_SPEED: f32 = 0.75;
-/// How fast the dot will move when the robot is 1 meter away. In m/s. The dot
-/// follows an inverse law with robot distance.
-const DOT_SPEED_FACTOR: f32 = 0.35;
+/// Default value for adjustment to sharpness of turns. Higher values result in
+/// sharper turns, deviating from the theoretical circle to the target point.
+const DEFAULT_TURNING_RATIO_ADJUSTMENT: f32 = 15.0;
+/// How fast the robot should move when following the dot by default. Error in
+/// position is also considered.
+const DEFAULT_FOLLOW_SPEED_FACTOR: f32 = 0.25;
+/// If the robot is closer to the dot than this distance, it will not move 
+/// towards the dot, to avoid wild spinning from the tiny distances involved.
+const MIN_FOLLOW_DISTANCE: f32 = 0.1;
+/// The maximum speed at which the dot will move along the given path, as a
+/// factor of the follow speed factor. Provides a cap for the inverse square
+/// law used to determine dot speed. Dimensionless, but operates on m/s.
+const MAX_DOT_SPEED_FACTOR: f32 = 2.5;
+/// How fast the dot will move when the robot is 1 meter away by default. In m/s. 
+/// The dot follows an inverse square law with robot distance.
+const DEFAULT_DOT_SPEED_FACTOR: f32 = 0.35;
+/// If the robot is closer to the goal than this distance, it will zero steering
+/// and end the job by default.
+const DEFAULT_COMPLETION_DISTANCE: f32 = 0.25;
+/// If the robot moves slower than this, it is considered stuck and the job
+/// will fail if it stays like this for too long by default.
+const DEFAULT_STUCK_SPEED: f32 = 0.15;
+/// How long the robot must be moving slower than a given threshold to be considered
+/// stuck and fail the job by default.
+const DEFAULT_STUCK_TIMEOUT: f32 = 5.0;
+/// How long each loop of the controller should be.
+const DT: f32 = 0.05;
 
 /// ## Summary
 /// Uses a pursuit controller to follow a given path in 2D. Directly communicates
@@ -37,8 +50,26 @@ const DOT_SPEED_FACTOR: f32 = 0.35;
 /// * The robot reaches a certain distance from the end point of the path.
 /// 
 /// **Fails if:**
-/// * ~~Robot fails to move significantly in stuck_timeout_secs.~~ **(TODO)**
+/// * Robot fails to move significantly in stuck_timeout_secs.
 /// * Job is canceled.
+/// 
+/// ## Parameters
+/// * `chain` - The kinematic chain which will be used to get robot position.
+/// * `path` - The list of 2D points used to define the path to follow.
+/// * `turning_ratio_adjustment` - An adjustment factor on turning speed, for
+///     when sharper turning is desired.
+/// * `follow_speed_factor` - How fast the robot should try to move when the
+///     dot is one meter away. Robot speed follows an inverse law with distance
+///     to dot. (in m/s).
+/// * `dot_speed_factor` - How fast the dot should try to move when the
+///     robot is one meter away. Dot speed follows an inverse square law with
+///     distance to robot. (in m/s).
+/// * `completion_distance` - If the robot is closer to the endpoint than this,
+///     it is considered done and the job succeeds. (in m)
+/// * `stuck_speed` - If the robot is moving slower than this, it is considered
+///     stuck, and will fail out of the job if it stays like that for too long. (in m/s).
+/// * `stuck_timeout_secs` - If the robot stays at too slow of a speed for this long
+///     (continuously), it will fail out of the job. (in s).
 /// 
 /// ## Details
 /// A traditional pursuit controller has been adapted in two ways:
@@ -47,12 +78,30 @@ const DOT_SPEED_FACTOR: f32 = 0.35;
 /// 
 /// The controller works by moving a target, (known here as a "dot", although
 /// this is not the technical term) along the path, and directing the robot to
-/// drive straight towards it
+/// drive straight towards it. Because the robot is non-holonomic, this instead
+/// draws the circular path with constant forward speed and turning rate that the
+/// robot could take to reach the dot, and applies that speed and turning rate.
+/// Additionally, the dot moves faster when the robot is closer, according to an
+/// inverse square law.
 pub fn follow_path_job(
-    _stuck_timeout_secs: f32, // Currently not used
-    chain: StaticNode,
-    path: Vec<Vector2<f32>>,
+    chain:                    StaticNode,
+    path:                     Vec<Vector2<f32>>,
+    turning_ratio_adjustment: impl Into<Option<f32>>,
+    follow_speed_factor:      impl Into<Option<f32>>,
+    dot_speed_factor:         impl Into<Option<f32>>,
+    completion_distance:      impl Into<Option<f32>>,
+    stuck_speed:              impl Into<Option<f32>>,
+    stuck_timeout_secs:       impl Into<Option<f32>>,
 ) -> Job<Steering> {
+    // Unwrap all the parameters to allow defaults
+    let turning_ratio_adjustment = turning_ratio_adjustment.into().unwrap_or(DEFAULT_TURNING_RATIO_ADJUSTMENT);
+    let follow_speed_factor      = follow_speed_factor     .into().unwrap_or(DEFAULT_FOLLOW_SPEED_FACTOR);
+    let dot_speed_factor         = dot_speed_factor        .into().unwrap_or(DEFAULT_DOT_SPEED_FACTOR);
+    let completion_distance      = completion_distance     .into().unwrap_or(DEFAULT_COMPLETION_DISTANCE);
+    let stuck_speed              = stuck_speed             .into().unwrap_or(DEFAULT_STUCK_SPEED);
+    let stuck_timeout_secs       = stuck_timeout_secs      .into().unwrap_or(DEFAULT_STUCK_TIMEOUT);
+
+    let (status_tx, status_rx) = watch::channel(bonsai_bt::Status::Running);
     let (output_tx, output_rx) = mpsc::channel(5);
     Job::spawn(
         async move {
@@ -66,24 +115,42 @@ pub fn follow_path_job(
                 path_parameter_boundaries.push(previous_totals);
             }
 
+            // Prepare loop interval
+            let mut interval = tokio::time::interval(Duration::from_secs_f32(DT));
+            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+
             // The current target on the path being followed. Will move along the path continuously.
             let mut dot: Vector2<f32> = path[0]; // Start at start of path.
             let mut dot_distance: f32 = 0.0;
-            let mut print_accumulator: f32 = 0.0; // FOR DEBUG USE
+            let mut previous_robot_pos: Vector2<f32> = chain.get_global_isometry().translation.vector.xy().cast();
+            let mut stuck_timer: f32 = 0.0;
             loop {
+                interval.tick().await;
+
                 let _robot_isometry = chain.get_global_isometry();
                 // Flatten and set up
                 let robot_pos = _robot_isometry.translation.vector.xy().cast();
                 let robot_angle = _robot_isometry.rotation.euler_angles().2 as f32;
                 let error = dot - robot_pos;
 
-                let dt: f32 = 0.05; // TODO determine or fix dt
+                // Check if stuck
+                if (robot_pos - previous_robot_pos).norm_squared() / (DT*DT) < stuck_speed*stuck_speed {
+                    stuck_timer += DT;
+                    // DEBUG
+                    //println!("Follower stuck! Count at {:.3}", stuck_timer);
+                    if stuck_timer > stuck_timeout_secs {
+                        let _ = status_tx.send(bonsai_bt::Status::Failure);
+                        break bonsai_bt::Status::Failure
+                    }
+                } else {
+                    stuck_timer = 0.0;
+                }
 
                 // In m/s. Moves faster when robot is closer, by inverse square law.
-                let dot_speed = (DOT_SPEED_FACTOR / error.norm_squared()).min(MAX_DOT_SPEED);
+                let dot_speed = (dot_speed_factor / error.norm_squared()).min(MAX_DOT_SPEED_FACTOR * follow_speed_factor);
 
                 // Update dot location
-                dot_distance += dt * dot_speed;
+                dot_distance += DT * dot_speed;
                 dot = parameter_along_path(dot_distance, &path, &path_parameter_boundaries);
 
                 let error = dot - robot_pos; // Update error again
@@ -99,43 +166,30 @@ pub fn follow_path_job(
                 let angle_difference = error_angle - robot_angle;
                 let radius = target_distance / (2.0 * angle_difference.sin()); // Check if this has a sign error
 
-                print_accumulator += dt; // DEBUG
                 // Only move if the dot is far enough away
-                let steering = if error.norm_squared() > 0.1 {
+                let steering = if error.norm_squared() > MIN_FOLLOW_DISTANCE * MIN_FOLLOW_DISTANCE {
                     //   Radius is proportional to the ratio of velocity to angular velocity:
                     //   https://www.desmos.com/calculator/f7grn652s4
                     // TODO Fix problems with dot being behind bot
-                    let velocity = FOLLOW_SPEED_FACTOR * (target_distance + FOLLOW_SPEED_MIN); // will be fixed by normalization
-                    let turning = velocity * WHEEL_BASE_SIZE * TURNING_RATIO_ADJUSTMENT * 0.5 / radius;
-
-                    // DEBUG
-                    if print_accumulator > 1.0 {
-                        println!("Robot: ({:<4}, {:<4})\t Dot: ({:<4}, {:<4})\t Error: ({:<4}, {:<4})\t Control: (^ = {:<4}, <-> = {:<4})", 
-                            robot_pos.x, robot_pos.y, 
-                            dot.x, dot.y, 
-                            error.x, error.y,
-                            velocity, 
-                            turning
-                        );
-                        println!("Robot: {:<4}\t Error: {:<4}\t Difference: {:<4}", 
-                            robot_angle,
-                            error_angle,
-                            angle_difference
-                        );
-                        print_accumulator = 0.0;
-                    }
+                    let velocity = follow_speed_factor * target_distance; // will be fixed by normalization
+                    let turning = velocity * WHEEL_BASE_SIZE * turning_ratio_adjustment * 0.5 / radius;
 
                     Steering::new_ik(velocity as f64, turning as f64, 5000.0)
                 } else {
                     Steering::new(0.0, 0.0, 5000.0)
                 };
 
-                if dot_distance > path_parameter_boundaries[path.len() - 1] && error.norm_squared() < 0.25*0.25 {
+                log_to_rerun(robot_pos, robot_angle, dot, steering.get_left_and_right());
+
+                // Prepare for next cycle
+                previous_robot_pos = robot_pos;
+
+                if dot_distance > path_parameter_boundaries[path.len() - 1] && error.norm_squared() < completion_distance*completion_distance {
                     let _ = output_tx.send(steering).await;
                     break bonsai_bt::Status::Success
                 } else {
                     let _ = output_tx.send(steering).await;
-                    tokio::time::sleep(Duration::from_secs_f32(dt)).await;
+                    let _ = status_tx.send(bonsai_bt::Status::Running);
                 }
             }
         },
@@ -166,4 +220,62 @@ fn parameter_along_path(t: f32, path: &Vec<Vector2<f32>>, path_parameter_boundar
 
     // After end
     return path[path.len() - 1];
+}
+
+/// Logs all relevant information to rerun for display. Consider adding steering output.
+fn log_to_rerun(robot_pos: Vector2<f32>, robot_angle: f32, dot: Vector2<f32>, steering_left_and_right: (f64, f64)) {
+    // Visualization / logging
+    if let Some(rec) = RECORDER.get() {
+        // Plots a unit vector for the robot
+        let _ = rec.recorder.log(
+            "ai/path_follower/robot",
+            &rerun::Arrows2D::from_vectors([[
+                    robot_angle.cos(), 
+                    robot_angle.sin()]])
+                .with_origins([[robot_pos.x, robot_pos.y]])
+                .with_colors([rerun::Color::from_rgb(0, 255, 255)])
+                .with_draw_order(40.0),
+        );
+
+        // Plots a point for the dot
+        let _ = rec.recorder.log(
+            "ai/path_follower/dot",
+            &rerun::Points2D::new([[dot.x, dot.y]])
+                .with_colors([rerun::Color::from_rgb(255, 128, 0)])
+                .with_draw_order(60.0),
+        );
+
+        // Plots error vector
+        let _ = rec.recorder.log(
+            "ai/path_follower/error",
+            &rerun::Arrows2D::from_vectors([[(dot-robot_pos).x, (dot-robot_pos).y]])
+                .with_origins([[robot_pos.x, robot_pos.y]])
+                .with_colors([rerun::Color::from_rgb(192, 128, 16)])
+                .with_draw_order(40.0),
+        );
+
+        let robot_right_side = robot_pos + 0.2 * Vector2::new((robot_angle - FRAC_PI_2).cos(), (robot_angle - FRAC_PI_2).sin());
+        let robot_left_side =  robot_pos - 0.2 * Vector2::new((robot_angle - FRAC_PI_2).cos(), (robot_angle - FRAC_PI_2).sin());
+
+        // Plots vectors for applied output to each side of the robot
+        let _ = rec.recorder.log(
+            "ai/path_follower/steering",
+            &rerun::Arrows2D::from_vectors([
+                [
+                    steering_left_and_right.0 as f32 * robot_angle.cos(), 
+                    steering_left_and_right.0 as f32 * robot_angle.sin()
+                ],
+                [
+                    steering_left_and_right.1 as f32 * robot_angle.cos(), 
+                    steering_left_and_right.1 as f32 * robot_angle.sin()
+                ]
+            ])
+                .with_origins([
+                    [robot_left_side.x, robot_left_side.y],
+                    [robot_right_side.x, robot_right_side.y]
+                ])
+                .with_colors([rerun::Color::from_rgb(16, 32, 32)])
+                .with_draw_order(40.0),
+        );
+    }
 }

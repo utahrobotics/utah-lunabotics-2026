@@ -204,7 +204,11 @@ impl LunabotAction {
                     if let Some(path) = blackboard.calculated_path.take() {
                         println!("Starting new follow path job with {} waypoints", path.len());
                         let mut follower_job =
-                            follow_path_job(5.0, ROBOT_STATE.get().unwrap().kinematic_root, path);
+                            follow_path_job(
+                                ROBOT_STATE.get().unwrap().kinematic_root,
+                                path,
+                                None, None, None, None, None, None
+                            );
                         let job_initial_status = follower_job.get_status();
                         blackboard.path_follower = Some(follower_job);
                         println!(
