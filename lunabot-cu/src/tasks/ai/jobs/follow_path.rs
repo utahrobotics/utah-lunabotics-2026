@@ -1,6 +1,4 @@
 use std::{f32::{self, consts::FRAC_PI_2}, time::Duration};
-
-use crate::rerun_viz;
 use crate::rerun_viz::RECORDER;
 use common::Steering;
 use nalgebra::Vector2;
@@ -101,7 +99,6 @@ pub fn follow_path_job(
     let stuck_speed              = stuck_speed             .into().unwrap_or(DEFAULT_STUCK_SPEED);
     let stuck_timeout_secs       = stuck_timeout_secs      .into().unwrap_or(DEFAULT_STUCK_TIMEOUT);
 
-    let (status_tx, status_rx) = watch::channel(bonsai_bt::Status::Running);
     let (output_tx, output_rx) = mpsc::channel(5);
     Job::spawn(
         async move {
@@ -139,7 +136,6 @@ pub fn follow_path_job(
                     // DEBUG
                     //println!("Follower stuck! Count at {:.3}", stuck_timer);
                     if stuck_timer > stuck_timeout_secs {
-                        let _ = status_tx.send(bonsai_bt::Status::Failure);
                         break bonsai_bt::Status::Failure
                     }
                 } else {
@@ -189,7 +185,6 @@ pub fn follow_path_job(
                     break bonsai_bt::Status::Success
                 } else {
                     let _ = output_tx.send(steering).await;
-                    let _ = status_tx.send(bonsai_bt::Status::Running);
                 }
             }
         },
