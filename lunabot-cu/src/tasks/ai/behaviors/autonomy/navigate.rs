@@ -1,7 +1,7 @@
 use bonsai_bt::Behavior::{self, Action, If, Sequence, While};
 use common::Steering;
 
-use crate::tasks::ai::action::LunabotAction;
+use crate::tasks::ai::{action::LunabotAction, behaviors::with_timeout};
 
 pub fn navigate_behavior() -> Behavior<LunabotAction> {
     While(
@@ -10,6 +10,7 @@ pub fn navigate_behavior() -> Behavior<LunabotAction> {
             // one extra yield to avoid busy looping, in case the stage was set in the same tick
             Action(LunabotAction::Yield),
             Action(LunabotAction::CalculatePath),
+            with_timeout(Action(LunabotAction::RotateToFacePath), 5.0),
             If(
                 Box::new(Action(LunabotAction::FollowPath)),
                 Box::new(set_stage(common::LunabotStage::Manual)),

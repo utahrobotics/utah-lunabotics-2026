@@ -111,9 +111,7 @@ tokio-util.workspace = true
 cobs = { workspace = true, optional = true }
 bytes = { version = "1.10.1", optional = true }
 mio = { version = "1.0.4", optional = true }
-bonsai-bt = { git = "https://github.com/Sollimann/bonsai.git", features = [
-    "visualize",
-] }
+bonsai-bt = { git = "https://github.com/utahrobotics/bonsai.git" }
 
 # production hardware feature only
 udev = { version = "0.9", features = ["mio10"], optional = true }

@@ -7,7 +7,7 @@ use crate::{
     ROBOT_STATE,
     tasks::ai::{
         blackboard::LunabotBlackboard,
-        jobs::{find_path_job, follow_path_job},
+        jobs::{direction_from_path, find_path_job, follow_path_job, rotation_shim},
     },
 };
 static PATHFINDING_GOAL: [f32; 2] = [5.843524, 1.4796992];
@@ -44,6 +44,9 @@ pub enum LunabotAction {
     FollowPath,
     SetStage(LunabotStage),
     GetUnstuck,
+
+    /// rotate to face a certain direction
+    RotateToFacePath,
 
     /// Cancels long running jobs like pathfinding and path following
     CancelJobs,
@@ -242,6 +245,42 @@ impl LunabotAction {
                 }
                 Success
             }
+            LunabotAction::RotateToFacePath => {
+                if ROBOT_STATE.get().is_none() {
+                    eprintln!(
+                        "Cannot start rotation shim job because ROBOT_STATE is not initialized"
+                    );
+                    Failure
+                } else if let Some(ref mut rotation_shim) = blackboard.rotation_shim {
+                    blackboard.outgoing_steering_msg = rotation_shim.get_output();
+                    let status = rotation_shim.get_status();
+                    if status == Success || status == Failure {
+                        println!("Rotate to face path job completed with status: {:?}", status);
+                        blackboard.rotation_shim = None;
+                    }
+                    status
+                } else {
+                    // Use the calculated path from CalculatePath action
+                    if let Some(path) = blackboard.calculated_path.take() {
+                        let Some(target_yaw) = direction_from_path(&path)  else {
+                            eprintln!("Calculated path has < 2 nodes");
+                            return (Failure, 0.0);
+                        };
+                        let mut rotation_shim =
+                            rotation_shim(target_yaw, 0.1);
+                        let job_initial_status = rotation_shim.get_status();
+                        blackboard.path_follower = Some(rotation_shim);
+                        println!(
+                            "Face path job started with initial status: {:?}",
+                            job_initial_status
+                        );
+                        job_initial_status
+                    } else {
+                        eprintln!("Cannot face path: no calculated path available");
+                        Failure
+                    }
+                }
+            },
         };
         (status, 0.0)
     }

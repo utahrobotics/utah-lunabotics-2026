@@ -35,8 +35,6 @@ impl CuTask for LunabotAi {
         let blackboard = LunabotBlackboard::default();
         let behavior = teleop_behavior();
         let mut bt = BT::new(behavior, blackboard);
-        let viz = bt.get_graphviz();
-        println!("GRAPHVIZ: {viz}");
         Ok(Self {
             bt: bt,
             last_tick_nanos: 0,

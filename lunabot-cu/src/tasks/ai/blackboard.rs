@@ -46,6 +46,10 @@ pub struct LunabotBlackboard {
     pub path_follower: Option<Job<Steering>>,
     /// if a path finding job is running, it will be stored here
     pub path_finder: Option<Job<Vec<Vector2<f32>>>>,
+
+    /// rotation shim
+    pub rotation_shim: Option<Job<Steering>>,
+
     /// the calculated path from the path finder job
     pub calculated_path: Option<Vec<Vector2<f32>>>,
 }
@@ -70,6 +74,7 @@ impl Default for LunabotBlackboard {
             navigate_destination: None,
             yielded: false,
             path_follower: None,
+            rotation_shim: None
         }
     }
 }

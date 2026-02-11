@@ -10,15 +10,10 @@ use crate::{ROBOT_STATE, tasks::ai::jobs::Job};
 /// Used to rotate the robot to start facing the direction of travel when a path comes in
 /// https://docs.nav2.org/configuration/packages/configuring-rotation-shim-controller.html
 /// TODO: test in sim
-pub fn rotation_shim(path: &Vec<Vector2<f32>>, tolerance: f64) -> Job<Steering> {
+pub fn rotation_shim(target_yaw: f32, tolerance: f64) -> Job<Steering> {
     let (output_tx, output_rx) = mpsc::channel(5);
-    // first calculate the direction the robot should be pointing based on the first few points in the path
-    let target_yaw = direction_from_path(path);
     // no need for full pid because it would just end up being fully proportional mattering anyways
     let body = async move {
-        let Some(target_yaw) = target_yaw else {
-            return Failure;
-        };
         let target_rot = Rotation2::new(target_yaw as f64);
         loop {
             // idc about unwrapping here because we are in an async task, and if the robot state is uninit,
@@ -39,8 +34,8 @@ pub fn rotation_shim(path: &Vec<Vector2<f32>>, tolerance: f64) -> Job<Steering> 
     Job::spawn(body, output_rx)
 }
 
-/// outputs angle as yaw
-fn direction_from_path(path: &Vec<Vector2<f32>>) -> Option<f32> {
+/// finds initial direction of travel based on first two nodes in a path
+pub fn direction_from_path(path: &Vec<Vector2<f32>>) -> Option<f32> {
     if path.len() < 2 {
         return None;
     }

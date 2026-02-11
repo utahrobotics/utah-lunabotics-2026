@@ -6,3 +6,4 @@ mod job;
 pub use follow_path::*;
 pub use find_path::*;
 pub use job::*;
+pub use rotation_shim::*;
