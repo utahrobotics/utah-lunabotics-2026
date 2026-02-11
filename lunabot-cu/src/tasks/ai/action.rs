@@ -265,15 +265,15 @@ impl LunabotAction {
                     status
                 } else {
                     // Use the calculated path from CalculatePath action
-                    if let Some(path) = blackboard.calculated_path.take() {
-                        let Some(target_yaw) = direction_from_path(&path)  else {
+                    if let Some(ref path) = blackboard.calculated_path {
+                        let Some(target_yaw) = direction_from_path(path)  else {
                             eprintln!("Calculated path has < 2 nodes");
                             return (Failure, 0.0);
                         };
                         let mut rotation_shim =
                             rotation_shim(target_yaw, 0.1);
                         let job_initial_status = rotation_shim.get_status();
-                        blackboard.path_follower = Some(rotation_shim);
+                        blackboard.rotation_shim = Some(rotation_shim);
                         println!(
                             "Face path job started with initial status: {:?}",
                             job_initial_status

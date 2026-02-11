@@ -170,9 +170,9 @@ pub fn follow_path_job(
                     let velocity = follow_speed_factor * target_distance; // will be fixed by normalization
                     let turning = velocity * WHEEL_BASE_SIZE * turning_ratio_adjustment * 0.5 / radius;
 
-                    Steering::new_ik(velocity as f64, turning as f64, 5000.0)
+                    Steering::new_ik(velocity as f64, turning as f64, 2000.)
                 } else {
-                    Steering::new(0.0, 0.0, 5000.0)
+                    Steering::new(0.0, 0.0, 2000.0)
                 };
 
                 log_to_rerun(robot_pos, robot_angle, dot, steering.get_left_and_right());
