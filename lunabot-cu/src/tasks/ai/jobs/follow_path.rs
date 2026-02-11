@@ -5,7 +5,7 @@ use nalgebra::Vector2;
 use simple_motion::StaticNode;
 use tasker::tokio::{
     self,
-    sync::{mpsc, watch},
+    sync::mpsc,
 };
 
 use crate::tasks::ai::jobs::Job;
@@ -23,7 +23,6 @@ pub fn follow_path_job(
     chain: StaticNode,
     path: Vec<Vector2<f32>>,
 ) -> Job<Steering> {
-    let (status_tx, status_rx) = watch::channel(bonsai_bt::Status::Running);
     let (output_tx, output_rx) = mpsc::channel(5);
     Job::spawn(
         async move {
@@ -103,10 +102,8 @@ pub fn follow_path_job(
 
                 let _ = output_tx.send(steering).await;
                 tokio::time::sleep(Duration::from_secs_f32(dt)).await;
-                let _ = status_tx.send(bonsai_bt::Status::Running); // This was used without full understanding - H
             }
         },
-        status_rx,
         output_rx,
     )
 }
