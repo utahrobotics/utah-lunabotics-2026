@@ -1,7 +1,10 @@
-use std::{f32::{self}, time::Duration};
+use std::{f32::{self, consts::FRAC_PI_2}, time::Duration};
 
+use crate::rerun_viz;
+use crate::rerun_viz::RECORDER;
 use common::Steering;
 use nalgebra::Vector2;
+use rerun::Archetype;
 use simple_motion::StaticNode;
 use tasker::tokio::{
     self,
@@ -72,7 +75,6 @@ pub fn follow_path_job(
             // The current target on the path being followed. Will move along the path continuously.
             let mut dot: Vector2<f32> = path[0]; // Start at start of path.
             let mut dot_distance: f32 = 0.0;
-            let mut print_accumulator: f32 = 0.0; // FOR DEBUG USE
             loop {
                 let _robot_isometry = chain.get_global_isometry();
                 // Flatten and set up
@@ -102,7 +104,6 @@ pub fn follow_path_job(
                 let angle_difference = error_angle - robot_angle;
                 let radius = target_distance / (2.0 * angle_difference.sin()); // Check if this has a sign error
 
-                print_accumulator += dt; // DEBUG
                 // Only move if the dot is far enough away
                 let steering = if error.norm_squared() > MIN_FOLLOW_DISTANCE * MIN_FOLLOW_DISTANCE {
                     //   Radius is proportional to the ratio of velocity to angular velocity:
@@ -111,27 +112,12 @@ pub fn follow_path_job(
                     let velocity = FOLLOW_SPEED_FACTOR * target_distance; // will be fixed by normalization
                     let turning = velocity * WHEEL_BASE_SIZE * TURNING_RATIO_ADJUSTMENT * 0.5 / radius;
 
-                    // DEBUG
-                    if print_accumulator > 1.0 {
-                        println!("Robot: ({:<4}, {:<4})\t Dot: ({:<4}, {:<4})\t Error: ({:<4}, {:<4})\t Control: (^ = {:<4}, <-> = {:<4})", 
-                            robot_pos.x, robot_pos.y, 
-                            dot.x, dot.y, 
-                            error.x, error.y,
-                            velocity, 
-                            turning
-                        );
-                        println!("Robot: {:<4}\t Error: {:<4}\t Difference: {:<4}", 
-                            robot_angle,
-                            error_angle,
-                            angle_difference
-                        );
-                        print_accumulator = 0.0;
-                    }
-
                     Steering::new_ik(velocity as f64, turning as f64, 5000.0)
                 } else {
                     Steering::new(0.0, 0.0, 5000.0)
                 };
+
+                log_to_rerun(robot_pos, robot_angle, dot, steering.get_left_and_right());
 
                 if dot_distance > path_parameter_boundaries[path.len() - 1] && error.norm_squared() < COMPLETION_DISTANCE * COMPLETION_DISTANCE {
                     let _ = output_tx.send(steering).await;
@@ -172,4 +158,58 @@ fn parameter_along_path(t: f32, path: &Vec<Vector2<f32>>, path_parameter_boundar
 
     // After end
     return path[path.len() - 1];
+}
+
+/// Logs all relevant information to rerun for display. Consider adding steering output.
+fn log_to_rerun(robot_pos: Vector2<f32>, robot_angle: f32, dot: Vector2<f32>, steering_left_and_right: (f64, f64)) {
+    // Visualization / logging
+    if let Some(rec) = RECORDER.get() {
+        // Plots a unit vector for the robot
+        let _ = rec.recorder.log(
+            "ai/path_follower/robot",
+            &rerun::Arrows2D::from_vectors([[
+                    robot_pos.x + robot_angle.cos(), 
+                    robot_pos.y + robot_angle.sin()]])
+                .with_origins([[robot_pos.x, robot_pos.y]])
+                .with_colors([rerun::Color::from_rgb(0, 255, 128)]),
+        );
+
+        // Plots a point for the dot
+        let _ = rec.recorder.log(
+            "ai/path_follower/dot",
+            &rerun::Points2D::new([[dot.x, dot.y]])
+                .with_colors([rerun::Color::from_rgb(255, 0, 32)]),
+        );
+
+        // Plots error vector
+        let _ = rec.recorder.log(
+            "ai/path_follower/error",
+            &rerun::Arrows2D::from_vectors([[dot.x, dot.y]])
+                .with_origins([[robot_pos.x, robot_pos.y]])
+                .with_colors([rerun::Color::from_rgb(192, 128, 16)]),
+        );
+
+        let robot_right_side = robot_pos + 0.2 * Vector2::new((robot_angle - FRAC_PI_2).cos(), (robot_angle - FRAC_PI_2).sin());
+        let robot_left_side =  robot_pos - 0.2 * Vector2::new((robot_angle - FRAC_PI_2).cos(), (robot_angle - FRAC_PI_2).sin());
+
+        // Plots vectors for applied output to each side of the robot
+        let _ = rec.recorder.log(
+            "ai/path_follower/steering",
+            &rerun::Arrows2D::from_vectors([
+                [
+                    robot_left_side.x + steering_left_and_right.0 as f32 * robot_angle.cos(), 
+                    robot_left_side.y + steering_left_and_right.0 as f32 * robot_angle.sin()
+                ],
+                [
+                    robot_right_side.x + steering_left_and_right.1 as f32 * robot_angle.cos(), 
+                    robot_right_side.y + steering_left_and_right.1 as f32 * robot_angle.sin()
+                ]
+            ])
+                .with_origins([
+                    [robot_left_side.x, robot_left_side.y],
+                    [robot_right_side.x, robot_right_side.y]
+                ])
+                .with_colors([rerun::Color::from_rgb(72, 192, 64)]),
+        );
+    }
 }
