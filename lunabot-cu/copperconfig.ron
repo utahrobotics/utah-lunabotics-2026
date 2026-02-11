@@ -269,7 +269,7 @@
     monitor: (type:"simple_monitor::SimpleMonitor"),
     logging:(
     // if true, each output payload of each will be logged unless a task opts out
-        enable_task_logging: true,
+        enable_task_logging: false,
         section_size_mib:100,
     ),
 )
