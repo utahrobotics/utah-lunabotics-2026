@@ -10,14 +10,44 @@ use tasker::tokio::{
 
 use crate::tasks::ai::jobs::Job;
 
-// Distance between wheels, in m
-const WHEEL_BASE_SIZE: f32 = 0.6 * 5.0; // TODO fill in
-const FOLLOW_SPEED_FACTOR: f32 = 0.15;
-const MAX_DOT_SPEED: f32 = 0.2; // In m/s
-const DOT_SPEED_FACTOR: f32 = 0.005; // In m/s // TODO test and adjust
+/// Distance between wheels, in m. Used for calculating the turning circle.
+const WHEEL_BASE_SIZE: f32 = 0.6; // TODO Find real numbers
+/// Adjustment to sharpness of turns. Higher values result in sharper turns,
+/// deviating from the theoretical circle to the target point.
+const TURNING_RATIO_ADJUSTMENT: f32 = 15.0;
+/// How fast the robot should move when following the dot. Error in position
+/// is also considered.
+const FOLLOW_SPEED_FACTOR: f32 = 0.25;
+/// A minimum value for how fast the robot can move in pursuit, to try and ensure
+/// it will actually reach its destination, instead of getting stuck when its
+/// follow speed is reduced greatly from proximity to the dot.
+const FOLLOW_SPEED_MIN: f32 = 0.15;
+/// The maximum speed at which the dot will move along the given path. Provides
+/// a cap for the inverse law used to determine dot speed. In m/s.
+const MAX_DOT_SPEED: f32 = 0.75;
+/// How fast the dot will move when the robot is 1 meter away. In m/s. The dot
+/// follows an inverse law with robot distance.
+const DOT_SPEED_FACTOR: f32 = 0.35;
 
-/// follows path ~~fails if the robot fails to move significantly in stuck_timeout_secs~~ (TODO)
-/// also could fail if this job is cancelled
+/// ## Summary
+/// Uses a pursuit controller to follow a given path in 2D. Directly communicates
+/// with the drivetrain to follow the path.
+/// 
+/// **Succeeds when:**
+/// * The robot reaches a certain distance from the end point of the path.
+/// 
+/// **Fails if:**
+/// * ~~Robot fails to move significantly in stuck_timeout_secs.~~ **(TODO)**
+/// * Job is canceled.
+/// 
+/// ## Details
+/// A traditional pursuit controller has been adapted in two ways:
+/// * Adapted to non-holonomic control.
+/// * Adapted to have a variable pursuit speed
+/// 
+/// The controller works by moving a target, (known here as a "dot", although
+/// this is not the technical term) along the path, and directing the robot to
+/// drive straight towards it
 pub fn follow_path_job(
     _stuck_timeout_secs: f32, // Currently not used
     chain: StaticNode,
@@ -26,8 +56,19 @@ pub fn follow_path_job(
     let (output_tx, output_rx) = mpsc::channel(5);
     Job::spawn(
         async move {
+            // Parameterize path
+            let mut path_parameter_boundaries: Vec<f32> = Vec::new();
+            let mut previous_totals: f32 = 0.0;
+            for (i, point) in path.iter().enumerate() {
+                if i != 0 {
+                    previous_totals += (point - path[i-1]).norm();
+                }
+                path_parameter_boundaries.push(previous_totals);
+            }
+
             // The current target on the path being followed. Will move along the path continuously.
-            let mut dot: Vector2<f32> = chain.get_global_isometry().translation.vector.xy().cast();
+            let mut dot: Vector2<f32> = path[0]; // Start at start of path.
+            let mut dot_distance: f32 = 0.0;
             let mut print_accumulator: f32 = 0.0; // FOR DEBUG USE
             loop {
                 let _robot_isometry = chain.get_global_isometry();
@@ -42,25 +83,10 @@ pub fn follow_path_job(
                 let dot_speed = (DOT_SPEED_FACTOR / error.norm_squared()).min(MAX_DOT_SPEED);
 
                 // Update dot location
-                //   Find closest segment
-                let mut min_dist = f32::INFINITY;
-                let mut closest_segment_index: usize = 0;
-                for i in 0..path.len()-1 {
-                    let dist = distance_to_segment(dot, (path[i], path[i+1]));
-                    if dist < min_dist {
-                        min_dist = dist;
-                        closest_segment_index = i;
-                    }
-                }
+                dot_distance += dt * dot_speed;
+                dot = parameter_along_path(dot_distance, &path, &path_parameter_boundaries);
 
-                if closest_segment_index < path.len() - 1 { // Hacky way to end path
-                    //   Move dot along closest segment
-                    dot = project_and_move_point_on_segment(
-                        dot, 
-                        (path[closest_segment_index], path[closest_segment_index+1]),
-                        dot_speed * dt
-                    );
-                }
+                let error = dot - robot_pos; // Update error again
 
                 // Calculate steering from dot and robot position
                 //   Some relevant math:
@@ -69,7 +95,7 @@ pub fn follow_path_job(
                 //   Determine radius of turn, so that turn intersects dot, and
                 //   aligns with current robot angle.
                 let target_distance = error.norm();
-                let error_angle = error.y.atan2(error.x);
+                let error_angle = (error.y).atan2(error.x);
                 let angle_difference = error_angle - robot_angle;
                 let radius = target_distance / (2.0 * angle_difference.sin()); // Check if this has a sign error
 
@@ -79,17 +105,22 @@ pub fn follow_path_job(
                     //   Radius is proportional to the ratio of velocity to angular velocity:
                     //   https://www.desmos.com/calculator/f7grn652s4
                     // TODO Fix problems with dot being behind bot
-                    let velocity = FOLLOW_SPEED_FACTOR * target_distance; // will be fixed by normalization // currently always goes max speed
-                    let turning = velocity * WHEEL_BASE_SIZE * 0.5 / radius;
+                    let velocity = FOLLOW_SPEED_FACTOR * (target_distance + FOLLOW_SPEED_MIN); // will be fixed by normalization
+                    let turning = velocity * WHEEL_BASE_SIZE * TURNING_RATIO_ADJUSTMENT * 0.5 / radius;
 
                     // DEBUG
                     if print_accumulator > 1.0 {
-                        println!("Robot: ({}, {})\t Dot: ({}, {})\t Error: {}\t Control: (^ = {}, <-> = {})", 
+                        println!("Robot: ({:<4}, {:<4})\t Dot: ({:<4}, {:<4})\t Error: ({:<4}, {:<4})\t Control: (^ = {:<4}, <-> = {:<4})", 
                             robot_pos.x, robot_pos.y, 
                             dot.x, dot.y, 
-                            target_distance,
+                            error.x, error.y,
                             velocity, 
                             turning
+                        );
+                        println!("Robot: {:<4}\t Error: {:<4}\t Difference: {:<4}", 
+                            robot_angle,
+                            error_angle,
+                            angle_difference
                         );
                         print_accumulator = 0.0;
                     }
@@ -99,47 +130,40 @@ pub fn follow_path_job(
                     Steering::new(0.0, 0.0, 5000.0)
                 };
 
-
-                let _ = output_tx.send(steering).await;
-                tokio::time::sleep(Duration::from_secs_f32(dt)).await;
+                if dot_distance > path_parameter_boundaries[path.len() - 1] && error.norm_squared() < 0.25*0.25 {
+                    let _ = output_tx.send(steering).await;
+                    break bonsai_bt::Status::Success
+                } else {
+                    let _ = output_tx.send(steering).await;
+                    tokio::time::sleep(Duration::from_secs_f32(dt)).await;
+                }
             }
         },
         output_rx,
     )
 }
 
-/// Determines the minimum distance between any part of a given line segment to a given point.
-fn distance_to_segment(point: Vector2<f32>, segment: (Vector2<f32>, Vector2<f32>)) -> f32 {
-    // Move to frame where the start point is at the origin
-    let segment_vec = segment.1 - segment.0;
-    let point_from_start = point - segment.0;
-
-    let start_point_dist = point_from_start.norm();
-    let end_point_dist = (point - segment.1).norm();
-    
-    // If the point is between the two points (in the perpendicular projection of the segment),
-    // return the parallel distance
-    let dist_along_segment = point_from_start.dot(&segment_vec.normalize());
-    if dist_along_segment > 0.0 || dist_along_segment < segment_vec.norm() {
-        // a X v = |a| |b| cos(theta), but length of line segment shouldn't matter,
-        // so divide by |b|.
-        return vector_2_cross(segment_vec, point_from_start) / segment_vec.norm();
+/// Turns a path of points and associated distances into a mapping
+/// from distance along the path to points along the path.
+fn parameter_along_path(t: f32, path: &Vec<Vector2<f32>>, path_parameter_boundaries: &Vec<f32>) -> Vector2<f32> {
+    // Before start
+    if t <= 0.0 {
+        return path[0];
     }
 
-    return start_point_dist.min(end_point_dist);
-}
+    // Linear search. If this takes too long, use a binary search or a hash map
+    for i in 1..(path.len()) {
+        if path_parameter_boundaries[i] > t {
+            let relevant_section = path[i] - path[i-1];
+            return
+                path[i-1] +
+                relevant_section * (
+                    (t - path_parameter_boundaries[i-1]) /
+                    (path_parameter_boundaries[i] - path_parameter_boundaries[i-1])
+                );
+        }
+    }
 
-/// Finds the closest point on a given line segment to a given point, then moves a given distance in the
-/// direction of the segment. Pretends the line is infinite.
-fn project_and_move_point_on_segment(point: Vector2<f32>, segment: (Vector2<f32>, Vector2<f32>), movement: f32) -> Vector2<f32> {
-    // Move to frame where the start point is at the origin
-    let segment_vec = segment.1 - segment.0;
-    let point_from_start = point - segment.0;
-    // Use a dot product to project the given point onto the segment
-    let projection_distance = point_from_start.dot(&segment_vec.normalize());
-    return (projection_distance + movement) * segment_vec.normalize() + segment.0;
-}
-
-fn vector_2_cross(a: Vector2<f32>, b: Vector2<f32>) -> f32 {
-    return a.x * b.y - a.y * b.x;
+    // After end
+    return path[path.len() - 1];
 }
