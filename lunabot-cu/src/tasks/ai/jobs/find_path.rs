@@ -1,6 +1,6 @@
 use nalgebra::Vector2;
 use rerun::Vec2D;
-use tasker::tokio::{ sync::{mpsc, watch}};
+use tasker::tokio::{ sync::mpsc};
 
 use crate::{
     pathfinding::field_dstar::find_path_dstar,
@@ -23,7 +23,6 @@ pub fn find_path_job(
     end: Vector2<f32>,
     max_acceptable_gradient: f32,
 ) -> Job<Vec<Vector2<f32>>> {
-    let (status_tx, status_rx) = watch::channel(bonsai_bt::Status::Running);
     let (output_tx, output_rx) = mpsc::channel(5);
 
     Job::spawn(
@@ -74,27 +73,12 @@ pub fn find_path_job(
                     path.into_iter().map(|(x, y)| Vector2::new(x, y)).collect();
 
                 let _ = output_tx.send(vector_path).await;
-                let _ = status_tx.send(bonsai_bt::Status::Success);
                 bonsai_bt::Status::Success
             } else {
-                // Bypass regular operation for testing:
-                let mut vector_path: Vec<Vector2<f32>> = Vec::new();
-                vector_path.push(Vector2::new(2.0, 1.0));
-                vector_path.push(Vector2::new(6.0, 1.0));
-                vector_path.push(Vector2::new(6.0, 3.0));
-                vector_path.push(Vector2::new(2.0, 3.0));
-
-                let _ = output_tx.send(vector_path).await;
-                let _ = status_tx.send(bonsai_bt::Status::Success);
-                bonsai_bt::Status::Success
-
-
-                // let _ = status_tx.send(bonsai_bt::Status::Failure);
-                // bonsai_bt::Status::Failure
+                bonsai_bt::Status::Failure
             };
             result
         },
-        status_rx,
         output_rx,
     )
 }

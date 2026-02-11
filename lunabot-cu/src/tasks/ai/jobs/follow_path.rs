@@ -7,7 +7,7 @@ use nalgebra::Vector2;
 use simple_motion::StaticNode;
 use tasker::tokio::{
     self,
-    sync::{mpsc, watch},
+    sync::mpsc,
 };
 
 use crate::tasks::ai::jobs::Job;
@@ -186,7 +186,6 @@ pub fn follow_path_job(
 
                 if dot_distance > path_parameter_boundaries[path.len() - 1] && error.norm_squared() < completion_distance*completion_distance {
                     let _ = output_tx.send(steering).await;
-                    let _ = status_tx.send(bonsai_bt::Status::Success);
                     break bonsai_bt::Status::Success
                 } else {
                     let _ = output_tx.send(steering).await;
@@ -194,7 +193,6 @@ pub fn follow_path_job(
                 }
             }
         },
-        status_rx,
         output_rx,
     )
 }
