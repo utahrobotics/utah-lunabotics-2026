@@ -40,8 +40,8 @@ impl std::fmt::Debug for Steering {
 }
 
 impl Steering {
-    pub const DEFAULT_WEIGHT: f64 = 25.0;
-
+    pub const DEFAULT_WEIGHT: f64 = 605.0;
+    
     pub fn get_left_and_right(self) -> (f64, f64) {
         (
             if self.left < 0 {
