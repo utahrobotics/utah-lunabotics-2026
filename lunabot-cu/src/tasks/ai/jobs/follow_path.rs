@@ -83,6 +83,7 @@ pub fn follow_path_job(
 
             // Prepare loop interval
             let mut interval = tokio::time::interval(Duration::from_secs_f32(DT));
+            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
 
             // The current target on the path being followed. Will move along the path continuously.
             let mut dot: Vector2<f32> = path[0]; // Start at start of path.
@@ -90,6 +91,8 @@ pub fn follow_path_job(
             let mut previous_robot_pos: Vector2<f32> = chain.get_global_isometry().translation.vector.xy().cast();
             let mut stuck_timer: f32 = 0.0;
             loop {
+                interval.tick().await;
+
                 let _robot_isometry = chain.get_global_isometry();
                 // Flatten and set up
                 let robot_pos = _robot_isometry.translation.vector.xy().cast();
@@ -151,7 +154,6 @@ pub fn follow_path_job(
                     break bonsai_bt::Status::Success
                 } else {
                     let _ = output_tx.send(steering).await;
-                    interval.tick().await;
                     let _ = status_tx.send(bonsai_bt::Status::Running);
                 }
             }
