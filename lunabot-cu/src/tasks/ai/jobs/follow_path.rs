@@ -18,16 +18,18 @@ const TURNING_RATIO_ADJUSTMENT: f32 = 15.0;
 /// How fast the robot should move when following the dot. Error in position
 /// is also considered.
 const FOLLOW_SPEED_FACTOR: f32 = 0.25;
-/// A minimum value for how fast the robot can move in pursuit, to try and ensure
-/// it will actually reach its destination, instead of getting stuck when its
-/// follow speed is reduced greatly from proximity to the dot.
-const FOLLOW_SPEED_MIN: f32 = 0.15;
+/// If the robot is closer to the dot than this distance, it will not move 
+/// towards the dot, to avoid wild spinning from the tiny distances involved.
+const MIN_FOLLOW_DISTANCE: f32 = 0.1;
 /// The maximum speed at which the dot will move along the given path. Provides
 /// a cap for the inverse law used to determine dot speed. In m/s.
 const MAX_DOT_SPEED: f32 = 0.75;
 /// How fast the dot will move when the robot is 1 meter away. In m/s. The dot
 /// follows an inverse law with robot distance.
 const DOT_SPEED_FACTOR: f32 = 0.35;
+/// If the robot is closer to the goal than this distance, it will zero steering
+/// and end the job.
+const COMPLETION_DISTANCE: f32 = 0.15;
 
 /// ## Summary
 /// Uses a pursuit controller to follow a given path in 2D. Directly communicates
@@ -102,11 +104,11 @@ pub fn follow_path_job(
 
                 print_accumulator += dt; // DEBUG
                 // Only move if the dot is far enough away
-                let steering = if error.norm_squared() > 0.1 {
+                let steering = if error.norm_squared() > MIN_FOLLOW_DISTANCE * MIN_FOLLOW_DISTANCE {
                     //   Radius is proportional to the ratio of velocity to angular velocity:
                     //   https://www.desmos.com/calculator/f7grn652s4
                     // TODO Fix problems with dot being behind bot
-                    let velocity = FOLLOW_SPEED_FACTOR * (target_distance + FOLLOW_SPEED_MIN); // will be fixed by normalization
+                    let velocity = FOLLOW_SPEED_FACTOR * target_distance; // will be fixed by normalization
                     let turning = velocity * WHEEL_BASE_SIZE * TURNING_RATIO_ADJUSTMENT * 0.5 / radius;
 
                     // DEBUG
@@ -131,7 +133,7 @@ pub fn follow_path_job(
                     Steering::new(0.0, 0.0, 5000.0)
                 };
 
-                if dot_distance > path_parameter_boundaries[path.len() - 1] && error.norm_squared() < 0.25*0.25 {
+                if dot_distance > path_parameter_boundaries[path.len() - 1] && error.norm_squared() < COMPLETION_DISTANCE * COMPLETION_DISTANCE {
                     let _ = output_tx.send(steering).await;
                     let _ = status_tx.send(bonsai_bt::Status::Success);
                     break bonsai_bt::Status::Success
