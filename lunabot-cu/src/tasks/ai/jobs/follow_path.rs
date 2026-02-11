@@ -32,10 +32,10 @@ const MAX_DOT_SPEED: f32 = 0.75;
 const DOT_SPEED_FACTOR: f32 = 0.35;
 /// If the robot is closer to the goal than this distance, it will zero steering
 /// and end the job.
-const COMPLETION_DISTANCE: f32 = 0.15;
+const COMPLETION_DISTANCE: f32 = 0.25;
 /// If the robot moves slower than this, it is considered stuck and the job
 /// will fail if it stays like this for too long.
-const STUCK_SPEED: f32 = 0.1;
+const STUCK_SPEED: f32 = 0.15;
 /// How long each loop of the controller should be.
 const DT: f32 = 0.05;
 
@@ -100,8 +100,10 @@ pub fn follow_path_job(
                 let error = dot - robot_pos;
 
                 // Check if stuck
-                if (robot_pos - previous_robot_pos).norm_squared() / DT < STUCK_SPEED*STUCK_SPEED {
+                if (robot_pos - previous_robot_pos).norm_squared() / (DT*DT) < STUCK_SPEED*STUCK_SPEED {
                     stuck_timer += DT;
+                    // DEBUG
+                    //println!("Follower stuck! Count at {:.3}", stuck_timer);
                     if stuck_timer > stuck_timeout_secs {
                         let _ = status_tx.send(bonsai_bt::Status::Failure);
                         break bonsai_bt::Status::Failure
@@ -196,25 +198,28 @@ fn log_to_rerun(robot_pos: Vector2<f32>, robot_angle: f32, dot: Vector2<f32>, st
         let _ = rec.recorder.log(
             "ai/path_follower/robot",
             &rerun::Arrows2D::from_vectors([[
-                    robot_pos.x + robot_angle.cos(), 
-                    robot_pos.y + robot_angle.sin()]])
+                    robot_angle.cos(), 
+                    robot_angle.sin()]])
                 .with_origins([[robot_pos.x, robot_pos.y]])
-                .with_colors([rerun::Color::from_rgb(0, 255, 128)]),
+                .with_colors([rerun::Color::from_rgb(0, 255, 255)])
+                .with_draw_order(40.0),
         );
 
         // Plots a point for the dot
         let _ = rec.recorder.log(
             "ai/path_follower/dot",
             &rerun::Points2D::new([[dot.x, dot.y]])
-                .with_colors([rerun::Color::from_rgb(255, 0, 32)]),
+                .with_colors([rerun::Color::from_rgb(255, 128, 0)])
+                .with_draw_order(60.0),
         );
 
         // Plots error vector
         let _ = rec.recorder.log(
             "ai/path_follower/error",
-            &rerun::Arrows2D::from_vectors([[dot.x, dot.y]])
+            &rerun::Arrows2D::from_vectors([[(dot-robot_pos).x, (dot-robot_pos).y]])
                 .with_origins([[robot_pos.x, robot_pos.y]])
-                .with_colors([rerun::Color::from_rgb(192, 128, 16)]),
+                .with_colors([rerun::Color::from_rgb(192, 128, 16)])
+                .with_draw_order(40.0),
         );
 
         let robot_right_side = robot_pos + 0.2 * Vector2::new((robot_angle - FRAC_PI_2).cos(), (robot_angle - FRAC_PI_2).sin());
@@ -225,19 +230,20 @@ fn log_to_rerun(robot_pos: Vector2<f32>, robot_angle: f32, dot: Vector2<f32>, st
             "ai/path_follower/steering",
             &rerun::Arrows2D::from_vectors([
                 [
-                    robot_left_side.x + steering_left_and_right.0 as f32 * robot_angle.cos(), 
-                    robot_left_side.y + steering_left_and_right.0 as f32 * robot_angle.sin()
+                    steering_left_and_right.0 as f32 * robot_angle.cos(), 
+                    steering_left_and_right.0 as f32 * robot_angle.sin()
                 ],
                 [
-                    robot_right_side.x + steering_left_and_right.1 as f32 * robot_angle.cos(), 
-                    robot_right_side.y + steering_left_and_right.1 as f32 * robot_angle.sin()
+                    steering_left_and_right.1 as f32 * robot_angle.cos(), 
+                    steering_left_and_right.1 as f32 * robot_angle.sin()
                 ]
             ])
                 .with_origins([
                     [robot_left_side.x, robot_left_side.y],
                     [robot_right_side.x, robot_right_side.y]
                 ])
-                .with_colors([rerun::Color::from_rgb(72, 192, 64)]),
+                .with_colors([rerun::Color::from_rgb(16, 32, 32)])
+                .with_draw_order(40.0),
         );
     }
 }
