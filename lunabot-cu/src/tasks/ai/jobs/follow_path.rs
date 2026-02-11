@@ -25,14 +25,19 @@ const FOLLOW_SPEED_FACTOR: f32 = 0.25;
 /// towards the dot, to avoid wild spinning from the tiny distances involved.
 const MIN_FOLLOW_DISTANCE: f32 = 0.1;
 /// The maximum speed at which the dot will move along the given path. Provides
-/// a cap for the inverse law used to determine dot speed. In m/s.
+/// a cap for the inverse square law used to determine dot speed. In m/s.
 const MAX_DOT_SPEED: f32 = 0.75;
 /// How fast the dot will move when the robot is 1 meter away. In m/s. The dot
-/// follows an inverse law with robot distance.
+/// follows an inverse square law with robot distance.
 const DOT_SPEED_FACTOR: f32 = 0.35;
 /// If the robot is closer to the goal than this distance, it will zero steering
 /// and end the job.
 const COMPLETION_DISTANCE: f32 = 0.15;
+/// If the robot moves slower than this, it is considered stuck and the job
+/// will fail if it stays like this for too long.
+const STUCK_SPEED: f32 = 0.1;
+/// How long each loop of the controller should be.
+const DT: f32 = 0.05;
 
 /// ## Summary
 /// Uses a pursuit controller to follow a given path in 2D. Directly communicates
@@ -42,7 +47,7 @@ const COMPLETION_DISTANCE: f32 = 0.15;
 /// * The robot reaches a certain distance from the end point of the path.
 /// 
 /// **Fails if:**
-/// * ~~Robot fails to move significantly in stuck_timeout_secs.~~ **(TODO)**
+/// * Robot fails to move significantly in stuck_timeout_secs.
 /// * Job is canceled.
 /// 
 /// ## Details
@@ -52,9 +57,9 @@ const COMPLETION_DISTANCE: f32 = 0.15;
 /// 
 /// The controller works by moving a target, (known here as a "dot", although
 /// this is not the technical term) along the path, and directing the robot to
-/// drive straight towards it
+/// drive straight towards it.
 pub fn follow_path_job(
-    _stuck_timeout_secs: f32, // Currently not used
+    stuck_timeout_secs: f32,
     chain: StaticNode,
     path: Vec<Vector2<f32>>,
 ) -> Job<Steering> {
@@ -72,9 +77,14 @@ pub fn follow_path_job(
                 path_parameter_boundaries.push(previous_totals);
             }
 
+            // Prepare loop interval
+            let mut interval = tokio::time::interval(Duration::from_secs_f32(DT));
+
             // The current target on the path being followed. Will move along the path continuously.
             let mut dot: Vector2<f32> = path[0]; // Start at start of path.
             let mut dot_distance: f32 = 0.0;
+            let mut previous_robot_pos: Vector2<f32> = chain.get_global_isometry().translation.vector.xy().cast();
+            let mut stuck_timer: f32 = 0.0;
             loop {
                 let _robot_isometry = chain.get_global_isometry();
                 // Flatten and set up
@@ -82,13 +92,22 @@ pub fn follow_path_job(
                 let robot_angle = _robot_isometry.rotation.euler_angles().2 as f32;
                 let error = dot - robot_pos;
 
-                let dt: f32 = 0.05; // TODO determine or fix dt
+                // Check if stuck
+                if (robot_pos - previous_robot_pos).norm_squared() / DT < STUCK_SPEED*STUCK_SPEED {
+                    stuck_timer += DT;
+                    if stuck_timer > stuck_timeout_secs {
+                        let _ = status_tx.send(bonsai_bt::Status::Failure);
+                        break bonsai_bt::Status::Failure
+                    }
+                } else {
+                    stuck_timer = 0.0;
+                }
 
                 // In m/s. Moves faster when robot is closer, by inverse square law.
                 let dot_speed = (DOT_SPEED_FACTOR / error.norm_squared()).min(MAX_DOT_SPEED);
 
                 // Update dot location
-                dot_distance += dt * dot_speed;
+                dot_distance += DT * dot_speed;
                 dot = parameter_along_path(dot_distance, &path, &path_parameter_boundaries);
 
                 let error = dot - robot_pos; // Update error again
@@ -119,13 +138,16 @@ pub fn follow_path_job(
 
                 log_to_rerun(robot_pos, robot_angle, dot, steering.get_left_and_right());
 
+                // Prepare for next cycle
+                previous_robot_pos = robot_pos;
+
                 if dot_distance > path_parameter_boundaries[path.len() - 1] && error.norm_squared() < COMPLETION_DISTANCE * COMPLETION_DISTANCE {
                     let _ = output_tx.send(steering).await;
                     let _ = status_tx.send(bonsai_bt::Status::Success);
                     break bonsai_bt::Status::Success
                 } else {
                     let _ = output_tx.send(steering).await;
-                    tokio::time::sleep(Duration::from_secs_f32(dt)).await;
+                    interval.tick().await;
                     let _ = status_tx.send(bonsai_bt::Status::Running);
                 }
             }
