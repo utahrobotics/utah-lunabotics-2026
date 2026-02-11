@@ -27,7 +27,6 @@ These 3 branches are activated from the teleop_behavior based on the ```IsSoftSt
 * located at ai/behaviors/helper_nodes.rs
 
 I have taken inspiration from [nav2](https://docs.nav2.org/behavior_trees/overview/nav2_specific_nodes.html)'s behavior trees and implemented some helper nodes for autonomy that will be useful. 
-_(currently just a retry node but more to come if we need them)._
 
 ## Actions
 * located in ai/action.rs
