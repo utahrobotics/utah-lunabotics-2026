@@ -57,7 +57,11 @@ const DT: f32 = 0.05;
 /// 
 /// The controller works by moving a target, (known here as a "dot", although
 /// this is not the technical term) along the path, and directing the robot to
-/// drive straight towards it.
+/// drive straight towards it. Because the robot is non-holonomic, this instead
+/// draws the circular path with constant forward speed and turning rate that the
+/// robot could take to reach the dot, and applies that speed and turning rate.
+/// Additionally, the dot moves faster when the robot is closer, according to an
+/// inverse square law.
 pub fn follow_path_job(
     stuck_timeout_secs: f32,
     chain: StaticNode,
