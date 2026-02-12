@@ -232,13 +232,22 @@ impl OccupancyGrid {
     }
 
     // permanent obstacles that should not be overwritten by sensor data
-    fn paint_permanent_obstacles(&mut self, obstacles: &ArenaObstacles) {
+    // robot_radius is added to obstacle radius to prevent the robot from colliding
+    fn paint_permanent_obstacles(&mut self, obstacles: &ArenaObstacles, robot_radius: f32) {
         const PERMANENT_GRADIENT: f32 = 10.0;  // gradient value marks permanent
 
-        // Paint rectangular walls
+        println!("[OccupancyGrid] Painting permanent obstacles with robot_radius expansion: {}m", robot_radius);
+
+        // Paint rectangular walls (expand by robot_radius on all sides)
         for &(min_x, min_y, max_x, max_y) in &obstacles.walls {
+            let expanded_min_x = min_x - robot_radius;
+            let expanded_min_y = min_y - robot_radius;
+            let expanded_max_x = max_x + robot_radius;
+            let expanded_max_y = max_y + robot_radius;
+
             if let (Ok((x1, y1)), Ok((x2, y2))) =
-                (self.world_to_cell(min_x, min_y), self.world_to_cell(max_x, max_y))
+                (self.world_to_cell(expanded_min_x, expanded_min_y),
+                 self.world_to_cell(expanded_max_x, expanded_max_y))
             {
                 for x in x1..=x2 {
                     for y in y1..=y2 {
@@ -249,13 +258,17 @@ impl OccupancyGrid {
         }
 
         // Paint circular obstacles (pillars, boulders, craters)
+        // Expand radius by robot_radius to account for robot size
         let all_circles = obstacles.pillars.iter()
             .chain(obstacles.boulders.iter())
             .chain(obstacles.craters.iter());
 
         for &(cx, cy, radius) in all_circles {
             if let Ok((center_x, center_y)) = self.world_to_cell(cx, cy) {
-                let radius_cells = (radius / self.layout.cell_size).ceil() as isize;
+                // Add robot_radius to obstacle radius for collision avoidance
+                let expanded_radius = radius + robot_radius;
+                let radius_cells = (expanded_radius / self.layout.cell_size).ceil() as isize;
+
                 for dx in -radius_cells..=radius_cells {
                     for dy in -radius_cells..=radius_cells {
                         if dx * dx + dy * dy <= radius_cells * radius_cells {
@@ -265,6 +278,9 @@ impl OccupancyGrid {
                         }
                     }
                 }
+
+                println!("[OccupancyGrid] Painted circular obstacle at ({}, {}) with expanded radius: {}m (base: {}m + robot: {}m)",
+                         cx, cy, expanded_radius, radius, robot_radius);
             }
         }
     }
@@ -561,9 +577,10 @@ impl CuTask for OccupancyGridTask {
                 println!("  - Boulders: {}", obstacles.boulders.len());
                 println!("  - Craters: {}", obstacles.craters.len());
 
-                grid.paint_permanent_obstacles(&obstacles);
-                println!("[OccupancyGrid] Painted {} permanent obstacles into global map",
-                    obstacles.pillars.len() + obstacles.boulders.len() + obstacles.craters.len());
+                grid.paint_permanent_obstacles(&obstacles, robot_radius_meters);
+                println!("[OccupancyGrid] Painted {} permanent obstacles into global map (with robot_radius: {}m)",
+                    obstacles.pillars.len() + obstacles.boulders.len() + obstacles.craters.len(),
+                    robot_radius_meters);
 
                 // // Log obstacles to Rerun immediately
                 // if let Some(logger) = RECORDER.get() {
