@@ -48,14 +48,16 @@ const DT: f32 = 0.05;
 ///
 pub fn fine_position_job(
     chain:           StaticNode,
-    target_position: Vector2<f32>
-    target_angle:    f32
+    target_position: Vector2<f32>,
+    target_angle:    f32,
 ) -> Job<Steering> {
 
     let (output_tx, output_rx) = mpsc::channel(5);
-    let mut state: State = State::InitialTurning;
+    let mut state: State = State::InitialAlignment;
     Job::spawn(
         async move {
+
+            let mut attempt_count: u32 = 0;
 
             // Prepare loop interval
             let mut interval = tokio::time::interval(Duration::from_secs_f32(DT));
@@ -69,93 +71,92 @@ pub fn fine_position_job(
                 let robot_pos = _robot_isometry.translation.vector.xy().cast();
                 let robot_angle = _robot_isometry.rotation.euler_angles().2 as f32;
 
+                let error = target_position - robot_pos;
+                let error_angle = (error.y).atan2(error.x);
+
                 // Only move if the dot is far enough away
                 let steering = match state {
-                    InitialTurning {
-                        if (target_angle - robot_angle)*(target_angle - robot_angle) < 0.05*0.05 {
+                    State::InitialAlignment => {
+                        if (error_angle - robot_angle).abs() < 0.05_f32 {
                             state = state.next();
                         }
 
-                        Steering::new_ik(0.0, (target_angle - robot_angle) * 0.5, 2000.)
+                        Steering::new_ik(0.0, 0.5 * (error_angle - robot_angle) as f64, 2000.)
                     },
-                    InitialTraversal {
-                        // Probably shouldn't be a circle follower
-                        let error = target_position - robot_pos;
-                        let error_angle = (error.y).atan2(error.x);
 
-                        let target_distance = error.norm();
-                        let angle_difference = error_angle - robot_angle;
-                        let radius = target_distance / (2.0 * angle_difference.sin());
-                        let velocity = follow_speed_factor * target_distance; // will be fixed by normalization
-                        let turning = velocity * WHEEL_BASE_SIZE * turning_ratio_adjustment * 0.5 / radius;
+                    State::InitialTraversal => {
+                        let velocity = 1.0; // will be fixed by normalization
+                        let turning = (error_angle - robot_angle) * velocity * WHEEL_BASE_SIZE * 0.5;
+                        let turning = 0.0; // Temporary override
 
-                        if error.norm_squared() < 0.05*0.05 {
+                        let parallel_dist = error.dot(&Vector2::new(robot_angle.cos(), robot_angle.sin()));
+                        if parallel_dist.abs() < 0.05 {
                             state = state.next();
                         }
 
                         Steering::new_ik(velocity as f64, turning as f64, 2000.)
                     },
-                    AdjustmentTargetAlignment {
-                        let error = target_position - robot_pos;
 
-                        if (error_angle - robot_angle)*(error_angle - robot_angle) < 0.05*0.05 {
-                            if error.norm_squared() < 0.05*0.05 {
-                                let _ = output_tx.send(Steering::new(0.0, 0.0, 2000.0)).await;
-                                break bonsai_bt::Status::Success
-                            }
+                    State::AdjustmentTargetAlignment => {
+                        if (target_angle - robot_angle).abs() < 0.05_f32 {
                             state = state.next();
+                            attempt_count += 1;
                         }
                         
-                        Steering::new_ik(0.0, (error_angle - robot_angle) * 0.5, 2000.)
+                        Steering::new_ik(0.0, 0.5 * (target_angle - robot_angle) as f64, 2000.)
                     },
-                    AdjustmentSidestepAlignment {
-                        // TODO PROJECTION
-                        if (target_angle - robot_angle)*(target_angle - robot_angle) < 0.05*0.05 {
+
+                    State::AdjustmentSidestepAlignment => {
+                        let sidestep_angle = 
+                            target_angle +
+                            if (target_position - robot_pos).dot(&Vector2::new(target_angle.cos(), target_angle.sin())) > 0.0 {
+                                20.0
+                            } else {
+                                -20.0
+                            }
+                        ;
+
+                        if (sidestep_angle - robot_angle).powi(2) < 0.05_f32.powi(2) {
                             state = state.next();
                         }
 
-                        Steering::new_ik(0.0, (target_angle - robot_angle) * 0.5, 2000.)
+                        Steering::new_ik(0.0, 0.5 * (sidestep_angle - robot_angle) as f64, 2000.)
                     },
-                    AdjustmentSidestepTraversal {
-                        // TODO PROJECTION
-                        // Probably shouldn't be a circle follower
-                        let error = target_position - robot_pos;
-                        let error_angle = (error.y).atan2(error.x);
 
-                        let target_distance = error.norm();
-                        let angle_difference = error_angle - robot_angle;
-                        let radius = target_distance / (2.0 * angle_difference.sin());
-                        let velocity = follow_speed_factor * target_distance; // will be fixed by normalization
-                        let turning = velocity * WHEEL_BASE_SIZE * turning_ratio_adjustment * 0.5 / radius;
+                    State::AdjustmentSidestepTraversal => {
+                        let (sidestep_angle, sidestep_speed) = 
+                            if (target_position - robot_pos).dot(&Vector2::new(target_angle.cos(), target_angle.sin())) > 0.0 {
+                                (target_angle + 20.0, -1.0)
+                            } else {
+                                (target_angle - 20.0, 1.0)
+                            }
+                        ;
 
-                        if error.norm_squared() < 0.05*0.05 {
+                        let velocity = sidestep_speed; // will be fixed by normalization
+                        let turning = (sidestep_angle - robot_angle) * velocity * WHEEL_BASE_SIZE * 0.5;
+
+                        let perpendicular_distance = cross_vector2(error, Vector2::new(target_angle.cos(), target_angle.sin()));
+                        if perpendicular_distance.abs() < 0.05_f32 {
                             state = state.next();
                         }
 
                         Steering::new_ik(velocity as f64, turning as f64, 2000.)
                     },
-                    AdjustmentLineupAlignment {
-                        let error = target_position - robot_pos;
-                        let error_angle = (error.y).atan2(error.x);
 
-                        if (error_angle - robot_angle)*(target_angle - robot_angle) < 0.05*0.05 {
+                    State::AdjustmentLineupAlignment => {
+                        if (error_angle - robot_angle).abs() < 0.05_f32 {
                             state = state.next();
                         }
 
-                        Steering::new_ik(0.0, (error_angle - robot_angle) * 0.5, 2000.)
+                        Steering::new_ik(0.0, 0.5 * (error_angle - robot_angle) as f64, 2000.)
                     },
-                    AdjustmentLineupTraversal {
-                        // Probably shouldn't be a circle follower
-                        let error = target_position - robot_pos;
-                        let error_angle = (error.y).atan2(error.x);
 
-                        let target_distance = error.norm();
-                        let angle_difference = error_angle - robot_angle;
-                        let radius = target_distance / (2.0 * angle_difference.sin());
-                        let velocity = follow_speed_factor * target_distance; // will be fixed by normalization
-                        let turning = velocity * WHEEL_BASE_SIZE * turning_ratio_adjustment * 0.5 / radius;
-
-                        if error.norm_squared() < 0.05*0.05 {
+                    State::AdjustmentLineupTraversal => {
+                        let parallel_dist = error.dot(&Vector2::new(target_angle, target_angle.sin().cos()));
+                        let velocity = -parallel_dist / parallel_dist.abs(); // will be fixed by normalization
+                        let turning = (target_angle - robot_angle) * velocity * WHEEL_BASE_SIZE * 0.5;
+                        
+                        if parallel_dist.abs() < 0.05 {
                             state = state.next();
                         }
 
@@ -163,14 +164,13 @@ pub fn fine_position_job(
                     },
                 };
 
-                log_to_rerun(robot_pos, robot_angle, dot, steering.get_left_and_right());
-
                 // Prepare for next cycle
-                previous_robot_pos = robot_pos;
-
-                if dot_distance > path_parameter_boundaries[path.len() - 1] && error.norm_squared() < completion_distance*completion_distance {
-                    let _ = output_tx.send(steering).await;
+                if error.norm_squared() < 0.05_f32.powi(2) && (target_angle - robot_angle).abs() < 0.05_f32 {
+                    let _ = output_tx.send(Steering::new(0.0, 0.0, 2000.)).await;
                     break bonsai_bt::Status::Success
+                } else if attempt_count > 3 {
+                    let _ = output_tx.send(Steering::new(0.0, 0.0, 2000.)).await;
+                    break bonsai_bt::Status::Failure
                 } else {
                     let _ = output_tx.send(steering).await;
                 }
@@ -181,7 +181,7 @@ pub fn fine_position_job(
 }
 
 enum State {
-    InitialTurning,
+    InitialAlignment,
     InitialTraversal,
     AdjustmentTargetAlignment,
     AdjustmentSidestepAlignment,
@@ -193,40 +193,15 @@ enum State {
 impl State {
     fn next(self) -> State {
         match self {
-            State::InitialTurning              => InitialTraversal,
-            State::InitialTraversal            => AdjustmentTargetAlignment,
-            State::AdjustmentTargetAlignment   => AdjustmentSidestepAlignment,
-            State::AdjustmentSidestepAlignment => AdjustmentSidestepTraversal,
-            State::AdjustmentSidestepTraversal => AdjustmentLineupAlignment,
-            State::AdjustmentLineupAlignment   => AdjustmentLineupTraversal,
-            State::AdjustmentLineupTraversal   => AdjustmentTargetAlignment,
+            State::InitialAlignment            => State::InitialTraversal,
+            State::InitialTraversal            => State::AdjustmentTargetAlignment,
+            State::AdjustmentTargetAlignment   => State::AdjustmentSidestepAlignment,
+            State::AdjustmentSidestepAlignment => State::AdjustmentSidestepTraversal,
+            State::AdjustmentSidestepTraversal => State::AdjustmentLineupAlignment,
+            State::AdjustmentLineupAlignment   => State::AdjustmentLineupTraversal,
+            State::AdjustmentLineupTraversal   => State::AdjustmentTargetAlignment,
         }
     }
-}
-
-/// Turns a path of points and associated distances into a mapping
-/// from distance along the path to points along the path.
-fn parameter_along_path(t: f32, path: &Vec<Vector2<f32>>, path_parameter_boundaries: &Vec<f32>) -> Vector2<f32> {
-    // Before start
-    if t <= 0.0 {
-        return path[0];
-    }
-
-    // Linear search. If this takes too long, use a binary search or a hash map
-    for i in 1..(path.len()) {
-        if path_parameter_boundaries[i] > t {
-            let relevant_section = path[i] - path[i-1];
-            return
-                path[i-1] +
-                relevant_section * (
-                    (t - path_parameter_boundaries[i-1]) /
-                    (path_parameter_boundaries[i] - path_parameter_boundaries[i-1])
-                );
-        }
-    }
-
-    // After end
-    return path[path.len() - 1];
 }
 
 /// Logs all relevant information to rerun for display. Consider adding steering output.
@@ -285,4 +260,8 @@ fn log_to_rerun(robot_pos: Vector2<f32>, robot_angle: f32, dot: Vector2<f32>, st
                 .with_draw_order(40.0),
         );
     }
+}
+
+fn cross_vector2(a: Vector2<f32>, b: Vector2<f32>) -> f32 {
+    a.x * b.y - a.y * b.x
 }
