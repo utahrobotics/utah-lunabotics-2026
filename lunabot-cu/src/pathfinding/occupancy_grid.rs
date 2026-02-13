@@ -1,9 +1,13 @@
+use rerun::Color;
+use rerun::Points2D;
 use wgsl_pcl::map_layout::MapLayout;
 use serde::Deserialize;
 use serde::Serialize;
 use std::fmt::Debug;
 use std::io;
 use cu_bincode::Encode;
+
+use crate::rerun_viz::RECORDER;
 
 #[derive(Serialize, Encode, cu_bincode::Decode, Clone, Debug, Deserialize)]
 pub struct OccupancyGrid {
@@ -65,7 +69,7 @@ impl OccupancyGrid {
         }
         let max_level = level as usize;
 
-        // --- Seed obstacle cells into bin 0 ---
+        // --- Seed obstacle cells intomut bin 0 ---
         // (mx, my, src_x, src_y) - current cell and the obstacle source it came from
         let mut inflation_bins: Vec<Vec<(usize, usize, usize, usize)>> =
             vec![Vec::new(); max_level + 1];
@@ -84,6 +88,9 @@ impl OccupancyGrid {
         let mut seen = vec![false; cells_x * cells_y];
         let mut output = self.gradient_map.clone();
 
+        // just for the logger
+        let mut new_obstacles = Vec::new();
+
         for dist in 0..=max_level {
             // Take the bin out to avoid borrow conflicts when pushing to other bins.
             // This is safe because cardinal neighbors always land in a strictly higher distance bin.
@@ -101,6 +108,7 @@ impl OccupancyGrid {
                 let src_gradient = self.gradient_map[sx + sy * cells_x];
                 if output[index] == f32::MIN || output[index] < src_gradient {
                     output[index] = src_gradient;
+                    new_obstacles.push(index);
                 }
 
                 // Enqueue 4-connected neighbors
@@ -135,12 +143,25 @@ impl OccupancyGrid {
                 }
             }
         }
-
-        Some(OccupancyGrid {
+        let expanded= OccupancyGrid {
             gradient_map: output,
             layout: self.layout.clone(),
             origin: self.origin,
-        })
+        };
+        
+        if let Some(logger) = RECORDER.get() {
+            let _ = logger.recorder.log("ai/expanded_obstacles", &Points2D::new(
+                new_obstacles.iter().map(|index| {
+                    expanded.linear_cell_to_world(*index)
+                }).flatten()
+            ).with_colors(
+                (0..new_obstacles.len()).map(|_| {
+                    Color::from_rgb(100, 0, 100)
+                })
+            ));
+        }
+
+        Some(expanded)
     }
 
     pub fn set_gradient_at(
@@ -180,6 +201,7 @@ impl OccupancyGrid {
             return Err(io::Error::other("cell out of bounds"));
         }
         let index = cell_x + cell_y * cells_x;
+
         Ok(self
             .gradient_map
             .get(index)
@@ -296,6 +318,13 @@ impl OccupancyGrid {
         let local_y = self.layout.min_y + (cell_y as f32 + 0.5) * self.layout.cell_size;
         Ok((local_x + self.origin.0, local_y + self.origin.1))
     }
+
+
+    pub fn linear_cell_to_world(&self, cell_linear_index: usize) -> Result<(f32, f32), io::Error> {
+        let y = cell_linear_index / self.cells_x();
+        let x = cell_linear_index % self.cells_x();
+        self.cell_to_world(x, y)
+    }
     
     /// registers self into another map, overwriting any affected cells
     pub fn append_to(
@@ -401,7 +430,7 @@ mod tests {
 
     #[test]
     fn unmapped_cells_not_treated_as_obstacles() {
-        let mut grid = make_grid(10, 10, 0.1);
+        let grid = make_grid(10, 10, 0.1);
         // All cells are f32::MIN (unmapped), none should be expanded
         grid.expand_obstacles(0.3, 0.5);
 
