@@ -126,7 +126,7 @@ fn sim_callback(
             let lift_speed = LIFT_SPEED.load();
             let bucket_speed = BUCKET_SPEED.load();
 
-            let speed_scale = 0.01;
+            let speed_scale = 0.005;
 
             let mut lift_target = LIFT_TARGET.load();
             if lift_speed > 0 {
@@ -136,7 +136,7 @@ fn sim_callback(
                     Direction::Forward => delta,
                     Direction::Backward => -delta,
                 };
-                lift_target = lift_target.clamp(-3.5, 1.0);
+                lift_target = lift_target.clamp(-1.0, 1.0);
                 LIFT_TARGET.store(lift_target);
             }
             data.actuator("lift_cylinder")
@@ -152,7 +152,7 @@ fn sim_callback(
                     Direction::Forward => delta,
                     Direction::Backward => -delta,
                 };
-                bucket_target = bucket_target.clamp(-2.0, 3.0);
+                bucket_target = bucket_target.clamp(-1.5, 2.5);
                 BUCKET_TARGET.store(bucket_target);
             }
             data.actuator("bucket_cylinder")
