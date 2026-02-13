@@ -61,7 +61,6 @@ pub struct OccupancyGridTask {
     rolling_map_start_position: Isometry3<f64>,
     max_distance_traveled_before_reset: f64,
     max_radians_rotated_before_reset: f64,
-    _min_grad_for_obstacle: f32,
 }
 
 impl Freezable for OccupancyGridTask {}
@@ -174,13 +173,6 @@ impl CuTask for OccupancyGridTask {
             .and_then(|c| c.get::<f64>("max_depth").expect("failed to deserialize"))
             .unwrap_or(3.0) as f32;
 
-        let robot_radius_meters = config
-            .and_then(|c| c.get::<f64>("robot_radius_meters").expect("failed to deserialize"))
-            .unwrap_or(0.3) as f32;
-
-        let obstacle_gradient_threshold = config
-            .and_then(|c| c.get::<f64>("obstacle_gradient_threshold").expect("failed to deserialize"))
-            .unwrap_or(0.2) as f32;
 
         // use bilateral by default, fall back on gaussian
         let use_bilateral = config
@@ -295,7 +287,6 @@ impl CuTask for OccupancyGridTask {
             max_distance_traveled_before_reset,
             max_radians_rotated_before_reset,
             rolling_map_start_position: camera_node.get_global_isometry(),
-            _min_grad_for_obstacle: obstacle_gradient_threshold,
         })
     }
 

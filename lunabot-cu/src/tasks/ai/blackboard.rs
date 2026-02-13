@@ -54,6 +54,9 @@ pub struct LunabotBlackboard {
 
     /// the calculated path from the path finder job
     pub calculated_path: Option<Vec<Vector2<f32>>>,
+
+    pub obstacle_gradient_threshold: f32,
+    pub robot_radius: f32,
 }
 
 impl Default for LunabotBlackboard {
@@ -76,7 +79,9 @@ impl Default for LunabotBlackboard {
             navigate_destination: None,
             yielded: false,
             path_follower: None,
-            rotation_shim: None
+            rotation_shim: None,
+            obstacle_gradient_threshold: 0.5,
+            robot_radius: 0.5,
         }
     }
 }

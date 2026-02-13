@@ -7,7 +7,10 @@
         (
             id: "new_ai",
             type: "crate::tasks::ai::lunabot_ai::LunabotAi",
-            config: {},
+            config: {
+                "obstacle_gradient_threshold": 0.5,
+                "robot_radius_meters": 0.5,
+            },
         ),
         // waits for v4l udev add events, and reports them to the camera tasks
         // camera tasks can open the device if the port from the reported event
@@ -92,14 +95,10 @@
                 "outlier_filter_std_dev_threshold": 3.5,
                 "outlier_filter_max_unknown_neighbors_ratio": 0.3,
                 "use_bilateral_filter": false,
-                "robot_radius_meters": 0.1,
                 "min_depth": 0.2,
                 "max_depth": 2.0,
                 "clear_affected_cells": false,
                 "min_distance_to_clear": 1.5,
-                // this is the gradient threshold for the obstacle expander
-                // if the gradient is greater than this value, the cell is considered an obstacle
-                "obstacle_gradient_threshold": 1.0,
 
                 // parameters for when to reset the local map
                 "max_distance_traveled_before_reset": 1.5,

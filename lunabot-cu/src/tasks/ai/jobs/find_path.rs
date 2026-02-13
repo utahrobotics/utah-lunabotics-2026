@@ -24,6 +24,7 @@ pub fn find_path_job(
     start: Vector2<f32>,
     end: Vector2<f32>,
     max_acceptable_gradient: f32,
+    robot_radius: f32,
 ) -> Job<Vec<Vector2<f32>>> {
     let (output_tx, output_rx) = mpsc::channel(5);
 
@@ -53,6 +54,7 @@ pub fn find_path_job(
                     [start.x, start.y],
                     [end.x, end.y],
                     max_acceptable_gradient,
+                    robot_radius
                 )
             })
             .await

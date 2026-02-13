@@ -54,7 +54,11 @@ pub fn find_path_dstar(
     start: [f32; 2],
     goal: [f32; 2],
     max_acceptable_gradient: f32,
+    robot_radius: f32,
 ) -> Option<Vec<(f32, f32)>> {
+    let local_map = &local_map.expand_obstacles(robot_radius, max_acceptable_gradient)?;
+    let global_map = &global_map.expand_obstacles(robot_radius, max_acceptable_gradient)?;
+
     // Helper to check gradient from both maps (prioritize local)
     let get_gradient = |x: f32, y: f32| -> Option<f32> {
         if let Ok(Some(grad)) = local_map.gradient_closest_to(x, y) {

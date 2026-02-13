@@ -11,7 +11,6 @@ use crate::{
     },
 };
 static PATHFINDING_GOAL: [f32; 2] = [5.843524, 1.4796992];
-static MAX_ACCEPTABLE_GRADIENT: f32 = 0.3;
 
 #[derive(Clone, Debug, Copy)]
 pub enum LunabotAction {
@@ -169,7 +168,7 @@ impl LunabotAction {
                         // Start a new path finder job
                         println!("Starting path finder job from {:?} to {:?}.", start, end);
                         let mut job =
-                            find_path_job(local_map.clone(), start, end, MAX_ACCEPTABLE_GRADIENT);
+                            find_path_job(local_map.clone(), start, end, blackboard.obstacle_gradient_threshold, blackboard.robot_radius);
                         let initial_status = job.get_status();
                         blackboard.path_finder = Some(job);
                         println!(

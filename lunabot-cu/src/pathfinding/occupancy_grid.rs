@@ -16,7 +16,8 @@ pub struct OccupancyGrid {
 }
 
 impl OccupancyGrid {
-    /// Expands obstacles using a BFS from all obstacle cells outward, similar to Nav2's inflation layer.
+    /// Shamelessly stolen from nav2 lmao:
+    /// Expands obstacles using a BFS from all obstacle cells outward.
     ///
     /// Any cell with a gradient >= `obstacle_threshold` is considered an obstacle source.
     /// All cells within `robot_radius` (in meters) of an obstacle source will have their gradient
@@ -24,14 +25,14 @@ impl OccupancyGrid {
     ///
     /// This uses distance-binned BFS so each cell is visited at most once by the nearest obstacle,
     /// avoiding cascading inflation artifacts that a naive in-place approach would cause.
-    pub fn expand_obstacles(&mut self, robot_radius: f32, obstacle_threshold: f32) {
+    pub fn expand_obstacles(&self, robot_radius: f32, obstacle_threshold: f32) -> Option<Self> {
         let cells_x = self.cells_x();
         let cells_y = self.cells_y();
         let cell_radius_f = robot_radius / self.layout.cell_size;
         let cell_radius = cell_radius_f.ceil() as isize;
 
         if cell_radius == 0 || cells_x == 0 || cells_y == 0 {
-            return;
+            return None;
         }
 
         // --- Precompute integer distance bins ---
@@ -135,7 +136,11 @@ impl OccupancyGrid {
             }
         }
 
-        self.gradient_map = output;
+        Some(OccupancyGrid {
+            gradient_map: output,
+            layout: self.layout.clone(),
+            origin: self.origin,
+        })
     }
 
     pub fn set_gradient_at(
