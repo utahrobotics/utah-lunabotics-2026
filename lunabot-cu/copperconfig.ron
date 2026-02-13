@@ -103,6 +103,10 @@
                 // parameters for when to reset the local map
                 "max_distance_traveled_before_reset": 1.5,
                 "max_rotation_radians_before_reset": 0.1,
+
+                // speed limit, refuses to map if the bot is moving too fast
+                "max_angular_velocity": 1.0,
+                "max_linear_velocity": 1.0,
             },
             background: false,
             logging: (
@@ -268,7 +272,7 @@
     monitor: (type:"simple_monitor::SimpleMonitor"),
     logging:(
     // if true, each output payload of each will be logged unless a task opts out
-        enable_task_logging: true,
+        enable_task_logging: false,
         section_size_mib:100,
     ),
 )

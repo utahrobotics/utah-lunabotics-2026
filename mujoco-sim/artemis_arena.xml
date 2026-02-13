@@ -22,6 +22,7 @@
   <include file="meshes/artemis_arena/arena_walls/arena_walls.xml" />
   <include file="meshes/artemis_arena/arena_window_frames/arena_window_frames.xml" />
   <include file="meshes/artemis_arena/arena_windows/arena_windows.xml" />
+  <include file="meshes/core/rock_rough/rock_rough.xml" />
 
   <!-- <include file="meshes/core/rock_rough/rock_rough.xml" /> -->
   <include file="meshes/core/simplify_lunabot/simplify_lunabot.xml" />

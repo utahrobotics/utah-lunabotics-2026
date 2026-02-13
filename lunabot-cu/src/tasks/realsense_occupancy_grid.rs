@@ -60,6 +60,10 @@ pub struct OccupancyGridTask {
     rolling_map_start_position: Isometry3<f64>,
     max_distance_traveled_before_reset: f64,
     max_radians_rotated_before_reset: f64,
+
+    /// pauses obstacle mapper and resets local map if the bot exceeds the speed limit
+    max_linear_velocity: f64,
+    max_angular_velocity: f64,
 }
 
 impl Freezable for OccupancyGridTask {}
@@ -103,6 +107,14 @@ impl CuTask for OccupancyGridTask {
         let camera_name = config
             .and_then(|c| c.get::<String>("camera_node").expect("failed to deserialize"))
             .unwrap_or_else(|| "upper_depth_camera".to_string());
+
+        let max_linear_velocity = config
+            .and_then(|c| c.get::<f64>("max_linear_velocity").expect("failed to deserialize"))
+            .expect("specify max speed");
+
+        let max_angular_velocity = config
+            .and_then(|c| c.get::<f64>("max_angular_velocity").expect("failed to deserialize"))
+            .expect("specify max speed");
 
         let focal_length_px = config
             .and_then(|c| c.get::<f64>("focal_length").expect("failed to deserialize"))
@@ -286,6 +298,8 @@ impl CuTask for OccupancyGridTask {
             max_distance_traveled_before_reset,
             max_radians_rotated_before_reset,
             rolling_map_start_position: camera_node.get_global_isometry(),
+            max_angular_velocity,
+            max_linear_velocity
         })
     }
 
@@ -376,6 +390,16 @@ impl CuTask for OccupancyGridTask {
             return Ok(());
         };
 
+        if let Some(state) = ROBOT_STATE.get() &&
+            let Some(linear_vel) = state.get_velocity() && 
+            let Some(angular_vel) = state.get_angular_velocity() 
+        {
+            if linear_vel.magnitude() > self.max_linear_velocity || angular_vel.magnitude() > self.max_angular_velocity {
+                eprintln!("Pausing obstacle mapper from speed limit violation");
+                return Err(CuError::new_with_cause("max speed exceeded", std::io::Error::other("max speed exceeded")));
+            }
+        }
+
         // Mark as processing and spawn the work
         *processing = true;
 
@@ -431,13 +455,13 @@ impl CuTask for OccupancyGridTask {
                             .with_meter(1.0 / request.depth_scale)
                             .with_depth_range([0.0, 2.0 / request.depth_scale as f64]),
                         );
-                        let _ =
-                            logger.recorder.log(
-                                "obstacle_mapper/pcl",
-                                &Points3D::new(point_cloud.iter().map(|p| {
-                                    [p.x + request.origin.0, p.y + request.origin.1, p.z]
-                                })),
-                            );
+                        // let _ =
+                        //     logger.recorder.log(
+                        //         "obstacle_mapper/pcl",
+                        //         &Points3D::new(point_cloud.iter().map(|p| {
+                        //             [p.x + request.origin.0, p.y + request.origin.1, p.z]
+                        //         })),
+                        //     );
 
                         let pipeline_guard = pipeline.lock().unwrap();
 
@@ -576,10 +600,10 @@ fn log_map(
             }
         }
     }
-    let _ = logger.recorder.log(
-        "obstacle_mapper/gradient_map",
-        &Points3D::new(gradient_points).with_colors(gradient_colors),
-    );
+    // let _ = logger.recorder.log(
+    //     "obstacle_mapper/gradient_map",
+    //     &Points3D::new(gradient_points).with_colors(gradient_colors),
+    // );
 
     // Log blur filtered height map
     let mut blur_height_points = Vec::new();
@@ -604,8 +628,8 @@ fn log_map(
             }
         }
     }
-    let _ = logger.recorder.log(
-        "obstacle_mapper/blur_filtered_height_map",
-        &Points3D::new(blur_height_points).with_colors(blur_height_colors),
-    );
+    // let _ = logger.recorder.log(
+    //     "obstacle_mapper/blur_filtered_height_map",
+    //     &Points3D::new(blur_height_points).with_colors(blur_height_colors),
+    // );
 }
