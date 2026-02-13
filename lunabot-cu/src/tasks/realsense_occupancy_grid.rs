@@ -25,7 +25,7 @@ use serde::Deserialize;
 use std::fmt::Debug;
 use std::io;
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
-use wgsl_pcl::pipelines::depth_to_obstacle::{ClearAffectedCellsOptions, ObstacleExpanderOptions};
+use wgsl_pcl::pipelines::depth_to_obstacle::ClearAffectedCellsOptions;
 use wgsl_pcl::pipelines::filters::*;
 
 use iceoryx_types::{IceoryxDepthFrame, ImuMsg};
@@ -37,7 +37,7 @@ use wgsl_pcl::map_layout::MapLayout;
 use wgsl_pcl::wgsl_setup::{get_device, init_gpu_blocking, is_gpu_initialized};
 
 use crate::ROBOT_STATE;
-use crate::rerun_viz::{RECORDER, ROBOT_STRUCTURE};
+use crate::rerun_viz::{RECORDER};
 use crate::tasks::{DEPTH_FRAME_HEIGHT, DEPTH_FRAME_SIZE, DEPTH_FRAME_WIDTH};
 
 pub static GLOBAL_MAP: OnceLock<Arc<RwLock<OccupancyGrid>>> = OnceLock::new();
@@ -421,10 +421,6 @@ impl CuTask for OccupancyGridTask {
             })
         };
 
-        let obstacle_expander_options = ObstacleExpanderOptions {
-            expansion_radius_meters: robot_radius_meters,
-            obstacle_gradient_threshold,
-        };
         let outlier_filter_options = OutlierFilterOptions {
             kernel_radius: outlier_filter_kernel_radius,
             std_dev_threshold: outlier_filter_std_dev_threshold,
@@ -443,7 +439,6 @@ impl CuTask for OccupancyGridTask {
                 local_layout.clone(),
                 blur_filter_options,
                 outlier_filter_options,
-                obstacle_expander_options,
                 gradient_filter_kernel_radius,
                 min_depth,
                 clear_affected_cells,
