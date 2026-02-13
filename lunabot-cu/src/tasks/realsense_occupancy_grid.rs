@@ -9,7 +9,6 @@
 /// 3. Uses either gaussian or bilateral filtering to reduce noise in the map.
 /// 4. Computes the avg gradient between k neighbors in the height map, disregarding cells with too many unknown neighbors.
 /// 5. Marks gradients over a certain value as obstacles.
-/// 6. Expands the obstacles to be > robot_radius.
 /// 
 /// Notes:
 /// 
