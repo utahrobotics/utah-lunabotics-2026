@@ -1,11 +1,13 @@
 use nalgebra::Vector2;
 use rerun::Vec2D;
 use tasker::tokio::{ sync::mpsc};
+use crate::pathfinding::OccupancyGrid;
+
 
 use crate::{
     pathfinding::field_dstar::find_path_dstar,
     rerun_viz::RECORDER,
-    tasks::{OccupancyGrid, ai::jobs::Job, realsense_occupancy_grid::GLOBAL_MAP},
+    tasks::{ai::jobs::Job, realsense_occupancy_grid::GLOBAL_MAP},
 };
 
 /// IMPORTANT: this job should not take more than a few ms, because since it has access to the global map's read guard,

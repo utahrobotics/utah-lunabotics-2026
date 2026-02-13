@@ -4,10 +4,12 @@ use common::{FromLunabase, LUNABOT_STAGE, LunabotStage, Steering};
 use embedded_common::ActuatorCommand;
 use nalgebra::Vector2;
 use simple_motion::StaticNode;
+use crate::pathfinding::OccupancyGrid;
+
 
 use crate::{
     ROBOT_STATE,
-    tasks::{OccupancyGrid, ai::jobs::Job},
+    tasks::{ai::jobs::Job},
 };
 
 #[derive(Debug)]

@@ -7,7 +7,7 @@ use cu29::{
 };
 use embedded_common::ActuatorCommand;
 
-use crate::tasks::OccupancyGrid;
+use crate::pathfinding::OccupancyGrid;
 use crate::tasks::ai::action::LunabotAction;
 use crate::tasks::ai::behaviors::teleop::teleop_behavior;
 use crate::tasks::ai::blackboard::LunabotBlackboard;

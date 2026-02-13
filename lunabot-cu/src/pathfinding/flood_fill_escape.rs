@@ -1,5 +1,4 @@
-use crate::tasks::OccupancyGrid;
-
+use crate::pathfinding::OccupancyGrid;
 /// used for when the robot appears to be stuck in unknown or obstacle space
 /// returns the nearest free space (by Euclidean distance)
 /// Searches both local and global map

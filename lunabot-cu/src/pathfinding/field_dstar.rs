@@ -1,9 +1,8 @@
+use crate::pathfinding::OccupancyGrid;
+
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap, HashSet};
-
 use crate::pathfinding::flood_fill_escape;
-use crate::tasks::OccupancyGrid;
-
 type WorldCoord = (f32, f32);
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
