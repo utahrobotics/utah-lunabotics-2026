@@ -1,11 +1,11 @@
+use cu_bincode::Encode;
 use rerun::Color;
 use rerun::Points2D;
-use wgsl_pcl::map_layout::MapLayout;
 use serde::Deserialize;
 use serde::Serialize;
 use std::fmt::Debug;
 use std::io;
-use cu_bincode::Encode;
+use wgsl_pcl::map_layout::MapLayout;
 
 use crate::rerun_viz::RECORDER;
 
@@ -137,28 +137,28 @@ impl OccupancyGrid {
                         continue;
                     }
 
-                    let bin_idx =
-                        distance_matrix[(dx + r) as usize][(dy + r) as usize] as usize;
+                    let bin_idx = distance_matrix[(dx + r) as usize][(dy + r) as usize] as usize;
                     inflation_bins[bin_idx].push((nx, ny, sx, sy));
                 }
             }
         }
-        let expanded= OccupancyGrid {
+        let expanded = OccupancyGrid {
             gradient_map: output,
             layout: self.layout.clone(),
             origin: self.origin,
         };
-        
+
         if let Some(logger) = RECORDER.get() {
-            let _ = logger.recorder.log("ai/expanded_obstacles", &Points2D::new(
-                new_obstacles.iter().map(|index| {
-                    expanded.linear_cell_to_world(*index)
-                }).flatten()
-            ).with_colors(
-                (0..new_obstacles.len()).map(|_| {
-                    Color::from_rgb(100, 0, 100)
-                })
-            ));
+            let _ = logger.recorder.log(
+                "ai/expanded_obstacles",
+                &Points2D::new(
+                    new_obstacles
+                        .iter()
+                        .map(|index| expanded.linear_cell_to_world(*index))
+                        .flatten(),
+                )
+                .with_colors((0..new_obstacles.len()).map(|_| Color::from_rgb(100, 0, 100))),
+            );
         }
 
         Some(expanded)
@@ -211,7 +211,7 @@ impl OccupancyGrid {
 
     /// Get gradient value at world coordinates
     /// uses origin to convert world coordinates to map-local coordinates
-    /// returns None if x and y are not in map bounds or if the gradient at x,y is unknown
+    /// returns Err if a cell is out of bounds, None if it is unknown
     pub fn gradient_closest_to(&self, x: f32, y: f32) -> Result<Option<f32>, std::io::Error> {
         let (cell_x, cell_y) = self.world_to_cell(x, y)?;
         self.gradient_at(cell_x, cell_y)
@@ -319,13 +319,12 @@ impl OccupancyGrid {
         Ok((local_x + self.origin.0, local_y + self.origin.1))
     }
 
-
     pub fn linear_cell_to_world(&self, cell_linear_index: usize) -> Result<(f32, f32), io::Error> {
         let y = cell_linear_index / self.cells_x();
         let x = cell_linear_index % self.cells_x();
         self.cell_to_world(x, y)
     }
-    
+
     /// registers self into another map, overwriting any affected cells
     pub fn append_to(
         &self,
@@ -341,7 +340,8 @@ impl OccupancyGrid {
                     continue;
                 };
 
-                if !global_map.layout
+                if !global_map
+                    .layout
                     .is_in_bounds(world_coords.0, world_coords.1)
                 {
                     continue;
@@ -356,8 +356,6 @@ impl OccupancyGrid {
         Ok(())
     }
 }
-
-
 
 impl Default for OccupancyGrid {
     fn default() -> Self {
