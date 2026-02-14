@@ -15,7 +15,6 @@ use crate::{
 /// Merges local map into global, expands obstacles on the combined map, then runs D* pathfinding.
 /// if the robot start position is in an unknown or obstacle, itll find its way out of that area first by searching around with flood_fill_escape to find a near free space and then start from there instead
 /// FAILS IF:
-/// 1. the goal is in an obstacle or unknown
 /// 2. there isnt a path to be found from start to end
 pub fn find_path_job(
     latest_local_map: OccupancyGrid,
