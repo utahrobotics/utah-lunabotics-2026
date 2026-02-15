@@ -23,7 +23,6 @@ pub fn find_path_job(
     robot_radius: f32,
 ) -> Job<Vec<Vector2<f32>>, ()> {
     let (output_tx, output_rx) = mpsc::channel(5);
-    let (input_tx, input_rx) = mpsc::channel(5);
 
     Job::spawn(
         async move {
@@ -89,6 +88,6 @@ pub fn find_path_job(
             result
         },
         output_rx,
-        input_tx,
+        None,
     )
 }
