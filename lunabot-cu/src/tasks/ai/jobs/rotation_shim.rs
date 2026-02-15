@@ -1,11 +1,11 @@
-use std::time::{Duration, Instant};
+use crate::{ROBOT_STATE, tasks::ai::jobs::Job};
 use bonsai_bt::Status::Success;
 use common::Steering;
 use nalgebra::{Rotation2, Vector2};
+use std::time::{Duration, Instant};
 use tasker::tokio::{self, sync::mpsc};
-use crate::{ROBOT_STATE, tasks::ai::jobs::Job};
 
-pub fn rotation_shim(target_yaw: f32, tolerance: f64) -> Job<Steering> {
+pub fn rotation_shim(target_yaw: f32, tolerance: f64) -> Job<Steering, ()> {
     let (output_tx, output_rx) = mpsc::channel(5);
 
     let body = async move {
@@ -57,7 +57,7 @@ pub fn rotation_shim(target_yaw: f32, tolerance: f64) -> Job<Steering> {
         Success
     };
 
-    Job::spawn(body, output_rx)
+    Job::spawn(body, output_rx, None)
 }
 /// finds initial direction of travel based on first two nodes in a path
 pub fn direction_from_path(path: &Vec<Vector2<f32>>) -> Option<f32> {

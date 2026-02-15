@@ -1,8 +1,7 @@
+use crate::pathfinding::OccupancyGrid;
 use nalgebra::Vector2;
 use rerun::Vec2D;
-use tasker::tokio::{ sync::mpsc};
-use crate::pathfinding::OccupancyGrid;
-
+use tasker::tokio::sync::mpsc;
 
 use crate::{
     pathfinding::field_dstar::find_path_dstar,
@@ -22,8 +21,9 @@ pub fn find_path_job(
     end: Vector2<f32>,
     max_acceptable_gradient: f32,
     robot_radius: f32,
-) -> Job<Vec<Vector2<f32>>> {
+) -> Job<Vec<Vector2<f32>>, ()> {
     let (output_tx, output_rx) = mpsc::channel(5);
+    let (input_tx, input_rx) = mpsc::channel(5);
 
     Job::spawn(
         async move {
@@ -49,7 +49,9 @@ pub fn find_path_job(
                 // propagates seamlessly across the local/global boundary.
                 let mut combined = global_map_guard.clone();
                 let _ = latest_local_map.append_to(&mut combined);
-                let Some(expanded) = combined.expand_obstacles(robot_radius, max_acceptable_gradient) else {
+                let Some(expanded) =
+                    combined.expand_obstacles(robot_radius, max_acceptable_gradient)
+                else {
                     return None;
                 };
 
@@ -87,5 +89,6 @@ pub fn find_path_job(
             result
         },
         output_rx,
+        input_tx,
     )
 }

@@ -6,18 +6,21 @@ use tasker::tokio::task::JoinHandle;
 
 /// Long running Action for bonsai
 #[derive(Debug)]
-pub struct Job<Output> {
+pub struct Job<Output, Input> {
     body_thread: JoinHandle<Status>,
     output: mpsc::Receiver<Output>,
+    /// used for sending inputs to the async job body
+    input: Option<mpsc::Sender<Input>>,
 }
 
-impl<Output> Job<Output> {
+impl<Output, Input> Job<Output, Input> {
     /// Returns new job in running state.
     /// The body should use the tx side of status_rx to send status updates
     /// The body should use the tx side of output_rx to enqueue output messages (i.e. Steering or ActuatorCommand)
     pub fn spawn<F>(
         body: F,
         output_rx: mpsc::Receiver<Output>,
+        input_tx: impl Into<Option<mpsc::Sender<Input>>>,
     ) -> Self
     where
         F: Future<Output = Status> + Send + 'static,
@@ -25,6 +28,7 @@ impl<Output> Job<Output> {
         Self {
             body_thread: tasker::get_tokio_handle().spawn(body),
             output: output_rx,
+            input: input_tx.into(),
         }
     }
 
@@ -62,5 +66,12 @@ impl<Output> Job<Output> {
             warning!("More than 3 messgaes in the output queue for job {}");
         }
         self.output.try_recv().ok()
+    }
+
+    pub fn send_to_job(&self, input: Input) -> Result<(), mpsc::error::TrySendError<Input>> {
+        let Some(sender) = self.input.as_ref() else {
+            return Err(mpsc::error::TrySendError::Closed(input));
+        };
+        sender.try_send(input)
     }
 }
