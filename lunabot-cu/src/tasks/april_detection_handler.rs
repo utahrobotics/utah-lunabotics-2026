@@ -154,7 +154,6 @@ impl CuTask for AprilDetectionHandler {
             if let Some(dets) = particular_input.payload() {
                 let camera_id = dets.camera_id.as_ref().clone();
                 for observation in self.cu_detections_to_tag_observations(dets, &camera_id) {
-                    let distrust = observation.decision_margin * observation.decision_margin;
                     let Some(isometry) = observation.get_isometry_of_observer() else {
                         eprintln!("tag observed by unknown camera. (make sure the camera node is correct and defined in the chain");
                         continue;
@@ -219,13 +218,13 @@ impl CuTask for AprilDetectionHandler {
 
                     for i in 0..3 {
                         for j in 0..3 {
-                            combined_covariance[6*i + j] = position_base_covariance_matrix[3*i + j] * distrust as f64;
+                            combined_covariance[6*i + j] = position_base_covariance_matrix[3*i + j];
                         }
                     }
 
                     for i in 0..3 {
                         for j in 0..3 {
-                            combined_covariance[6*(i+3) + (j+3)] = orientation_base_covarience_matrix[3*i + j] * distrust as f64;
+                            combined_covariance[6*(i+3) + (j+3)] = orientation_base_covarience_matrix[3*i + j];
                         }
                     }
 
