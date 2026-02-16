@@ -12,7 +12,7 @@
         {
             "name": Some("l2_front"),
             "origin": [0.80, 0.0, 0.45],
-            "euler":  [0.0, 0., 165.0],
+            "euler":  [0.0, 0., 160.0],
             // "euler": [0,0,0],
             // dont question my decision to add this field
             // this field determines the orders the angles are applied in
