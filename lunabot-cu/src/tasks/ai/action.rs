@@ -256,9 +256,11 @@ impl LunabotAction {
             LunabotAction::CancelJobs => {
                 if let Some(ref mut pathfinder) = blackboard.path_finder {
                     pathfinder.cancel();
+                    blackboard.path_finder = None;
                 }
                 if let Some(ref mut pathfollower) = blackboard.path_follower {
                     pathfollower.cancel();
+                    blackboard.path_follower = None;
                 }
                 Success
             }
