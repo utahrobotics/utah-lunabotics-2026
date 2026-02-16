@@ -169,10 +169,10 @@ fn run_one_copperlist(
                 msg.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
-            default::SimStep::LunabaseBridgeRxFromLunabaseRx{..} => SimOverride::ExecutedBySim,
+            default::SimStep::LunabaseBridgeRxFromLunabaseRx { .. } => SimOverride::ExecutedBySim,
 
             default::SimStep::LunabaseBridgeBridge(..) => SimOverride::ExecutedBySim,
-            default::SimStep::LunabaseBridgeTxToLunabase {..} => SimOverride::ExecutedBySim,
+            default::SimStep::LunabaseBridgeTxToLunabase { .. } => SimOverride::ExecutedBySim,
 
             default::SimStep::NewAi(..) => SimOverride::ExecuteByRuntime,
             default::SimStep::DetectionHandler(..) => SimOverride::ExecuteByRuntime,

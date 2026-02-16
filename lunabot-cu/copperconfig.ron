@@ -93,7 +93,7 @@
                 // outlier removal works best when the clear affected cells is enabled
                 // this is because it allows the outlier cells to be re mapped on the next frame
                 "outlier_filter_std_dev_threshold": 3.5,
-                "outlier_filter_max_unknown_neighbors_ratio": 0.3,
+                "outlier_filter_max_unknown_neighbors_ratio": 0.2,
                 "use_bilateral_filter": false,
                 "min_depth": 0.2,
                 "max_depth": 2.0,
@@ -122,15 +122,15 @@
                 "voxel_size": .7,
                 "max_range": 10.0,
                 "min_range": 1.5,
-                "max_points_per_voxel": 200,
-                "initial_threshold": 2.0,
+                "max_points_per_voxel": 100,
+                "initial_threshold": 1.0,
                 "min_motion_th": 0.2,
                 "enable_deskewing": true,
                 "max_num_threads": 10,
                 "convergence_criterion": 0.0001,
                 "max_num_iterations": 500,
                 "max_accumulation": 1,
-                "max_point_age_seconds": 30.0,
+                "max_point_age_seconds": 40.0,
                 "min_reflectivity": 0.0,
 
                 // max distances between poses used to deskew. if any pose is too far apart, we skip deskewing
@@ -159,6 +159,8 @@
                 "process_noise_angular_velocity": 0.5,
 
                 "initial_covariance": 100.0,
+                // max age (ms) of ICP reading for it to be used in apriltag offset computation
+                "icp_apriltag_max_age_ms": 50.0,
             },
 
         ),
@@ -240,13 +242,13 @@
             path:"camera_configs/camera_template_gstreamer.ron",
             params:{
                 "id":"side",
-                "port":"pci-0000:00:14.0-usb-0:6.4:1.0",
-                "fx":1023.70,
-                "fy":1023.70,
-                "cx":1076.93,
-                "cy":669.95,
-                "width":1920,
-                "height":1200,
+                "port":"pci-0000:00:14.0-usb-0:7:1.0",
+                "fx":430.66,
+                "fy":430.66,
+                "cx":309.73,
+                "cy":244.27,
+                "width":640,
+                "height":480,
                 "udp_host":"127.0.0.1",
                 "udp_port":5003,
             },
@@ -272,7 +274,7 @@
     monitor: (type:"simple_monitor::SimpleMonitor"),
     logging:(
     // if true, each output payload of each will be logged unless a task opts out
-        enable_task_logging: false,
+        enable_task_logging: true,
         section_size_mib:100,
     ),
 )
