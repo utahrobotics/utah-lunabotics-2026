@@ -110,14 +110,7 @@ pub fn follow_path_job(
     Job::spawn(
         async move {
             // Parameterize path
-            let mut path_parameter_boundaries: Vec<f32> = Vec::new();
-            let mut previous_totals: f32 = 0.0;
-            for (i, point) in path.iter().enumerate() {
-                if i != 0 {
-                    previous_totals += (point - path[i - 1]).norm();
-                }
-                path_parameter_boundaries.push(previous_totals);
-            }
+            let mut path_parameter_boundaries: Vec<f32> = parameterize_path(&path);
 
             // Prepare loop interval
             let mut interval = tokio::time::interval(Duration::from_secs_f32(DT));
@@ -130,12 +123,30 @@ pub fn follow_path_job(
                 chain.get_global_isometry().translation.vector.xy().cast();
             let mut stuck_timer: f32 = 0.0;
             loop {
-                // drain any pending paths
+                // drain pending paths
+                let mut got_new_path = false;
                 while let Ok(new_path) = input_rx.try_recv() {
                     path = new_path;
-                    println!("Updating follower with new path");
-                    // TODO: do some math
+                    got_new_path = true;
                 }
+                if got_new_path {
+                    path_parameter_boundaries = parameterize_path(&path);
+
+                    let robot_pos_now: Vector2<f32> =
+                        chain.get_global_isometry().translation.vector.xy().cast();
+
+                    // this should make it so the robot doesnt slow all the way down every time a new path is calculated
+                    let current_lead = (dot - robot_pos_now).norm();
+
+                    let closest_param =
+                        closest_parameter_on_path(robot_pos_now, &path, &path_parameter_boundaries);
+
+                    dot_distance = closest_param + current_lead;
+                    dot = parameter_along_path(dot_distance, &path, &path_parameter_boundaries);
+
+                    stuck_timer = 0.0;
+                }
+
                 interval.tick().await;
 
                 let _robot_isometry = chain.get_global_isometry();
@@ -211,6 +222,41 @@ pub fn follow_path_job(
         output_rx,
         input_tx,
     )
+}
+
+/// calculates cumulative arc-length boundaries for each point in the path.
+fn parameterize_path(path: &[Vector2<f32>]) -> Vec<f32> {
+    let mut boundaries: Vec<f32> = Vec::with_capacity(path.len());
+    let mut total: f32 = 0.0;
+    for (i, point) in path.iter().enumerate() {
+        if i != 0 {
+            total += (point - path[i - 1]).norm();
+        }
+        boundaries.push(total);
+    }
+    boundaries
+}
+
+/// finds the arc-length parameter on the path that is closest to the given
+/// position. only used when switching to a new path so the dot starts near the robot.
+fn closest_parameter_on_path(pos: Vector2<f32>, path: &[Vector2<f32>], boundaries: &[f32]) -> f32 {
+    let mut best_dist_sq = f32::MAX;
+    let mut best_param = 0.0_f32;
+    for i in 1..path.len() {
+        let seg = path[i] - path[i - 1];
+        let seg_len = seg.norm();
+        if seg_len < 1e-9 {
+            continue;
+        }
+        let t_local = ((pos - path[i - 1]).dot(&seg) / (seg_len * seg_len)).clamp(0.0, 1.0);
+        let proj = path[i - 1] + seg * t_local;
+        let d_sq = (pos - proj).norm_squared();
+        if d_sq < best_dist_sq {
+            best_dist_sq = d_sq;
+            best_param = boundaries[i - 1] + t_local * seg_len;
+        }
+    }
+    best_param
 }
 
 /// Turns a path of points and associated distances into a mapping
