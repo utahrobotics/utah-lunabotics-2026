@@ -64,6 +64,7 @@ pub struct OccupancyGridTask {
     /// pauses obstacle mapper and resets local map if the bot exceeds the speed limit
     max_linear_velocity: f64,
     max_angular_velocity: f64,
+    max_acceleration: f64,
 }
 
 impl Freezable for OccupancyGridTask {}
@@ -111,6 +112,10 @@ impl CuTask for OccupancyGridTask {
         let max_linear_velocity = config
             .and_then(|c| c.get::<f64>("max_linear_velocity").expect("failed to deserialize"))
             .expect("specify max speed");
+
+        let max_acceleration = config
+            .and_then(|c| c.get::<f64>("max_acceleration").expect("failed to deserialize"))
+            .expect("specify max accel");
 
         let max_angular_velocity = config
             .and_then(|c| c.get::<f64>("max_angular_velocity").expect("failed to deserialize"))
@@ -299,7 +304,8 @@ impl CuTask for OccupancyGridTask {
             max_radians_rotated_before_reset,
             rolling_map_start_position: camera_node.get_global_isometry(),
             max_angular_velocity,
-            max_linear_velocity
+            max_linear_velocity,
+            max_acceleration
         })
     }
 
@@ -392,9 +398,13 @@ impl CuTask for OccupancyGridTask {
 
         if let Some(state) = ROBOT_STATE.get() &&
             let Some(linear_vel) = state.get_velocity() && 
-            let Some(angular_vel) = state.get_angular_velocity() 
+            let Some(angular_vel) = state.get_angular_velocity() &&
+            let Some(accel) = state.get_acceleration()
         {
-            if linear_vel.magnitude() > self.max_linear_velocity || angular_vel.magnitude() > self.max_angular_velocity {
+            if accel.magnitude() > self.max_acceleration {
+                eprintln!("Accel violation");
+            }
+            if linear_vel.magnitude() > self.max_linear_velocity || angular_vel.magnitude() > self.max_angular_velocity || accel.magnitude() > self.max_acceleration {
                 eprintln!("Pausing obstacle mapper from speed limit violation");
                 return Err(CuError::new_with_cause("max speed exceeded", std::io::Error::other("max speed exceeded")));
             }

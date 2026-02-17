@@ -10,8 +10,8 @@ pub struct RobotState {
     /// Position of each part of the robot, determined by the simple_motion
     /// kinematics library
     pub kinematic_root: StaticNode,
-    pub kalman_state: Arc<AtomicCell<Option<SVector<f64, 12>>>>,
-    pub kalman_variances: Arc<AtomicCell<Option<SMatrix<f64, 12, 12>>>>,
+    pub kalman_state: Arc<AtomicCell<Option<SVector<f64, 15>>>>,
+    pub kalman_variances: Arc<AtomicCell<Option<SMatrix<f64, 15, 15>>>>,
 }
 
 impl RobotState {
@@ -21,6 +21,13 @@ impl RobotState {
             .load()
             .as_ref()
             .map(|s| s.fixed_view::<3, 1>(0, 0).clone_owned())
+    }
+
+    pub fn get_acceleration(&self) -> Option<SVector<f64,3>> {
+        self.kalman_state
+            .load()
+            .as_ref()
+            .map(|s| s.fixed_view::<3, 1>(12, 0).clone_owned())
     }
 
     pub fn get_velocity(&self) -> Option<SVector<f64, 3>> {

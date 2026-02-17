@@ -29,7 +29,7 @@ use nalgebra::{Isometry3, SMatrix, SVector, Vector3, Vector6};
 
 use crate::ROBOT_STATE;
 
-const STATE_DIM: usize = 12;
+const STATE_DIM: usize = 15;
 const INPUT_DIM: usize = 1;
 const POSE_MEAS_DIM: usize = 6;
 const VEL_MEAS_DIM: usize = 6;
@@ -38,6 +38,7 @@ static PROCESS_NOISE_POSITION: OnceLock<f64> = OnceLock::new();
 static PROCESS_NOISE_VELOCITY: OnceLock<f64> = OnceLock::new();
 static PROCESS_NOISE_ORIENTATION: OnceLock<f64> = OnceLock::new();
 static PROCESS_NOISE_ANGULAR_VEL: OnceLock<f64> = OnceLock::new();
+static PROCESS_NOISE_ACCELERATION: OnceLock<f64> = OnceLock::new();
 
 type StateVec = SVector<f64, STATE_DIM>;
 type InputVec = SVector<f64, INPUT_DIM>;
@@ -69,25 +70,41 @@ fn step_function(state: StateVec, input: InputVec) -> StepReturn<f64, STATE_DIM>
     let velocity = state.fixed_rows::<3>(3);
     let orientation_error = state.fixed_rows::<3>(6);
     let angular_velocity = state.fixed_rows::<3>(9);
+    let acceleration = state.fixed_rows::<3>(12);
 
     let mut new_state = StateVec::zeros();
 
     new_state
         .fixed_rows_mut::<3>(0)
-        .copy_from(&(position + velocity * dt));
-    new_state.fixed_rows_mut::<3>(3).copy_from(&velocity);
+        .copy_from(&(position + velocity * dt + 0.5 * acceleration * dt * dt));
+    new_state
+        .fixed_rows_mut::<3>(3)
+        .copy_from(&(velocity + acceleration * dt));
     new_state
         .fixed_rows_mut::<3>(6)
         .copy_from(&orientation_error);
     new_state
         .fixed_rows_mut::<3>(9)
         .copy_from(&angular_velocity);
+    new_state
+        .fixed_rows_mut::<3>(12)
+        .copy_from(&acceleration);
 
     let mut jacobian = SMatrix::<f64, STATE_DIM, STATE_DIM>::identity();
 
     jacobian[(0, 3)] = dt;
     jacobian[(1, 4)] = dt;
     jacobian[(2, 5)] = dt;
+
+    // ∂position/∂acceleration = 0.5 * dt²
+    jacobian[(0, 12)] = 0.5 * dt * dt;
+    jacobian[(1, 13)] = 0.5 * dt * dt;
+    jacobian[(2, 14)] = 0.5 * dt * dt;
+
+    // ∂velocity/∂acceleration = dt
+    jacobian[(3, 12)] = dt;
+    jacobian[(4, 13)] = dt;
+    jacobian[(5, 14)] = dt;
 
     let wx = angular_velocity[0];
     let wy = angular_velocity[1];
@@ -112,6 +129,9 @@ fn step_function(state: StateVec, input: InputVec) -> StepReturn<f64, STATE_DIM>
     }
     for i in 9..12 {
         covariance[(i, i)] = *PROCESS_NOISE_ANGULAR_VEL.get().unwrap() * dt;
+    }
+    for i in 12..15 {
+        covariance[(i, i)] = *PROCESS_NOISE_ACCELERATION.get().unwrap() * dt;
     }
 
     StepReturn {
@@ -269,6 +289,12 @@ impl CuTask for Localizer {
             .expect("failed to deserialize")
             .expect("please supply process noise angular velocity");
 
+        let process_noise_acceleration = config
+            .unwrap()
+            .get::<f64>("process_noise_acceleration")
+            .expect("failed to deserialize")
+            .expect("please supply process noise acceleration");
+
         let initial_covariance = config
             .unwrap()
             .get::<f64>("initial_covariance")
@@ -293,6 +319,9 @@ impl CuTask for Localizer {
             .expect("failed to set oncelock");
         PROCESS_NOISE_ANGULAR_VEL
             .set(process_noise_angular_vel)
+            .expect("failed to set oncelock");
+        PROCESS_NOISE_ACCELERATION
+            .set(process_noise_acceleration)
             .expect("failed to set oncelock");
 
         let initial_state = StateVec::zeros();

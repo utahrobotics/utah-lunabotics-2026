@@ -107,6 +107,7 @@
                 // speed limit, refuses to map if the bot is moving too fast
                 "max_angular_velocity": 1.0,
                 "max_linear_velocity": 1.0,
+                "max_acceleration": 2.5,
             },
             background: false,
             logging: (
@@ -140,8 +141,8 @@
                 "time_between_pose_collections_ms": 2,
 
                 // kalman filtering parameters
-                "icp_position_variance": 0.6,
-                "icp_orientation_variance": 0.001,
+                "icp_position_variance": 0.8,
+                "icp_orientation_variance": 0.1,
             },
             logging: (
                 enabled: false
@@ -157,6 +158,7 @@
                 "process_noise_velocity": 0.5,
                 "process_noise_orientation": 0.5,
                 "process_noise_angular_velocity": 0.5,
+                "process_noise_acceleration": 0.5,
 
                 "initial_covariance": 100.0,
                 // max age (ms) of ICP reading for it to be used in apriltag offset computation
@@ -243,12 +245,12 @@
             params:{
                 "id":"side",
                 "port":"pci-0000:00:14.0-usb-0:7:1.0",
-                "fx":430.66,
-                "fy":430.66,
-                "cx":309.73,
-                "cy":244.27,
-                "width":640,
-                "height":480,
+                "fx":1056.50,
+                "fy":1056.50,
+                "cx":913.26,
+                "cy":604.28,
+                "width":1920,
+                "height":1200,
                 "udp_host":"127.0.0.1",
                 "udp_port":5003,
             },
