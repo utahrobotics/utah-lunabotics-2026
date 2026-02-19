@@ -5,14 +5,20 @@ use nalgebra::{Rotation2, Vector2};
 use std::time::{Duration, Instant};
 use tasker::tokio::{self, sync::mpsc};
 
-pub fn rotation_shim(target_yaw: f32, tolerance: f64) -> Job<Steering, ()> {
+/// rotates to target yaw within tolerance radians
+pub fn rotation_shim(
+    target_yaw: f32,
+    tolerance: f64,
+    kp: impl Into<Option<f64>>,
+    ki: impl Into<Option<f64>>,
+) -> Job<Steering, ()> {
     let (output_tx, output_rx) = mpsc::channel(5);
+    let kp = kp.into().unwrap_or(1.0);
+    let ki = ki.into().unwrap_or(0.6);
 
     let body = async move {
         let target_rot = Rotation2::new(target_yaw as f64);
 
-        let kp = 1.0;
-        let ki = 0.6;
         let max_integral = 1.0;
 
         let mut integral = 0.0;

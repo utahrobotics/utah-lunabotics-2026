@@ -264,8 +264,9 @@ fn sim_callback(
                     eprintln!("Unexpected pose buffer len");
                     return SimOverride::ExecutedBySim;
                 }
-                // Offset from MuJoCo body origin to robot center (matches center of mass in simplify_lunabot.xml)
+                // Offset from MuJoCo body origin to robot center
                 // The kinematic chain in lunabot.ron assumes origin at robot center
+                // mujoco considers the 0,0 of the robot to be the back left corner but we consider it to be the center of the robot
                 let body_origin_to_center = Translation3::new(0.37, -0.18, 0.00);
                 let isometry = Isometry3::from_parts(
                     Translation3::from(

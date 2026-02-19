@@ -33,6 +33,8 @@ const STATE_DIM: usize = 15;
 const INPUT_DIM: usize = 1;
 const POSE_MEAS_DIM: usize = 6;
 const VEL_MEAS_DIM: usize = 6;
+const ACCEL_MEAS_DIM: usize = 6;
+
 // lower = filter trusts prediction more, higher = filter trusts measurements more
 static PROCESS_NOISE_POSITION: OnceLock<f64> = OnceLock::new();
 static PROCESS_NOISE_VELOCITY: OnceLock<f64> = OnceLock::new();
@@ -45,6 +47,7 @@ type InputVec = SVector<f64, INPUT_DIM>;
 type CovMat = SMatrix<f64, STATE_DIM, STATE_DIM>;
 type PoseMeasurement = LinearMeasurement<f64, STATE_DIM, POSE_MEAS_DIM>;
 type VelocityMeasurement = LinearMeasurement<f64, STATE_DIM, VEL_MEAS_DIM>;
+type AccelerationMeasurement = LinearMeasurement<f64, STATE_DIM, ACCEL_MEAS_DIM>;
 
 /// Per-sensor state for each T265 tracker
 #[derive(Clone)]
@@ -86,9 +89,7 @@ fn step_function(state: StateVec, input: InputVec) -> StepReturn<f64, STATE_DIM>
     new_state
         .fixed_rows_mut::<3>(9)
         .copy_from(&angular_velocity);
-    new_state
-        .fixed_rows_mut::<3>(12)
-        .copy_from(&acceleration);
+    new_state.fixed_rows_mut::<3>(12).copy_from(&acceleration);
 
     let mut jacobian = SMatrix::<f64, STATE_DIM, STATE_DIM>::identity();
 

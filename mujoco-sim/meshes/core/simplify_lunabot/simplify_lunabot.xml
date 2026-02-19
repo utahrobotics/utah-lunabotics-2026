@@ -365,6 +365,8 @@
 
   <sensor>
     <velocimeter name="lunabot_velocimeter" site="imu_mount" />
+    <accelerometer
+      name="lunabot_accelerometer" site="imu_mount" />
     <gyro name="lunabot_gyro" site="imu_mount" />
   </sensor>
 

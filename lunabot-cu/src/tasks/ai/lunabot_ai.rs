@@ -28,22 +28,31 @@ impl CuTask for LunabotAi {
     type Output<'m> = (CuMsg<Steering>, CuMsg<ActuatorCommand>);
     type Resources<'r> = ();
 
-    fn new(config: Option<&cu29::prelude::ComponentConfig>, _resources: Self::Resources<'_>) -> cu29::CuResult<Self>
+    fn new(
+        config: Option<&cu29::prelude::ComponentConfig>,
+        _resources: Self::Resources<'_>,
+    ) -> cu29::CuResult<Self>
     where
         Self: Sized,
     {
         let robot_radius_meters = config
-            .and_then(|c| c.get::<f64>("robot_radius_meters").expect("failed to deserialize"))
+            .and_then(|c| {
+                c.get::<f64>("robot_radius_meters")
+                    .expect("failed to deserialize")
+            })
             .unwrap_or(0.3) as f32;
 
         let obstacle_gradient_threshold = config
-            .and_then(|c| c.get::<f64>("obstacle_gradient_threshold").expect("failed to deserialize"))
+            .and_then(|c| {
+                c.get::<f64>("obstacle_gradient_threshold")
+                    .expect("failed to deserialize")
+            })
             .unwrap_or(0.2) as f32;
         let mut blackboard = LunabotBlackboard::default();
         blackboard.obstacle_gradient_threshold = obstacle_gradient_threshold;
         blackboard.robot_radius = robot_radius_meters;
         let behavior = teleop_behavior();
-        let mut bt = BT::new(behavior, blackboard);
+        let bt = BT::new(behavior, blackboard);
         Ok(Self {
             bt: bt,
             last_tick_nanos: 0,
@@ -89,5 +98,4 @@ impl CuTask for LunabotAi {
         }
         Ok(())
     }
-    
 }
