@@ -73,10 +73,10 @@ texture = ExtResource("4_h6673")
 
 [node name="origin" type="Control" parent="Artemis"]
 anchors_preset = 0
-offset_left = 305.0
-offset_top = 635.0
-offset_right = 345.0
-offset_bottom = 675.0
+offset_left = 12.5
+offset_top = 762.5
+offset_right = 52.5
+offset_bottom = 802.5
 
 [node name="LocationArtemis" type="TextureRect" parent="Artemis/origin"]
 layout_mode = 0
