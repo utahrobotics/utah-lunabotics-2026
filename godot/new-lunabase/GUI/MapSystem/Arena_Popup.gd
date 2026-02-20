@@ -29,7 +29,6 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	var locationValues = connection.get_location()
 	updateLunabotLocation(locationValues)
-	_draw()
 	
 
 func _on_button_for_arena_toggled(toggled_on: bool) -> void:
@@ -58,8 +57,3 @@ func updateLunabotLocation(values: PackedFloat32Array ) -> void:
 		marker_pos = Vector2(x * 69, y* 69)
 		
 		
-		
-func _draw() -> void:
-	if arena or marker_pos != Vector2.ZERO:
-		draw_circle(marker_pos, 5,Color.RED)
-	
