@@ -6,10 +6,14 @@ use crate::{
     errors::WgslPclError,
     map_layout,
     mem_layouts::{BindGroupLayoutBuilder, GpuBuffer},
-    pipelines::depth_to_obstacle::ObstacleExpanderOptions,
     shader_pipeline::ComputePipelineBuilder,
     wgsl_setup::GpuDevice,
 };
+
+pub struct ObstacleExpanderOptions {
+    pub expansion_radius_meters: f32,
+    pub obstacle_gradient_threshold: f32,
+}
 
 /// returns the output buffer for the map after obstacle expansion and the compute pipeline, and the compute pipeline
 pub fn new_obstacle_expander_pipeline(

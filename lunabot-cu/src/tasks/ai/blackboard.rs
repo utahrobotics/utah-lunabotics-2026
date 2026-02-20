@@ -1,14 +1,12 @@
 use std::collections::VecDeque;
 
+use crate::pathfinding::OccupancyGrid;
 use common::{FromLunabase, LUNABOT_STAGE, LunabotStage, Steering};
 use embedded_common::ActuatorCommand;
 use nalgebra::Vector2;
 use simple_motion::StaticNode;
 
-use crate::{
-    ROBOT_STATE,
-    tasks::{OccupancyGrid, ai::jobs::Job},
-};
+use crate::{ROBOT_STATE, tasks::ai::jobs::Job};
 
 #[derive(Debug)]
 pub struct LunabotBlackboard {
@@ -43,11 +41,18 @@ pub struct LunabotBlackboard {
     pub yielded: bool,
 
     /// if a path following long running task is going, the job will be stored here
-    pub path_follower: Option<Job<Steering>>,
+    pub path_follower: Option<Job<Steering, Vec<Vector2<f32>>>>,
     /// if a path finding job is running, it will be stored here
-    pub path_finder: Option<Job<Vec<Vector2<f32>>>>,
+    pub path_finder: Option<Job<Vec<Vector2<f32>>, ()>>,
+
+    /// rotation shim
+    pub rotation_shim: Option<Job<Steering, ()>>,
+
     /// the calculated path from the path finder job
     pub calculated_path: Option<Vec<Vector2<f32>>>,
+
+    pub obstacle_gradient_threshold: f32,
+    pub robot_radius: f32,
 }
 
 impl Default for LunabotBlackboard {
@@ -70,6 +75,9 @@ impl Default for LunabotBlackboard {
             navigate_destination: None,
             yielded: false,
             path_follower: None,
+            rotation_shim: None,
+            obstacle_gradient_threshold: 0.5,
+            robot_radius: 0.5,
         }
     }
 }

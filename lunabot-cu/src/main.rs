@@ -68,9 +68,9 @@ fn main() {
     let robot_chain = ChainBuilder::from(robot_chain).finish_static();
     let _ = ROBOT_STATE.set(RobotState {
         kinematic_root: robot_chain,
-        kalman_state: Arc::new(AtomicCell::new(Some(SVector::<f64, 12>::from_element(0.0)))),
+        kalman_state: Arc::new(AtomicCell::new(Some(SVector::<f64, 15>::from_element(0.0)))),
         kalman_variances: Arc::new(AtomicCell::new(Some(
-            SMatrix::<f64, 12, 12>::from_diagonal_element(1E64),
+            SMatrix::<f64, 15, 15>::from_diagonal_element(1E64),
         ))),
     });
 

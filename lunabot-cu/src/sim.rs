@@ -37,8 +37,8 @@ const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 pub static ROBOT_STATE: OnceLock<RobotState> = OnceLock::new();
 
 pub static COPPER_HZ: usize = 1000; // MUST BE THE SAME AS THE TARGET HZ IN COPPERCONFIG.RON
-pub static PHYSICS_HZ: usize = 100;
-pub static RENDER_HZ: usize = 60;
+pub static PHYSICS_HZ: usize = 60;
+pub static RENDER_HZ: usize = 30;
 
 #[copper_runtime(config = "copperconfig.ron", sim_mode = true)]
 struct LunabotApplication {}
@@ -66,9 +66,9 @@ fn default_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::OccupancyGridPipeline(_) => SimOverride::ExecuteByRuntime,
         default::SimStep::NewAi(_) => SimOverride::ExecuteByRuntime,
         default::SimStep::Localizer(_) => SimOverride::ExecutedBySim,
-        default::SimStep::LunabaseBridgeRxFromLunabaseRx{..} => SimOverride::ExecuteByRuntime,
-        default::SimStep::LunabaseBridgeTxToLunabase{..} => SimOverride::ExecuteByRuntime,
-        default::SimStep::LunabaseBridgeBridge{..} => SimOverride::ExecuteByRuntime,
+        default::SimStep::LunabaseBridgeRxFromLunabaseRx { .. } => SimOverride::ExecuteByRuntime,
+        default::SimStep::LunabaseBridgeTxToLunabase { .. } => SimOverride::ExecuteByRuntime,
+        default::SimStep::LunabaseBridgeBridge { .. } => SimOverride::ExecuteByRuntime,
         default::SimStep::__Phantom(_) => SimOverride::ExecutedBySim,
     }
 }
@@ -126,7 +126,7 @@ fn sim_callback(
             let lift_speed = LIFT_SPEED.load();
             let bucket_speed = BUCKET_SPEED.load();
 
-            let speed_scale = 0.01;
+            let speed_scale = 0.005;
 
             let mut lift_target = LIFT_TARGET.load();
             if lift_speed > 0 {
@@ -136,7 +136,7 @@ fn sim_callback(
                     Direction::Forward => delta,
                     Direction::Backward => -delta,
                 };
-                lift_target = lift_target.clamp(-3.5, 1.0);
+                lift_target = lift_target.clamp(-1.0, 1.0);
                 LIFT_TARGET.store(lift_target);
             }
             data.actuator("lift_cylinder")
@@ -152,7 +152,7 @@ fn sim_callback(
                     Direction::Forward => delta,
                     Direction::Backward => -delta,
                 };
-                bucket_target = bucket_target.clamp(-2.0, 3.0);
+                bucket_target = bucket_target.clamp(-1.5, 2.5);
                 BUCKET_TARGET.store(bucket_target);
             }
             data.actuator("bucket_cylinder")
@@ -256,6 +256,7 @@ fn sim_callback(
                 && let Some(lunabot_body) = data.body("simplify_lunabot")
                 && let Some(velocimeter) = data.sensor("lunabot_velocimeter")
                 && let Some(gyro) = data.sensor("lunabot_gyro")
+                && let Some(accel) = data.sensor("lunabot_accelerometer")
             {
                 let coords = lunabot_body.view(&data).xpos.to_vec();
                 let quat = lunabot_body.view(&data).xquat.to_vec();
@@ -263,8 +264,9 @@ fn sim_callback(
                     eprintln!("Unexpected pose buffer len");
                     return SimOverride::ExecutedBySim;
                 }
-                // Offset from MuJoCo body origin to robot center (matches center of mass in simplify_lunabot.xml)
+                // Offset from MuJoCo body origin to robot center
                 // The kinematic chain in lunabot.ron assumes origin at robot center
+                // mujoco considers the 0,0 of the robot to be the back left corner but we consider it to be the center of the robot
                 let body_origin_to_center = Translation3::new(0.37, -0.18, 0.00);
                 let isometry = Isometry3::from_parts(
                     Translation3::from(
@@ -286,9 +288,16 @@ fn sim_callback(
 
                 let angular_velocity = gyro.view(data).data.to_vec();
 
+                let acceleration = accel.view(data).data.to_vec();
+                let accel_nalgebra =
+                    Vector3::new(acceleration[0], acceleration[1], acceleration[2]);
+                let gravity = Vector3::new(0.0, 0.0, 9.8);
+                let body_gravity = isometry.rotation * gravity;
+                let accel = accel_nalgebra - body_gravity;
+
                 // store the state:
                 // State: [x, y, z, vx, vy, vz, orientationerrorx, orientationerrory, orientationerrorz, wx, wy, wz]
-                let kalman_state = SVector::<f64, 12>::from_row_slice(&[
+                let kalman_state = SVector::<f64, 15>::from_row_slice(&[
                     coords[0],
                     coords[1],
                     coords[2],
@@ -301,7 +310,11 @@ fn sim_callback(
                     angular_velocity[0],
                     angular_velocity[1],
                     angular_velocity[2],
+                    accel.x,
+                    accel.y,
+                    accel.x,
                 ]);
+
                 // we are just going to ignore variances for now
                 state.kalman_state.store(Some(kalman_state));
 
@@ -318,77 +331,15 @@ fn sim_callback(
                                 ),
                             ),
                         );
-                        let cam_translation = data
-                            .camera("front_depth_camera")
-                            .unwrap()
-                            .view(data)
-                            .xpos
-                            .to_vec();
-                        let cam_mat = data
-                            .camera("front_depth_camera")
-                            .unwrap()
-                            .view(data)
-                            .xmat
-                            .to_vec();
-
-                        // Convert translation to [f32; 3]
-                        let cam_pos = [
-                            cam_translation[0] as f32,
-                            cam_translation[1] as f32,
-                            cam_translation[2] as f32,
-                        ];
-
-                        // Convert 3x3 rotation matrix to quaternion
-                        let rot_mat = nalgebra::Matrix3::from_row_slice(&cam_mat);
-                        let cam_quat = UnitQuaternion::from_matrix(&rot_mat);
-
-                        let actual_depth_camera_pose = state
-                            .kinematic_root
-                            .get_node_with_name("upper_depth_camera")
-                            .unwrap()
-                            .get_global_isometry();
-
-                        let _ = recorder.recorder.log(
-                            "actual_depth_camera_pose",
-                            &Transform3D::from_translation_rotation(
-                                actual_depth_camera_pose
-                                    .translation
-                                    .vector
-                                    .cast::<f32>()
-                                    .data
-                                    .0[0],
-                                rerun::Quaternion::from_xyzw(
-                                    actual_depth_camera_pose
-                                        .rotation
-                                        .as_vector()
-                                        .cast::<f32>()
-                                        .data
-                                        .0[0],
-                                ),
-                            ),
-                        );
-
-                        let _ = recorder.recorder.log(
-                            "depth_cam_pose",
-                            &Transform3D::from_translation_rotation(
-                                cam_pos,
-                                rerun::Quaternion::from_xyzw([
-                                    cam_quat.i as f32,
-                                    cam_quat.j as f32,
-                                    cam_quat.k as f32,
-                                    cam_quat.w as f32,
-                                ]),
-                            ),
-                        );
                     }
                 }
             }
             SimOverride::ExecutedBySim
         }
         default::SimStep::Localizer(..) => SimOverride::ExecutedBySim,
-        default::SimStep::LunabaseBridgeRxFromLunabaseRx{..} => SimOverride::ExecuteByRuntime,
-        default::SimStep::LunabaseBridgeTxToLunabase{..} => SimOverride::ExecuteByRuntime,
-        default::SimStep::LunabaseBridgeBridge{..} => SimOverride::ExecuteByRuntime,
+        default::SimStep::LunabaseBridgeRxFromLunabaseRx { .. } => SimOverride::ExecuteByRuntime,
+        default::SimStep::LunabaseBridgeTxToLunabase { .. } => SimOverride::ExecuteByRuntime,
+        default::SimStep::LunabaseBridgeBridge { .. } => SimOverride::ExecuteByRuntime,
 
         default::SimStep::__Phantom(_) => SimOverride::ExecutedBySim,
     }
@@ -429,9 +380,9 @@ fn main() {
     let robot_chain = ChainBuilder::from(robot_chain).finish_static();
     let _ = ROBOT_STATE.set(RobotState {
         kinematic_root: robot_chain,
-        kalman_state: Arc::new(AtomicCell::new(Some(SVector::<f64, 12>::from_element(0.0)))),
+        kalman_state: Arc::new(AtomicCell::new(Some(SVector::<f64, 15>::from_element(0.0)))),
         kalman_variances: Arc::new(AtomicCell::new(Some(
-            SMatrix::<f64, 12, 12>::from_diagonal_element(1E64),
+            SMatrix::<f64, 15, 15>::from_diagonal_element(1E64),
         ))),
     });
     let mut application = LunabotApplicationBuilder::new()
@@ -467,13 +418,12 @@ fn main() {
     let mut last_render_time = std::time::Instant::now();
     let mut copper_accumulator = 0usize;
     let mut physics_accumulator = 0usize;
-    
+
     let start = std::time::Instant::now();
 
     while viewer.running() {
         let loop_start = std::time::Instant::now();
         robot_clock_mock.set_value(start.elapsed().as_nanos() as u64);
-
 
         physics_accumulator += PHYSICS_HZ;
         let run_physics = physics_accumulator >= COPPER_HZ;
@@ -481,13 +431,11 @@ fn main() {
             physics_accumulator -= COPPER_HZ;
         }
 
-        let mut sim_cb = |step: default::SimStep| -> SimOverride {
-            sim_callback(step, data, &mut renderer)
-        };
+        let mut sim_cb =
+            |step: default::SimStep| -> SimOverride { sim_callback(step, data, &mut renderer) };
         application
             .run_one_iteration(&mut sim_cb)
             .expect("failed to run copper iteration");
-        
 
         // Step physics
         if run_physics {

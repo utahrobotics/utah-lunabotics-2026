@@ -7,11 +7,10 @@ use crate::{
     ROBOT_STATE,
     tasks::ai::{
         blackboard::LunabotBlackboard,
-        jobs::{find_path_job, follow_path_job},
+        jobs::{direction_from_path, find_path_job, follow_path_job, rotation_shim},
     },
 };
 static PATHFINDING_GOAL: [f32; 2] = [5.843524, 1.4796992];
-static MAX_ACCEPTABLE_GRADIENT: f32 = 0.3;
 
 #[derive(Clone, Debug, Copy)]
 pub enum LunabotAction {
@@ -44,6 +43,9 @@ pub enum LunabotAction {
     FollowPath,
     SetStage(LunabotStage),
     GetUnstuck,
+
+    /// rotate to face a certain direction
+    RotateToFacePath,
 
     /// Cancels long running jobs like pathfinding and path following
     CancelJobs,
@@ -132,9 +134,7 @@ impl LunabotAction {
 
                     // Get destination from blackboard, or use default PATHFINDING_GOAL
                     // PATHFINDING_GOAL is just for testing for now.
-                    let end = 
-                        Vector2::new(PATHFINDING_GOAL[0], PATHFINDING_GOAL[1]);
-
+                    let end = Vector2::new(PATHFINDING_GOAL[0], PATHFINDING_GOAL[1]);
 
                     // Check if we already have a path finder job running
                     if let Some(ref mut path_finder) = blackboard.path_finder {
@@ -146,8 +146,15 @@ impl LunabotAction {
                                     "Path calculation completed with {} waypoints",
                                     path.len()
                                 );
-                                blackboard.calculated_path = Some(path);
+                                blackboard.calculated_path = Some(path.clone());
                                 blackboard.path_finder = None;
+                                if let Some(ref follower) = blackboard.path_follower {
+                                    if let Err(e) = follower.send_to_job(path) {
+                                        eprintln!(
+                                            "Failed to send new path to existing follower: {e}"
+                                        );
+                                    }
+                                }
                                 Success
                             } else {
                                 eprintln!("Path finder job succeeded but produced no output.");
@@ -165,8 +172,13 @@ impl LunabotAction {
                     } else {
                         // Start a new path finder job
                         println!("Starting path finder job from {:?} to {:?}.", start, end);
-                        let mut job =
-                            find_path_job(local_map.clone(), start, end, MAX_ACCEPTABLE_GRADIENT);
+                        let mut job = find_path_job(
+                            local_map.clone(),
+                            start,
+                            end,
+                            blackboard.obstacle_gradient_threshold,
+                            blackboard.robot_radius,
+                        );
                         let initial_status = job.get_status();
                         blackboard.path_finder = Some(job);
                         println!(
@@ -200,8 +212,16 @@ impl LunabotAction {
                     // Use the calculated path from CalculatePath action
                     if let Some(path) = blackboard.calculated_path.take() {
                         println!("Starting new follow path job with {} waypoints", path.len());
-                        let mut follower_job =
-                            follow_path_job(5.0, ROBOT_STATE.get().unwrap().kinematic_root, path);
+                        let mut follower_job = follow_path_job(
+                            ROBOT_STATE.get().unwrap().kinematic_root,
+                            path,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                            None,
+                        );
                         let job_initial_status = follower_job.get_status();
                         blackboard.path_follower = Some(follower_job);
                         println!(
@@ -236,11 +256,51 @@ impl LunabotAction {
             LunabotAction::CancelJobs => {
                 if let Some(ref mut pathfinder) = blackboard.path_finder {
                     pathfinder.cancel();
+                    blackboard.path_finder = None;
                 }
                 if let Some(ref mut pathfollower) = blackboard.path_follower {
                     pathfollower.cancel();
+                    blackboard.path_follower = None;
                 }
                 Success
+            }
+            LunabotAction::RotateToFacePath => {
+                if ROBOT_STATE.get().is_none() {
+                    eprintln!(
+                        "Cannot start rotation shim job because ROBOT_STATE is not initialized"
+                    );
+                    Failure
+                } else if let Some(ref mut rotation_shim) = blackboard.rotation_shim {
+                    blackboard.outgoing_steering_msg = rotation_shim.get_output();
+                    let status = rotation_shim.get_status();
+                    if status == Success || status == Failure {
+                        println!(
+                            "Rotate to face path job completed with status: {:?}",
+                            status
+                        );
+                        blackboard.rotation_shim = None;
+                    }
+                    status
+                } else {
+                    // Use the calculated path from CalculatePath action
+                    if let Some(ref path) = blackboard.calculated_path {
+                        let Some(target_yaw) = direction_from_path(path) else {
+                            eprintln!("Calculated path has < 2 nodes");
+                            return (Failure, 0.0);
+                        };
+                        let mut rotation_shim = rotation_shim(target_yaw, 0.1, None, None);
+                        let job_initial_status = rotation_shim.get_status();
+                        blackboard.rotation_shim = Some(rotation_shim);
+                        println!(
+                            "Face path job started with initial status: {:?}",
+                            job_initial_status
+                        );
+                        job_initial_status
+                    } else {
+                        eprintln!("Cannot face path: no calculated path available");
+                        Failure
+                    }
+                }
             }
         };
         (status, 0.0)

@@ -7,8 +7,8 @@ use crate::robot_state::RobotState;
 use crate::tasks::AprilTagMeasurement;
 use crate::tasks::IcpMeasurement;
 use crate::tasks::ImuMeasurement;
-use crate::utils::transform_sensor_velocity_to_base;
 use crate::tasks::T265Msg;
+use crate::utils::transform_sensor_velocity_to_base;
 use common::FromLunabot;
 use cu29::cutask::CuTask;
 use cu29::output_msg;
@@ -29,21 +29,25 @@ use nalgebra::{Isometry3, SMatrix, SVector, Vector3, Vector6};
 
 use crate::ROBOT_STATE;
 
-const STATE_DIM: usize = 12;
+const STATE_DIM: usize = 15;
 const INPUT_DIM: usize = 1;
 const POSE_MEAS_DIM: usize = 6;
 const VEL_MEAS_DIM: usize = 6;
+const ACCEL_MEAS_DIM: usize = 6;
 
+// lower = filter trusts prediction more, higher = filter trusts measurements more
 static PROCESS_NOISE_POSITION: OnceLock<f64> = OnceLock::new();
 static PROCESS_NOISE_VELOCITY: OnceLock<f64> = OnceLock::new();
 static PROCESS_NOISE_ORIENTATION: OnceLock<f64> = OnceLock::new();
 static PROCESS_NOISE_ANGULAR_VEL: OnceLock<f64> = OnceLock::new();
+static PROCESS_NOISE_ACCELERATION: OnceLock<f64> = OnceLock::new();
 
 type StateVec = SVector<f64, STATE_DIM>;
 type InputVec = SVector<f64, INPUT_DIM>;
 type CovMat = SMatrix<f64, STATE_DIM, STATE_DIM>;
 type PoseMeasurement = LinearMeasurement<f64, STATE_DIM, POSE_MEAS_DIM>;
 type VelocityMeasurement = LinearMeasurement<f64, STATE_DIM, VEL_MEAS_DIM>;
+type AccelerationMeasurement = LinearMeasurement<f64, STATE_DIM, ACCEL_MEAS_DIM>;
 
 /// Per-sensor state for each T265 tracker
 #[derive(Clone)]
@@ -52,7 +56,6 @@ struct T265SensorState {
     prev_pose: Isometry3<f64>,
     /// Previous timestamp
     prev_time: CuTime,
-
 }
 
 fn step_function(state: StateVec, input: InputVec) -> StepReturn<f64, STATE_DIM> {
@@ -70,25 +73,39 @@ fn step_function(state: StateVec, input: InputVec) -> StepReturn<f64, STATE_DIM>
     let velocity = state.fixed_rows::<3>(3);
     let orientation_error = state.fixed_rows::<3>(6);
     let angular_velocity = state.fixed_rows::<3>(9);
+    let acceleration = state.fixed_rows::<3>(12);
 
     let mut new_state = StateVec::zeros();
 
     new_state
         .fixed_rows_mut::<3>(0)
-        .copy_from(&(position + velocity * dt));
-    new_state.fixed_rows_mut::<3>(3).copy_from(&velocity);
+        .copy_from(&(position + velocity * dt + 0.5 * acceleration * dt * dt));
+    new_state
+        .fixed_rows_mut::<3>(3)
+        .copy_from(&(velocity + acceleration * dt));
     new_state
         .fixed_rows_mut::<3>(6)
         .copy_from(&orientation_error);
     new_state
         .fixed_rows_mut::<3>(9)
         .copy_from(&angular_velocity);
+    new_state.fixed_rows_mut::<3>(12).copy_from(&acceleration);
 
     let mut jacobian = SMatrix::<f64, STATE_DIM, STATE_DIM>::identity();
 
     jacobian[(0, 3)] = dt;
     jacobian[(1, 4)] = dt;
     jacobian[(2, 5)] = dt;
+
+    // ∂position/∂acceleration = 0.5 * dt²
+    jacobian[(0, 12)] = 0.5 * dt * dt;
+    jacobian[(1, 13)] = 0.5 * dt * dt;
+    jacobian[(2, 14)] = 0.5 * dt * dt;
+
+    // ∂velocity/∂acceleration = dt
+    jacobian[(3, 12)] = dt;
+    jacobian[(4, 13)] = dt;
+    jacobian[(5, 14)] = dt;
 
     let wx = angular_velocity[0];
     let wy = angular_velocity[1];
@@ -113,6 +130,9 @@ fn step_function(state: StateVec, input: InputVec) -> StepReturn<f64, STATE_DIM>
     }
     for i in 9..12 {
         covariance[(i, i)] = *PROCESS_NOISE_ANGULAR_VEL.get().unwrap() * dt;
+    }
+    for i in 12..15 {
+        covariance[(i, i)] = *PROCESS_NOISE_ACCELERATION.get().unwrap() * dt;
     }
 
     StepReturn {
@@ -180,15 +200,19 @@ pub struct Localizer {
 
     /// ICP-to-global transform
     icp_to_global: Option<Isometry3<f64>>,
-    
+
     /// Most recent ICP pose in raw ICP frame
     last_raw_icp_pose: Option<Isometry3<f64>>,
+    /// Timestamp of the most recent ICP pose
+    last_raw_icp_time: CuTime,
 
     /// Per-sensor state for each T265, keyed by node name
     t265_sensors: HashMap<String, T265SensorState>,
 
     /// Whether we've received our first global reference (AprilTag)
     has_global_reference: bool,
+    /// Max age (seconds) of ICP reading for apriltag offset computation
+    icp_apriltag_max_age_s: f64,
 }
 
 impl Localizer {
@@ -235,44 +259,71 @@ impl CuTask for Localizer {
     type Resources<'r> = ();
     type Output<'m> = output_msg!(FromLunabot);
 
-    fn new(config: Option<&cu29::prelude::ComponentConfig>, _resources: Self::Resources<'_>) -> cu29::CuResult<Self>
+    fn new(
+        config: Option<&cu29::prelude::ComponentConfig>,
+        _resources: Self::Resources<'_>,
+    ) -> cu29::CuResult<Self>
     where
         Self: Sized,
     {
         let process_noise_position = config
             .unwrap()
-            .get::<f64>("process_noise_position").expect("failed to deserialize")
+            .get::<f64>("process_noise_position")
+            .expect("failed to deserialize")
             .expect("please supply process noise position");
 
         let process_noise_velocity = config
             .unwrap()
-            .get::<f64>("process_noise_velocity").expect("failed to deserialize")
+            .get::<f64>("process_noise_velocity")
+            .expect("failed to deserialize")
             .expect("please supply process noise velocity");
-            
+
         let process_noise_orientation = config
             .unwrap()
-            .get::<f64>("process_noise_orientation").expect("failed to deserialize")
+            .get::<f64>("process_noise_orientation")
+            .expect("failed to deserialize")
             .expect("please supply process noise orientation");
 
         let process_noise_angular_vel = config
             .unwrap()
-            .get::<f64>("process_noise_angular_velocity").expect("failed to deserialize")
+            .get::<f64>("process_noise_angular_velocity")
+            .expect("failed to deserialize")
             .expect("please supply process noise angular velocity");
+
+        let process_noise_acceleration = config
+            .unwrap()
+            .get::<f64>("process_noise_acceleration")
+            .expect("failed to deserialize")
+            .expect("please supply process noise acceleration");
 
         let initial_covariance = config
             .unwrap()
             .get::<f64>("initial_covariance")
             .expect("failed to deserialize")
             .expect("please supply initial covariance");
-            
+
+        let icp_apriltag_max_age_ms: f64 = config
+            .unwrap()
+            .get::<f64>("icp_apriltag_max_age_ms")
+            .expect("failed to deserialize")
+            .expect("please supply icp_apriltag_max_age_ms");
+        let icp_apriltag_max_age_s = icp_apriltag_max_age_ms / 1000.0;
+
         PROCESS_NOISE_POSITION
-            .set(process_noise_position).expect("failed to set oncelock");
+            .set(process_noise_position)
+            .expect("failed to set oncelock");
         PROCESS_NOISE_VELOCITY
-            .set(process_noise_velocity).expect("failed to set oncelock");
+            .set(process_noise_velocity)
+            .expect("failed to set oncelock");
         PROCESS_NOISE_ORIENTATION
-            .set(process_noise_orientation).expect("failed to set oncelock");
+            .set(process_noise_orientation)
+            .expect("failed to set oncelock");
         PROCESS_NOISE_ANGULAR_VEL
-            .set(process_noise_angular_vel).expect("failed to set oncelock");
+            .set(process_noise_angular_vel)
+            .expect("failed to set oncelock");
+        PROCESS_NOISE_ACCELERATION
+            .set(process_noise_acceleration)
+            .expect("failed to set oncelock");
 
         let initial_state = StateVec::zeros();
         let initial_covariance = CovMat::from_diagonal_element(initial_covariance);
@@ -297,8 +348,10 @@ impl CuTask for Localizer {
                 most_recent_update: CuTime::default(),
                 icp_to_global: None,
                 last_raw_icp_pose: None,
+                last_raw_icp_time: CuTime::default(),
                 t265_sensors: HashMap::new(),
                 has_global_reference: false,
+                icp_apriltag_max_age_s,
             })
         } else {
             Err(CuError::new_with_cause(
@@ -350,34 +403,6 @@ impl CuTask for Localizer {
                         println!("First AprilTag seen - global reference established");
                     }
 
-                    // Update ICP-to-global offset if we have a recent ICP pose
-                    if let Some(raw_icp) = &self.last_raw_icp_pose {
-                        self.icp_to_global = Some(compute_frame_offset(raw_icp, &global_pose));
-                        if let Some(logger) = RECORDER.get() {
-                            let _ = logger.recorder.log(
-                                "kiss_icp",
-                                &rerun::Transform3D::from_translation_rotation(
-                                    self.icp_to_global
-                                        .unwrap()
-                                        .translation
-                                        .vector
-                                        .cast::<f32>()
-                                        .data
-                                        .0[0],
-                                    rerun::Quaternion::from_xyzw(
-                                        self.icp_to_global
-                                            .unwrap()
-                                            .rotation
-                                            .as_vector()
-                                            .cast::<f32>()
-                                            .data
-                                            .0[0],
-                                    ),
-                                ),
-                            );
-                        }
-                    }
-
                     let pose_vec = self.create_pose_measurement(&global_pose);
                     let mut pose_r =
                         SMatrix::<f64, POSE_MEAS_DIM, POSE_MEAS_DIM>::from_row_slice(&tag.variance);
@@ -395,6 +420,42 @@ impl CuTask for Localizer {
                     }
 
                     self.reset_orientation_error();
+
+                    // Update ICP-to-global offset using filtered EKF state (not raw apriltag)
+                    // Only update when the ICP reading is temporally close (within 100ms)
+                    let icp_age_s = ((now - self.last_raw_icp_time).as_nanos() as f64) / 1e9;
+                    if let Some(raw_icp) = &self.last_raw_icp_pose {
+                        if icp_age_s < self.icp_apriltag_max_age_s {
+                            let filtered_state = self.ekf.state();
+                            let filtered_pose =
+                                state_to_isometry(filtered_state, &self.reference_quaternion);
+                            self.icp_to_global =
+                                Some(compute_frame_offset(raw_icp, &filtered_pose));
+                            if let Some(logger) = RECORDER.get() {
+                                let _ = logger.recorder.log(
+                                    "kiss_icp",
+                                    &rerun::Transform3D::from_translation_rotation(
+                                        self.icp_to_global
+                                            .unwrap()
+                                            .translation
+                                            .vector
+                                            .cast::<f32>()
+                                            .data
+                                            .0[0],
+                                        rerun::Quaternion::from_xyzw(
+                                            self.icp_to_global
+                                                .unwrap()
+                                                .rotation
+                                                .as_vector()
+                                                .cast::<f32>()
+                                                .data
+                                                .0[0],
+                                        ),
+                                    ),
+                                );
+                            }
+                        }
+                    }
 
                     if let Some(logger) = RECORDER.get() {
                         let _ = logger.recorder.log(
@@ -415,6 +476,7 @@ impl CuTask for Localizer {
         if let Some(icp_msg) = input.1.payload() {
             if let Some(raw_icp_pose) = icp_msg.pose.to_na() {
                 self.last_raw_icp_pose = Some(raw_icp_pose);
+                self.last_raw_icp_time = now;
 
                 if let Some(logger) = RECORDER.get() {
                     let _ = logger.recorder.log(
@@ -427,10 +489,10 @@ impl CuTask for Localizer {
                         ),
                     );
                 }
-                
+
                 let offset = self.icp_to_global.unwrap_or(Isometry3::identity());
                 let global_icp_pose = offset * raw_icp_pose;
-                
+
                 if let Some(logger) = RECORDER.get() {
                     let _ = logger.recorder.log(
                         "localizer/icp_global",
@@ -463,13 +525,13 @@ impl CuTask for Localizer {
                 self.reset_orientation_error();
             }
         }
-        
+
         // if true, the orientation will be reset in the kalman state
         let mut should_reset_orientation = false;
         if let Some(t265_msg) = input.4.payload() {
             if let Some(current_t265_raw) = t265_msg.pose.to_na() {
                 let node_name = &t265_msg.node_name;
-                
+
                 if let Some(logger) = RECORDER.get() {
                     let _ = logger.recorder.log(
                         format!("localizer/t265_raw/{}", node_name),
@@ -483,12 +545,13 @@ impl CuTask for Localizer {
                 }
 
                 // Get or create sensor state
-                let sensor_state = self.t265_sensors.entry(node_name.clone()).or_insert_with(|| {
-                    T265SensorState {
-                        prev_pose: current_t265_raw,
-                        prev_time: now
-                    }
-                });
+                let sensor_state =
+                    self.t265_sensors
+                        .entry(node_name.clone())
+                        .or_insert_with(|| T265SensorState {
+                            prev_pose: current_t265_raw,
+                            prev_time: now,
+                        });
 
                 let delta_time = ((now - sensor_state.prev_time).as_nanos() as f64) / 1e9;
                 if delta_time > 1e-6 && delta_time < 0.5 {
@@ -498,7 +561,11 @@ impl CuTask for Localizer {
                     let sensor_angular_vel = sensor_delta.rotation.scaled_axis() / delta_time;
 
                     // Get the sensor node and transform velocity to base frame
-                    if let Some(cam_node) = self.robot_state.kinematic_root.get_node_with_name(node_name) {
+                    if let Some(cam_node) = self
+                        .robot_state
+                        .kinematic_root
+                        .get_node_with_name(node_name)
+                    {
                         let base_to_t265 = cam_node.get_isometry_from_base();
                         let (base_linear_vel, base_angular_vel) = transform_sensor_velocity_to_base(
                             sensor_linear_vel,
@@ -507,7 +574,8 @@ impl CuTask for Localizer {
                         );
                         let state = self.ekf.state();
                         let orientation_error = Vector3::new(state[6], state[7], state[8]);
-                        let current_orientation = compose_error(&self.reference_quaternion, &orientation_error);
+                        let current_orientation =
+                            compose_error(&self.reference_quaternion, &orientation_error);
 
                         let global_linear_vel = current_orientation * base_linear_vel;
                         let global_angular_vel = current_orientation * base_angular_vel;
@@ -539,7 +607,10 @@ impl CuTask for Localizer {
                             }
 
                             if let Err(e) = self.ekf.update(&self.t265_velocity_measurement) {
-                                eprintln!("EKF update with T265 velocity ({}) failed: {:?}", node_name, e);
+                                eprintln!(
+                                    "EKF update with T265 velocity ({}) failed: {:?}",
+                                    node_name, e
+                                );
                             }
                             should_reset_orientation = true;
                         } else {
@@ -549,10 +620,12 @@ impl CuTask for Localizer {
                             );
                         }
                     } else {
-                        eprintln!("Warning: T265 node '{}' not found in robot kinematic chain", node_name);
+                        eprintln!(
+                            "Warning: T265 node '{}' not found in robot kinematic chain",
+                            node_name
+                        );
                     }
                 }
-
 
                 // Update sensor state
                 sensor_state.prev_pose = current_t265_raw;
@@ -562,7 +635,6 @@ impl CuTask for Localizer {
         if should_reset_orientation {
             self.reset_orientation_error();
         }
-
 
         if let Some(imu_measurement) = input.0.payload() {
             if let Some(logger) = RECORDER.get() {
@@ -601,7 +673,7 @@ impl CuTask for Localizer {
                         state[5] as f32,
                     )]),
                 );
-                
+
                 let _ = logger.recorder.log(
                     "localizer/angular_velocity",
                     &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(
