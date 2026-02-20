@@ -19,6 +19,7 @@ config/icon="uid://c3b2y3ky1m03k"
 
 NotificationCanvasGlobal="*res://GUI/NotificationSystem/Assets/NotificationCanvas.tscn"
 SettingsMenu="*res://GUI/SettingsMenu/Scene/SettingsMenu.tscn"
+GlobalLunabaseConnection="*res://Systems/Connection/lunabase_connection.tscn"
 
 [display]
 

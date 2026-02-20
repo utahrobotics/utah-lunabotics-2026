@@ -1,7 +1,7 @@
 extends Control
 
-@onready var connection: Node = $LunabaseConnection
-@onready var controller: LunabaseHumanController = $LunabaseHumanController
+@onready var connection:= GlobalLunabaseConnection
+@onready var controller:= $LunabaseHumanController
 @onready var ip_input: LineEdit = $VBoxContainer/TopBar/MarginContainer/TopPanel/ConnectionGroup/IPInput
 @onready var connect_button: Button = $VBoxContainer/TopBar/MarginContainer/TopPanel/ConnectionGroup/ConnectButton
 @onready var packet_label: Label = $VBoxContainer/TopBar/MarginContainer/TopPanel/StatusGroup/PacketLabel
@@ -14,7 +14,7 @@ extends Control
 @onready var speed_slider: HSlider = $VBoxContainer/MainContent/HBoxContainer/RightColumn/SpeedControl/MarginContainer/VBox/SpeedMultiplierSlider
 @onready var location_label: Label = $VBoxContainer/TopBar/MarginContainer/TopPanel/StatusGroup/location_label
 @onready var orientation_label: Label = $VBoxContainer/MainContent/HBoxContainer/CenterColumn/OrientationPanel/MarginContainer/OrientationLabel
-@onready var PitchAndRollGUI: Control = $VBoxContainer/MainContent/HBoxContainer/CenterColumn/AttitudeContainer/UIAttitude
+@onready var PitchAndRollGUI: Control = $IsometriesMenu/UIAttitude
 var command_recorder: CommandRecorder
 
 #Speed Slider
@@ -35,6 +35,7 @@ enum LunabotStage {
 }
 
 func _ready() -> void:
+	
 	connection.stage_changed.connect(_on_stage_changed)
 	
 	connect_button.pressed.connect(_on_connect_pressed)

@@ -1,4 +1,4 @@
-<mujoco model="artemis_arena">
+<mujoco model="ucf_arena">
   <default>
     <default class="visual">
       <geom group="3" type="mesh" contype="0" conaffinity="0" />
