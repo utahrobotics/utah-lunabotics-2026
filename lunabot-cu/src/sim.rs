@@ -267,15 +267,16 @@ fn sim_callback(
                 // Offset from MuJoCo body origin to robot center
                 // The kinematic chain in lunabot.ron assumes origin at robot center
                 // mujoco considers the 0,0 of the robot to be the back left corner but we consider it to be the center of the robot
-                let body_origin_to_center = Translation3::new(0.37, -0.18, 0.00);
+                let rotation = UnitQuaternion::from_quaternion(Quaternion::new(
+                    quat[0], quat[1], quat[2], quat[3],
+                ));
+                let body_origin_to_center = Vector3::new(0.37, -0.18, 0.00);
                 let isometry = Isometry3::from_parts(
                     Translation3::from(
-                        Translation3::new(coords[0], coords[1], coords[2]).vector
-                            + body_origin_to_center.vector,
+                        Vector3::new(coords[0], coords[1], coords[2])
+                            + rotation * body_origin_to_center,
                     ),
-                    UnitQuaternion::from_quaternion(Quaternion::new(
-                        quat[0], quat[1], quat[2], quat[3],
-                    )),
+                    rotation,
                 );
                 state.kinematic_root.set_isometry(isometry);
                 output.set_payload(FromLunabot::RobotIsometry {
