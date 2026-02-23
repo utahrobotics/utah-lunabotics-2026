@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://lfb3k4n5gotg" path="res://MainControl.gd" id="1"]
 [ext_resource type="Script" uid="uid://cyolsda2lojye" path="res://Systems/CommandPattern/Controllers/LunabaseHumanController.gd" id="2"]
+[ext_resource type="Script" uid="uid://y314st0yvl0o" path="res://control_interface_v_box.gd" id="2_pnl2l"]
 [ext_resource type="Texture2D" uid="uid://c3b2y3ky1m03k" path="res://Assets/icons/USR-Icon.png" id="3_w6ul0"]
 [ext_resource type="PackedScene" uid="uid://dhg4sb4ifrvh8" path="res://GUI/PitchAndRollProposal/Testing/FlightSim/UIAttitude/UIAttitude.tscn" id="4_3r4oj"]
 [ext_resource type="PackedScene" uid="uid://d0gs2f7n7wdhm" path="res://newWindow.tscn" id="5_33q4t"]
@@ -295,205 +296,32 @@ theme_override_constants/margin_top = 18
 theme_override_constants/margin_right = 18
 theme_override_constants/margin_bottom = 18
 
-[node name="VBox" type="VBoxContainer" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer" unique_id=1949022318]
+[node name="ControlInterfaceVBox" type="VBoxContainer" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer" unique_id=1949022318]
 layout_mode = 2
 size_flags_vertical = 0
 theme_override_constants/separation = 15
+script = ExtResource("2_pnl2l")
 
-[node name="Title" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox" unique_id=717054381]
+[node name="Title" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/ControlInterfaceVBox" unique_id=717054381]
 layout_mode = 2
 theme_override_colors/font_color = Color(0.2, 0.6, 1, 1)
 theme_override_font_sizes/font_size = 16
 text = "CONTROL INTERFACE"
 
-[node name="Divider" type="ColorRect" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox" unique_id=1274341835]
+[node name="Divider" type="ColorRect" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/ControlInterfaceVBox" unique_id=1274341835]
 custom_minimum_size = Vector2(0, 2)
 layout_mode = 2
 color = Color(0.2, 0.5, 0.9, 0.2)
 
-[node name="KeyboardSection" type="VBoxContainer" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox" unique_id=1021671217]
+[node name="ScrollContainer" type="ScrollContainer" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/ControlInterfaceVBox" unique_id=2142096388]
+custom_minimum_size = Vector2(0, 275)
 layout_mode = 2
-theme_override_constants/separation = 6
+size_flags_vertical = 3
 
-[node name="Header" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/KeyboardSection" unique_id=898596921]
+[node name="ControlsLabel" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/ControlInterfaceVBox/ScrollContainer" unique_id=1095829832]
 layout_mode = 2
-theme_override_colors/font_color = Color(0.6, 0.65, 0.7, 1)
-theme_override_font_sizes/font_size = 11
-text = "KEYBOARD"
-
-[node name="Control1" type="HBoxContainer" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/KeyboardSection" unique_id=883466365]
-layout_mode = 2
-
-[node name="Keys" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/KeyboardSection/Control1" unique_id=1502328939]
-custom_minimum_size = Vector2(70, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.3, 0.7, 1, 1)
-theme_override_font_sizes/font_size = 12
-text = "W / S"
-
-[node name="Action" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/KeyboardSection/Control1" unique_id=2079609348]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.8, 0.85, 0.9, 1)
-theme_override_font_sizes/font_size = 12
-text = "Forward / Backward"
-
-[node name="Control2" type="HBoxContainer" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/KeyboardSection" unique_id=284743640]
-layout_mode = 2
-
-[node name="Keys" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/KeyboardSection/Control2" unique_id=1187157049]
-custom_minimum_size = Vector2(70, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.3, 0.7, 1, 1)
-theme_override_font_sizes/font_size = 12
-text = "A / D"
-
-[node name="Action" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/KeyboardSection/Control2" unique_id=484149343]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.8, 0.85, 0.9, 1)
-theme_override_font_sizes/font_size = 12
-text = "Turn Left / Right"
-
-[node name="Control3" type="HBoxContainer" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/KeyboardSection" unique_id=885468414]
-layout_mode = 2
-
-[node name="Keys" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/KeyboardSection/Control3" unique_id=1704978823]
-custom_minimum_size = Vector2(70, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.3, 0.7, 1, 1)
-theme_override_font_sizes/font_size = 12
-text = "Q / E"
-
-[node name="Action" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/KeyboardSection/Control3" unique_id=1565452810]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.8, 0.85, 0.9, 1)
-theme_override_font_sizes/font_size = 12
-text = "Lift Down / Up"
-
-[node name="Control4" type="HBoxContainer" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/KeyboardSection" unique_id=1758549647]
-layout_mode = 2
-
-[node name="Keys" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/KeyboardSection/Control4" unique_id=1300984653]
-custom_minimum_size = Vector2(70, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.3, 0.7, 1, 1)
-theme_override_font_sizes/font_size = 12
-text = "Z / C"
-
-[node name="Action" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/KeyboardSection/Control4" unique_id=181934262]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.8, 0.85, 0.9, 1)
-theme_override_font_sizes/font_size = 12
-text = "Bucket Down / Up"
-
-[node name="Control5" type="HBoxContainer" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/KeyboardSection" unique_id=416089906]
-layout_mode = 2
-
-[node name="Keys" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/KeyboardSection/Control5" unique_id=1682141090]
-custom_minimum_size = Vector2(70, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.3, 0.7, 1, 1)
-theme_override_font_sizes/font_size = 12
-text = "↑ / ↓"
-
-[node name="Action" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/KeyboardSection/Control5" unique_id=1325112192]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.8, 0.85, 0.9, 1)
-theme_override_font_sizes/font_size = 12
-text = "Increment / Decrement Speed"
-
-[node name="Spacer1" type="Control" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox" unique_id=391271495]
-custom_minimum_size = Vector2(0, 10)
-layout_mode = 2
-
-[node name="GamepadSection" type="VBoxContainer" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox" unique_id=309905914]
-layout_mode = 2
-theme_override_constants/separation = 6
-
-[node name="Header" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/GamepadSection" unique_id=250636375]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.6, 0.65, 0.7, 1)
-theme_override_font_sizes/font_size = 11
-text = "GAMEPAD"
-
-[node name="Control1" type="HBoxContainer" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/GamepadSection" unique_id=393139396]
-layout_mode = 2
-
-[node name="Keys" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/GamepadSection/Control1" unique_id=1463733414]
-custom_minimum_size = Vector2(70, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.3, 0.7, 1, 1)
-theme_override_font_sizes/font_size = 12
-text = "RT / LT"
-
-[node name="Action" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/GamepadSection/Control1" unique_id=1726458554]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.8, 0.85, 0.9, 1)
-theme_override_font_sizes/font_size = 12
-text = "Forward / Backward"
-
-[node name="Control2" type="HBoxContainer" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/GamepadSection" unique_id=616721694]
-layout_mode = 2
-
-[node name="Keys" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/GamepadSection/Control2" unique_id=210005499]
-custom_minimum_size = Vector2(70, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.3, 0.7, 1, 1)
-theme_override_font_sizes/font_size = 12
-text = "L-Stick"
-
-[node name="Action" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/GamepadSection/Control2" unique_id=220883819]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.8, 0.85, 0.9, 1)
-theme_override_font_sizes/font_size = 12
-text = "Turning"
-
-[node name="Control3" type="HBoxContainer" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/GamepadSection" unique_id=1020003875]
-layout_mode = 2
-
-[node name="Keys" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/GamepadSection/Control3" unique_id=2107725122]
-custom_minimum_size = Vector2(70, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.3, 0.7, 1, 1)
-theme_override_font_sizes/font_size = 12
-text = "D-Pad"
-
-[node name="Action" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/GamepadSection/Control3" unique_id=1968154291]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.8, 0.85, 0.9, 1)
-theme_override_font_sizes/font_size = 12
-text = "Lift Actuators"
-
-[node name="Control4" type="HBoxContainer" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/GamepadSection" unique_id=985332044]
-layout_mode = 2
-
-[node name="Keys" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/GamepadSection/Control4" unique_id=105431433]
-custom_minimum_size = Vector2(70, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.3, 0.7, 1, 1)
-theme_override_font_sizes/font_size = 12
-text = "Y / A"
-
-[node name="Action" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/GamepadSection/Control4" unique_id=1416202151]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.8, 0.85, 0.9, 1)
-theme_override_font_sizes/font_size = 12
-text = "Bucket Actuators"
-
-[node name="Control5" type="HBoxContainer" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/GamepadSection" unique_id=448054365]
-layout_mode = 2
-
-[node name="Keys" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/GamepadSection/Control5" unique_id=263655881]
-custom_minimum_size = Vector2(70, 0)
-layout_mode = 2
-theme_override_colors/font_color = Color(0.3, 0.7, 1, 1)
-theme_override_font_sizes/font_size = 12
-text = "RB / LB"
-
-[node name="Action" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/VBox/GamepadSection/Control5" unique_id=1548259250]
-layout_mode = 2
-theme_override_colors/font_color = Color(0.8, 0.85, 0.9, 1)
-theme_override_font_sizes/font_size = 12
-text = "Increment / Decrement Speed"
+size_flags_horizontal = 3
+size_flags_vertical = 6
 
 [node name="ErrorsPanel" type="PanelContainer" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn" unique_id=1453449401]
 layout_mode = 2

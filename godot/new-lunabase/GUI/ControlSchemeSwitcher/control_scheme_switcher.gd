@@ -1,10 +1,12 @@
-extends Control
+class_name ControlSchemeSwitcher extends Control
 
 @onready var controller_scheme_option_button: OptionButton = $Panel/VBoxContainer/HBoxContainer/ControllerSchemeOptionButton
 @onready var keyboard_scheme_option_button: OptionButton = $Panel/VBoxContainer/HBoxContainer2/KeyboardSchemeOptionButton
 
 @export var controller_path : String = "res://Systems/ControlSchemes/schemes/ControllerSchemes"
 @export var keyboard_path : String = "res://Systems/ControlSchemes/schemes/KeyboardSchemes"
+
+signal updated_control_scheme
 
 var controller_schemes : Array[ControlSchemeResource]
 var keyboard_schemes : Array[ControlSchemeResource]
@@ -31,6 +33,7 @@ func populate_schemes():
 		keyboard_schemes.append(new_resource)
 		keyboard_scheme_option_button.add_item(new_resource.scheme_name)
 	_on_keyboard_scheme_option_button_item_selected(0)
+	_on_controller_scheme_option_button_item_selected(0)
 
 func _process(_delta: float) -> void:
 	if Input.is_action_just_pressed("left_wheel"):
@@ -60,6 +63,8 @@ func populate_from_scheme(new_scheme : ControlSchemeResource):
 			if event is InputEvent and not null:
 				print("adding event ", event, "to action ", action)
 				InputMap.action_add_event(action, event)
+	
+	updated_control_scheme.emit()
 
 func _on_keyboard_scheme_option_button_item_selected(index: int) -> void:
 	if keyboard_prev_index >= 0:
@@ -73,3 +78,7 @@ func _on_controller_scheme_option_button_item_selected(index: int) -> void:
 		unload_scheme(controller_schemes[controller_prev_index])
 	populate_from_scheme(controller_schemes[index])
 	controller_prev_index = index
+
+
+func _on_default_button_pressed() -> void:
+	populate_schemes()

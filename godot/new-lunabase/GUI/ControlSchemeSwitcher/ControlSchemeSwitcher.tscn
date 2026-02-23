@@ -1,4 +1,4 @@
-[gd_scene load_steps=3 format=3 uid="uid://bm44cf3l53nfk"]
+[gd_scene format=3 uid="uid://bm44cf3l53nfk"]
 
 [ext_resource type="Script" uid="uid://cwwvb5mondipu" path="res://GUI/ControlSchemeSwitcher/control_scheme_switcher.gd" id="1_5b5wv"]
 
@@ -9,7 +9,7 @@ corner_radius_top_right = 10
 corner_radius_bottom_right = 10
 corner_radius_bottom_left = 10
 
-[node name="ControlSchemeSwitcher" type="Control"]
+[node name="ControlSchemeSwitcher" type="Control" unique_id=1149457847]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -18,39 +18,57 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_5b5wv")
 
-[node name="Panel" type="Panel" parent="."]
+[node name="Panel" type="Panel" parent="." unique_id=1001667156]
 layout_mode = 0
-offset_right = 490.0
-offset_bottom = 80.0
+offset_right = 660.0
+offset_bottom = 204.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_5b5wv")
 
-[node name="VBoxContainer" type="VBoxContainer" parent="Panel"]
+[node name="VBoxContainer" type="VBoxContainer" parent="Panel" unique_id=1992655495]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_constants/separation = 19
+alignment = 1
 
-[node name="HBoxContainer" type="HBoxContainer" parent="Panel/VBoxContainer"]
+[node name="HBoxContainer" type="HBoxContainer" parent="Panel/VBoxContainer" unique_id=1167786125]
 layout_mode = 2
+alignment = 1
 
-[node name="Label" type="Label" parent="Panel/VBoxContainer/HBoxContainer"]
+[node name="Label" type="Label" parent="Panel/VBoxContainer/HBoxContainer" unique_id=598773090]
 layout_mode = 2
 text = "Controller Scheme: "
 
-[node name="ControllerSchemeOptionButton" type="OptionButton" parent="Panel/VBoxContainer/HBoxContainer"]
+[node name="ControllerSchemeOptionButton" type="OptionButton" parent="Panel/VBoxContainer/HBoxContainer" unique_id=805731581]
 layout_mode = 2
 
-[node name="HBoxContainer2" type="HBoxContainer" parent="Panel/VBoxContainer"]
+[node name="HBoxContainer2" type="HBoxContainer" parent="Panel/VBoxContainer" unique_id=1320455947]
 layout_mode = 2
+alignment = 1
 
-[node name="Label" type="Label" parent="Panel/VBoxContainer/HBoxContainer2"]
+[node name="Label" type="Label" parent="Panel/VBoxContainer/HBoxContainer2" unique_id=96430671]
 layout_mode = 2
 text = "Keyboard Scheme: "
 
-[node name="KeyboardSchemeOptionButton" type="OptionButton" parent="Panel/VBoxContainer/HBoxContainer2"]
+[node name="KeyboardSchemeOptionButton" type="OptionButton" parent="Panel/VBoxContainer/HBoxContainer2" unique_id=98250649]
 layout_mode = 2
+
+[node name="DefaultButton" type="Button" parent="Panel" unique_id=169126372]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -140.0
+offset_top = -31.0
+grow_horizontal = 0
+grow_vertical = 0
+text = "Revert to Default"
 
 [connection signal="item_selected" from="Panel/VBoxContainer/HBoxContainer/ControllerSchemeOptionButton" to="." method="_on_controller_scheme_option_button_item_selected"]
 [connection signal="item_selected" from="Panel/VBoxContainer/HBoxContainer2/KeyboardSchemeOptionButton" to="." method="_on_keyboard_scheme_option_button_item_selected"]
+[connection signal="pressed" from="Panel/DefaultButton" to="." method="_on_default_button_pressed"]

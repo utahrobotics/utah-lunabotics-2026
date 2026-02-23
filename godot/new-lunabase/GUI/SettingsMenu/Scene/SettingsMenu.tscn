@@ -1,14 +1,16 @@
-[gd_scene load_steps=4 format=3 uid="uid://bo8083ejge52r"]
+[gd_scene format=3 uid="uid://bo8083ejge52r"]
 
 [ext_resource type="Script" uid="uid://cdn10f6wpe4vy" path="res://GUI/SettingsMenu/Scene/settings_menu.gd" id="1_c6bo6"]
 [ext_resource type="PackedScene" uid="uid://bm44cf3l53nfk" path="res://GUI/ControlSchemeSwitcher/ControlSchemeSwitcher.tscn" id="2_hgbih"]
+[ext_resource type="Texture2D" uid="uid://dpxgt1ib3prx3" path="res://GUI/SettingsMenu/Scene/settings.svg" id="3_85h60"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hgbih"]
-bg_color = Color(0.6, 0.8117647, 0.87058824, 0.42745098)
+bg_color = Color(0.59987265, 0.5918262, 0.5979706, 0.22352941)
 
-[node name="CanvasLayer" type="CanvasLayer"]
+[node name="SettingsMenu" type="CanvasLayer" unique_id=1631071603]
+script = ExtResource("1_c6bo6")
 
-[node name="SettingsMenu" type="Control" parent="."]
+[node name="Control" type="Control" parent="." unique_id=1117054132]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -17,9 +19,8 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 mouse_behavior_recursive = 2
-script = ExtResource("1_c6bo6")
 
-[node name="Panel" type="Panel" parent="SettingsMenu"]
+[node name="Panel" type="Panel" parent="Control" unique_id=1924508246]
 visible = false
 layout_mode = 1
 anchors_preset = 15
@@ -30,7 +31,7 @@ grow_vertical = 2
 mouse_filter = 2
 theme_override_styles/panel = SubResource("StyleBoxFlat_hgbih")
 
-[node name="ScrollContainer" type="ScrollContainer" parent="SettingsMenu/Panel"]
+[node name="ScrollContainer" type="ScrollContainer" parent="Control/Panel" unique_id=1535194856]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -42,36 +43,39 @@ offset_bottom = -225.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="SettingsMenu/Panel/ScrollContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="Control/Panel/ScrollContainer" unique_id=715428262]
 layout_mode = 2
 size_flags_horizontal = 3
 alignment = 1
 
-[node name="ToggleNotificationsButton" type="CheckButton" parent="SettingsMenu/Panel/ScrollContainer/VBoxContainer"]
+[node name="ToggleNotificationsButton" type="CheckButton" parent="Control/Panel/ScrollContainer/VBoxContainer" unique_id=1014650020]
+visible = false
 layout_mode = 2
 text = "Notification System"
 
-[node name="ControlSchemeSwitcher" parent="SettingsMenu/Panel" instance=ExtResource("2_hgbih")]
+[node name="ControlSchemeSwitcher" parent="Control/Panel" unique_id=514087895 instance=ExtResource("2_hgbih")]
 layout_mode = 1
 offset_left = 316.0
 offset_top = 270.0
 offset_right = -378.0
 offset_bottom = -88.0
 
-[node name="SettingsButton" type="Button" parent="SettingsMenu"]
+[node name="SettingsButton" type="Button" parent="Control" unique_id=386834087]
 z_index = 10
 z_as_relative = false
 layout_mode = 1
-anchors_preset = -1
+anchors_preset = 3
 anchor_left = 1.0
-anchor_top = 0.08800001
+anchor_top = 1.0
 anchor_right = 1.0
-anchor_bottom = 0.08800001
-offset_left = -166.0
-offset_top = 297.0
-offset_right = -48.0
-offset_bottom = 328.0
+anchor_bottom = 1.0
+offset_left = -100.0
+offset_top = -100.0
+grow_horizontal = 0
+grow_vertical = 0
 toggle_mode = true
-text = "Settings Panel"
+icon = ExtResource("3_85h60")
+flat = true
+expand_icon = true
 
-[connection signal="toggled" from="SettingsMenu/SettingsButton" to="SettingsMenu" method="_on_settings_button_toggled"]
+[connection signal="toggled" from="Control/SettingsButton" to="." method="_on_settings_button_toggled"]
