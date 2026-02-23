@@ -1,6 +1,4 @@
 extends Control
-
-@onready var connection: Node = $LunabaseConnection
 @onready var controller: LunabaseHumanController = $LunabaseHumanController
 @onready var ip_input: LineEdit = $VBoxContainer/TopBar/MarginContainer/TopPanel/ConnectionGroup/IPInput
 @onready var connect_button: Button = $VBoxContainer/TopBar/MarginContainer/TopPanel/ConnectionGroup/ConnectButton
@@ -35,7 +33,7 @@ enum LunabotStage {
 }
 
 func _ready() -> void:
-	connection.stage_changed.connect(_on_stage_changed)
+	GlobalLunabaseConnection.stage_changed.connect(_on_stage_changed)
 	
 	connect_button.pressed.connect(_on_connect_pressed)
 	soft_stop_button.pressed.connect(_on_soft_stop_pressed)
@@ -44,15 +42,13 @@ func _ready() -> void:
 	
 	
 	speed_slider.value = 0;
-	var new_weight = connection.set_speed(weight)
+	var new_weight = GlobalLunabaseConnection.set_speed(weight)
 	
 	speed_label.text = "SpeedMultiplier set to " + str(new_weight)
 	
-	PitchAndRollGUI.set_conn(connection)
-	
 
 func _process(delta: float) -> void:
-	var ms_since_packet: int = connection.get_ms_since_last_packet()
+	var ms_since_packet: int = GlobalLunabaseConnection.get_ms_since_last_packet()
 	var packet_time_sec: float = ms_since_packet / 1000.0
 	
 	# Format time text
@@ -74,7 +70,7 @@ func _process(delta: float) -> void:
 		t = 1.0
 	packet_label.modulate = Color.GREEN.lerp(Color.RED, t)
 	
-	var stage: int = connection.get_lunabot_stage()
+	var stage: int = GlobalLunabaseConnection.get_lunabot_stage()
 	match stage:
 		LunabotStage.MANUAL:
 			stage_label.text = "Stage: Manual"
@@ -88,16 +84,16 @@ func _process(delta: float) -> void:
 			
 	
 	#location  maybe temporary 
-	var location = connection.get_location()
+	var location = GlobalLunabaseConnection.get_location()
 	location_label.text = "location: [%.2f, %.2f, %.2f]" % [location[0], location[1], location[2]]
 	
 	#orientation label prob only here for debugging purposes 
-	var orientation = connection.get_orientation()
+	var orientation = GlobalLunabaseConnection.get_orientation()
 	orientation_label.text = "orientation: [%.2f, %.2f, %.2f, %.2f]" % [orientation[0], orientation[1], orientation[2], orientation[3]
 ]
  
 	# Update errored tasks
-	var errored_tasks: Dictionary = connection.get_errored_tasks()
+	var errored_tasks: Dictionary = GlobalLunabaseConnection.get_errored_tasks()
 	if errored_tasks.is_empty():
 		errored_tasks_label.text = "No errors"
 	else:
@@ -120,7 +116,7 @@ func _on_connect_pressed() -> void:
 	
 	print("Connecting to: ", address)
 	# this should probably an action also idk
-	connection.reconnect(address)
+	GlobalLunabaseConnection.reconnect(address)
 
 
 func _on_soft_stop_pressed() -> void:
@@ -140,7 +136,7 @@ func _on_autonomous_pressed() -> void:
 
 func _on_speed_multiplier_slider_value_changed(value: float) -> void:
 	# Update slider weight
-	var new_weight = connection.set_speed(value)
+	var new_weight = GlobalLunabaseConnection.set_speed(value)
 
 	# Update UI
 	speed_label.text = "SpeedMultiplier set to " + str(new_weight)

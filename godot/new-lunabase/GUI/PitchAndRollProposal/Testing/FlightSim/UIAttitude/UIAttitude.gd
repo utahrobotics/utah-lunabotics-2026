@@ -1,30 +1,22 @@
 extends Control
-#onready var connection: Node = $LunabaseConnection
-var connectionToBase: LunabaseConnection
+
 var orientation: PackedFloat32Array
 
-
-func set_conn(connection: LunabaseConnection) -> void:
-	connectionToBase = connection
-	
-	orientation = connectionToBase.get_orientation()
-	update_interface(orientation)
-	
 func _ready()-> void:
-	if connectionToBase == null:
+	if GlobalLunabaseConnection == null:
 		return
 		
 	
-	orientation = connectionToBase.get_orientation()
+	orientation = GlobalLunabaseConnection.get_orientation()
 	update_interface(orientation)
 	
 
 func _process(_delta: float)-> void:
-	if connectionToBase == null:
+	if GlobalLunabaseConnection == null:
 		return
 		
 	
-	orientation = connectionToBase.get_orientation()
+	orientation = GlobalLunabaseConnection.get_orientation()
 	update_interface(orientation)
 	
 func update_interface(values: PackedFloat32Array):

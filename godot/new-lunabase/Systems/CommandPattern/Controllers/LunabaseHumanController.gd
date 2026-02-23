@@ -1,6 +1,7 @@
 class_name LunabaseHumanController extends Node
 
 @export var actor_path: NodePath
+@export var is_actor_lunabase_connection := true
 var actor: Node
 
 @export var default_path := "res://Systems/CommandPattern/SavedHistory/lunabotHistory.tres"
@@ -23,6 +24,9 @@ var prev_right_speed: float = 0.0
 func _ready() -> void:
 	if actor_path:
 		actor = get_node(actor_path)
+	
+	if is_actor_lunabase_connection:
+		actor = GlobalLunabaseConnection
 	
 	if not actor:
 		push_error("LunabaseHumanController: No actor assigned or path invalid!")
