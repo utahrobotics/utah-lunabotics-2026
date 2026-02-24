@@ -27,7 +27,6 @@ These 3 branches are activated from the teleop_behavior based on the ```IsSoftSt
 * located at ai/behaviors/helper_nodes.rs
 
 I have taken inspiration from [nav2](https://docs.nav2.org/behavior_trees/overview/nav2_specific_nodes.html)'s behavior trees and implemented some helper nodes for autonomy that will be useful. 
-_(currently just a retry node but more to come if we need them)._
 
 ## Actions
 * located in ai/action.rs
@@ -59,14 +58,12 @@ Instead if you have an action that will run for a long time it should be an asyn
 Theoretically we could implement all the autonomy purely with a bt where all the actions are extremely simple unit blocks like set steering, but that would be really annoying, hence the long running job concept.
 <br>
 
-Long running actions are created with the ```Job::spawn``` method where you pass an async ```Future```, and the resulting struct has helper methods for polling the jobs status, and getting any output information. The long running job's status (Success, Running, or Failure) is determined by a tokio::watch channel, and the outputs are also a thread channel like so:
+Long running actions are created with the ```Job::spawn``` method where you pass an async ```Future```, and the resulting struct has helper methods for polling the jobs status, and getting any output information. The long running job's status (Success, Running, or Failure) is determined by the body's return value, or while the body hasn't terminated the job is still running;
 
 
 ```rust
 /// outputs forward steering commands for n seconds
 pub fn forward_for(seconds: f32) -> Job<Steering>{
-    // create status channel with initial value of Running
-    let (status_tx, status_rx) = watch::channel(bonsai_bt::Status::Running);
     // output steering commands sent through this channel
     let (output_tx, output_rx) = mpsc::channel(5);
 
@@ -78,14 +75,12 @@ pub fn forward_for(seconds: f32) -> Job<Steering>{
                 output_tx.send(Steering::new(1.0, 1.0, 1200.0)).await.ok();
                 // add a little sleep to avoid backpressure
                 tokio::time::sleep(Duration::from_millis(20)).await;
-                // we could update the status here but it isnt actually necessary because our initial value was running
-                status_tx.send(Running).ok();
             }
         }).await;
 
-        // I made it so the async body must return a Status to prevent logic bugs where the status gets stuck in running if the developer forgets to set it.
+        // final status of success
         Success
-    }, status_rx, output_rx)
+    }, output_rx)
 }
 ```
 

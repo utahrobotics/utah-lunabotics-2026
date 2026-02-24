@@ -1,18 +1,11 @@
-use std::cmp::Ordering;
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use crate::pathfinding::OccupancyGrid;
 
 use crate::pathfinding::flood_fill_escape;
-use crate::tasks::OccupancyGrid;
-
+use std::cmp::Ordering;
+use std::collections::{BinaryHeap, HashMap, HashSet};
 type WorldCoord = (f32, f32);
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
-enum MapId {
-    Local,
-    Global,
-}
-
-type GridKey = (MapId, i32, i32);
+type GridKey = (i32, i32);
 
 #[derive(Clone, Copy)]
 struct Node {
@@ -46,12 +39,10 @@ impl PartialOrd for Node {
 }
 
 /// If goal is an obstacle, it will not pathfind to it
-/// If goal is out of the bounds of the global map, it will fail to find a path
-/// prioritizes the local map as the source of ultimate truth, but falls back to the global map if a cell is unknown locally
-/// Eventually may need to take in multiple local maps from different realsense devices
+/// If goal is out of the bounds of the map, it will fail to find a path
+/// Expects a single pre-expanded combined map (local merged into global, then obstacle-expanded)
 pub fn find_path_dstar(
-    local_map: &OccupancyGrid,
-    global_map: &OccupancyGrid,
+    map: &OccupancyGrid,
     start: [f32; 2],
     goal: [f32; 2],
     max_acceptable_gradient: f32,
@@ -61,10 +52,11 @@ pub fn find_path_dstar(
 
     // Helper to check gradient from both maps (prioritize local)
     let get_gradient = |x: f32, y: f32| -> Option<f32> {
-        if let Ok(Some(grad)) = local_map.gradient_closest_to(x, y) {
-            return Some(grad);
-        }
-        global_map.gradient_closest_to(x, y).unwrap_or_default()
+        Some(
+            map.gradient_closest_to(x, y)
+                .unwrap_or_default()
+                .unwrap_or(f32::MIN),
+        )
     };
 
     // Handle case where robot starts in obstacle or unknown area
@@ -85,7 +77,7 @@ pub fn find_path_dstar(
     {
         println!("[PathFinding] Start is in obstacle or unknown, attempting flood fill escape");
         if let Some(valid_cell) =
-            flood_fill_escape(local_map, global_map, start, max_acceptable_gradient, 200)
+            flood_fill_escape(map, start, max_acceptable_gradient, 200)
         {
             println!("[PathFinding] Found escape cell at {:?}", valid_cell);
             initial_path.push(valid_cell);
@@ -130,59 +122,50 @@ pub fn find_path_dstar(
         return None;
     }
 
+    // Check if goal is free
+    let goal_gradient = get_gradient(goal[0], goal[1]);
+    let goal_is_free = is_free(goal[0], goal[1]);
+    println!("[PathFinding] Goal gradient: {:?}, Goal is free: {}", goal_gradient, goal_is_free);
+
+    if !goal_is_free {
+        println!("[PathFinding] FAILED: Goal is blocked (gradient: {:?}, max acceptable: {})",
+                 goal_gradient, max_acceptable_gradient);
+        return None;
+    }
+
     // Determine which map to use for cell size
     let cell_size = global_map.layout.cell_size;
 
     // Helper to convert world coordinates to grid keys
     // Prioritize local map, fall back to global map
+
     let to_grid_key = |x: f32, y: f32| -> Option<GridKey> {
-        if let Ok((cx, cy)) = local_map.world_to_cell(x, y) {
-            Some((MapId::Local, cx as i32, cy as i32))
-        } else {
-            global_map
-                .world_to_cell(x, y)
-                .ok()
-                .map(|(cx, cy)| (MapId::Global, cx as i32, cy as i32))
-        }
+        map.world_to_cell(x, y)
+            .ok()
+            .map(|(cx, cy)| (cx as i32, cy as i32))
     };
 
-    // Helper to convert grid key back to world coordinates
     let to_world = |key: GridKey| -> Option<WorldCoord> {
-        match key.0 {
-            MapId::Local => local_map.cell_to_world(key.1 as usize, key.2 as usize).ok(),
-            MapId::Global => global_map
-                .cell_to_world(key.1 as usize, key.2 as usize)
-                .ok(),
-        }
+        map.cell_to_world(key.0 as usize, key.1 as usize).ok()
     };
 
-    // Neighbors are generated in world space and then converted back to grid keys
-    // This allows transitions between local and global maps
+    let cells_x = map.cells_x() as i32;
+    let cells_y = map.cells_y() as i32;
+
     let get_neighbors_for_key = |key: GridKey| -> Vec<GridKey> {
         let mut neighbors = Vec::new();
-
-        let Some(current_world) = to_world(key) else {
-            return neighbors;
-        };
-
-        // iterate through neighbors in world space by stepping by cell_size
-        for dx in -1..=1 {
-            for dy in -1..=1 {
+        for dx in -1..=1i32 {
+            for dy in -1..=1i32 {
                 if dx == 0 && dy == 0 {
                     continue;
                 }
-
-                let neighbor_x = current_world.0 + (dx as f32) * cell_size;
-                let neighbor_y = current_world.1 + (dy as f32) * cell_size;
-
-                // conv back to grid key - this will automatically choose
-                // local map if available, otherwise global map
-                if let Some(neighbor_key) = to_grid_key(neighbor_x, neighbor_y) {
-                    neighbors.push(neighbor_key);
+                let nx = key.0 + dx;
+                let ny = key.1 + dy;
+                if nx >= 0 && ny >= 0 && nx < cells_x && ny < cells_y {
+                    neighbors.push((nx, ny));
                 }
             }
         }
-
         neighbors
     };
 

@@ -22,12 +22,25 @@
   <include file="meshes/artemis_arena/arena_walls/arena_walls.xml" />
   <include file="meshes/artemis_arena/arena_window_frames/arena_window_frames.xml" />
   <include file="meshes/artemis_arena/arena_windows/arena_windows.xml" />
-
-  <!-- <include file="meshes/core/rock_rough/rock_rough.xml" /> -->
   <include file="meshes/core/simplify_lunabot/simplify_lunabot.xml" />
 
+  <asset>
+    <model name="rock_rough" file="meshes/core/rock_rough/rock_rough.xml" />
+  </asset>
 
   <worldbody>
+
+    <replicate count="2" offset="0 0.7 0">
+      <body>
+        <joint type="free" />
+        <attach model="rock_rough" prefix="rock_rough_" />
+      </body>
+    </replicate>
+
+    <body pos="1.5 1.5 1.0">
+      <joint type="free" />
+      <attach model="rock_rough" prefix="obstructor" />
+    </body>
 
     <light name="sun" directional="true" pos="0 0 10" dir="-0.5 0.1 -0.9"
       diffuse="0.4 0.4 0.4" specular="0.1 0.1 0.1" />
@@ -37,5 +50,4 @@
 
 
   </worldbody>
-
 </mujoco>

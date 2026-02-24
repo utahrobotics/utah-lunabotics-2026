@@ -48,8 +48,7 @@ impl CuBridge for Lunabase {
         _rx_channels: &[cu29::prelude::BridgeChannelConfig<
             <Self::Rx as cu29::prelude::BridgeChannelSet>::Id,
         >],
-        _resources: Self::Resources<'_>
-
+        _resources: Self::Resources<'_>,
     ) -> cu29::CuResult<Self>
     where
         Self: Sized,
@@ -66,7 +65,7 @@ impl CuBridge for Lunabase {
         _rx_channels: &[cu29::prelude::BridgeChannelConfig<
             <Self::Rx as cu29::prelude::BridgeChannelSet>::Id,
         >],
-        _resources: Self::Resources<'_>
+        _resources: Self::Resources<'_>,
     ) -> cu29::CuResult<Self>
     where
         Self: Sized,
@@ -123,7 +122,8 @@ impl CuBridge for Lunabase {
         use common::{FromLunabot, LUNABOT_STAGE};
 
         let heartbeat =
-            cu_bincode::encode_to_vec(LUNABOT_STAGE.load(), cu_bincode::config::standard()).unwrap();
+            cu_bincode::encode_to_vec(LUNABOT_STAGE.load(), cu_bincode::config::standard())
+                .unwrap();
         self.connection.server.set_keep_alive_msg(&heartbeat);
 
         if let Some(errored_tasks) = ERRORED_TASKS.get()
@@ -173,8 +173,8 @@ impl CuBridge for Lunabase {
                 // let accel = ROBOT_STATE.get().unwrap().get_acceleration();
 
                 // let velof32 = [
-                //     velo[0] as f32, 
-                //     velo[1] as f32, 
+                //     velo[0] as f32,
+                //     velo[1] as f32,
                 //     velo[2] as f32
                 // ];
                 // let accelf32 = [
@@ -182,14 +182,12 @@ impl CuBridge for Lunabase {
                 //     accel[1] as f32,
                 //     accel[2] as f32,
                 // ];
-                // if let Err(e) = self.connection.try_send(FromLunabot::RobotMotion { 
+                // if let Err(e) = self.connection.try_send(FromLunabot::RobotMotion {
                 //     velocity: (velof32),
                 //     acceleration: (accelf32)
                 //  }){
                 //     eprintln!("cannot send motion to lunabase{}" , e);
                 //  }
-
-
             }
         }
 
@@ -216,7 +214,8 @@ impl CuBridge for Lunabase {
 
             // Send heartbeat and robot state (moved from send method since send might not be called)
             let heartbeat =
-                cu_bincode::encode_to_vec(LUNABOT_STAGE.load(), cu_bincode::config::standard()).unwrap();
+                cu_bincode::encode_to_vec(LUNABOT_STAGE.load(), cu_bincode::config::standard())
+                    .unwrap();
             self.connection.server.set_keep_alive_msg(&heartbeat);
 
             // Send errored tasks periodically
@@ -254,11 +253,12 @@ impl CuBridge for Lunabase {
                 self.message_buffer.clear();
                 // Set disconnect message as payload
                 if std::any::TypeId::of::<Payload>() == std::any::TypeId::of::<FromLunabase>() {
-                    let disconnect_msg = unsafe {
-                        std::mem::transmute_copy::<FromLunabase, Payload>(&FromLunabase::Disconnect)
-                    };
-                    msg.set_payload(disconnect_msg);
-                    msg.metadata.process_time.start = clock.now().into();
+                    let disconnect_msg = FromLunabase::Disconnect;
+                    let payload_msg = Box::new(disconnect_msg) as Box<dyn std::any::Any>;
+                    if let Ok(downcasted) = payload_msg.downcast::<Payload>() {
+                        msg.set_payload(*downcasted);
+                        msg.metadata.process_time.start = clock.now().into();
+                    }
                 }
                 return Err(CuError::new_with_cause(
                     "lunabase not connected",
@@ -268,11 +268,12 @@ impl CuBridge for Lunabase {
             // Set the next message from buffer as payload
             if let Some(next_msg) = self.message_buffer.pop_front() {
                 if std::any::TypeId::of::<Payload>() == std::any::TypeId::of::<FromLunabase>() {
-                    let payload_msg =
-                        unsafe { std::mem::transmute_copy::<FromLunabase, Payload>(&next_msg) };
+                    let payload_msg = Box::new(next_msg) as Box<dyn std::any::Any>;
+                    if let Ok(downcasted) = payload_msg.downcast::<Payload>() {
+                        msg.set_payload(*downcasted);
+                        msg.metadata.process_time.start = clock.now().into();
+                    }
                     println!("{:?}", next_msg);
-                    msg.set_payload(payload_msg);
-                    msg.metadata.process_time.start = clock.now().into();
                 }
             } else {
                 msg.clear_payload();

@@ -1,29 +1,27 @@
+use crate::pathfinding::OccupancyGrid;
 use nalgebra::Vector2;
 use rerun::Vec2D;
-use tasker::tokio::{ sync::{mpsc, watch}};
+use tasker::tokio::sync::mpsc;
 
 use crate::{
     pathfinding::field_dstar::find_path_dstar,
     rerun_viz::RECORDER,
-    tasks::{OccupancyGrid, ai::jobs::Job, realsense_occupancy_grid::GLOBAL_MAP},
+    tasks::{ai::jobs::Job, realsense_occupancy_grid::GLOBAL_MAP},
 };
 
 /// IMPORTANT: this job should not take more than a few ms, because since it has access to the global map's read guard,
 /// it could cause delays in other tasks that need the global map if it takes too long.
-/// Uses D* to navigate from start to end
-/// prioritizes the local map as the source of ultimate truth, but falls back to the global map if a cell is unknown locally
-/// Eventually may need to take in multiple local maps from different realsense devices
-/// if the robot start postion is in an unknown or obstacle, itll find its way out of that area first by searching around with flood_fill_escape to find a near free space and then start from there instead
-/// FAILS IF: 
-/// 1. the goal is in an obstacle or unknown
+/// Merges local map into global, expands obstacles on the combined map, then runs D* pathfinding.
+/// if the robot start position is in an unknown or obstacle, itll find its way out of that area first by searching around with flood_fill_escape to find a near free space and then start from there instead
+/// FAILS IF:
 /// 2. there isnt a path to be found from start to end
 pub fn find_path_job(
     latest_local_map: OccupancyGrid,
     start: Vector2<f32>,
     end: Vector2<f32>,
     max_acceptable_gradient: f32,
-) -> Job<Vec<Vector2<f32>>> {
-    let (status_tx, status_rx) = watch::channel(bonsai_bt::Status::Running);
+    robot_radius: f32,
+) -> Job<Vec<Vector2<f32>>, ()> {
     let (output_tx, output_rx) = mpsc::channel(5);
 
     Job::spawn(
@@ -46,9 +44,18 @@ pub fn find_path_job(
                     return None;
                 };
 
+                // Merge local into global before expanding so obstacle inflation
+                // propagates seamlessly across the local/global boundary.
+                let mut combined = global_map_guard.clone();
+                let _ = latest_local_map.append_to(&mut combined);
+                let Some(expanded) =
+                    combined.expand_obstacles(robot_radius, max_acceptable_gradient)
+                else {
+                    return None;
+                };
+
                 find_path_dstar(
-                    &latest_local_map,
-                    &*global_map_guard,
+                    &expanded,
                     [start.x, start.y],
                     [end.x, end.y],
                     max_acceptable_gradient,
@@ -74,15 +81,13 @@ pub fn find_path_job(
                     path.into_iter().map(|(x, y)| Vector2::new(x, y)).collect();
 
                 let _ = output_tx.send(vector_path).await;
-                let _ = status_tx.send(bonsai_bt::Status::Success);
                 bonsai_bt::Status::Success
             } else {
-                let _ = status_tx.send(bonsai_bt::Status::Failure);
                 bonsai_bt::Status::Failure
             };
             result
         },
-        status_rx,
         output_rx,
+        None,
     )
 }

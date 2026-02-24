@@ -9,23 +9,19 @@
 /// 3. Uses either gaussian or bilateral filtering to reduce noise in the map.
 /// 4. Computes the avg gradient between k neighbors in the height map, disregarding cells with too many unknown neighbors.
 /// 5. Marks gradients over a certain value as obstacles.
-/// 6. Expands the obstacles to be > robot_radius.
 /// 
 /// Notes:
 /// 
 /// The height map is smaller than the size of the arena to save memory, so the shaders operate on a local map around the robot, 
 /// and the local map is registered into the global map periodically, then cleared.
 
-use cu_bincode::Encode;
 use cu29::cutask::Freezable;
 use cu29::prelude::*;
 use nalgebra::Isometry3;
 use rayon::{ThreadPool, ThreadPoolBuilder};
-use serde::Deserialize;
-use std::fmt::Debug;
-use std::io;
+
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
-use wgsl_pcl::pipelines::depth_to_obstacle::{ClearAffectedCellsOptions, ObstacleExpanderOptions};
+use wgsl_pcl::pipelines::depth_to_obstacle::ClearAffectedCellsOptions;
 use wgsl_pcl::pipelines::filters::*;
 
 use iceoryx_types::{IceoryxDepthFrame, ImuMsg};
@@ -37,8 +33,9 @@ use wgsl_pcl::map_layout::MapLayout;
 use wgsl_pcl::wgsl_setup::{get_device, init_gpu_blocking, is_gpu_initialized};
 
 use crate::ROBOT_STATE;
-use crate::rerun_viz::{RECORDER, ROBOT_STRUCTURE};
+use crate::rerun_viz::{RECORDER};
 use crate::tasks::{DEPTH_FRAME_HEIGHT, DEPTH_FRAME_SIZE, DEPTH_FRAME_WIDTH};
+use crate::pathfinding::OccupancyGrid;
 
 pub static GLOBAL_MAP: OnceLock<Arc<RwLock<OccupancyGrid>>> = OnceLock::new();
 
@@ -387,6 +384,18 @@ impl CuTask for OccupancyGridTask {
             .and_then(|c| c.get::<String>("camera_node").expect("failed to deserialize"))
             .unwrap_or_else(|| "upper_depth_camera".to_string());
 
+        let max_linear_velocity = config
+            .and_then(|c| c.get::<f64>("max_linear_velocity").expect("failed to deserialize"))
+            .expect("specify max speed");
+
+        let max_acceleration = config
+            .and_then(|c| c.get::<f64>("max_acceleration").expect("failed to deserialize"))
+            .expect("specify max accel");
+
+        let max_angular_velocity = config
+            .and_then(|c| c.get::<f64>("max_angular_velocity").expect("failed to deserialize"))
+            .expect("specify max speed");
+
         let focal_length_px = config
             .and_then(|c| c.get::<f64>("focal_length").expect("failed to deserialize"))
             .expect("specify focal length") as f32;
@@ -455,13 +464,6 @@ impl CuTask for OccupancyGridTask {
             .and_then(|c| c.get::<f64>("max_depth").expect("failed to deserialize"))
             .unwrap_or(3.0) as f32;
 
-        let robot_radius_meters = config
-            .and_then(|c| c.get::<f64>("robot_radius_meters").expect("failed to deserialize"))
-            .unwrap_or(0.3) as f32;
-
-        let obstacle_gradient_threshold = config
-            .and_then(|c| c.get::<f64>("obstacle_gradient_threshold").expect("failed to deserialize"))
-            .unwrap_or(0.2) as f32;
 
         // use bilateral by default, fall back on gaussian
         let use_bilateral = config
@@ -524,10 +526,6 @@ impl CuTask for OccupancyGridTask {
             })
         };
 
-        let obstacle_expander_options = ObstacleExpanderOptions {
-            expansion_radius_meters: robot_radius_meters,
-            obstacle_gradient_threshold,
-        };
         let outlier_filter_options = OutlierFilterOptions {
             kernel_radius: outlier_filter_kernel_radius,
             std_dev_threshold: outlier_filter_std_dev_threshold,
@@ -546,7 +544,6 @@ impl CuTask for OccupancyGridTask {
                 local_layout.clone(),
                 blur_filter_options,
                 outlier_filter_options,
-                obstacle_expander_options,
                 gradient_filter_kernel_radius,
                 min_depth,
                 clear_affected_cells,
@@ -625,7 +622,9 @@ impl CuTask for OccupancyGridTask {
             max_distance_traveled_before_reset,
             max_radians_rotated_before_reset,
             rolling_map_start_position: camera_node.get_global_isometry(),
-            _min_grad_for_obstacle: obstacle_gradient_threshold,
+            max_angular_velocity,
+            max_linear_velocity,
+            max_acceleration
         })
     }
 
@@ -655,10 +654,42 @@ impl CuTask for OccupancyGridTask {
             {
                 drop(output_buf); // appease the borrow checker by dropping immutable borrow to self
 
-                self.append_local_to_global(&grid, &mut *write_guard)
+                grid.append_to(&mut *write_guard)
                     .map_err(|e| {
                         CuError::new_with_cause("failed to append local map to global", std::io::Error::other(e))
                     })?;
+
+                if let Some(logger) = RECORDER.get() {
+                    let mut global_obstacle_map_points = vec![];
+                    let mut global_obstacle_map_colors = vec![];
+                    for cell_y in 0..write_guard.cells_y() {
+                        for cell_x in 0..write_guard.cells_x() {
+                            let idx = cell_x + cell_y * write_guard.cells_x();
+                        
+                            if idx < write_guard.gradient_map.len() {
+                                let gradient = write_guard.gradient_map[idx];
+                            
+                                if gradient != f32::MIN {
+                                    if let Ok((world_x, world_y)) = write_guard.cell_to_world(cell_x, cell_y)
+                                    {
+                                        global_obstacle_map_points.push([world_x, world_y]);
+                                    
+                                        let normalized = ((gradient + 1.0) / 4.0).clamp(0.0, 1.0);
+                                        global_obstacle_map_colors.push([
+                                            (normalized * 255.0) as u8,
+                                            50,
+                                            ((1.0 - normalized) * 255.0) as u8,
+                                        ]);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    let _ = logger.recorder.log(
+                        "obstacle_mapper/global_obstacle_map",
+                        &Points2D::new(global_obstacle_map_points).with_colors(global_obstacle_map_colors),
+                    );
+                }
 
                 self.rolling_map_start_position = camera_isometry;
                 let mut pipeline_guard = self.depth_projector_pipeline.lock().unwrap();
@@ -683,6 +714,20 @@ impl CuTask for OccupancyGridTask {
         let Some(ref depth_frame) = input_msg.0 else {
             return Ok(());
         };
+
+        if let Some(state) = ROBOT_STATE.get() &&
+            let Some(linear_vel) = state.get_velocity() && 
+            let Some(angular_vel) = state.get_angular_velocity() &&
+            let Some(accel) = state.get_acceleration()
+        {
+            if accel.magnitude() > self.max_acceleration {
+                eprintln!("Accel violation");
+            }
+            if linear_vel.magnitude() > self.max_linear_velocity || angular_vel.magnitude() > self.max_angular_velocity || accel.magnitude() > self.max_acceleration {
+                eprintln!("Pausing obstacle mapper from speed limit violation");
+                return Err(CuError::new_with_cause("max speed exceeded", std::io::Error::other("max speed exceeded")));
+            }
+        }
 
         // Mark as processing and spawn the work
         *processing = true;
@@ -739,13 +784,13 @@ impl CuTask for OccupancyGridTask {
                             .with_meter(1.0 / request.depth_scale)
                             .with_depth_range([0.0, 2.0 / request.depth_scale as f64]),
                         );
-                        let _ =
-                            logger.recorder.log(
-                                "obstacle_mapper/pcl",
-                                &Points3D::new(point_cloud.iter().map(|p| {
-                                    [p.x + request.origin.0, p.y + request.origin.1, p.z]
-                                })),
-                            );
+                        // let _ =
+                        //     logger.recorder.log(
+                        //         "obstacle_mapper/pcl",
+                        //         &Points3D::new(point_cloud.iter().map(|p| {
+                        //             [p.x + request.origin.0, p.y + request.origin.1, p.z]
+                        //         })),
+                        //     );
 
                         let pipeline_guard = pipeline.lock().unwrap();
 
@@ -962,10 +1007,10 @@ fn log_map(
             }
         }
     }
-    let _ = logger.recorder.log(
-        "obstacle_mapper/gradient_map",
-        &Points3D::new(gradient_points).with_colors(gradient_colors),
-    );
+    // let _ = logger.recorder.log(
+    //     "obstacle_mapper/gradient_map",
+    //     &Points3D::new(gradient_points).with_colors(gradient_colors),
+    // );
 
     // Log blur filtered height map
     let mut blur_height_points = Vec::new();
@@ -990,8 +1035,8 @@ fn log_map(
             }
         }
     }
-    let _ = logger.recorder.log(
-        "obstacle_mapper/blur_filtered_height_map",
-        &Points3D::new(blur_height_points).with_colors(blur_height_colors),
-    );
+    // let _ = logger.recorder.log(
+    //     "obstacle_mapper/blur_filtered_height_map",
+    //     &Points3D::new(blur_height_points).with_colors(blur_height_colors),
+    // );
 }

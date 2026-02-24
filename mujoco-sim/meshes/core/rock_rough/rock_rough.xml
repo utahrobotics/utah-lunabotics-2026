@@ -1,4 +1,13 @@
 <mujoco model="rock_rough">
+  <default>
+    <default class="visual">
+      <geom group="3" type="mesh" contype="0" conaffinity="0" />
+    </default>
+    <default class="collision">
+      <geom group="2" type="mesh" priority="11" friction="1 0.005 0.0001" solimp="0.9 0.95 0.001"
+        solref="0.01 0.5" />
+    </default>
+  </default>
   <asset>
     <material name="DefaultMaterialRock" specular="0.5" shininess="0.5" rgba="1 1 1 1.0" />
 
@@ -30,8 +39,8 @@
     <mesh file="rock_rough_collision_24.obj" />
   </asset>
   <worldbody>
-    <body name="rock_rough" pos="1 -2 1.5">
-      <joint type="free" />
+    <body name="rock_rough" pos="3 1 1.5">
+
       <geom material="DefaultMaterialRock" mesh="rock_rough" class="visual" />
       <geom mesh="rock_rough_collision_0"
         rgba="0.32585668582706884 0.033629754966980174 0.38378051611649244 1" class="collision" />

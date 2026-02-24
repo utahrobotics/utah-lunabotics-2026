@@ -97,11 +97,10 @@
 
       <site name="imu_mount" pos="0.25 -0.15 -0.09" />
 
-      <!-- TODO: measure this correctly -->
       <body name="depth_cam_mount">
         <camera name="front_depth_camera"
           mode="fixed"
-          pos="1.0 0.0 0.25"
+          pos="1.26 -0.18 0.31"
           euler="0 -62 90"
           resolution="640 480"
           focalpixel="383 383"
@@ -365,6 +364,8 @@
 
   <sensor>
     <velocimeter name="lunabot_velocimeter" site="imu_mount" />
+    <accelerometer
+      name="lunabot_accelerometer" site="imu_mount" />
     <gyro name="lunabot_gyro" site="imu_mount" />
   </sensor>
 

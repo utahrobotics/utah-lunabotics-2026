@@ -10,7 +10,6 @@ use crate::{
     map_layout,
     mem_layouts::{BindGroupLayoutBuilder, GpuBuffer},
     pipelines::{
-        expander::new_obstacle_expander_pipeline,
         filters::{
             BlurFilterOptions, OutlierFilterOptions, new_blur_pipeline,
             new_outlier_removal_pipeline,
@@ -23,10 +22,6 @@ use crate::{
     wgsl_setup::GpuDevice,
 };
 
-pub struct ObstacleExpanderOptions {
-    pub expansion_radius_meters: f32,
-    pub obstacle_gradient_threshold: f32,
-}
 
 /// When enabled, only cells that will be affected by the new frame are cleared
 #[derive(Clone, Copy)]
@@ -45,7 +40,6 @@ pub struct DepthToPclAndHeightPipeline {
     blur_filtered_height_map_buffer: GpuBuffer,
     output_outlier_filtered_height_map_buffer: GpuBuffer,
     output_gradient_map_buffer: GpuBuffer,
-    output_expanded_gradient_map_buffer: GpuBuffer,
     camera_transform_buffer: GpuBuffer,
     workgroup_size_stage1: (u32, u32, u32),
     workgroup_size_stage2: (u32, u32, u32),
@@ -73,7 +67,6 @@ impl DepthToPclAndHeightPipeline {
         map_layout: map_layout::MapLayout,
         blur_filter_options: BlurFilterOptions,
         outlier_filter_options: OutlierFilterOptions,
-        obstacle_expander_options: ObstacleExpanderOptions,
         gradient_kernel_radius: u32,
         min_depth: f32,
         clear_affected_cells: Option<ClearAffectedCellsOptions>,
@@ -332,16 +325,6 @@ impl DepthToPclAndHeightPipeline {
             &map_height_buffer,
         )?;
 
-        let (obstacle_expander_output_buffer, obstacle_expander_pipeline) =
-            new_obstacle_expander_pipeline(
-                device,
-                map_layout,
-                obstacle_expander_options,
-                &gradient_map_buffer,
-                &map_width_buffer,
-                &map_height_buffer,
-            )?;
-
         let mut chain_builder = ComputePipelineChainBuilder::new();
 
         // Add clear stage first if enabled
@@ -369,10 +352,7 @@ impl DepthToPclAndHeightPipeline {
                 gradient_pipeline,
                 (workgroup_size_stage2.0, workgroup_size_stage2.1, 1),
             ))
-            .add_stage(PipelineStage::new(
-                obstacle_expander_pipeline,
-                (workgroup_size_stage2.0, workgroup_size_stage2.1, 1),
-            ))
+
             .build()?;
 
         Ok(Self {
@@ -387,7 +367,6 @@ impl DepthToPclAndHeightPipeline {
             blur_filtered_height_map_buffer,
             output_outlier_filtered_height_map_buffer: outlier_filtered_height_map_buffer,
             output_gradient_map_buffer: gradient_map_buffer,
-            output_expanded_gradient_map_buffer: obstacle_expander_output_buffer,
             workgroup_size_stage1: (workgroup_size_stage1.0, workgroup_size_stage1.1, 1),
             workgroup_size_stage2: (workgroup_size_stage2.0, workgroup_size_stage2.1, 1),
             clear_affected_cells_enabled: clear_affected_cells.is_some(),
@@ -438,13 +417,6 @@ impl DepthToPclAndHeightPipeline {
             1,
         );
         let workgroups_gradient = workgroups_filter;
-        let workgroups_obstacle_expander = (
-            ((self.map_layout.width_meters() / self.map_layout.cell_size).ceil() as u32 + 8 - 1)
-                / 8,
-            ((self.map_layout.height_meters() / self.map_layout.cell_size).ceil() as u32 + 8 - 1)
-                / 8,
-            1,
-        );
 
         let workgroups = if self.clear_affected_cells_enabled {
             vec![
@@ -453,7 +425,6 @@ impl DepthToPclAndHeightPipeline {
                 workgroups_outlier_filter,
                 workgroups_filter,
                 workgroups_gradient,
-                workgroups_obstacle_expander,
             ]
         } else {
             vec![
@@ -461,14 +432,13 @@ impl DepthToPclAndHeightPipeline {
                 workgroups_outlier_filter,
                 workgroups_filter,
                 workgroups_gradient,
-                workgroups_obstacle_expander,
             ]
         };
 
         self.pipeline.execute_blocking(device, workgroups)?;
         let pcl_data: Vec<AlignedVec4<f32>> = self.output_pcl_buffer.read_data_blocking(device)?;
         let gradient_data: Vec<f32> = self
-            .output_expanded_gradient_map_buffer
+            .output_gradient_map_buffer
             .read_data_blocking(device)?;
 
         Ok((
@@ -502,7 +472,7 @@ impl DepthToPclAndHeightPipeline {
 
     pub fn get_obstacle_expanded_height_map(&self, device: &GpuDevice) -> anyhow::Result<Vec<f32>> {
         let height_map_data: Vec<f32> = self
-            .output_expanded_gradient_map_buffer
+            .output_gradient_map_buffer
             .read_data_blocking(device)?;
         Ok(height_map_data)
     }
