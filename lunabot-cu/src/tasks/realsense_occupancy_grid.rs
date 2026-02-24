@@ -32,6 +32,8 @@ use wgsl_pcl::gpu_types::AlignedMatrix4;
 use wgsl_pcl::map_layout::MapLayout;
 use wgsl_pcl::wgsl_setup::{get_device, init_gpu_blocking, is_gpu_initialized};
 
+use serde::Deserialize;
+
 use crate::ROBOT_STATE;
 use crate::rerun_viz::{RECORDER};
 use crate::tasks::{DEPTH_FRAME_HEIGHT, DEPTH_FRAME_SIZE, DEPTH_FRAME_WIDTH};

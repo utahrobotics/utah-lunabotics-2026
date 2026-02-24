@@ -95,11 +95,11 @@ pub fn find_path_dstar(
     };
 
     // if goal is not in bounds of the global map
-    if !global_map.layout.is_in_bounds(goal[0], goal[1]) {
+    if !map.layout.is_in_bounds(goal[0], goal[1]) {
         println!("[PathFinding] FAILED: Goal is out of bounds");
         println!("[PathFinding] Global map bounds: min_x={}, max_x={}, min_y={}, max_y={}",
-                 global_map.layout.min_x, global_map.layout.max_x,
-                 global_map.layout.min_y, global_map.layout.max_y);
+                 map.layout.min_x, map.layout.max_x,
+                 map.layout.min_y, map.layout.max_y);
         return None;
     }
 
@@ -134,7 +134,7 @@ pub fn find_path_dstar(
     }
 
     // Determine which map to use for cell size
-    let cell_size = global_map.layout.cell_size;
+    let cell_size = map.layout.cell_size;
 
     // Helper to convert world coordinates to grid keys
     // Prioritize local map, fall back to global map
