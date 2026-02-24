@@ -7,7 +7,7 @@ use crate::{
     ROBOT_STATE,
     tasks::ai::{
         blackboard::LunabotBlackboard,
-        jobs::{direction_from_path, find_path_job, follow_path_job, rotation_shim},
+        jobs::{direction_from_path, find_path_job, fine_position_job, follow_path_job, rotation_shim},
     },
 };
 static PATHFINDING_GOAL: [f32; 2] = [5.843524, 1.4796992];
@@ -41,6 +41,7 @@ pub enum LunabotAction {
     /// calculates path from the robots position to x,y
     CalculatePath,
     FollowPath,
+    FinePosition(Vector2<f32>, f32),
     SetStage(LunabotStage),
     GetUnstuck,
 
@@ -206,7 +207,7 @@ impl LunabotAction {
                             follow_path_job(
                                 ROBOT_STATE.get().unwrap().kinematic_root,
                                 path,
-                                None, None, None, None, None, None
+                                None, None, None, 0.5, None, None // TEMP FOR TESTING PRECISE POSITIONING
                             );
                         let job_initial_status = follower_job.get_status();
                         blackboard.path_follower = Some(follower_job);
@@ -221,6 +222,37 @@ impl LunabotAction {
                     }
                 }
             }
+            LunabotAction::FinePosition(target_position, target_angle) => {
+                if ROBOT_STATE.get().is_none() {
+                    eprintln!("Cannot start fine position job because ROBOT_STATE is not initialized");
+                    Failure
+                } else if let Some(ref mut fine_positioner) = blackboard.fine_positioner {
+                    blackboard.outgoing_steering_msg = fine_positioner.get_output();
+                    let status = fine_positioner.get_status();
+                    if status == Success || status == Failure {
+                        println!("Fine positioning job completed with status: {:?}", status);
+                        // ensure the task is no longer running just in case
+                        fine_positioner.cancel();
+                        blackboard.fine_positioner = None;
+                    }
+                    status
+                } else {
+                    // Use the calculated path from CalculatePath action
+                    println!("Honing in to ({}, {}) oriented at {}", target_position.x, target_position.y, target_angle);
+                    let mut positioner_job = fine_position_job(
+                        ROBOT_STATE.get().unwrap().kinematic_root, 
+                        *target_position,
+                        *target_angle
+                    );
+                    let job_initial_status = positioner_job.get_status();
+                    blackboard.fine_positioner = Some(positioner_job);
+                    println!(
+                        "Follow path job started with initial status: {:?}",
+                        job_initial_status
+                    );
+                    job_initial_status
+                }
+            },
             LunabotAction::CheckNavigation => Running,
             LunabotAction::GetUnstuck => todo!(),
             LunabotAction::Yield => {

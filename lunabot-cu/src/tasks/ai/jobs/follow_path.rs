@@ -136,6 +136,7 @@ pub fn follow_path_job(
                     // DEBUG
                     //println!("Follower stuck! Count at {:.3}", stuck_timer);
                     if stuck_timer > stuck_timeout_secs {
+                        let _ = output_tx.send(Steering::new(0.0, 0.0, 2000.0)).await;
                         break bonsai_bt::Status::Failure
                     }
                 } else {
@@ -181,7 +182,7 @@ pub fn follow_path_job(
                 previous_robot_pos = robot_pos;
 
                 if dot_distance > path_parameter_boundaries[path.len() - 1] && error.norm_squared() < completion_distance*completion_distance {
-                    let _ = output_tx.send(steering).await;
+                    let _ = output_tx.send(Steering::new(0.0, 0.0, 2000.0)).await;
                     break bonsai_bt::Status::Success
                 } else {
                     let _ = output_tx.send(steering).await;

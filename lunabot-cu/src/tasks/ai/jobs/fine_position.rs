@@ -1,4 +1,4 @@
-use std::{f32::{self, consts::FRAC_PI_2}, time::Duration};
+use std::{f32::{self, consts::{FRAC_PI_2, PI}}, fmt, time::Duration};
 use crate::rerun_viz::RECORDER;
 use common::Steering;
 use nalgebra::Vector2;
@@ -12,31 +12,6 @@ use crate::tasks::ai::jobs::Job;
 
 /// Distance between wheels, in m. Used for calculating the turning circle.
 const WHEEL_BASE_SIZE: f32 = 0.6; // TODO Find real numbers
-/// Default value for adjustment to sharpness of turns. Higher values result in
-/// sharper turns, deviating from the theoretical circle to the target point.
-const DEFAULT_TURNING_RATIO_ADJUSTMENT: f32 = 15.0;
-/// How fast the robot should move when following the dot by default. Error in
-/// position is also considered.
-const DEFAULT_FOLLOW_SPEED_FACTOR: f32 = 0.25;
-/// If the robot is closer to the dot than this distance, it will not move 
-/// towards the dot, to avoid wild spinning from the tiny distances involved.
-const MIN_FOLLOW_DISTANCE: f32 = 0.1;
-/// The maximum speed at which the dot will move along the given path, as a
-/// factor of the follow speed factor. Provides a cap for the inverse square
-/// law used to determine dot speed. Dimensionless, but operates on m/s.
-const MAX_DOT_SPEED_FACTOR: f32 = 2.5;
-/// How fast the dot will move when the robot is 1 meter away by default. In m/s. 
-/// The dot follows an inverse square law with robot distance.
-const DEFAULT_DOT_SPEED_FACTOR: f32 = 0.35;
-/// If the robot is closer to the goal than this distance, it will zero steering
-/// and end the job by default.
-const DEFAULT_COMPLETION_DISTANCE: f32 = 0.25;
-/// If the robot moves slower than this, it is considered stuck and the job
-/// will fail if it stays like this for too long by default.
-const DEFAULT_STUCK_SPEED: f32 = 0.15;
-/// How long the robot must be moving slower than a given threshold to be considered
-/// stuck and fail the job by default.
-const DEFAULT_STUCK_TIMEOUT: f32 = 5.0;
 /// How long each loop of the controller should be.
 const DT: f32 = 0.05;
 
@@ -48,7 +23,7 @@ const DT: f32 = 0.05;
 ///
 pub fn fine_position_job(
     chain:           StaticNode,
-    target_position: Vector2<f32>,
+    target_pos: Vector2<f32>,
     target_angle:    f32,
 ) -> Job<Steering> {
 
@@ -71,13 +46,14 @@ pub fn fine_position_job(
                 let robot_pos = _robot_isometry.translation.vector.xy().cast();
                 let robot_angle = _robot_isometry.rotation.euler_angles().2 as f32;
 
-                let error = target_position - robot_pos;
+                let error = target_pos - robot_pos;
                 let error_angle = (error.y).atan2(error.x);
 
                 // Only move if the dot is far enough away
                 let steering = match state {
                     State::InitialAlignment => {
                         if (error_angle - robot_angle).abs() < 0.05_f32 {
+                            on_phase_change(state, attempt_count, 3, robot_pos, robot_angle);
                             state = state.next();
                         }
 
@@ -87,10 +63,11 @@ pub fn fine_position_job(
                     State::InitialTraversal => {
                         let velocity = 1.0; // will be fixed by normalization
                         let turning = (error_angle - robot_angle) * velocity * WHEEL_BASE_SIZE * 0.5;
-                        let turning = 0.0; // Temporary override
+                        //let turning = 0.0; // Temporary override
 
                         let parallel_dist = error.dot(&Vector2::new(robot_angle.cos(), robot_angle.sin()));
                         if parallel_dist.abs() < 0.05 {
+                            on_phase_change(state, attempt_count, 3, robot_pos, robot_angle);
                             state = state.next();
                         }
 
@@ -99,6 +76,7 @@ pub fn fine_position_job(
 
                     State::AdjustmentTargetAlignment => {
                         if (target_angle - robot_angle).abs() < 0.05_f32 {
+                            on_phase_change(state, attempt_count, 3, robot_pos, robot_angle);
                             state = state.next();
                             attempt_count += 1;
                         }
@@ -109,7 +87,7 @@ pub fn fine_position_job(
                     State::AdjustmentSidestepAlignment => {
                         let sidestep_angle = 
                             target_angle +
-                            if (target_position - robot_pos).dot(&Vector2::new(target_angle.cos(), target_angle.sin())) > 0.0 {
+                            if (target_pos - robot_pos).dot(&Vector2::new(target_angle.cos(), target_angle.sin())) > 0.0 {
                                 20.0
                             } else {
                                 -20.0
@@ -117,6 +95,7 @@ pub fn fine_position_job(
                         ;
 
                         if (sidestep_angle - robot_angle).powi(2) < 0.05_f32.powi(2) {
+                            on_phase_change(state, attempt_count, 3, robot_pos, robot_angle);
                             state = state.next();
                         }
 
@@ -125,7 +104,7 @@ pub fn fine_position_job(
 
                     State::AdjustmentSidestepTraversal => {
                         let (sidestep_angle, sidestep_speed) = 
-                            if (target_position - robot_pos).dot(&Vector2::new(target_angle.cos(), target_angle.sin())) > 0.0 {
+                            if (target_pos - robot_pos).dot(&Vector2::new(target_angle.cos(), target_angle.sin())) > 0.0 {
                                 (target_angle + 20.0, -1.0)
                             } else {
                                 (target_angle - 20.0, 1.0)
@@ -137,6 +116,7 @@ pub fn fine_position_job(
 
                         let perpendicular_distance = cross_vector2(error, Vector2::new(target_angle.cos(), target_angle.sin()));
                         if perpendicular_distance.abs() < 0.05_f32 {
+                            on_phase_change(state, attempt_count, 3, robot_pos, robot_angle);
                             state = state.next();
                         }
 
@@ -145,6 +125,7 @@ pub fn fine_position_job(
 
                     State::AdjustmentLineupAlignment => {
                         if (error_angle - robot_angle).abs() < 0.05_f32 {
+                            on_phase_change(state, attempt_count, 3, robot_pos, robot_angle);
                             state = state.next();
                         }
 
@@ -157,6 +138,7 @@ pub fn fine_position_job(
                         let turning = (target_angle - robot_angle) * velocity * WHEEL_BASE_SIZE * 0.5;
                         
                         if parallel_dist.abs() < 0.05 {
+                            on_phase_change(state, attempt_count, 3, robot_pos, robot_angle);
                             state = state.next();
                         }
 
@@ -164,6 +146,7 @@ pub fn fine_position_job(
                     },
                 };
 
+                log_to_rerun(robot_pos, robot_angle, target_pos, target_angle, steering.get_left_and_right());
                 // Prepare for next cycle
                 if error.norm_squared() < 0.05_f32.powi(2) && (target_angle - robot_angle).abs() < 0.05_f32 {
                     let _ = output_tx.send(Steering::new(0.0, 0.0, 2000.)).await;
@@ -180,6 +163,7 @@ pub fn fine_position_job(
     )
 }
 
+#[derive(Debug, Clone, Copy)]
 enum State {
     InitialAlignment,
     InitialTraversal,
@@ -205,12 +189,12 @@ impl State {
 }
 
 /// Logs all relevant information to rerun for display. Consider adding steering output.
-fn log_to_rerun(robot_pos: Vector2<f32>, robot_angle: f32, dot: Vector2<f32>, steering_left_and_right: (f64, f64)) {
+fn log_to_rerun(robot_pos: Vector2<f32>, robot_angle: f32, target_pos: Vector2<f32>, target_angle: f32, steering_left_and_right: (f64, f64)) {
     // Visualization / logging
     if let Some(rec) = RECORDER.get() {
         // Plots a unit vector for the robot
         let _ = rec.recorder.log(
-            "ai/path_follower/robot",
+            "ai/fine_positioner/robot",
             &rerun::Arrows2D::from_vectors([[
                     robot_angle.cos(), 
                     robot_angle.sin()]])
@@ -219,20 +203,14 @@ fn log_to_rerun(robot_pos: Vector2<f32>, robot_angle: f32, dot: Vector2<f32>, st
                 .with_draw_order(40.0),
         );
 
-        // Plots a point for the dot
+        // Plots a unit vector for the target
         let _ = rec.recorder.log(
-            "ai/path_follower/dot",
-            &rerun::Points2D::new([[dot.x, dot.y]])
+            "ai/fine_positioner/target",
+            &rerun::Arrows2D::from_vectors([[
+                    target_angle.cos(), 
+                    target_angle.sin()]])
+                .with_origins([[target_pos.x, target_pos.y]])
                 .with_colors([rerun::Color::from_rgb(255, 128, 0)])
-                .with_draw_order(60.0),
-        );
-
-        // Plots error vector
-        let _ = rec.recorder.log(
-            "ai/path_follower/error",
-            &rerun::Arrows2D::from_vectors([[(dot-robot_pos).x, (dot-robot_pos).y]])
-                .with_origins([[robot_pos.x, robot_pos.y]])
-                .with_colors([rerun::Color::from_rgb(192, 128, 16)])
                 .with_draw_order(40.0),
         );
 
@@ -241,7 +219,7 @@ fn log_to_rerun(robot_pos: Vector2<f32>, robot_angle: f32, dot: Vector2<f32>, st
 
         // Plots vectors for applied output to each side of the robot
         let _ = rec.recorder.log(
-            "ai/path_follower/steering",
+            "ai/fine_positioner/steering",
             &rerun::Arrows2D::from_vectors([
                 [
                     steering_left_and_right.0 as f32 * robot_angle.cos(), 
@@ -260,6 +238,15 @@ fn log_to_rerun(robot_pos: Vector2<f32>, robot_angle: f32, dot: Vector2<f32>, st
                 .with_draw_order(40.0),
         );
     }
+}
+
+fn on_phase_change(prev_state: State, attempt: u32, attempt_limit: u32, position: Vector2<f32>, angle: f32) {
+    println!(
+        "Fine positioner completed {:?} and is now performing {:?}\n\tAttempt: {}/{}\n\tOrientation: ({:3}, {:3}) {:3}°",
+        prev_state, prev_state.next(),
+        attempt + 1, attempt_limit,
+        position.x, position.y, angle * 180.0 / PI
+    );
 }
 
 fn cross_vector2(a: Vector2<f32>, b: Vector2<f32>) -> f32 {

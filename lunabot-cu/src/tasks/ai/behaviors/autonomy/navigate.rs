@@ -1,5 +1,6 @@
 use bonsai_bt::Behavior::{self, Action, If, Sequence, While};
 use common::Steering;
+use nalgebra::Vector2;
 
 use crate::tasks::ai::{action::LunabotAction, behaviors::with_timeout};
 
@@ -13,7 +14,10 @@ pub fn navigate_behavior() -> Behavior<LunabotAction> {
             // hale's path follow shouldn't need this
             // Action(LunabotAction::RotateToFacePath),
             If(
-                Box::new(Action(LunabotAction::FollowPath)),
+                Box::new(Sequence(vec![
+                    Action(LunabotAction::FollowPath),
+                    Action(LunabotAction::FinePosition(Vector2::new(5.0, 3.5), 0.0)),
+                ])),
                 Box::new(set_stage(common::LunabotStage::Manual)),
                 Box::new(set_stage(common::LunabotStage::SoftStop)),
             ),

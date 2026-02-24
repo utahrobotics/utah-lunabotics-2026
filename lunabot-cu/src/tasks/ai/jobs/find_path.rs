@@ -79,7 +79,15 @@ pub fn find_path_job(
                 let _ = output_tx.send(vector_path).await;
                 bonsai_bt::Status::Success
             } else {
-                bonsai_bt::Status::Failure
+                // TEMP path finding override
+                let vector_path: Vec<Vector2<f32>> = vec![
+                    Vector2::new(1.0, 1.0),
+                    Vector2::new(1.0, 3.5),
+                    Vector2::new(5.0, 3.5),
+                ];
+                let _ = output_tx.send(vector_path).await;
+                bonsai_bt::Status::Success
+                //bonsai_bt::Status::Failure
             };
             result
         },
