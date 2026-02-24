@@ -60,19 +60,13 @@ pub struct OccupancyGridTask {
     rolling_map_start_position: Isometry3<f64>,
     max_distance_traveled_before_reset: f64,
     max_radians_rotated_before_reset: f64,
+    max_linear_velocity: f64,
+    max_angular_velocity: f64,
+    max_acceleration: f64,
     _min_grad_for_obstacle: f32,
 }
 
-#[derive(Serialize, Encode, cu_bincode::Decode, Clone, Debug, Deserialize)]
-pub struct OccupancyGrid {
-    /// the layout describes the size and resolution of the map
-    /// the layout is not sufficient to interpret the map data alone, the origin field is also needed
-    /// however the origin is automatically applied in some getter methods such as gradient_closest_to and world_to_cell
-    pub layout: MapLayout,
-    pub gradient_map: Vec<f32>,
-    pub origin: (f32, f32),
-}
-
+/*
 impl OccupancyGrid {
     pub fn set_gradient_at(
         &mut self,
@@ -281,17 +275,7 @@ impl OccupancyGrid {
             }
         }
     }
-}
-
-impl Default for OccupancyGrid {
-    fn default() -> Self {
-        OccupancyGrid {
-            layout: MapLayout::new(0.0, 0.0, 0.0, 0.0, 0.1),
-            gradient_map: Vec::new(),
-            origin: (0.0, 0.0),
-        }
-    }
-}
+}*/
 
 /// Arena obstacle configuration
 #[derive(Deserialize, Debug)]
@@ -310,6 +294,58 @@ fn load_arena_obstacles() -> Option<ArenaObstacles> {
     let path = format!("arena_obstacles/{}.ron", arena);
     let contents = std::fs::read_to_string(&path).ok()?;
     ron::de::from_str(&contents).ok()
+}
+
+/// Paint known arena obstacles permanently into the occupancy grid.
+/// robot_radius is added to all obstacle extents to account for robot size.
+fn paint_permanent_obstacles(grid: &mut OccupancyGrid, obstacles: &ArenaObstacles, robot_radius: f32) {
+    const PERMANENT_GRADIENT: f32 = 10.0;
+
+    println!("[OccupancyGrid] Painting permanent obstacles with robot_radius expansion: {}m", robot_radius);
+
+    // Paint rectangular walls (expand by robot_radius on all sides)
+    for &(min_x, min_y, max_x, max_y) in &obstacles.walls {
+        let expanded_min_x = min_x - robot_radius;
+        let expanded_min_y = min_y - robot_radius;
+        let expanded_max_x = max_x + robot_radius;
+        let expanded_max_y = max_y + robot_radius;
+
+        if let (Ok((x1, y1)), Ok((x2, y2))) = (
+            grid.world_to_cell(expanded_min_x, expanded_min_y),
+            grid.world_to_cell(expanded_max_x, expanded_max_y),
+        ) {
+            for x in x1..=x2 {
+                for y in y1..=y2 {
+                    let _ = grid.set_gradient_at(x, y, PERMANENT_GRADIENT);
+                }
+            }
+        }
+    }
+
+    // Paint circular obstacles (pillars, boulders, craters), expanded by robot_radius
+    let all_circles = obstacles.pillars.iter()
+        .chain(obstacles.boulders.iter())
+        .chain(obstacles.craters.iter());
+
+    for &(cx, cy, radius) in all_circles {
+        if let Ok((center_x, center_y)) = grid.world_to_cell(cx, cy) {
+            let expanded_radius = radius + robot_radius;
+            let radius_cells = (expanded_radius / grid.layout.cell_size).ceil() as isize;
+
+            for dx in -radius_cells..=radius_cells {
+                for dy in -radius_cells..=radius_cells {
+                    if dx * dx + dy * dy <= radius_cells * radius_cells {
+                        let x = (center_x as isize + dx).max(0) as usize;
+                        let y = (center_y as isize + dy).max(0) as usize;
+                        let _ = grid.set_gradient_at(x, y, PERMANENT_GRADIENT);
+                    }
+                }
+            }
+
+            println!("[OccupancyGrid] Painted circular obstacle at ({}, {}) with expanded radius: {}m (base: {}m + robot: {}m)",
+                cx, cy, expanded_radius, radius, robot_radius);
+        }
+    }
 }
 
 impl Freezable for OccupancyGridTask {}
@@ -489,6 +525,9 @@ impl CuTask for OccupancyGridTask {
         let max_radians_rotated_before_reset = config
             .and_then(|c| c.get::<f64>("max_radians_rotated_before_reset").expect("failed to deserialize"))
             .unwrap_or(std::f64::consts::PI / 4.0);
+        let robot_radius_meters = config
+            .and_then(|c| c.get::<f64>("robot_radius_meters").expect("failed to deserialize"))
+            .unwrap_or(0.4) as f32;
 
         let camera_node = ROBOT_STATE
             .get()
@@ -574,7 +613,7 @@ impl CuTask for OccupancyGridTask {
                 println!("  - Boulders: {}", obstacles.boulders.len());
                 println!("  - Craters: {}", obstacles.craters.len());
 
-                grid.paint_permanent_obstacles(&obstacles, robot_radius_meters);
+                paint_permanent_obstacles(&mut grid, &obstacles, robot_radius_meters);
                 println!("[OccupancyGrid] Painted {} permanent obstacles into global map (with robot_radius: {}m)",
                     obstacles.pillars.len() + obstacles.boulders.len() + obstacles.craters.len(),
                     robot_radius_meters);
@@ -624,7 +663,8 @@ impl CuTask for OccupancyGridTask {
             rolling_map_start_position: camera_node.get_global_isometry(),
             max_angular_velocity,
             max_linear_velocity,
-            max_acceleration
+            max_acceleration,
+            _min_grad_for_obstacle: 0.0,
         })
     }
 
@@ -861,18 +901,7 @@ impl OccupancyGridTask {
                 let Ok((gx, gy)) = global_map.world_to_cell(world_coords.0, world_coords.1) else {
                     continue;
                 };
-
-                // Protect permanent obstacles from being overwritten by sensor data
-                // Permanent obstacles use gradient=10.0, sensor data uses ~0-3
-                const PERMANENT_THRESHOLD: f32 = 5.0;
-                if let Ok(Some(existing)) = global_map.gradient_at(gx, gy) {
-                    if existing < PERMANENT_THRESHOLD {
-                        global_map.set_gradient_at(gx, gy, gradient)?;
-                    }
-                } else {
-                    // Cell is unmapped (f32::MIN), safe to update
-                    global_map.set_gradient_at(gx, gy, gradient)?;
-                }
+                global_map.set_gradient_at(gx, gy, gradient)?;
             }
         }
 
