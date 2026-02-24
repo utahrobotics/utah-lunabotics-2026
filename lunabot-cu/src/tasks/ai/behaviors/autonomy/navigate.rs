@@ -16,7 +16,7 @@ pub fn navigate_behavior() -> Behavior<LunabotAction> {
             If(
                 Box::new(Sequence(vec![
                     Action(LunabotAction::FollowPath),
-                    Action(LunabotAction::FinePosition(Vector2::new(5.0, 3.5), 0.0)),
+                    Action(LunabotAction::FinePosition(Vector2::new(5.2, 3.5), 0.0)),
                 ])),
                 Box::new(set_stage(common::LunabotStage::Manual)),
                 Box::new(set_stage(common::LunabotStage::SoftStop)),

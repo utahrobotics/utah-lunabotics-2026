@@ -57,13 +57,13 @@ pub fn fine_position_job(
                             state = state.next();
                         }
 
-                        Steering::new_ik(0.0, 0.5 * (error_angle - robot_angle) as f64, 2000.)
+                        Steering::new_ik(0.0, 1.0 * (error_angle - robot_angle) as f64, 2000.)
                     },
 
                     State::InitialTraversal => {
                         let velocity = 1.0; // will be fixed by normalization
-                        let turning = (error_angle - robot_angle) * velocity * WHEEL_BASE_SIZE * 0.5;
-                        //let turning = 0.0; // Temporary override
+                        //let turning = (error_angle - robot_angle) * velocity * WHEEL_BASE_SIZE * 0.5;
+                        let turning = 0.0; // Temporary override
 
                         let parallel_dist = error.dot(&Vector2::new(robot_angle.cos(), robot_angle.sin()));
                         if parallel_dist.abs() < 0.05 {
@@ -81,25 +81,25 @@ pub fn fine_position_job(
                             attempt_count += 1;
                         }
                         
-                        Steering::new_ik(0.0, 0.5 * (target_angle - robot_angle) as f64, 2000.)
+                        Steering::new_ik(0.0, 1.0 * (target_angle - robot_angle) as f64, 2000.)
                     },
 
                     State::AdjustmentSidestepAlignment => {
-                        let sidestep_angle = 
+                        let sidestep_angle = angle_norm(
                             target_angle +
                             if (target_pos - robot_pos).dot(&Vector2::new(target_angle.cos(), target_angle.sin())) > 0.0 {
-                                20.0
+                                20.0 * PI / 180.0
                             } else {
-                                -20.0
+                                -20.0 * PI / 180.0
                             }
-                        ;
+                        );
 
-                        if (sidestep_angle - robot_angle).powi(2) < 0.05_f32.powi(2) {
+                        if (sidestep_angle - robot_angle).abs() < 0.05_f32 {
                             on_phase_change(state, attempt_count, 3, robot_pos, robot_angle);
                             state = state.next();
                         }
 
-                        Steering::new_ik(0.0, 0.5 * (sidestep_angle - robot_angle) as f64, 2000.)
+                        Steering::new_ik(0.0, 1.0 * (sidestep_angle - robot_angle) as f64, 2000.)
                     },
 
                     State::AdjustmentSidestepTraversal => {
@@ -129,7 +129,7 @@ pub fn fine_position_job(
                             state = state.next();
                         }
 
-                        Steering::new_ik(0.0, 0.5 * (error_angle - robot_angle) as f64, 2000.)
+                        Steering::new_ik(0.0, 1.0 * (error_angle - robot_angle) as f64, 2000.)
                     },
 
                     State::AdjustmentLineupTraversal => {
@@ -242,7 +242,7 @@ fn log_to_rerun(robot_pos: Vector2<f32>, robot_angle: f32, target_pos: Vector2<f
 
 fn on_phase_change(prev_state: State, attempt: u32, attempt_limit: u32, position: Vector2<f32>, angle: f32) {
     println!(
-        "Fine positioner completed {:?} and is now performing {:?}\n\tAttempt: {}/{}\n\tOrientation: ({:3}, {:3}) {:3}°",
+        "Fine positioner completed {:?} and is now performing {:?}\n\tAttempt: {}/{}\n\tPose: ({:3}, {:3}) {:3}°",
         prev_state, prev_state.next(),
         attempt + 1, attempt_limit,
         position.x, position.y, angle * 180.0 / PI
@@ -251,4 +251,16 @@ fn on_phase_change(prev_state: State, attempt: u32, attempt_limit: u32, position
 
 fn cross_vector2(a: Vector2<f32>, b: Vector2<f32>) -> f32 {
     a.x * b.y - a.y * b.x
+}
+
+fn angle_norm(x: f32) -> f32 {
+    let mut result = x;
+    result %= PI * 2.0;
+    if result > PI {
+        result = PI - result;
+    }
+    if result < -PI {
+        result = -PI - result;
+    }
+    return result;
 }
