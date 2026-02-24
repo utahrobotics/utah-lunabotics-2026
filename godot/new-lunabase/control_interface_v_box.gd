@@ -1,6 +1,6 @@
 extends VBoxContainer
 @onready var lunabase_human_controller: LunabaseHumanController = $"../../../../../../../LunabaseHumanController"
-@onready var controls_label: Label = $ScrollContainer/ControlsLabel
+@onready var controls_label: RichTextLabel = $ScrollContainer/ControlsLabel
 
 func _ready() -> void:
 	populate_control_text()
@@ -9,6 +9,7 @@ func _ready() -> void:
 
 func populate_control_text():
 	var controls = ""
+	controls_label.clear()
 	var regex = RegEx.new()
 	regex.compile(r"\(([^)]*)\)")
 	
@@ -18,7 +19,7 @@ func populate_control_text():
 			continue
 		var events = InputMap.action_get_events(action_name)
 		print(action_name)
-		controls += action_name + "\n"
+		controls += "[color=3399ff]" + action_name +  "[/color]\n "
 		for event in events:
 			var result = event.as_text()
 			if event is InputEventJoypadButton or event is InputEventJoypadMotion:
@@ -26,6 +27,6 @@ func populate_control_text():
 				result = readable[0].get_string()
 			controls += result + "\n"
 			print(event.as_text()) 
-		controls += "------------\n"
+		controls += "[color=3399ff]------------[/color]\n"
 		print("__________")
-	controls_label.text = controls
+	controls_label.append_text(controls)

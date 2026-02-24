@@ -318,10 +318,12 @@ custom_minimum_size = Vector2(0, 275)
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="ControlsLabel" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/ControlInterfaceVBox/ScrollContainer" unique_id=1095829832]
+[node name="ControlsLabel" type="RichTextLabel" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/ControlInterfaceVBox/ScrollContainer" unique_id=722369990]
+custom_minimum_size = Vector2(0, 280)
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_vertical = 6
+bbcode_enabled = true
 
 [node name="ErrorsPanel" type="PanelContainer" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn" unique_id=1453449401]
 layout_mode = 2
