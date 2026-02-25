@@ -46,22 +46,3 @@ pub fn create_imu_frame_publisher(
         .create()
         .expect("Failed to create imu publisher")
 }
-
-pub fn create_pose_frame_publisher(
-    node: &iceoryx2::node::Node<ipc::Service>,
-    serial: &str,
-) -> Publisher<ipc::Service, PoseMsg, ()> {
-    let service_name = format!("realsense/{}/pose", serial);
-    let pose_service = node
-        .service_builder(&ServiceName::new(&service_name).expect("Invalid service name"))
-        .publish_subscribe::<PoseMsg>()
-        .enable_safe_overflow(true)
-        .subscriber_max_buffer_size(20)
-        .open_or_create()
-        .expect("Failed to create pose service");
-
-    pose_service
-        .publisher_builder()
-        .create()
-        .expect("Failed to create pose publisher")
-}

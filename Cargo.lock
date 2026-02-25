@@ -3722,6 +3722,7 @@ dependencies = [
  "serde-big-array",
  "simple-icp",
  "simple-motion",
+ "t265-rs",
  "tasker",
  "tokio-serial",
  "tokio-util",
@@ -5661,7 +5662,6 @@ dependencies = [
  "parking_lot",
  "realsense-rust",
  "serde",
- "t265-rs",
 ]
 
 [[package]]
@@ -6453,7 +6453,7 @@ dependencies = [
 [[package]]
 name = "t265-rs"
 version = "0.1.0"
-source = "git+https://github.com/utahrobotics/t265-rs.git#ba7a9cc51fcf19179da9c6c6e25d6d001e5b851b"
+source = "git+https://github.com/utahrobotics/t265-rs.git#9025ed708809eeca48adb5ffc50318911d4cfe1f"
 dependencies = [
  "bytemuck",
  "rusb",
