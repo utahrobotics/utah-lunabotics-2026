@@ -10,8 +10,8 @@ pub struct RobotState {
     /// Position of each part of the robot, determined by the simple_motion
     /// kinematics library
     pub kinematic_root: StaticNode,
-    pub kalman_state: Arc<AtomicCell<Option<SVector<f64, 15>>>>,
-    pub kalman_variances: Arc<AtomicCell<Option<SMatrix<f64, 15, 15>>>>,
+    pub kalman_state: Arc<AtomicCell<Option<SVector<f64, 18>>>>,
+    pub kalman_variances: Arc<AtomicCell<Option<SMatrix<f64, 18, 18>>>>,
 }
 
 impl RobotState {

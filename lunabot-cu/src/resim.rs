@@ -29,8 +29,6 @@ const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 
 pub static ROBOT_STATE: OnceLock<RobotState> = OnceLock::new();
 
-pub static TARGET_HZ: usize = 1000; // MUST BE THE SAME AS THE TARGET HZ IN COPPERCONFIG.RON
-
 #[copper_runtime(config = "copperconfig.ron", sim_mode = true)]
 struct LunabotApplication {}
 
@@ -180,7 +178,6 @@ fn run_one_copperlist(
             default::SimStep::OccupancyGridPipeline(..) => SimOverride::ExecuteByRuntime,
             default::SimStep::Localizer(..) => SimOverride::ExecuteByRuntime,
             default::SimStep::__Phantom(..) => SimOverride::ExecuteByRuntime,
-            _ => SimOverride::ExecuteByRuntime,
         }
     };
 
@@ -231,11 +228,11 @@ fn main() {
             let robot_chain = ChainBuilder::from(robot_chain).finish_static();
             let _ = ROBOT_STATE.set(RobotState {
                 kinematic_root: robot_chain,
-                kalman_state: Arc::new(AtomicCell::new(Some(SVector::<f64, 15>::from_element(
+                kalman_state: Arc::new(AtomicCell::new(Some(SVector::<f64, 18>::from_element(
                     0.0,
                 )))),
                 kalman_variances: Arc::new(AtomicCell::new(Some(
-                    SMatrix::<f64, 15, 15>::from_diagonal_element(1E64),
+                    SMatrix::<f64, 18, 18>::from_diagonal_element(1E64),
                 ))),
             });
 
@@ -260,17 +257,32 @@ fn main() {
             let mut reader = UnifiedLoggerIOReader::new(dl, UnifiedLogType::CopperList);
             let copperlists = copperlists_reader::<default::CuStampedDataSet>(&mut reader);
 
-            let target_duration = std::time::Duration::from_nanos(1_000_000_000 / TARGET_HZ as u64);
-            let mut last_time = std::time::Instant::now();
+            let mut last_wall_time = std::time::Instant::now();
+            let mut last_robot_time_ns: Option<u64> = None;
 
             for copper_list in copperlists {
-                run_one_copperlist(&mut application, &mut robot_clock_mock, copper_list);
+                let robot_time_ns = copper_list
+                    .msgs
+                    .get_t_265_subscriber_output()
+                    .metadata()
+                    .process_time()
+                    .start
+                    .unwrap()
+                    .as_nanos();
 
-                let elapsed = last_time.elapsed();
-                if elapsed < target_duration {
-                    std::thread::sleep(target_duration - elapsed);
+                if let Some(prev_ns) = last_robot_time_ns {
+                    let delta_ns = robot_time_ns.saturating_sub(prev_ns);
+                    let target_duration = std::time::Duration::from_nanos(delta_ns);
+                    let elapsed = last_wall_time.elapsed();
+                    if elapsed < target_duration {
+                        std::thread::sleep(target_duration - elapsed);
+                    }
                 }
-                last_time = std::time::Instant::now();
+
+                last_wall_time = std::time::Instant::now();
+                last_robot_time_ns = Some(robot_time_ns);
+
+                run_one_copperlist(&mut application, &mut robot_clock_mock, copper_list);
             }
 
             application

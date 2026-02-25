@@ -159,6 +159,10 @@
                 "process_noise_orientation": 0.5,
                 "process_noise_angular_velocity": 0.5,
                 "process_noise_acceleration": 0.5,
+                "process_noise_angular_acceleration": 0.3,
+                "t265_accel_variance": 0.05,
+                "t265_angular_accel_variance": 0.002,
+                "t265_accel_variance": 0.002,
 
                 "initial_covariance": 100.0,
                 // max age (ms) of ICP reading for it to be used in apriltag offset computation

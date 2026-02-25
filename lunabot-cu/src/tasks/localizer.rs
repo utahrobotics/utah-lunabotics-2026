@@ -26,10 +26,11 @@ use kfilter::system::StepReturn;
 use kfilter::system::System;
 use nalgebra::UnitQuaternion;
 use nalgebra::{Isometry3, SMatrix, SVector, Vector3, Vector6};
+use rerun::Scalars;
 
 use crate::ROBOT_STATE;
 
-const STATE_DIM: usize = 15;
+const STATE_DIM: usize = 18;
 const INPUT_DIM: usize = 1;
 const POSE_MEAS_DIM: usize = 6;
 const VEL_MEAS_DIM: usize = 6;
@@ -41,6 +42,7 @@ static PROCESS_NOISE_VELOCITY: OnceLock<f64> = OnceLock::new();
 static PROCESS_NOISE_ORIENTATION: OnceLock<f64> = OnceLock::new();
 static PROCESS_NOISE_ANGULAR_VEL: OnceLock<f64> = OnceLock::new();
 static PROCESS_NOISE_ACCELERATION: OnceLock<f64> = OnceLock::new();
+static PROCESS_NOISE_ANGULAR_ACCEL: OnceLock<f64> = OnceLock::new();
 
 type StateVec = SVector<f64, STATE_DIM>;
 type InputVec = SVector<f64, INPUT_DIM>;
@@ -74,6 +76,7 @@ fn step_function(state: StateVec, input: InputVec) -> StepReturn<f64, STATE_DIM>
     let orientation_error = state.fixed_rows::<3>(6);
     let angular_velocity = state.fixed_rows::<3>(9);
     let acceleration = state.fixed_rows::<3>(12);
+    let angular_acceleration = state.fixed_rows::<3>(15);
 
     let mut new_state = StateVec::zeros();
 
@@ -88,8 +91,11 @@ fn step_function(state: StateVec, input: InputVec) -> StepReturn<f64, STATE_DIM>
         .copy_from(&orientation_error);
     new_state
         .fixed_rows_mut::<3>(9)
-        .copy_from(&angular_velocity);
+        .copy_from(&(angular_velocity + angular_acceleration * dt));
     new_state.fixed_rows_mut::<3>(12).copy_from(&acceleration);
+    new_state
+        .fixed_rows_mut::<3>(15)
+        .copy_from(&angular_acceleration);
 
     let mut jacobian = SMatrix::<f64, STATE_DIM, STATE_DIM>::identity();
 
@@ -106,6 +112,11 @@ fn step_function(state: StateVec, input: InputVec) -> StepReturn<f64, STATE_DIM>
     jacobian[(3, 12)] = dt;
     jacobian[(4, 13)] = dt;
     jacobian[(5, 14)] = dt;
+
+    // ∂angular_velocity/∂angular_acceleration = dt
+    jacobian[(9, 15)] = dt;
+    jacobian[(10, 16)] = dt;
+    jacobian[(11, 17)] = dt;
 
     let wx = angular_velocity[0];
     let wy = angular_velocity[1];
@@ -133,6 +144,9 @@ fn step_function(state: StateVec, input: InputVec) -> StepReturn<f64, STATE_DIM>
     }
     for i in 12..15 {
         covariance[(i, i)] = *PROCESS_NOISE_ACCELERATION.get().unwrap() * dt;
+    }
+    for i in 15..18 {
+        covariance[(i, i)] = *PROCESS_NOISE_ANGULAR_ACCEL.get().unwrap() * dt;
     }
 
     StepReturn {
@@ -177,6 +191,17 @@ fn velocity_observation_matrix() -> SMatrix<f64, VEL_MEAS_DIM, STATE_DIM> {
     h
 }
 
+fn acceleration_observation_matrix() -> SMatrix<f64, ACCEL_MEAS_DIM, STATE_DIM> {
+    let mut h = SMatrix::<f64, ACCEL_MEAS_DIM, STATE_DIM>::zeros();
+    h[(0, 12)] = 1.0;
+    h[(1, 13)] = 1.0;
+    h[(2, 14)] = 1.0;
+    h[(3, 15)] = 1.0;
+    h[(4, 16)] = 1.0;
+    h[(5, 17)] = 1.0;
+    h
+}
+
 fn state_to_isometry(state: &StateVec, reference_quat: &UnitQuaternion<f64>) -> Isometry3<f64> {
     let translation = Vector3::new(state[0], state[1], state[2]);
     let error = Vector3::new(state[6], state[7], state[8]);
@@ -196,6 +221,7 @@ pub struct Localizer {
     reference_quaternion: UnitQuaternion<f64>,
     pose_measurement: PoseMeasurement,
     t265_velocity_measurement: VelocityMeasurement,
+    accel_measurement: AccelerationMeasurement,
     most_recent_update: CuTime,
 
     /// ICP-to-global transform
@@ -296,6 +322,24 @@ impl CuTask for Localizer {
             .expect("failed to deserialize")
             .expect("please supply process noise acceleration");
 
+        let process_noise_angular_accel = config
+            .unwrap()
+            .get::<f64>("process_noise_angular_acceleration")
+            .expect("failed to deserialize")
+            .expect("please supply process noise angular acceleration");
+
+        let t265_accel_variance = config
+            .unwrap()
+            .get::<f64>("t265_accel_variance")
+            .expect("failed to deserialize")
+            .expect("please supply t265_accel_variance");
+
+        let t265_angular_accel_variance = config
+            .unwrap()
+            .get::<f64>("t265_angular_accel_variance")
+            .expect("failed to deserialize")
+            .expect("please supply t265_angular_accel_variance");
+
         let initial_covariance = config
             .unwrap()
             .get::<f64>("initial_covariance")
@@ -324,6 +368,9 @@ impl CuTask for Localizer {
         PROCESS_NOISE_ACCELERATION
             .set(process_noise_acceleration)
             .expect("failed to set oncelock");
+        PROCESS_NOISE_ANGULAR_ACCEL
+            .set(process_noise_angular_accel)
+            .expect("failed to set oncelock");
 
         let initial_state = StateVec::zeros();
         let initial_covariance = CovMat::from_diagonal_element(initial_covariance);
@@ -337,6 +384,14 @@ impl CuTask for Localizer {
         let vel_r = SMatrix::<f64, VEL_MEAS_DIM, VEL_MEAS_DIM>::identity();
         let t265_velocity_measurement = VelocityMeasurement::new(vel_h, vel_r, Vector6::zeros());
 
+        let accel_h = acceleration_observation_matrix();
+        let mut accel_r = SMatrix::<f64, ACCEL_MEAS_DIM, ACCEL_MEAS_DIM>::zeros();
+        for i in 0..3 {
+            accel_r[(i, i)] = t265_accel_variance;
+            accel_r[(3 + i, 3 + i)] = t265_angular_accel_variance;
+        }
+        let accel_measurement = AccelerationMeasurement::new(accel_h, accel_r, Vector6::zeros());
+
         if let Some(robot_state) = ROBOT_STATE.get() {
             Ok(Self {
                 robot_state: robot_state.clone(),
@@ -345,6 +400,7 @@ impl CuTask for Localizer {
                 reference_quaternion: UnitQuaternion::identity(),
                 pose_measurement,
                 t265_velocity_measurement,
+                accel_measurement,
                 most_recent_update: CuTime::default(),
                 icp_to_global: None,
                 last_raw_icp_pose: None,
@@ -572,6 +628,22 @@ impl CuTask for Localizer {
                             sensor_angular_vel,
                             &base_to_t265,
                         );
+                        let sensor_accel = Vector3::new(
+                            t265_msg.imu_msg.accel[0],
+                            t265_msg.imu_msg.accel[1],
+                            t265_msg.imu_msg.accel[2],
+                        );
+                        let sensor_angular_accel = Vector3::new(
+                            t265_msg.imu_msg.angular_accel[0],
+                            t265_msg.imu_msg.angular_accel[1],
+                            t265_msg.imu_msg.angular_accel[2],
+                        );
+                        let (base_linear_accel, base_angular_accel) =
+                            transform_sensor_velocity_to_base(
+                                sensor_accel.cast::<f64>(),
+                                sensor_angular_accel.cast::<f64>(),
+                                &base_to_t265,
+                            );
                         let state = self.ekf.state();
                         let orientation_error = Vector3::new(state[6], state[7], state[8]);
                         let current_orientation =
@@ -579,6 +651,77 @@ impl CuTask for Localizer {
 
                         let global_linear_vel = current_orientation * base_linear_vel;
                         let global_angular_vel = current_orientation * base_angular_vel;
+                        let mut global_linear_accel = current_orientation * base_linear_accel;
+                        let global_angular_accel = current_orientation * base_angular_accel;
+                        global_linear_accel.y *= -1.0;
+                        if let Some(logger) = RECORDER.get() {
+                            let _ = logger.recorder.log(
+                                format!("localizer/t265_accel/{}/sensor_linear", node_name),
+                                &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(
+                                    sensor_accel.x,
+                                    sensor_accel.y,
+                                    sensor_accel.z,
+                                )]),
+                            );
+                            let _ = logger.recorder.log(
+                                format!("localizer/t265_accel/{}/sensor_angular", node_name),
+                                &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(
+                                    sensor_angular_accel.x,
+                                    sensor_angular_accel.y,
+                                    sensor_angular_accel.z,
+                                )]),
+                            );
+                            let _ = logger.recorder.log(
+                                format!("localizer/t265_accel/{}/global_linear", node_name),
+                                &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(
+                                    global_linear_accel.x as f32,
+                                    global_linear_accel.y as f32,
+                                    global_linear_accel.z as f32,
+                                )]),
+                            );
+                            let _ = logger.recorder.log(
+                                format!("localizer/t265_accel/{}/global_angular", node_name),
+                                &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(
+                                    global_angular_accel.x as f32,
+                                    global_angular_accel.y as f32,
+                                    global_angular_accel.z as f32,
+                                )]),
+                            );
+                        }
+
+                        if let Some(logger) = RECORDER.get() {
+                            // Log x/y/z components separately so direction is visible
+                            for (i, axis) in ["x", "y", "z"].iter().enumerate() {
+                                let _ = logger.recorder.log(
+                                    format!(
+                                        "localizer/t265_scalars/{}/vel_from_pose/{}",
+                                        node_name, axis
+                                    ),
+                                    &Scalars::new([global_linear_vel[i]]),
+                                );
+                                let _ = logger.recorder.log(
+                                    format!(
+                                        "localizer/t265_scalars/{}/accel_from_imu/{}",
+                                        node_name, axis
+                                    ),
+                                    &Scalars::new([global_linear_accel[i]]),
+                                );
+                                let _ = logger.recorder.log(
+                                    format!(
+                                        "localizer/t265_scalars/{}/angular_vel_from_pose/{}",
+                                        node_name, axis
+                                    ),
+                                    &Scalars::new([global_angular_vel[i]]),
+                                );
+                                let _ = logger.recorder.log(
+                                    format!(
+                                        "localizer/t265_scalars/{}/angular_accel_from_imu/{}",
+                                        node_name, axis
+                                    ),
+                                    &Scalars::new([global_angular_accel[i]]),
+                                );
+                            }
+                        }
 
                         let angular_speed = global_angular_vel.magnitude();
                         let linear_speed = global_linear_vel.magnitude();
@@ -612,6 +755,24 @@ impl CuTask for Localizer {
                                     node_name, e
                                 );
                             }
+
+                            let accel_vec = Vector6::new(
+                                global_linear_accel.x,
+                                global_linear_accel.y,
+                                global_linear_accel.z,
+                                0.0,
+                                0.0,
+                                0.0,
+                            );
+                            self.accel_measurement.z = accel_vec;
+
+                            if let Err(e) = self.ekf.update(&self.accel_measurement) {
+                                eprintln!(
+                                    "EKF update with T265 acceleration ({}) failed: {:?}",
+                                    node_name, e
+                                );
+                            }
+
                             should_reset_orientation = true;
                         } else {
                             eprintln!(

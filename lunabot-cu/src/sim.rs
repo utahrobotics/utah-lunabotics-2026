@@ -298,7 +298,7 @@ fn sim_callback(
 
                 // store the state:
                 // State: [x, y, z, vx, vy, vz, orientationerrorx, orientationerrory, orientationerrorz, wx, wy, wz]
-                let kalman_state = SVector::<f64, 15>::from_row_slice(&[
+                let kalman_state = SVector::<f64, 18>::from_row_slice(&[
                     coords[0],
                     coords[1],
                     coords[2],
@@ -313,7 +313,10 @@ fn sim_callback(
                     angular_velocity[2],
                     accel.x,
                     accel.y,
-                    accel.x,
+                    accel.z,
+                    0.0,
+                    0.0,
+                    0.0, // angular acceleration
                 ]);
 
                 // we are just going to ignore variances for now
@@ -381,9 +384,9 @@ fn main() {
     let robot_chain = ChainBuilder::from(robot_chain).finish_static();
     let _ = ROBOT_STATE.set(RobotState {
         kinematic_root: robot_chain,
-        kalman_state: Arc::new(AtomicCell::new(Some(SVector::<f64, 15>::from_element(0.0)))),
+        kalman_state: Arc::new(AtomicCell::new(Some(SVector::<f64, 18>::from_element(0.0)))),
         kalman_variances: Arc::new(AtomicCell::new(Some(
-            SMatrix::<f64, 15, 15>::from_diagonal_element(1E64),
+            SMatrix::<f64, 18, 18>::from_diagonal_element(1E64),
         ))),
     });
     let mut application = LunabotApplicationBuilder::new()
