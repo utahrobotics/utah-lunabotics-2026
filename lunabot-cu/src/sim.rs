@@ -8,6 +8,8 @@ pub mod robot_state;
 pub mod simple_monitor;
 pub mod tasks;
 pub mod utils;
+pub mod kalman_filtering;
+
 
 use common::FromLunabot;
 use crossbeam::atomic::AtomicCell;

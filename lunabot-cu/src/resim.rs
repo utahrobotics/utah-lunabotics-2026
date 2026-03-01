@@ -8,6 +8,8 @@ pub mod robot_state;
 pub mod simple_monitor;
 pub mod tasks;
 pub mod utils;
+pub mod kalman_filtering;
+
 
 use crossbeam::atomic::AtomicCell;
 use crossbeam_channel::{Receiver, Sender};

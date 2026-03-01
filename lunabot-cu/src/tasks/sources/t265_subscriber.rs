@@ -32,6 +32,8 @@ pub struct T265Subscriber {
     velocity_variance: f64,
     #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     angular_velocity_variance: f64,
+    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+    pose_variance: f64
 }
 
 #[derive(Encode, Decode, Clone, Serialize, Debug, Deserialize)]
@@ -39,6 +41,7 @@ pub struct T265Msg {
     pub pose: EncodableIsometry,
     pub velocity_variance: f64,
     pub angular_velocity_variance: f64,
+    pub pose_variance: f64,
     pub node_name: String,
 }
 
@@ -48,6 +51,7 @@ impl Default for T265Msg {
             pose: EncodableIsometry::default(),
             velocity_variance: 1.0,
             angular_velocity_variance: 1.0,
+            pose_variance: 1.0,
             node_name: "t265".to_string(),
         }
     }
@@ -99,12 +103,17 @@ impl CuSrcTask for T265Subscriber {
             .and_then(|c| c.get::<f64>("t265_angular_velocity_variance").expect("failed to deserialize"))
             .unwrap_or(1.0);
 
+        let pose_variance = config
+            .and_then(|c| c.get::<f64>("pose_variance").expect("failed to deserialize"))
+            .unwrap_or(0.05);
+
         Ok(Self {
             last_seen: 0,
             pose_subscriber,
             initial_yaw_offset: None,
             velocity_variance,
             angular_velocity_variance,
+            pose_variance,
         })
     }
 
@@ -191,6 +200,7 @@ impl CuSrcTask for T265Subscriber {
                 pose: EncodableIsometry::from_na(&corrected_robot_pose.cast::<f64>()),
                 velocity_variance: velocity_variance,
                 angular_velocity_variance: angular_velocity_variance,
+                pose_variance: self.pose_variance,
                 node_name: serial_num.to_string(),
             };
             new_msg.set_payload(payload);

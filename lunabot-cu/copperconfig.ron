@@ -63,6 +63,7 @@
                 "serial_num": "929122111514",
                 "t265_velocity_variance": 1.0,
                 "t265_angular_velocity_variance": 1.0,
+                "pose_variance": 0.05,
             },
             logging: (
                 enabled: true
@@ -156,13 +157,12 @@
             config:{
                 "process_noise_position": 0.5,
                 "process_noise_velocity": 0.5,
-                "process_noise_orientation": 0.5,
-                "process_noise_angular_velocity": 0.5,
+                "process_noise_orientation": 1.01,
+                "process_noise_angular_velocity": 1.01,
                 "process_noise_acceleration": 0.5,
 
                 "initial_covariance": 100.0,
-                // max age (ms) of ICP reading for it to be used in apriltag offset computation
-                "icp_apriltag_max_age_ms": 50.0,
+
             },
 
         ),
@@ -185,7 +185,7 @@
             type: "crate::tasks::AprilDetectionHandler",
             config: {
                 // all tags > max_distance away will be ignored
-                "max_distance": 1.0
+                "max_distance": 1.5
             }
         )
     ],
