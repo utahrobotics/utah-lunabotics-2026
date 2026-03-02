@@ -87,9 +87,8 @@ impl OccupancyGrid {
         // --- BFS by increasing distance ---
         let mut seen = vec![false; cells_x * cells_y];
         let mut output = self.gradient_map.clone();
-
         // just for the logger
-        let mut new_obstacles = Vec::new();
+        let mut new_obstacles: Vec<(usize, f32)> = Vec::new();
 
         for dist in 0..=max_level {
             // Take the bin out to avoid borrow conflicts when pushing to other bins.
@@ -104,11 +103,15 @@ impl OccupancyGrid {
                 }
                 seen[index] = true;
 
-                // Propagate source obstacle's gradient (max wins)
-                let src_gradient = self.gradient_map[sx + sy * cells_x];
-                if output[index] == f32::MIN || output[index] < src_gradient {
-                    output[index] = src_gradient;
-                    new_obstacles.push(index);
+                // All obstacles inflate identically: linear decay from obstacle_threshold at source to 0 at robot_radius
+                let dx_cells = mx as f32 - sx as f32;
+                let dy_cells = my as f32 - sy as f32;
+                let distance = (dx_cells * dx_cells + dy_cells * dy_cells).sqrt()
+                    * self.layout.cell_size;
+                let decayed = obstacle_threshold * (1.0 - distance / robot_radius).max(0.0);
+                if output[index] == f32::MIN || output[index] < decayed {
+                    output[index] = decayed;
+                    new_obstacles.push((index, decayed));
                 }
 
                 // Enqueue 4-connected neighbors
@@ -148,16 +151,37 @@ impl OccupancyGrid {
             origin: self.origin,
         };
 
+        if !new_obstacles.is_empty() {
+            let min_decay = new_obstacles.iter().map(|(_, d)| *d).fold(f32::INFINITY, f32::min);
+            let max_decay = new_obstacles.iter().map(|(_, d)| *d).fold(f32::NEG_INFINITY, f32::max);
+            let avg_decay = new_obstacles.iter().map(|(_, d)| *d).sum::<f32>() / new_obstacles.len() as f32;
+        }
+
         if let Some(logger) = RECORDER.get() {
+            // Color by decayed gradient: bright red = high decay value, dark purple = low decay value
+            let decay_range = {
+                let max_d = new_obstacles.iter().map(|(_, d)| *d).fold(f32::NEG_INFINITY, f32::max);
+                if max_d > 0.0 { max_d } else { 1.0 }
+            };
             let _ = logger.recorder.log(
                 "ai/expanded_obstacles",
                 &Points2D::new(
                     new_obstacles
                         .iter()
-                        .map(|index| expanded.linear_cell_to_world(*index))
+                        .map(|(index, _)| expanded.linear_cell_to_world(*index))
                         .flatten(),
                 )
-                .with_colors((0..new_obstacles.len()).map(|_| Color::from_rgb(100, 0, 100))),
+                .with_colors(new_obstacles.iter().map(|(_, decayed)| {
+                    let t = (*decayed / decay_range).clamp(0.0, 1.0);
+                    let r = (60.0 + 195.0 * t) as u8;
+                    let g = 0u8;
+                    let b = (120.0 * (1.0 - t)) as u8;
+                    Color::from_rgb(r, g, b)
+                })).with_labels(
+                    new_obstacles
+                        .iter()
+                        .map(|(index, _)| expanded.gradient_map[*index].to_string()),     
+                ),
             );
         }
 

@@ -19,7 +19,8 @@ pub fn find_path_job(
     latest_local_map: OccupancyGrid,
     start: Vector2<f32>,
     end: Vector2<f32>,
-    max_acceptable_gradient: f32,
+    max_acceptable_gradient_expander: f32,
+    max_acceptable_gradient_pathfinder: f32,
     robot_radius: f32,
 ) -> Job<Vec<Vector2<f32>>, ()> {
     let (output_tx, output_rx) = mpsc::channel(5);
@@ -49,7 +50,7 @@ pub fn find_path_job(
                 let mut combined = global_map_guard.clone();
                 let _ = latest_local_map.append_to(&mut combined);
                 let Some(expanded) =
-                    combined.expand_obstacles(robot_radius, max_acceptable_gradient)
+                    combined.expand_obstacles(robot_radius, max_acceptable_gradient_expander)
                 else {
                     return None;
                 };
@@ -58,7 +59,7 @@ pub fn find_path_job(
                     &expanded,
                     [start.x, start.y],
                     [end.x, end.y],
-                    max_acceptable_gradient,
+                    max_acceptable_gradient_pathfinder,
                 )
             })
             .await

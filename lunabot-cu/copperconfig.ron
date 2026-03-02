@@ -8,8 +8,9 @@
             id: "new_ai",
             type: "crate::tasks::ai::lunabot_ai::LunabotAi",
             config: {
-                "obstacle_gradient_threshold": 0.5,
-                "robot_radius_meters": 0.5,
+                "obstacle_gradient_threshold_expander": 0.9,
+                "obstacle_gradient_threshold_pathfinder": 0.3,
+                "robot_radius_meters": 0.8,
             },
         ),
         // waits for v4l udev add events, and reports them to the camera tasks
