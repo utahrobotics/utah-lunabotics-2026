@@ -65,6 +65,8 @@ pub struct OccupancyGridTask {
     max_angular_velocity: f64,
     max_acceleration: f64,
     _min_grad_for_obstacle: f32,
+    artemis_obstacles_enabled: bool,
+    ucf_obstacles_enabled: bool,
 }
 
 /// Arena obstacle configuration
@@ -76,14 +78,7 @@ struct ArenaObstacles {
     craters: Vec<(f32, f32, f32)>,    // (center_x, center_y, radius)
 }
 
-// Take command line args to load obstacle
-fn load_arena_obstacles() -> Option<ArenaObstacles> {
-    let arena = std::env::args().find(|arg| arg == "artemis" || arg == "ucf")?;
 
-    let path = format!("arena_obstacles/{}.ron", arena);
-    let contents = std::fs::read_to_string(&path).ok()?;
-    ron::de::from_str(&contents).ok()
-}
 
 /// Paint known arena obstacles permanently into the occupancy grid.
 /// robot_radius is added to all obstacle extents to account for robot size.
@@ -117,6 +112,8 @@ fn paint_permanent_obstacles(
             }
         }
     }
+    // TODO add obstacles to copperconfig so they can be removed as needed - instead of env vars 
+
 
     // Paint circular obstacles (pillars, boulders, craters), expanded by robot_radius
     let all_circles = obstacles
@@ -175,7 +172,7 @@ impl CuTask for OccupancyGridTask {
                 )
                 .unwrap();
 
-            // Log permanent obstacles to Rerun TODO for testing, remove later
+            // Log permanent obstacles to Rerun 
             if let Some(global_map) = GLOBAL_MAP.get() {
                 if let Ok(grid) = global_map.read() {
                     let mut points = vec![];
@@ -368,6 +365,19 @@ impl CuTask for OccupancyGridTask {
             .and_then(|c| c.get::<f64>("max_depth").expect("failed to deserialize"))
             .unwrap_or(3.0) as f32;
 
+        let artemis_obstacles_enabled = config
+            .and_then(|c| {
+                c.get::<bool>("artemis_obstacles_enabled")
+                    .expect("failed to deserialize")
+            })
+            .unwrap_or(true);
+        let ucf_obstacles_enabled = config
+            .and_then(|c| {
+                c.get::<bool>("ucf_obstacles_enabled")
+                    .expect("failed to deserialize")
+            })
+            .unwrap_or(false);
+
         // use bilateral by default, fall back on gaussian
         let use_bilateral = config
             .and_then(|c| {
@@ -491,7 +501,7 @@ impl CuTask for OccupancyGridTask {
             };
 
             // Load and paint arena obstacles
-            if let Some(obstacles) = load_arena_obstacles() {
+            if let Some(obstacles) = load_arena_obstacles(artemis_obstacles_enabled, ucf_obstacles_enabled) {
                 println!("[OccupancyGrid] Loaded arena obstacles:");
                 println!("  - Walls: {}", obstacles.walls.len());
                 println!("  - Pillars: {}", obstacles.pillars.len());
@@ -735,9 +745,25 @@ impl CuTask for OccupancyGridTask {
         });
         Ok(())
     }
+
+}
+
+fn load_arena_obstacles(artemis_obstacles_enabled: bool, ucf_obstacles_enabled: bool) -> Option<ArenaObstacles> {
+    if artemis_obstacles_enabled {
+        let path = "arena_obstacles/artemis.ron";
+        let contents = std::fs::read_to_string(path).ok()?;
+        ron::de::from_str(&contents).ok()
+    } else if ucf_obstacles_enabled {
+        let path = "arena_obstacles/ucf.ron";
+        let contents = std::fs::read_to_string(path).ok()?;
+        ron::de::from_str(&contents).ok()
+    } else {
+        None
+    }
 }
 
 impl OccupancyGridTask {
+
     /// also logs out the global map
     /// only needs self for access to the global layout
     fn append_local_to_global(
