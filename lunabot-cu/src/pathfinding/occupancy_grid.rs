@@ -151,11 +151,7 @@ impl OccupancyGrid {
             origin: self.origin,
         };
 
-        if !new_obstacles.is_empty() {
-            let min_decay = new_obstacles.iter().map(|(_, d)| *d).fold(f32::INFINITY, f32::min);
-            let max_decay = new_obstacles.iter().map(|(_, d)| *d).fold(f32::NEG_INFINITY, f32::max);
-            let avg_decay = new_obstacles.iter().map(|(_, d)| *d).sum::<f32>() / new_obstacles.len() as f32;
-        }
+
 
         if let Some(logger) = RECORDER.get() {
             // Color by decayed gradient: bright red = high decay value, dark purple = low decay value
