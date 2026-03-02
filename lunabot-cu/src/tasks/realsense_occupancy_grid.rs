@@ -535,6 +535,8 @@ impl CuTask for OccupancyGridTask {
             max_linear_velocity,
             max_acceleration,
             _min_grad_for_obstacle: 0.0,
+            artemis_obstacles_enabled,
+            ucf_obstacles_enabled,
         })
     }
 
