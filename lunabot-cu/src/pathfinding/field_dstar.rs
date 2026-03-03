@@ -47,8 +47,6 @@ pub fn find_path_dstar(
     goal: [f32; 2],
     max_acceptable_gradient: f32,
 ) -> Option<Vec<(f32, f32)>> {
-    println!("[PathFinding] Starting pathfinding from {:?} to {:?}", start, goal);
-    println!("[PathFinding] Max acceptable gradient: {}", max_acceptable_gradient);
 
     // Helper to check gradient from both maps (prioritize local)
     let get_gradient = |x: f32, y: f32| -> Option<f32> {
@@ -62,8 +60,6 @@ pub fn find_path_dstar(
     // Handle case where robot starts in obstacle or unknown area
     let mut initial_path = Vec::new();
     let start_gradient = get_gradient(start[0], start[1]);
-    println!("[PathFinding] Start gradient: {:?}", start_gradient);
-
     if get_gradient(start[0], start[1])
         .map(|val| {
             if val > max_acceptable_gradient {
@@ -75,14 +71,11 @@ pub fn find_path_dstar(
         .flatten()
         .is_none()
     {
-        println!("[PathFinding] Start is in obstacle or unknown, attempting flood fill escape");
         if let Some(valid_cell) =
             flood_fill_escape(map, start, max_acceptable_gradient, 200)
         {
-            println!("[PathFinding] Found escape cell at {:?}", valid_cell);
             initial_path.push(valid_cell);
         } else {
-            println!("[PathFinding] FAILED: Could not escape from start position");
             return None;
         }
     }
@@ -96,10 +89,7 @@ pub fn find_path_dstar(
 
     // if goal is not in bounds of the global map
     if !map.layout.is_in_bounds(goal[0], goal[1]) {
-        println!("[PathFinding] FAILED: Goal is out of bounds");
-        println!("[PathFinding] Global map bounds: min_x={}, max_x={}, min_y={}, max_y={}",
-                 map.layout.min_x, map.layout.max_x,
-                 map.layout.min_y, map.layout.max_y);
+        eprintln!("[PathFinding] FAILED: Goal is out of bounds");
         return None;
     }
 
@@ -114,21 +104,8 @@ pub fn find_path_dstar(
     // Check if goal is free
     let goal_gradient = get_gradient(goal[0], goal[1]);
     let goal_is_free = is_free(goal[0], goal[1]);
-    println!("[PathFinding] Goal gradient: {:?}, Goal is free: {}", goal_gradient, goal_is_free);
-
     if !goal_is_free {
-        println!("[PathFinding] FAILED: Goal is blocked (gradient: {:?}, max acceptable: {})",
-                 goal_gradient, max_acceptable_gradient);
-        return None;
-    }
-
-    // Check if goal is free
-    let goal_gradient = get_gradient(goal[0], goal[1]);
-    let goal_is_free = is_free(goal[0], goal[1]);
-    println!("[PathFinding] Goal gradient: {:?}, Goal is free: {}", goal_gradient, goal_is_free);
-
-    if !goal_is_free {
-        println!("[PathFinding] FAILED: Goal is blocked (gradient: {:?}, max acceptable: {})",
+        eprintln!("[PathFinding] FAILED: Goal is blocked (gradient: {:?}, max acceptable: {})",
                  goal_gradient, max_acceptable_gradient);
         return None;
     }
@@ -209,7 +186,6 @@ pub fn find_path_dstar(
             path.push(start_world);
             path.reverse();
 
-            println!("[PathFinding] SUCCESS: Found path with {} waypoints", path.len());
             return Some(path);
         }
 
@@ -250,7 +226,7 @@ pub fn find_path_dstar(
         }
     }
 
-    println!("[PathFinding] FAILED: No path found (explored {} cells)", closed_set.len());
+    eprintln!("[PathFinding] FAILED: No path found (explored {} cells)", closed_set.len());
     None
 }
 

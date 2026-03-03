@@ -88,12 +88,6 @@ fn paint_permanent_obstacles(
     robot_radius: f32,
 ) {
     const PERMANENT_GRADIENT: f32 = 10.0;
-
-    println!(
-        "[OccupancyGrid] Painting permanent obstacles with robot_radius expansion: {}m",
-        robot_radius
-    );
-
     // Paint rectangular walls (expand by robot_radius on all sides)
     for &(min_x, min_y, max_x, max_y) in &obstacles.walls {
         let expanded_min_x = min_x - robot_radius;
@@ -112,8 +106,6 @@ fn paint_permanent_obstacles(
             }
         }
     }
-    // TODO add obstacles to copperconfig so they can be removed as needed - instead of env vars 
-
 
     // Paint circular obstacles (pillars, boulders, craters), expanded by robot_radius
     let all_circles = obstacles
@@ -136,11 +128,6 @@ fn paint_permanent_obstacles(
                     }
                 }
             }
-
-            println!(
-                "[OccupancyGrid] Painted circular obstacle at ({}, {}) with expanded radius: {}m (base: {}m + robot: {}m)",
-                cx, cy, expanded_radius, radius, robot_radius
-            );
         }
     }
 }
@@ -203,10 +190,6 @@ impl CuTask for OccupancyGridTask {
                                 &Points2D::new(points).with_colors(colors),
                             )
                             .unwrap();
-                        println!(
-                            "[OccupancyGrid] Logged {} permanent obstacle cells to Rerun",
-                            colors_len
-                        );
                     }
                 }
             }
@@ -502,19 +485,10 @@ impl CuTask for OccupancyGridTask {
 
             // Load and paint arena obstacles
             if let Some(obstacles) = load_arena_obstacles(artemis_obstacles_enabled, ucf_obstacles_enabled) {
-                println!("[OccupancyGrid] Loaded arena obstacles:");
-                println!("  - Walls: {}", obstacles.walls.len());
-                println!("  - Pillars: {}", obstacles.pillars.len());
-                println!("  - Boulders: {}", obstacles.boulders.len());
-                println!("  - Craters: {}", obstacles.craters.len());
-
                 paint_permanent_obstacles(&mut grid, &obstacles, robot_radius_meters);
-                println!("[OccupancyGrid] Painted {} permanent obstacles into global map (with robot_radius: {}m)",
-                    obstacles.pillars.len() + obstacles.boulders.len() + obstacles.craters.len(),
-                    robot_radius_meters);
 
             } else {
-                println!("[OccupancyGrid] No arena obstacles loaded");
+                eprintln!("[OccupancyGrid] No arena obstacles loaded");
             }
 
             Arc::new(RwLock::new(grid))
@@ -760,6 +734,7 @@ fn load_arena_obstacles(artemis_obstacles_enabled: bool, ucf_obstacles_enabled: 
         let contents = std::fs::read_to_string(path).ok()?;
         ron::de::from_str(&contents).ok()
     } else {
+        eprintln!("No arena obstacles enabled, skipping loading");
         None
     }
 }
