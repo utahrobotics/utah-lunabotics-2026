@@ -171,7 +171,7 @@ impl LunabotAction {
                         }
                     } else {
                         // Start a new path finder job
-                        println!("Starting path finder job from {:?} to {:?}.", start, end);
+                        // println!("Starting path finder job from {:?} to {:?}.", start, end);
                         let mut job = find_path_job(
                             local_map.clone(),
                             start,

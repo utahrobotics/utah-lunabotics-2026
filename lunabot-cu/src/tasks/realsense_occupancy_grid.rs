@@ -39,6 +39,7 @@ use crate::rerun_viz::RECORDER;
 use crate::tasks::{DEPTH_FRAME_HEIGHT, DEPTH_FRAME_SIZE, DEPTH_FRAME_WIDTH};
 
 pub static GLOBAL_MAP: OnceLock<Arc<RwLock<OccupancyGrid>>> = OnceLock::new();
+const PERMANENT_GRADIENT: f32 = 10.0;
 
 #[allow(unused)]
 struct ProcessRequest {
@@ -87,7 +88,7 @@ fn paint_permanent_obstacles(
     obstacles: &ArenaObstacles,
     robot_radius: f32,
 ) {
-    const PERMANENT_GRADIENT: f32 = 10.0;
+    
     // Paint rectangular walls (expand by robot_radius on all sides)
     for &(min_x, min_y, max_x, max_y) in &obstacles.walls {
         let expanded_min_x = min_x - robot_radius;
@@ -169,8 +170,8 @@ impl CuTask for OccupancyGridTask {
                             let idx = cell_x + cell_y * grid.cells_x();
                             if idx < grid.gradient_map.len() {
                                 let gradient = grid.gradient_map[idx];
-                                if gradient > 5.0 {
-                                    // Only show permanent obstacles
+                                if gradient > PERMANENT_GRADIENT / 2.0 {
+                                    // Only show permanent obstacles - obstacles should have gradient of 10. 
                                     if let Ok((world_x, world_y)) =
                                         grid.cell_to_world(cell_x, cell_y)
                                     {
