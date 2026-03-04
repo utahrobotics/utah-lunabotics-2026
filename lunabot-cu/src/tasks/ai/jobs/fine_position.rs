@@ -43,8 +43,8 @@ pub fn fine_position_job(
 
                 let _robot_isometry = chain.get_global_isometry();
                 // Flatten and set up
-                let robot_pos = _robot_isometry.translation.vector.xy().cast();
                 let robot_angle = _robot_isometry.rotation.euler_angles().2 as f32;
+                let robot_pos = _robot_isometry.translation.vector.xy().cast() + Vector2::new(robot_angle.cos(), robot_angle.sin()) * 0.5; // Patch attempt
 
                 let error = target_pos - robot_pos;
                 let error_angle = (error.y).atan2(error.x);
@@ -112,7 +112,7 @@ pub fn fine_position_job(
                         ;
 
                         let velocity = sidestep_speed; // will be fixed by normalization
-                        let turning = (sidestep_angle - robot_angle) * velocity * WHEEL_BASE_SIZE * 0.5;
+                        let turning = 0.0;//(sidestep_angle - robot_angle) * velocity * WHEEL_BASE_SIZE * 0.5;
 
                         let perpendicular_distance = cross_vector2(error, Vector2::new(target_angle.cos(), target_angle.sin()));
                         if perpendicular_distance.abs() < 0.05_f32 {
@@ -163,7 +163,7 @@ pub fn fine_position_job(
     )
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 enum State {
     InitialAlignment,
     InitialTraversal,
@@ -172,6 +172,21 @@ enum State {
     AdjustmentSidestepTraversal,
     AdjustmentLineupAlignment,
     AdjustmentLineupTraversal,
+}
+
+impl fmt::Debug for State {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::InitialAlignment =>            write!(f, "InitialAlignment            | ) * |"),
+            Self::InitialTraversal =>            write!(f, "InitialTraversal            | ->* |"),
+            Self::AdjustmentTargetAlignment =>   write!(f, "AdjustmentTargetAlignment   | *)  |"),
+            Self::AdjustmentSidestepAlignment => write!(f, "AdjustmentSidestepAlignment | ( * |"),
+            Self::AdjustmentSidestepTraversal => write!(f, "AdjustmentSidestepTraversal | <-* |"),
+            Self::AdjustmentLineupAlignment =>   write!(f, "AdjustmentLineupAlignment   | ) * |"),
+            Self::AdjustmentLineupTraversal =>   write!(f, "AdjustmentLineupTraversal   | ->* |"),
+        }
+        
+    }
 }
 
 impl State {

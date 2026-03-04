@@ -126,8 +126,8 @@ pub fn follow_path_job(
 
                 let _robot_isometry = chain.get_global_isometry();
                 // Flatten and set up
-                let robot_pos = _robot_isometry.translation.vector.xy().cast();
                 let robot_angle = _robot_isometry.rotation.euler_angles().2 as f32;
+                let robot_pos = _robot_isometry.translation.vector.xy().cast() + Vector2::new(robot_angle.cos(), robot_angle.sin()) * 0.75; // Patch attempt
                 let error = dot - robot_pos;
 
                 // Check if stuck
@@ -168,7 +168,7 @@ pub fn follow_path_job(
                     //   Radius is proportional to the ratio of velocity to angular velocity:
                     //   https://www.desmos.com/calculator/f7grn652s4
                     // TODO Fix problems with dot being behind bot
-                    let velocity = follow_speed_factor * target_distance; // will be fixed by normalization
+                    let velocity = (follow_speed_factor * target_distance).max(0.2); // will be fixed by normalization
                     let turning = velocity * WHEEL_BASE_SIZE * turning_ratio_adjustment * 0.5 / radius;
 
                     Steering::new_ik(velocity as f64, turning as f64, 2000.)
