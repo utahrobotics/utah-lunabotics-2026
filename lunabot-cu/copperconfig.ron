@@ -61,7 +61,6 @@
             id: "t265_subscriber",
             type: "crate::tasks::sources::T265Subscriber",
             config: {
-                "serial_num": "929122111514",
                 "t265_velocity_variance": 1.0,
                 "t265_angular_velocity_variance": 1.0,
                 "pose_variance": 0.05,
@@ -202,8 +201,26 @@
             type: "crate::tasks::AprilDetectionHandler",
             config: {
                 // all tags > max_distance away will be ignored
-                "max_distance": 1.5
+                "max_distance": 20.5
             }
+        ),
+        (
+            id: "detector_cam_t265",
+            type: "cu_apriltag::AprilTags",
+            config: {
+                "family": "tag36h11",
+                "tag_size": 0.145,
+                "fx": 1,
+                "fy": 1,
+                "cx": 960.84,
+                "cy": 600.819,
+                "camera_id": "929122111514",
+                "distortion_path": "camera_configs/t265_distortion.ron",
+            },
+            logging: (
+                enabled: true
+            ),
+            background: true,
         )
     ],
     cnx:[
@@ -220,6 +237,9 @@
         (src:"v3_pico",                       dst:"localizer",               msg:"embedded_common::FromPicoV3"),
         (src:"detection_handler",             dst: "localizer",              msg:"Vec<crate::tasks::AprilTagMeasurement>"),
         (src:"t265_subscriber",               dst:"localizer",               msg:"crate::tasks::sources::T265Msg"),
+        (src:"t265_subscriber",               dst:"detector_cam_t265",       msg:"cu_sensor_payloads::CuImage<Vec<u8>>"),
+        (src:"detector_cam_t265",             dst: "detection_handler",      msg:"cu_apriltag::AprilTagDetections"),
+
     ],
 
     // comms to lunabase software

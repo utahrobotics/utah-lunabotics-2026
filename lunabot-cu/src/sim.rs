@@ -71,6 +71,7 @@ fn default_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::LunabaseBridgeRxFromLunabaseRx { .. } => SimOverride::ExecuteByRuntime,
         default::SimStep::LunabaseBridgeTxToLunabase { .. } => SimOverride::ExecuteByRuntime,
         default::SimStep::LunabaseBridgeBridge { .. } => SimOverride::ExecuteByRuntime,
+        default::SimStep::DetectorCamT265(..) => SimOverride::ExecutedBySim,
         default::SimStep::__Phantom(_) => SimOverride::ExecutedBySim,
     }
 }
@@ -184,6 +185,7 @@ fn sim_callback(
         default::SimStep::MotorCtrl(..) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamBack(_) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamSide(_) => SimOverride::ExecutedBySim,
+        default::SimStep::DetectorCamT265(..) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamLaptopFront(_) => SimOverride::ExecutedBySim,
         default::SimStep::RealsenseSubscriber(CuTaskCallbackState::Process(_, output)) => {
             use std::sync::atomic::{AtomicU64, Ordering};

@@ -19,11 +19,9 @@ use std::path::Path;
 use crate::ROBOT_STATE;
 use crate::rerun_viz::RECORDER;
 
-
 const LATERAL_VARIANCE_MODIFIER: f64 = 0.05;
 const DEPTH_VARIENCE_MODIFIER: f64 = 0.05;
 const ANGULAR_VARIANCE_MODIFIER: f64 = 0.05;
-
 
 /// Data definition that mirrors the contents of a `.ron` apriltag isometry file.
 /// The field names are intentionally kept simple so that we can be flexible with
@@ -126,6 +124,7 @@ impl CuTask for AprilDetectionHandler {
         &'m input_msg!(AprilTagDetections),
         &'m input_msg!(AprilTagDetections),
         &'m input_msg!(AprilTagDetections),
+        &'m input_msg!(AprilTagDetections),
     );
     // camera_id, estimated isometry of camera
     type Output<'m> = output_msg!(Vec<AprilTagMeasurement>);
@@ -135,7 +134,6 @@ impl CuTask for AprilDetectionHandler {
     fn new(config: Option<&ComponentConfig>, _resources: Self::Resources<'_>) -> CuResult<Self> {
         let known_tags = load_known_apriltag_isometries()?;
         let max_distance = config.expect("provide a config for apriltag handler").get("max_distance").expect("failed to deserialize").unwrap_or(1.0);
-
         Ok(Self { known_tags, max_distance })
     }
 
@@ -146,11 +144,11 @@ impl CuTask for AprilDetectionHandler {
         output: &mut Self::Output<'_>,
     ) -> CuResult<()> {
         output.clear_payload();
-        let (input1, input2, input3) = input;
+        let (input1, input2, input3, input4) = input;
 
         let mut result_vec: Vec<AprilTagMeasurement> = Vec::new();
 
-        for particular_input in [input1, input2, input3] {
+        for particular_input in [input1, input2, input3, input4] {
             if let Some(dets) = particular_input.payload() {
                 let camera_id = dets.camera_id.as_ref().clone();
                 for observation in self.cu_detections_to_tag_observations(dets, &camera_id) {
@@ -162,7 +160,6 @@ impl CuTask for AprilDetectionHandler {
                         // println!("ignored > max distance");
                         continue;
                     }
-
 
                     // Translational
                     let position_state: SVector<f64, 3> = isometry.translation.vector;
@@ -185,8 +182,7 @@ impl CuTask for AprilDetectionHandler {
                     let position_base_covariance_matrix = 
                         translational_eigenvector_matrix * 
                         translational_eigenvalue_matrix * 
-                        translational_eigenvector_matrix.try_inverse().expect("April tag eigenvector matrix was not invertable. Likely a cross product edge case.")
-                    ;
+                        translational_eigenvector_matrix.try_inverse().expect("April tag eigenvector matrix was not invertable. Likely a cross product edge case.");
 
                     // Angular
                     let orientation_state = 
@@ -288,7 +284,6 @@ impl AprilDetectionHandler {
         Isometry3::from_parts(physics_translation.into(), physics_rotation)
     }
 
-
     fn cu_detections_to_tag_observations(
         &self,
         dets: &AprilTagDetections,
@@ -307,6 +302,7 @@ impl AprilDetectionHandler {
             };
 
             let tag_local_isometry: Isometry3<f64> = Self::transform_cv_to_physics(pose);
+
             let tag_global_isometry = self.known_tags.get(&id).unwrap();
 
             let tag_half_size = (0.002, 0.08, 0.08);
@@ -411,7 +407,6 @@ impl TagObservation {
         // inverse of the camera isometry relative to robot base
         let camera_isometry_inverse = camera_node.get_isometry_from_base().inverse();
 
-
         // tag local isometry is the observed location of the tag as if the camera was always at 0,0,0 facing forward
         let inv_rotation = self.tag_local_isometry.rotation.inverse();
 
@@ -421,8 +416,9 @@ impl TagObservation {
                 (inv_rotation * -self.tag_local_isometry.translation.vector).into(),
                 inv_rotation,
             );
-        
+
         // this should be the position of the robot base
-        Some(isometry_of_observer_in_camera_frame * camera_isometry_inverse)
+        let result = isometry_of_observer_in_camera_frame * camera_isometry_inverse;
+        Some(result)
     }
 }

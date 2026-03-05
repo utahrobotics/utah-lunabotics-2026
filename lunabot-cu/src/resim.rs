@@ -31,7 +31,7 @@ const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 
 pub static ROBOT_STATE: OnceLock<RobotState> = OnceLock::new();
 
-pub static TARGET_HZ: usize = 1000; // MUST BE THE SAME AS THE TARGET HZ IN COPPERCONFIG.RON
+pub static TARGET_HZ: usize = 1000000; // MUST BE THE SAME AS THE TARGET HZ IN COPPERCONFIG.RON
 
 #[copper_runtime(config = "copperconfig.ron", sim_mode = true)]
 struct LunabotApplication {}
@@ -65,7 +65,7 @@ fn run_one_copperlist(
 ) {
     let msgs = &copper_list.msgs;
     let now = msgs
-        .get_t_265_subscriber_output()
+        .get_t_265_subscriber_outputs().0
         .metadata()
         .process_time()
         .start
@@ -81,15 +81,12 @@ fn run_one_copperlist(
                 SimOverride::ExecutedBySim
             }
             default::SimStep::UdevMonitor(..) => SimOverride::ExecutedBySim,
-
             default::SimStep::CamSide(..) => SimOverride::ExecutedBySim,
             default::SimStep::CamBack(..) => SimOverride::ExecutedBySim,
-
             default::SimStep::CamLaptopFront(..) => SimOverride::ExecutedBySim,
             default::SimStep::GstConvertBack(..) => SimOverride::ExecutedBySim,
             default::SimStep::GstConvertSide(..) => SimOverride::ExecutedBySim,
             default::SimStep::GstConvertLaptopFront(..) => SimOverride::ExecutedBySim,
-
             default::SimStep::L2Pointcloud(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_l_2_pointcloud_output().clone();
                 output.tov = robot_clock.now().into();
@@ -115,21 +112,18 @@ fn run_one_copperlist(
                 SimOverride::ExecutedBySim
             }
             default::SimStep::L2Pointcloud(..) => SimOverride::ExecutedBySim,
-
             default::SimStep::L2Imu(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_l_2_imu_output().clone();
                 output.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
             default::SimStep::L2Imu(..) => SimOverride::ExecutedBySim,
-
             default::SimStep::V3Pico(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_v_3_pico_output().clone();
                 output.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
             default::SimStep::V3Pico(..) => SimOverride::ExecutedBySim,
-
             default::SimStep::MotorCtrl(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_motor_ctrl_output().clone();
                 output.tov = robot_clock.now().into();
@@ -147,6 +141,12 @@ fn run_one_copperlist(
                 output.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
+            default::SimStep::DetectorCamT265(CuTaskCallbackState::Process(_, output)) => {
+                *output = msgs.get_detector_cam_t_265_output().clone();
+                output.tov = robot_clock.now().into();
+                SimOverride::ExecutedBySim
+            }
+            default::SimStep::DetectorCamT265(..) => SimOverride::ExecutedBySim,
             default::SimStep::DetectorCamSide(..) => SimOverride::ExecutedBySim,
             default::SimStep::DetectorCamLaptopFront(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_detector_cam_laptop_front_output().clone();
@@ -159,8 +159,12 @@ fn run_one_copperlist(
                 SimOverride::ExecutedBySim
             }
             default::SimStep::T265Subscriber(CuTaskCallbackState::Process(_, output)) => {
-                *output = msgs.get_t_265_subscriber_output().clone();
-                output.tov = robot_clock.now().into();
+                let outputs  = msgs.get_t_265_subscriber_outputs().clone();
+                output.0 = outputs.0;
+                output.1 = outputs.1; 
+                output.0.tov = robot_clock.now().into();
+                output.1.tov = robot_clock.now().into();
+
                 SimOverride::ExecutedBySim
             }
             default::SimStep::T265Subscriber(..) => SimOverride::ExecutedBySim,
@@ -172,17 +176,14 @@ fn run_one_copperlist(
                 SimOverride::ExecutedBySim
             }
             default::SimStep::LunabaseBridgeRxFromLunabaseRx { .. } => SimOverride::ExecutedBySim,
-
             default::SimStep::LunabaseBridgeBridge(..) => SimOverride::ExecutedBySim,
             default::SimStep::LunabaseBridgeTxToLunabase { .. } => SimOverride::ExecutedBySim,
-
             default::SimStep::NewAi(..) => SimOverride::ExecuteByRuntime,
             default::SimStep::DetectionHandler(..) => SimOverride::ExecuteByRuntime,
             default::SimStep::L2KissIcp(..) => SimOverride::ExecuteByRuntime,
             default::SimStep::OccupancyGridPipeline(..) => SimOverride::ExecuteByRuntime,
             default::SimStep::Localizer(..) => SimOverride::ExecuteByRuntime,
             default::SimStep::__Phantom(..) => SimOverride::ExecuteByRuntime,
-            _ => SimOverride::ExecuteByRuntime,
         }
     };
 

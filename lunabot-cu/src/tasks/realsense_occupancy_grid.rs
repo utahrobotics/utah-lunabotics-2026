@@ -25,7 +25,7 @@ use wgsl_pcl::pipelines::depth_to_obstacle::ClearAffectedCellsOptions;
 use wgsl_pcl::pipelines::filters::*;
 
 use iceoryx_types::{IceoryxDepthFrame, ImuMsg};
-use rerun::{ImageFormat, Points2D, Points3D};
+use rerun::{ImageFormat, Points2D};
 use simple_motion::StaticNode;
 use wgsl_pcl::DepthToPclAndHeightPipeline;
 use wgsl_pcl::gpu_types::AlignedMatrix4;
@@ -189,7 +189,6 @@ impl CuTask for OccupancyGridTask {
             .and_then(|c| c.get::<f64>("max_depth").expect("failed to deserialize"))
             .unwrap_or(3.0) as f32;
 
-
         // use bilateral by default, fall back on gaussian
         let use_bilateral = config
             .and_then(|c| c.get::<bool>("use_bilateral_filter").expect("failed to deserialize"))
@@ -200,6 +199,7 @@ impl CuTask for OccupancyGridTask {
         let min_distance_to_clear = config
             .and_then(|c| c.get::<f64>("min_distance_to_clear").expect("failed to deserialize"))
             .unwrap_or(0.8) as f32;
+
         let clear_affected_cells = if clear_affected_cells_enabled {
             Some(ClearAffectedCellsOptions {
                 min_distance_to_clear,
@@ -229,6 +229,7 @@ impl CuTask for OccupancyGridTask {
                 ))
             })?
             .clone();
+
         let global_layout = MapLayout::new(max_x, min_x, max_y, min_y, cell_size);
         let distance_buffer = max_depth + max_distance_traveled_before_reset as f32;
         let local_layout = MapLayout::new(
@@ -444,7 +445,7 @@ impl CuTask for OccupancyGridTask {
             };
 
             match result {
-                Ok((point_cloud, obstacle_map)) => {
+                Ok((_, obstacle_map)) => {
                     if let Some(logger) = RECORDER.get() {
                         // Log the raw depth image
                         let depth_bytes: &[u8] = unsafe {
@@ -465,13 +466,14 @@ impl CuTask for OccupancyGridTask {
                             .with_meter(1.0 / request.depth_scale)
                             .with_depth_range([0.0, 2.0 / request.depth_scale as f64]),
                         );
+
                         // let _ =
                         //     logger.recorder.log(
                         //         "obstacle_mapper/pcl",
                         //         &Points3D::new(point_cloud.iter().map(|p| {
                         //             [p.x + request.origin.0, p.y + request.origin.1, p.z]
                         //         })),
-                        //     );
+                        // );
 
                         let pipeline_guard = pipeline.lock().unwrap();
 
