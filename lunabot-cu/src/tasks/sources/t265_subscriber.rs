@@ -118,13 +118,11 @@ impl CuSrcTask for T265Subscriber {
             })
             .unwrap_or(1.0);
 
-        let mut manager = T265Manager::new().expect("Failed to create t265 manager");
+        let mut manager = T265Manager::new().map_err(|e|CuError::from(e.to_string()))?;
         manager
-            .discover_devices_with_options(true)
-            .expect("Failed to discover devices with auto boot");
+            .discover_devices_with_options(true).map_err(|e|CuError::from(e.to_string()))?;
         manager
-            .enable_all_video_streams()
-            .expect("failed to enable video streams");
+            .enable_all_video_streams().map_err(|e|CuError::from(e.to_string()))?;
 
         let imu_rx = manager
             .start_all_imu_streams().map_err(|e|CuError::from(e.to_string()))?;
