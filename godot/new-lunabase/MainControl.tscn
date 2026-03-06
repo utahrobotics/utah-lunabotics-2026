@@ -1,10 +1,9 @@
-[gd_scene load_steps=18 format=3 uid="uid://cxqk5j2vp8obb"]
+[gd_scene load_steps=17 format=3 uid="uid://cxqk5j2vp8obb"]
 
 [ext_resource type="Script" uid="uid://lfb3k4n5gotg" path="res://MainControl.gd" id="1"]
 [ext_resource type="Script" uid="uid://cyolsda2lojye" path="res://Systems/CommandPattern/Controllers/LunabaseHumanController.gd" id="2"]
 [ext_resource type="Texture2D" uid="uid://c3b2y3ky1m03k" path="res://Assets/icons/USR-Icon.png" id="3_w6ul0"]
 [ext_resource type="PackedScene" uid="uid://dhg4sb4ifrvh8" path="res://GUI/PitchAndRollProposal/Testing/FlightSim/UIAttitude/UIAttitude.tscn" id="4_3r4oj"]
-[ext_resource type="PackedScene" uid="uid://d0gs2f7n7wdhm" path="res://newWindow.tscn" id="5_33q4t"]
 [ext_resource type="PackedScene" uid="uid://buo5ncrpuluwh" path="res://ArenaMap.tscn" id="5_pnl2l"]
 
 [sub_resource type="StyleBoxFlat" id="button_hover"]
@@ -656,9 +655,6 @@ text = "AUTONOMOUS"
 script = ExtResource("2")
 actor_path = NodePath("/root/GlobalLunabaseConnection")
 
-[node name="Node2D" parent="." instance=ExtResource("5_33q4t")]
-visible = false
-
 [node name="IsometriesMenu" type="Control" parent="."]
 anchors_preset = 0
 offset_left = 4.0
@@ -668,16 +664,16 @@ offset_bottom = 46.0
 
 [node name="UIAttitude" parent="IsometriesMenu" instance=ExtResource("4_3r4oj")]
 layout_mode = 0
-offset_left = 811.0
-offset_top = 445.0
-offset_right = 1027.0
-offset_bottom = 573.0
+offset_left = 784.0
+offset_top = 448.0
+offset_right = 1000.0
+offset_bottom = 576.0
 
-[node name="Control" parent="IsometriesMenu" instance=ExtResource("5_pnl2l")]
+[node name="LocationMap" parent="IsometriesMenu" instance=ExtResource("5_pnl2l")]
 layout_mode = 1
-offset_left = 319.0
-offset_top = 141.0
-offset_right = 319.0
-offset_bottom = 141.0
+offset_left = 294.0
+offset_top = 32.0
+offset_right = 294.0
+offset_bottom = 32.0
 
 [connection signal="value_changed" from="VBoxContainer/MainContent/HBoxContainer/RightColumn/SpeedControl/MarginContainer/VBox/SpeedMultiplierSlider" to="." method="_on_speed_multiplier_slider_value_changed"]

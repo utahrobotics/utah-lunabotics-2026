@@ -53,7 +53,7 @@ func updateLunabotLocation(values: PackedFloat32Array ) -> void:
 		LocationLunabotArtemis.position = Vector2(x * 100,-y * 100)
 		TrailArtemis.add_point(Vector2(x*100,-y*100))
 		if(TrailArtemis.points.size() > 1000): # change the > x if you want the snail trail to last longer
-			TrailArtemis.remove_point(0)
+			TrailArtemis.remove_point(0) #or just comment out if you want it to stay
 		
 	if(arena == false):
 		LocationLunabotUcf.position = Vector2(x * 100,-y * 100 )

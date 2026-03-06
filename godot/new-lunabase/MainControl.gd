@@ -88,11 +88,11 @@ func _process(delta: float) -> void:
 			stage_label.modulate = Color.CYAN
 			
 	
-	#location  maybe temporary 
+	#location  
 	var location = connection.get_location()
 	location_label.text = "location: [%.2f, %.2f, %.2f]" % [location[0], location[1], location[2]]
 	
-	#orientation label prob only here for debugging purposes 
+	#orientation label 
 	var orientation = connection.get_orientation()
 	orientation_label.text = "orientation: [%.2f, %.2f, %.2f, %.2f]" % [orientation[0], orientation[1], orientation[2], orientation[3]
 ]

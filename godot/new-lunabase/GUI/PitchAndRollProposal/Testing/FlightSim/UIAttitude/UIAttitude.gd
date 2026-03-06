@@ -35,7 +35,6 @@ func update_interface(values: PackedFloat32Array):
 	
 	var roll  = atan2(2*(w*x + y*z), 1 - 2*(x*x + y*y))
 	var pitch = asin(2.0 * (w*y - z*x))
-	#might include later implementing rotation to left indicator later cuz it was wonky af
 	var yaw   = atan2(2*(w*z + x*y), 1 - 2*(y*y + z*z))
 
 
