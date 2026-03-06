@@ -62,53 +62,62 @@ scroll_active = false
 
 [node name="Artemis" type="TextureRect" parent="."]
 visible = false
-custom_minimum_size = Vector2(635, 631)
 layout_mode = 0
 offset_left = 65.000015
 offset_top = 102.0
-offset_right = 1116.0
-offset_bottom = 877.0
+offset_right = 753.0
+offset_bottom = 602.0
 scale = Vector2(0.4, 0.4)
 texture = ExtResource("4_h6673")
+expand_mode = 1
 
 [node name="origin" type="Control" parent="Artemis"]
 anchors_preset = 0
-offset_left = 12.5
-offset_top = 762.5
-offset_right = 52.5
-offset_bottom = 802.5
+offset_left = -42.50003
+offset_top = 445.0
+offset_right = -2.5000305
+offset_bottom = 485.0
+pivot_offset = Vector2(50, 50)
+
+[node name="TrailMarkerArtemis" type="Line2D" parent="Artemis/origin"]
+position = Vector2(50, 50)
+scale = Vector2(0.9999998, 0.9999998)
 
 [node name="LocationArtemis" type="TextureRect" parent="Artemis/origin"]
 layout_mode = 0
-offset_right = 40.0
-offset_bottom = 40.0
-scale = Vector2(0.05, 0.05)
+offset_right = 100.0
+offset_bottom = 100.0
 texture = ExtResource("3_x0vsi")
+expand_mode = 1
 
 [node name="Ucf" type="TextureRect" parent="."]
 visible = false
 layout_mode = 0
 offset_left = 71.0
 offset_top = 114.0
-offset_right = 908.7
-offset_bottom = 744.7
-scale = Vector2(0.4, 0.4)
+offset_right = 885.0
+offset_bottom = 1028.0
+scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_1610t")
+expand_mode = 1
 
 [node name="Origin" type="Control" parent="Ucf"]
 anchors_preset = 0
-offset_left = 54.99999
-offset_top = 285.0
-offset_right = 94.999985
-offset_bottom = 325.0
-pivot_offset = Vector2(40, 30)
+offset_left = 40.0
+offset_top = 413.33334
+offset_right = 80.0
+offset_bottom = 453.33334
+pivot_offset = Vector2(50, 50)
+
+[node name="TrailMarkerUcf" type="Line2D" parent="Ucf/Origin"]
+position = Vector2(50, 50)
 
 [node name="LocationUcf" type="TextureRect" parent="Ucf/Origin"]
 layout_mode = 0
-offset_right = 40.0
-offset_bottom = 40.0
-scale = Vector2(0.05, 0.05)
+offset_right = 100.0
+offset_bottom = 100.00003
 texture = ExtResource("3_x0vsi")
+expand_mode = 1
 
 [connection signal="toggled" from="Panel/Button" to="." method="_on_button_toggled"]
 [connection signal="toggled" from="Panel/ButtonForArena" to="." method="_on_button_for_arena_toggled"]

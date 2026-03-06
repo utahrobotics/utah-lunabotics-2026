@@ -8,8 +8,9 @@ extends Control
 @onready var connection := GlobalLunabaseConnection
 @onready var Ucf: TextureRect = $Ucf
 @onready var Artemis: TextureRect = $Artemis
+@onready var TrailArtemis:= $Artemis/origin/TrailMarkerArtemis
+@onready var TrailUcf:= $Ucf/Origin/TrailMarkerUcf
 
-var marker_pos = Vector2.ZERO
 
 
 var arena = false
@@ -24,6 +25,8 @@ func _on_button_toggled(is_button_toggled: bool) -> void:
 
 	
 func _ready() -> void:
+	TrailUcf.default_color = Color(0.76, 0.0, 0.0, 1.0) 
+	TrailArtemis.default_color = Color(0.629, 0.0, 0.0, 1.0) 
 	pass
 	
 func _process(_delta: float) -> void:
@@ -44,16 +47,17 @@ func updateLunabotLocation(values: PackedFloat32Array ) -> void:
 		return 
 	var x: float = values[0] 
 	var y: float = values[1] 
-	#not bound to traditional x and y persay check 
-	#what each arena defines x and y as :j
-	
+
 	
 	if (arena == true):
-		LocationLunabotArtemis.position = Vector2(x * 153,y * 153)
-		marker_pos = Vector2(x * 153, y * 153)
+		LocationLunabotArtemis.position = Vector2(x * 100,-y * 100)
+		TrailArtemis.add_point(Vector2(x*100,-y*100))
+		if(TrailArtemis.points.size() > 1000): # change the > x if you want the snail trail to last longer
+			TrailArtemis.remove_point(0)
 		
 	if(arena == false):
-		LocationLunabotUcf.position = Vector2(x * 69,-y * 69 )
-		marker_pos = Vector2(x * 69, y* 69)
-		
+		LocationLunabotUcf.position = Vector2(x * 100,-y * 100 )
+		TrailUcf.add_point(Vector2(x*100,-y*100))
+		if(TrailUcf.points.size() > 1000):
+			TrailUcf.remove_point(0)
 		
