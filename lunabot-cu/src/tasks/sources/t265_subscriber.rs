@@ -18,9 +18,6 @@ use t265_rs::{ImuFrame, Pose, T265Manager, VideoFrame};
 
 pub struct T265Subscriber {
     last_seen: u64,
-    /// Initial yaw offset captured on first pose to align T265's arbitrary tracking frame with world
-    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
-    initial_yaw_offset: Option<f32>,
 
     #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     velocity_variance: f64,
@@ -136,7 +133,6 @@ impl CuSrcTask for T265Subscriber {
 
         Ok(Self {
             last_seen: 0,
-            initial_yaw_offset: None,
             velocity_variance,
             angular_velocity_variance,
             manager,
@@ -210,6 +206,8 @@ impl CuSrcTask for T265Subscriber {
             let q_t265 = UnitQuaternion::from_quaternion(Quaternion::new(rotation[3], rotation[0], rotation[1], rotation[2]));
             let q_robot = coord_transform * q_t265 * coord_transform.inverse();
             let pose = Isometry3::from_parts(Vector3::new(-translation[2], -translation[0], translation[1]).into(), q_robot);
+
+
             let msg = T265Msg {
                 pose: EncodableIsometry::from_na(&pose.cast()),
                 pose_variance: self.pose_variance,
