@@ -188,6 +188,7 @@ impl CuSrcTask for T265Subscriber {
                 new_msg.1.set_payload(image);
             }
         }
+
         if let Ok(Pose {
             translation,
             rotation,
@@ -202,72 +203,22 @@ impl CuSrcTask for T265Subscriber {
             device_id,
         }) = self.pose_rx.try_recv()
         {
-            // T265 to robot coordinate frame
-
-            use t265_rs::Confidence;
-            let transformed_translation =
-                Vector3::new(-translation[2], translation[0], translation[1]);
-            let t265_translation = Vector3::new(
-                transformed_translation.x,
-                -transformed_translation.y,
-                transformed_translation.z,
-            );
-
-            let (qx, qy, qz, qw) = (rotation[0], rotation[1], rotation[2], rotation[3]);
-            let t265_rotation =
-                UnitQuaternion::new_normalize(nalgebra::Quaternion::new(qw, -qz, -qx, qy));
-
-            let t265_pose = Isometry3::from_parts(t265_translation.into(), t265_rotation);
-
-            // t264 starts with a basically arbitrary "twist" error
-            if self.initial_yaw_offset.is_none() {
-                let initial_yaw = t265_pose.rotation.euler_angles().2;
-                self.initial_yaw_offset = Some(initial_yaw);
-            }
-
-            // align with world frame (robot starts facing +X)
-            let yaw_correction = UnitQuaternion::from_axis_angle(
-                &Vector3::z_axis(),
-                -self.initial_yaw_offset.unwrap(),
-            );
-
-            let corrected_robot_pose =
-                yaw_correction * Isometry3::from_parts(t265_pose.translation, t265_pose.rotation);
-            let pose_variance = if tracker_confidence == Confidence::High {
-                self.pose_variance
-            } else if tracker_confidence == Confidence::Medium {
-                self.pose_variance * 1.5
-            } else if tracker_confidence == Confidence::Low {
-                self.pose_variance * 5.
-            } else {
-                self.pose_variance * 30.
-            };
-
-            let transformed_accel: Vector3<f32> =
-                yaw_correction * Vector3::new(acceleration[2], -acceleration[0], acceleration[1]);
-            let transformed_angluar_accel = yaw_correction
-                * Vector3::new(
-                    angular_acceleration[2],
-                    -angular_acceleration[0],
-                    angular_acceleration[1],
-                );
-
-            let imu_msg = T265IMUMsg {
-                accel: transformed_accel.data.0[0],
-                angular_accel: transformed_angluar_accel.data.0[0],
-                velocity,
-                angular_velocity,
-            };
-            let payload = T265Msg {
-                pose: EncodableIsometry::from_na(&corrected_robot_pose.cast::<f64>()),
+            use nalgebra::Quaternion;
+            // Coordinate frame transform from T265 to robot (same as translation: [-z, -x, y])
+            // https://stackoverflow.com/questions/18818102/convert-quaternion-representing-rotation-from-one-coordinate-system-to-another
+            let coord_transform = UnitQuaternion::from_quaternion(Quaternion::new(0.5, 0.5, -0.5, -0.5));
+            let q_t265 = UnitQuaternion::from_quaternion(Quaternion::new(rotation[3], rotation[0], rotation[1], rotation[2]));
+            let q_robot = coord_transform * q_t265 * coord_transform.inverse();
+            let pose = Isometry3::from_parts(Vector3::new(-translation[2], -translation[0], translation[1]).into(), q_robot);
+            let msg = T265Msg {
+                pose: EncodableIsometry::from_na(&pose.cast()),
+                pose_variance: self.pose_variance,
                 velocity_variance: self.velocity_variance,
                 angular_velocity_variance: self.angular_velocity_variance,
-                pose_variance: pose_variance,
                 node_name: device_id,
-                imu_msg,
+                imu_msg: T265IMUMsg { accel: acceleration, angular_accel: angular_acceleration, velocity, angular_velocity },
             };
-            new_msg.0.set_payload(payload);
-            self.last_seen = clock.now().as_nanos();
+            new_msg.0.set_payload(msg);
         }
 
         if clock.now().as_nanos() - self.last_seen > 500_000_000 {
