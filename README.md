@@ -1,7 +1,7 @@
 # Lunabot
 
 ## Architecture Overview
-<img width="4782" height="4886" alt="graphviz(3)" src="https://github.com/user-attachments/assets/587c9d5a-91f8-44a0-96ba-6378b68e8d6e" />
+<img width="7916" height="1812" alt="image" src="https://github.com/user-attachments/assets/2a677af1-867d-446d-bd8f-a53078787d23" />
 
 ##### Check copperconfig.ron to see the definitions of all the tasks running and the datatypes passed between tasks.
 
