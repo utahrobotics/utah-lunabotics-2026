@@ -424,9 +424,8 @@ impl CuTask for Localizer {
                     .get_node_with_name(node_name)
                 {
                     let base_to_t265 = cam_node.get_isometry_from_base();
-                    // Transform T265 pose from sensor frame to robot base frame:
-                    // base_relative_pose = T_base_to_sensor * T_sensor_start_to_now * T_sensor_to_base
-                    let base_pose = base_to_t265 * t265_raw_pose * base_to_t265.inverse();
+
+                    let base_pose = t265_raw_pose * base_to_t265.inverse();
 
                     let pose_vec = create_pose_measurement_vec(
                         self.local_filter.reference_quaternion(),
