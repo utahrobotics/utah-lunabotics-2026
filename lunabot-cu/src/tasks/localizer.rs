@@ -1,8 +1,9 @@
 use std::sync::OnceLock;
 
+use crate::ROBOT_STATE;
 use crate::kalman_filtering::{
-    GlobalMeasurementFilter, RelativeMeasurementFilter, MEKF,
-    STATE_DIM_GLOBAL, STATE_DIM_LOCAL, quaternion_error,
+    GlobalMeasurementFilter, MEKF, RelativeMeasurementFilter, STATE_DIM_GLOBAL, STATE_DIM_LOCAL,
+    quaternion_error,
 };
 use crate::rerun_viz;
 use crate::rerun_viz::RECORDER;
@@ -11,7 +12,6 @@ use crate::tasks::AprilTagMeasurement;
 use crate::tasks::IcpMeasurement;
 use crate::tasks::ImuMeasurement;
 use crate::tasks::T265Msg;
-use crate::ROBOT_STATE;
 use common::FromLunabot;
 use cu29::cutask::CuTask;
 use cu29::output_msg;
@@ -373,7 +373,7 @@ impl CuTask for Localizer {
                     .with_colors([[255, 0, 0], [0, 255, 0], [0, 0, 255]])
                     .with_labels(vec!["x", "y", "z"]);
 
-            let _ = logger.recorder.log_static("localizer/t265_raw", &axes);
+            let _ = logger.recorder.log_static("localizer/robot_base_seen_by_t265", &axes);
             let _ = logger.recorder.log_static("localizer/icp_raw", &axes);
         }
         Ok(())
@@ -403,53 +403,41 @@ impl CuTask for Localizer {
 
         // Process T265 -> local filter (direct pose measurement, transformed to base frame)
         if let Some(t265_msg) = input.4.payload() {
-            if let Some(t265_raw_pose) = t265_msg.pose.to_na() {
+            if let Some(robot_base_seen_by_t265) = t265_msg.pose.to_na() {
                 let node_name = &t265_msg.node_name;
 
                 if let Some(logger) = RECORDER.get() {
                     let _ = logger.recorder.log(
-                        "localizer/t265_raw",
+                        "localizer/robot_base_seen_by_t265",
                         &rerun::Transform3D::from_translation_rotation(
-                            t265_raw_pose.translation.vector.cast::<f32>().data.0[0],
+                            robot_base_seen_by_t265.translation.vector.cast::<f32>().data.0[0],
                             rerun::Quaternion::from_xyzw(
-                                t265_raw_pose.rotation.as_vector().cast::<f32>().data.0[0],
+                                robot_base_seen_by_t265.rotation.as_vector().cast::<f32>().data.0[0],
                             ),
                         ),
                     );
                 }
 
-                if let Some(cam_node) = self
-                    .robot_state
-                    .kinematic_root
-                    .get_node_with_name(node_name)
-                {
-                    let base_to_t265 = cam_node.get_isometry_from_base();
+                let pose_vec = create_pose_measurement_vec(
+                    self.local_filter.reference_quaternion(),
+                    &robot_base_seen_by_t265,
+                );
 
-                    let base_pose = t265_raw_pose * base_to_t265.inverse();
+                let mut pose_r = SMatrix::<f64, POSE_MEAS_DIM, POSE_MEAS_DIM>::zeros();
+                for i in 0..3 {
+                    pose_r[(i, i)] = t265_msg.pose_variance;
+                }
+                for i in 3..6 {
+                    pose_r[(i, i)] = t265_msg.pose_variance;
+                }
 
-                    let pose_vec = create_pose_measurement_vec(
-                        self.local_filter.reference_quaternion(),
-                        &base_pose,
-                    );
+                self.pose_measurement_local.R = pose_r;
+                self.pose_measurement_local.z = pose_vec;
 
-                    let mut pose_r = SMatrix::<f64, POSE_MEAS_DIM, POSE_MEAS_DIM>::zeros();
-                    for i in 0..3 {
-                        pose_r[(i, i)] = t265_msg.pose_variance;
-                    }
-                    for i in 3..6 {
-                        pose_r[(i, i)] = t265_msg.pose_variance;
-                    }
-
-                    self.pose_measurement_local.R = pose_r;
-                    self.pose_measurement_local.z = pose_vec;
-
-                    if let Err(e) = self.local_filter.update(&self.pose_measurement_local) {
-                        eprintln!("Local filter update with T265 ({}) failed: {:?}", node_name, e);
-                    }
-                } else {
+                if let Err(e) = self.local_filter.update(&self.pose_measurement_local) {
                     eprintln!(
-                        "Warning: T265 node '{}' not found in robot kinematic chain",
-                        node_name
+                        "Local filter update with T265 ({}) failed: {:?}",
+                        node_name, e
                     );
                 }
             }
