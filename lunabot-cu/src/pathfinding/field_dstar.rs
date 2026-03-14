@@ -1,11 +1,24 @@
+use common::Steering;
+
 use crate::pathfinding::OccupancyGrid;
 
 use crate::pathfinding::flood_fill_escape;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::f32::consts::FRAC_PI_3;
+
+const SQRT_3: f32 = 1.7320507764816284;
+const SQRT_3_INV: f32 = 1.0 / SQRT_3;
+const GRID_SPACE: f32 = 0.1;
+const ANGLE_SPACE: f32 = FRAC_PI_3;
+
+const STEERING_POWER: f64 = 2000.0;
+
 type WorldCoord = (f32, f32);
+type WorldPose = (f32, f32, f32); // x, y, theta (rad) (+x = 0)
 
 type GridKey = (i32, i32);
+type GridPose = (i32, i32, i32);
 
 #[derive(Clone, Copy)]
 struct Node {
@@ -218,4 +231,63 @@ fn distance(a: WorldCoord, b: WorldCoord) -> f32 {
     let dx = a.0 - b.0;
     let dy = a.1 - b.1;
     (dx * dx + dy * dy).sqrt()
+}
+
+
+
+/// Finds a policy (what to do in any state) from an obstacle map, and
+/// a goal. Uses reverse A*, which is fairly inefficient, on a lattice
+/// using motion primitives.
+/// ## Improvements:
+/// * Switch to D* Lite
+/// * Allow a goal set instead of goal point
+pub fn find_policy(
+    map: &OccupancyGrid,
+    goal: WorldPose,
+    max_acceptable_gradient: f32,
+) -> impl Fn([f32; 3]) -> Steering {
+
+    let goal_index = cartesian_to_index(goal);
+
+
+    return |s| {Steering::new(0.0, 0.0, 0.0)}
+}
+
+fn index_to_cartesian(grid_pose: GridPose) -> WorldPose {
+    let position = iso_to_cartesian(grid_pose.0 as f32 * GRID_SPACE, grid_pose.1 as f32 * GRID_SPACE);
+    
+    (position.0, position.1, grid_pose.2 as f32 * ANGLE_SPACE)
+}
+
+fn cartesian_to_index(pose: WorldPose) -> GridPose {
+    let position = cartesian_to_iso(pose.0, pose.1);
+    
+    (
+        (position.0 / GRID_SPACE).round() as i32,
+        (position.1 / GRID_SPACE).round() as i32,
+        (pose.2 / ANGLE_SPACE).round() as i32,
+    )
+}
+
+fn iso_to_cartesian(u_1: f32, u_2: f32) -> (f32, f32) {
+    (
+        u_1 * SQRT_3 * 0.5,
+        u_2 + u_1 * 0.5,
+    )
+}
+
+fn cartesian_to_iso(x: f32, y: f32) -> (f32, f32) {
+    (
+        2.0 * SQRT_3_INV * x,
+        y - SQRT_3_INV * x,
+    )
+}
+
+/// Returns: (Steering, cost weight (path length), end state)
+fn iso_neighbors(pose: GridPose) -> (Steering, f32, GridPose) {
+    let motion_primitives = [
+        (Steering::new_ik(1.0, 0.0, STEERING_POWER), 1.0, (0,1,0)),
+        (Steering::new_ik(1.0, 0.0, STEERING_POWER), 2.0, (0,2,0)),
+        (Steering::new_ik(1.0, 0.0, STEERING_POWER), 2.0, (1,1,-1)), // TODO This is where you left off.
+    ];
 }
