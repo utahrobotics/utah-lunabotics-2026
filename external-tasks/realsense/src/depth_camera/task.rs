@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     constants::DEPTH_FRAME_SIZE,
-    iceoryx_utils::{create_depth_frame_publisher, create_imu_frame_publisher, create_node},
+    iceoryx_utils::{create_depth_frame_publisher, create_node},
 };
 use iceoryx2::{port::publisher::Publisher, service::ipc};
 use iceoryx_types::{IceoryxDepthFrame, ImuMsg};
@@ -103,8 +103,6 @@ impl DepthCameraTask {
         } else {
             None
         };
-        let imu_publisher = create_imu_frame_publisher(&node, self.serial);
-
         if has_depth {
             if let Some(df) = depth_format {
                 println!("RealSense Camera {} opened with (fx, fy) = ({:.0}, {:.0}), (width, height) = ({:.0}, {:.0})",
@@ -132,17 +130,6 @@ impl DepthCameraTask {
                     break;
                 }
             };
-
-            for frame in frames.frames_of_type::<frame::AccelFrame>() {
-                let accel = frame.acceleration();
-                if let Err(e) = imu_publisher.send_copy(ImuMsg {
-                    quaternion: [0.0; 4],
-                    angular_velocity: [0.0; 3],
-                    linear_acceleration: *accel,
-                }) {
-                    eprintln!("Failed to publish imu msg: {e}");
-                }
-            }
 
             for frame in frames.frames_of_type::<DepthFrame>() {
                 if !matches!(frame.get(0, 0), Some(PixelKind::Z16 { .. })) {

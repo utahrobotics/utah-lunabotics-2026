@@ -151,6 +151,5 @@ pub fn enumerate_depth_cameras(serial_numbers: &[&str]) {
 
 fn enable_d455_streams(config: &mut Config) -> Result<(), ConfigurationError> {
     config.enable_stream(Rs2StreamKind::Depth, None, 640, 480, Rs2Format::Z16, 30)?;
-    config.enable_stream(Rs2StreamKind::Accel, None, 0, 0, Rs2Format::Any, 0)?;
     Ok(())
 }
