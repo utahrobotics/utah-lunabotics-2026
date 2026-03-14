@@ -63,7 +63,7 @@
             config: {
                 "t265_velocity_variance": 1.0,
                 "t265_angular_velocity_variance": 1.0,
-                "pose_variance": 0.05,
+                "pose_variance": 0.005,
             },
             logging: (
                 enabled: true
