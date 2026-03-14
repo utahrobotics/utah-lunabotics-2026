@@ -1,5 +1,8 @@
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
-use std::sync::{Arc, mpsc::Receiver};
+use std::sync::Arc;
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+use crossbeam::channel::Receiver;
+
 
 use cu_bincode::{Decode, Encode};
 use cu_sensor_payloads::CuImage;
@@ -14,10 +17,15 @@ use serde::Deserialize;
 use simple_motion::StaticNode;
 use std::ops::DerefMut;
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
-use t265_rs::{ImuFrame, Pose, T265Manager, VideoFrame};
+use t265_rs::{Pose, T265Manager, VideoFrame};
 
 pub struct T265Subscriber {
+    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+    last_process_call: std::time::Instant,
     last_seen: u64,
+
+    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+    last_seen_img: u64,
 
     #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     velocity_variance: f64,
@@ -27,8 +35,6 @@ pub struct T265Subscriber {
     angular_velocity_variance: f64,
     #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     manager: T265Manager,
-    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
-    imu_rx: Receiver<ImuFrame>,
     #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     image_rx: Receiver<VideoFrame>,
     #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
@@ -121,8 +127,6 @@ impl CuSrcTask for T265Subscriber {
         manager
             .enable_all_video_streams().map_err(|e|CuError::from(e.to_string()))?;
 
-        let imu_rx = manager
-            .start_all_imu_streams().map_err(|e|CuError::from(e.to_string()))?;
         let pose_rx = manager
             .start_all_pose_streams().map_err(|e|CuError::from(e.to_string()))?;
         let image_rx = manager
@@ -132,11 +136,12 @@ impl CuSrcTask for T265Subscriber {
         let pool = CuHostMemoryPool::new("t265_imgs", 4, || vec![0u8; (WIDTH * HEIGHT) as usize])?;
 
         Ok(Self {
+            last_process_call: std::time::Instant::now(),
+            last_seen_img: 0,
             last_seen: 0,
             velocity_variance,
             angular_velocity_variance,
             manager,
-            imu_rx,
             pose_rx,
             image_rx,
             pool,
@@ -149,11 +154,20 @@ impl CuSrcTask for T265Subscriber {
         clock: &cu29::prelude::RobotClock,
         new_msg: &mut Self::Output<'o>,
     ) -> cu29::CuResult<()> {
+        let start = std::time::Instant::now();
+        if self.last_process_call.elapsed().as_millis() > 1 {
+            eprintln!("[WARNING] process not called for a milisecond: took {}s", self.last_process_call.elapsed().as_secs_f64());
+        }
+        self.last_process_call = std::time::Instant::now();
         new_msg.0.clear_payload();
         new_msg.1.clear_payload();
 
         'image_rx: {
+            if self.image_rx.len() > 5 {
+                eprintln!("WARNING: t265 image backpressure: {}", self.image_rx.len())
+            }
             if let Ok(image) = self.image_rx.try_recv() {
+                self.last_seen_img = clock.now().as_millis();
                 use cu_sensor_payloads::CuImageBufferFormat;
 
                 let Some(handle) = self.pool.acquire() else {
@@ -185,6 +199,9 @@ impl CuSrcTask for T265Subscriber {
             }
         }
 
+        if self.pose_rx.len() > 5 {
+            eprintln!("WARNING: t265 pose backpressure: {}", self.pose_rx.len())
+        }
         if let Ok(Pose {
             translation,
             rotation,
@@ -217,14 +234,26 @@ impl CuSrcTask for T265Subscriber {
                 imu_msg: T265IMUMsg { accel: acceleration, angular_accel: angular_acceleration, velocity, angular_velocity },
             };
             new_msg.0.set_payload(msg);
+            self.last_seen = clock.now().as_millis();
         }
 
-        if clock.now().as_nanos() - self.last_seen > 500_000_000 {
-            return Err(CuError::new_with_cause(
-                "no pose frames seen in 500 ms",
-                std::io::Error::other("no pose frames seen in 500 ms"),
-            ));
+        if start.elapsed().as_millis() > 1 {
+            eprintln!("failed to run t265 subscriber in under 1 milisecond.");
         }
+        let mut err_msg = None;
+        if clock.now().as_millis() - self.last_seen > 500 {
+            err_msg = Some("no poses seen in 500 ms".to_string());
+        }
+
+        if clock.now().as_millis() - self.last_seen_img > 500 {
+            *err_msg.get_or_insert(String::new()) += " No images seen in 500 ms";
+        }
+
+        if let Some(ref err_msg) = err_msg {
+            return Err(CuError::from(err_msg.as_str()));
+        }
+
+
 
         Ok(())
     }
