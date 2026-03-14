@@ -233,6 +233,33 @@ fn distance(a: WorldCoord, b: WorldCoord) -> f32 {
     (dx * dx + dy * dy).sqrt()
 }
 
+struct AStarKey {
+    pose: GridPose,
+    cost: f32,
+}
+
+impl Ord for AStarKey {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.cost.total_cmp(&other.cost)
+    }
+}
+
+// Rust has a RICH TYPE SYSTEM!!!!
+impl PartialOrd for AStarKey {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+// Rust, you literally have derives for this.
+impl PartialEq for AStarKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other).is_eq()
+    }
+}
+
+// Come on Rust, no need to overthink this.
+impl Eq for AStarKey {}
 
 
 /// Finds a policy (what to do in any state) from an obstacle map, and
@@ -245,9 +272,33 @@ pub fn find_policy(
     map: &OccupancyGrid,
     goal: WorldPose,
     max_acceptable_gradient: f32,
-) -> impl Fn([f32; 3]) -> Steering {
+) -> impl Fn(WorldPose) -> Steering {
 
     let goal_index = cartesian_to_index(goal);
+
+    let mut frontier: BinaryHeap<AStarKey> = BinaryHeap::new();
+    let mut visited: HashSet<GridPose> = HashSet::new();
+    let mut policy: HashMap<GridPose, Steering> = HashMap::new();
+    
+    frontier.push(AStarKey { pose: goal_index, cost: 0.0 });
+
+    while !frontier.is_empty() {
+        let next = frontier.pop().unwrap();
+        visited.insert(next.pose);
+
+        for neighbor in iso_neighbors(map, next.pose) {
+            if visited.contains(&neighbor.2) {
+                continue;
+            }
+
+            // Is it in the frontier?
+            if frontier.iter().map(|x| {x.pose}).any(|x| {x == next.pose}) {
+
+            }
+
+            // But wait, the actions are associated with paths, not points. What do you do?
+        }
+    }
 
 
     return |s| {Steering::new(0.0, 0.0, 0.0)}
@@ -284,10 +335,69 @@ fn cartesian_to_iso(x: f32, y: f32) -> (f32, f32) {
 }
 
 /// Returns: (Steering, cost weight (path length), end state)
-fn iso_neighbors(pose: GridPose) -> (Steering, f32, GridPose) {
+fn iso_neighbors(map: &OccupancyGrid, pose: GridPose) -> Vec<(Steering, f32, GridPose)> {
     let motion_primitives = [
-        (Steering::new_ik(1.0, 0.0, STEERING_POWER), 1.0, (0,1,0)),
-        (Steering::new_ik(1.0, 0.0, STEERING_POWER), 2.0, (0,2,0)),
-        (Steering::new_ik(1.0, 0.0, STEERING_POWER), 2.0, (1,1,-1)), // TODO This is where you left off.
+        (0,1,0),
+
+        (-1,2,1),
+        (-1,1,2),
+        (-2,2,2),
+        (-2,1,3),
+
+        (-1,-1,-1),
+        (-1,0,-2),
+        (-2,0,-2),
+        (-2,1,-3),
+
+        (0,-1,0),
+
+        (1,-2,1),
+        (1,-1,2),
+        (2,-2,2),
+        (2,-1,3),
+
+        (1,1,-1),
+        (1,0,-2),
+        (2,0,-2),
+        (2,-1,-3),
+
+        (0, 0, 1),
+        (0, 0, -1),
     ];
+
+    let mut out = vec![];
+
+    for motion in motion_primitives {
+        let dif = iso_grid_rotate(motion, pose.2);
+        // We've rotated the little difference on the end, the rotation doesn't need to be added again
+        let result = (pose.0 + dif.0, pose.1 + dif.1, dif.2);
+
+        // TODO steering inputs
+        out.push((Steering::new_ik(0.0, 0.0, 0.0), 1.0, result));
+    }
+
+    out
+}
+
+fn iso_grid_rotate(pose: GridPose, rotation: i32) -> GridPose {
+    let rotation = modulo(rotation, 6);
+
+    return match rotation {
+        0 => pose,
+        1 => (        -pose.1,  pose.0 +pose.1, modulo(pose.2 + rotation, 6)),
+        2 => (-pose.0 -pose.1,  pose.0        , modulo(pose.2 + rotation, 6)),
+        3 => (-pose.0        ,         -pose.1, modulo(pose.2 + rotation, 6)),
+        4 => ( pose.0 +pose.1, -pose.0        , modulo(pose.2 + rotation, 6)),
+        5 => (         pose.1, -pose.0 -pose.1, modulo(pose.2 + rotation, 6)),
+        _ => panic!("rotation was not in [0,5] after modulo.")
+    };
+}
+
+fn modulo(a: i32, b: i32) -> i32 {
+    ((a%b) + b) % b
+}
+
+fn is_iso_point_in_bounds(map: &OccupancyGrid, pose: GridPose) -> bool {
+    let cartesian = index_to_cartesian(pose);
+    map.layout.is_in_bounds(cartesian.0, cartesian.1)
 }
