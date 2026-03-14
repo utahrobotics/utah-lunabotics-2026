@@ -3,6 +3,8 @@ pub mod comms;
 pub mod rerun_viz;
 
 pub mod bridges;
+pub mod kalman_filtering;
+pub mod payloads;
 pub mod pathfinding;
 pub mod robot_state;
 pub mod simple_monitor;
