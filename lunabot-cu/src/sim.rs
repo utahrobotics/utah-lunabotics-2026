@@ -4,14 +4,12 @@ pub mod rerun_viz;
 
 pub mod bridges;
 pub mod kalman_filtering;
-pub mod payloads;
 pub mod pathfinding;
+pub mod payloads;
 pub mod robot_state;
 pub mod simple_monitor;
 pub mod tasks;
 pub mod utils;
-pub mod kalman_filtering;
-
 
 use common::FromLunabot;
 use crossbeam::atomic::AtomicCell;
@@ -190,49 +188,39 @@ fn sim_callback(
         default::SimStep::DetectorCamT265(..) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamLaptopFront(_) => SimOverride::ExecutedBySim,
         default::SimStep::RealsenseSubscriber(CuTaskCallbackState::Process(_, output)) => {
+            use crate::payloads::depth_frame::{CuDepthFrame, CuDepthFrameFormat};
             use std::sync::atomic::{AtomicU64, Ordering};
             use std::time::SystemTime;
 
             static LAST_OUTPUT_TIME: OnceLock<AtomicU64> = OnceLock::new();
-
             let now_ns = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()
                 .as_nanos() as u64;
-
-            let output_interval_ns = 1_000_000_000 / 10; // output at 10 Hz
             let last_output_time = LAST_OUTPUT_TIME.get_or_init(|| AtomicU64::new(0));
-
             let last = last_output_time.load(Ordering::Relaxed);
-            if now_ns - last > output_interval_ns {
+
+            if now_ns - last > 1_000_000_000 / 10 {
                 last_output_time.store(now_ns, Ordering::Relaxed);
 
-                let depth_image = renderer.depth_flat();
-
-                const DEPTH_SIZE: usize = DEPTH_FRAME_WIDTH as usize * DEPTH_FRAME_HEIGHT as usize;
-                let mut depths = [0u16; DEPTH_SIZE];
-                let depth_scale = 0.001; // 1 unit = 1mm
-
-                if let Some(depth_image) = depth_image {
+                if let Some(depth_image) = renderer.depth_flat() {
+                    let mut depths =
+                        vec![0u16; DEPTH_FRAME_WIDTH as usize * DEPTH_FRAME_HEIGHT as usize];
                     for (i, value) in depth_image.iter().enumerate() {
-                        let depth_mm = (value * 1000.0).clamp(0.0, 65535.0) as u16;
-                        // Mirror the image left to right
                         let row = i / DEPTH_FRAME_WIDTH as usize;
                         let col = i % DEPTH_FRAME_WIDTH as usize;
                         let mirrored_col = DEPTH_FRAME_WIDTH as usize - 1 - col;
-                        let mirrored_idx = row * DEPTH_FRAME_WIDTH as usize + mirrored_col;
-                        depths[mirrored_idx] = depth_mm;
+                        depths[row * DEPTH_FRAME_WIDTH as usize + mirrored_col] =
+                            (value * 1000.0).clamp(0.0, 65535.0) as u16;
                     }
-
-                    let focal_len = (383.0, 383.0);
-
-                    output.set_payload((
-                        Some(IceoryxDepthFrame {
-                            depths,
-                            depth_scale,
-                            focal_len,
-                        }),
-                        None,
+                    output.set_payload(CuDepthFrame::new(
+                        CuDepthFrameFormat {
+                            width: DEPTH_FRAME_WIDTH,
+                            height: DEPTH_FRAME_HEIGHT,
+                            depth_scale: 0.001,
+                            focal_len: (383.0, 383.0),
+                        },
+                        CuHandle::new_detached(depths),
                     ));
                 }
             }
