@@ -165,8 +165,8 @@ impl CuSrcTask for T265Subscriber {
         new_msg: &mut Self::Output<'o>,
     ) -> cu29::CuResult<()> {
         let start = std::time::Instant::now();
-        if self.last_process_call.elapsed().as_millis() > 1 {
-            eprintln!("[WARNING] process not called for a milisecond: took {}s", self.last_process_call.elapsed().as_secs_f64());
+        if self.last_process_call.elapsed().as_millis() > 5 {
+            eprintln!("[WARNING] process not called for 5 miliseconds: took {}s", self.last_process_call.elapsed().as_secs_f64());
         }
         self.last_process_call = std::time::Instant::now();
         new_msg.0.clear_payload();
