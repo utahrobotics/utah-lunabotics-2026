@@ -108,6 +108,26 @@ fn paint_permanent_obstacles(
         }
     }
 
+    // Paint rectangular pillar obstacle (expand by robot_radius on all sides) 
+    for&(cx, cy, w, h) in &obstacles.pillars_rect {
+        let half_w = w / 2.0 + robot_radius;
+        let half_h = h / 2.0 + robot_radius;
+        let min_x = cx - half_w;
+        let max_x = cx + half_w;
+        let min_y = cy - half_h;
+        let max_y = cy + half_h;
+
+        if let (Ok((x1, y1)), Ok((x2, y2))) = (
+            grid.world_to_cell(min_x, min_y),
+            grid.world_to_cell(max_x, max_y),
+        ) {
+            for x in x1..=x2 {
+                for y in y1..=y2 {
+                    let _ = grid.set_gradient_at(x, y, PERMANENT_GRADIENT);
+                }
+            }
+    }
+
     // Paint circular obstacles (pillars, boulders, craters), expanded by robot_radius
     let all_circles = obstacles
         .pillars

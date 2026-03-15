@@ -1,20 +1,22 @@
 
 (
-    walls: [],
-
-    // Central support column - permanent fixed 
-    // Defined as (center_x, center_y, radius) in meters
-    pillars: [
-        // TODO: Verify central column position 
-        (3.5, 2.6, 0.2), 
+    walls: [
+        (0.0, 0.0, 6.88, 5.0),
     ],
+
+    // Central support pillar 
+    // Defined as (center_x, center_y, dimensions) in meters
+    pillars_rect: [
+        (3.44, 2.5, 0.5, 0.5), 
+    ],
+    
+    pillars: [],
 
     // Boulder obstacles - randomly positioned 
     // Defined as (center_x, center_y, radius) in meters
     // Specs: Minimum 3 boulders, 30-40 cm diameter (radius ~0.15-0.20m)
     boulders: [
-        // TODO: Update with actual boulder positions 
-        (1.5, 1.0, 0.18),  
+        (2.3, 1.3, 0.18),  
         (4.0, 4.5, 0.20),  
         (6.5, 2.0, 0.15),  
     ],
@@ -23,9 +25,8 @@
     // Minimum 3 craters, up to 40-50 cm width 
     // Represented as circular obstacle zones
     craters: [
-        // TODO: Update with actual crater positions
         (2.5, 3.0, 0.22),  
         (5.5, 1.5, 0.25),  
-        (7.0, 4.0, 0.20),  
+        (6.2, 3.8, 0.20),  
     ],
 )
