@@ -1,12 +1,11 @@
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use std::sync::Arc;
 
-use cu_sensor_payloads::CuImage;
 use cu29::{
     cutask::{CuSrcTask, Freezable},
     prelude::*,
 };
-use iceoryx_types::{IceoryxDepthFrame, ImuMsg};
+use iceoryx_types::IceoryxDepthFrame;
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use iceoryx2::{
     node::NodeBuilder,
@@ -27,8 +26,6 @@ pub struct RealsenseSubscriber {
     /// subscribes to depth frames published by the realsense external task
     #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     depth_subscriber: Subscriber<ipc::Service, IceoryxDepthFrame<DEPTH_FRAME_SIZE>, ()>,
-    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
-    imu_subscriber: Subscriber<ipc::Service, ImuMsg, ()>,
     #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     pool: Arc<CuHostMemoryPool<Vec<u16>>>,
 }
@@ -55,11 +52,8 @@ impl CuSrcTask for RealsenseSubscriber {
             })
             .unwrap_or_else(|| "realsense/depth".to_string());
         let depth_service_str = format!("realsense/{serial_num}/depth");
-        let imu_service_str = format!("realsense/{serial_num}/imu");
 
         let depth_service_name = ServiceName::new(&depth_service_str)
-            .map_err(|e| CuError::new_with_cause("invalid service name", e))?;
-        let imu_service_name = ServiceName::new(&imu_service_str)
             .map_err(|e| CuError::new_with_cause("invalid service name", e))?;
 
         let node = NodeBuilder::new()
@@ -74,24 +68,12 @@ impl CuSrcTask for RealsenseSubscriber {
             .subscriber_max_buffer_size(20)
             .open_or_create()
             .map_err(|e| CuError::new_with_cause("service open error", e))?;
-        let imu_service = node
-            .service_builder(&imu_service_name)
-            .publish_subscribe::<ImuMsg>()
-            .enable_safe_overflow(true)
-            .subscriber_max_buffer_size(20)
-            .open_or_create()
-            .map_err(|e| CuError::new_with_cause("service open error", e))?;
-
         let depth_subscriber = depth_service
             .subscriber_builder()
             .buffer_size(19)
             .create()
             .map_err(|e| CuError::new_with_cause("subscriber creation error", e))?;
-        let imu_subscriber = imu_service
-            .subscriber_builder()
-            .buffer_size(19)
-            .create()
-            .map_err(|e| CuError::new_with_cause("subscriber creation error", e))?;
+
         let pool = CuHostMemoryPool::new("realsense_depth_frames", 4, || {
             vec![016; (DEPTH_FRAME_HEIGHT * DEPTH_FRAME_WIDTH) as usize]
         })?;
@@ -99,7 +81,6 @@ impl CuSrcTask for RealsenseSubscriber {
         Ok(Self {
             last_seen: 0,
             depth_subscriber,
-            imu_subscriber,
             pool,
         })
     }
