@@ -19,6 +19,9 @@ use std::ops::DerefMut;
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use t265_rs::{Pose, T265Manager, VideoFrame};
 
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+use crate::{ROBOT_STATE, utils::swing_twist_decomposition};
+
 pub struct T265Subscriber {
     #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     last_process_call: std::time::Instant,
@@ -52,6 +55,7 @@ pub struct T265Subscriber {
 
 #[derive(Encode, Decode, Clone, Serialize, Debug, Deserialize)]
 pub struct T265Msg {
+    /// the pose of the robot base
     pub pose: EncodableIsometry,
     pub pose_variance: f64,
     pub velocity_variance: f64,
@@ -128,16 +132,20 @@ impl CuSrcTask for T265Subscriber {
             })
             .unwrap_or(1.0);
 
-        let mut manager = T265Manager::new().map_err(|e|CuError::from(e.to_string()))?;
+        let mut manager = T265Manager::new().map_err(|e| CuError::from(e.to_string()))?;
         manager
-            .discover_devices_with_options(true).map_err(|e|CuError::from(e.to_string()))?;
+            .discover_devices_with_options(true)
+            .map_err(|e| CuError::from(e.to_string()))?;
         manager
-            .enable_all_video_streams().map_err(|e|CuError::from(e.to_string()))?;
+            .enable_all_video_streams()
+            .map_err(|e| CuError::from(e.to_string()))?;
 
         let pose_rx = manager
-            .start_all_pose_streams().map_err(|e|CuError::from(e.to_string()))?;
+            .start_all_pose_streams()
+            .map_err(|e| CuError::from(e.to_string()))?;
         let image_rx = manager
-            .start_all_video_streams().map_err(|e|CuError::from(e.to_string()))?;
+            .start_all_video_streams()
+            .map_err(|e| CuError::from(e.to_string()))?;
         const WIDTH: usize = 848;
         const HEIGHT: usize = 800;
         let pool = CuHostMemoryPool::new("t265_imgs", 4, || vec![0u8; (WIDTH * HEIGHT) as usize])?;

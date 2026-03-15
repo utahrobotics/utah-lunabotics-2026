@@ -373,9 +373,7 @@ impl CuTask for Localizer {
                     .with_colors([[255, 0, 0], [0, 255, 0], [0, 0, 255]])
                     .with_labels(vec!["x", "y", "z"]);
 
-            let _ = logger
-                .recorder
-                .log_static("localizer/robot_base_seen_by_t265", &axes);
+            let _ = logger.recorder.log_static("localizer/robot_base_seen_by_t265", &axes);
             let _ = logger.recorder.log_static("localizer/icp_raw", &axes);
         }
         Ok(())

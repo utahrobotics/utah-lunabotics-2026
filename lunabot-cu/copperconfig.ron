@@ -63,7 +63,7 @@
             config: {
                 "t265_velocity_variance": 1.0,
                 "t265_angular_velocity_variance": 1.0,
-                "pose_variance": 0.005,
+                "pose_variance": 0.0005,
             },
             logging: (
                 enabled: true
@@ -157,8 +157,8 @@
             config:{
                 "process_noise_position": 0.5,
                 "process_noise_velocity": 0.5,
-                "process_noise_orientation": 1.01,
-                "process_noise_angular_velocity": 1.01,
+                "process_noise_orientation": 5.01,
+                "process_noise_angular_velocity": 5.01,
                 "process_noise_acceleration": 0.5,
 
                 "initial_covariance": 100.0,
