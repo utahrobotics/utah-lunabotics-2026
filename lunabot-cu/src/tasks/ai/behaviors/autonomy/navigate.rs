@@ -1,7 +1,7 @@
-use bonsai_bt::Behavior::{self, Action, If, Race, Sequence, Wait, WaitForever, WhenAny, While};
+use bonsai_bt::Behavior::{self, Action, Race, Sequence, Wait, WaitForever, While};
 use common::Steering;
 
-use crate::tasks::ai::{action::LunabotAction, behaviors::with_timeout};
+use crate::tasks::ai::action::LunabotAction;
 
 pub fn navigate_behavior() -> Behavior<LunabotAction> {
     While(
@@ -23,6 +23,7 @@ pub fn navigate_behavior() -> Behavior<LunabotAction> {
     )
 }
 
+#[allow(unused)]
 fn set_stage(stage: common::LunabotStage) -> Behavior<LunabotAction> {
     Sequence(vec![Action(LunabotAction::SetStage(stage))])
 }

@@ -12,12 +12,19 @@ use cu29::{
     prelude::*,
 };
 
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use nalgebra::{Isometry3, UnitQuaternion, Vector3};
 use serde::Deserialize;
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use std::ops::DerefMut;
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use t265_rs::{Pose, T265Manager, VideoFrame};
 
+#[cfg(all(any(feature = "resim", feature = "sim")))]
+pub struct T265Subscriber {}
+
+
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 pub struct T265Subscriber {
     #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     last_process_call: std::time::Instant,
@@ -329,13 +336,13 @@ impl CuSrcTask for T265Subscriber {
     type Output<'m> = output_msg!(T265Msg, CuImage<Vec<u8>>);
     type Resources<'r> = ();
     fn new(
-        config: Option<&cu29::prelude::ComponentConfig>,
+        _config: Option<&cu29::prelude::ComponentConfig>,
         _resources: Self::Resources<'_>,
     ) -> cu29::CuResult<Self>
     where
         Self: Sized,
     {
-        Ok(Self { last_seen: 0 })
+        Ok(Self { })
     }
     fn process<'o>(
         &mut self,

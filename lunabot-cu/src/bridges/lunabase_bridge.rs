@@ -1,5 +1,7 @@
+#[cfg(not(feature = "resim"))]
 use std::{collections::VecDeque, time::Duration};
 
+#[cfg(not(feature = "resim"))]
 use crate::ROBOT_STATE;
 #[cfg(not(feature = "resim"))]
 use crate::comms::LunabaseConnection;
@@ -41,7 +43,7 @@ impl CuBridge for Lunabase {
 
     #[cfg(feature = "resim")]
     fn new(
-        config: Option<&cu29::prelude::ComponentConfig>,
+        _config: Option<&cu29::prelude::ComponentConfig>,
         _tx_channels: &[cu29::prelude::BridgeChannelConfig<
             <Self::Tx as cu29::prelude::BridgeChannelSet>::Id,
         >],
@@ -92,12 +94,12 @@ impl CuBridge for Lunabase {
     #[cfg(feature = "resim")]
     fn send<'a, Payload>(
         &mut self,
-        clock: &cu29::prelude::RobotClock,
-        channel: &'static cu29::prelude::BridgeChannel<
+        _clock: &cu29::prelude::RobotClock,
+        _channel: &'static cu29::prelude::BridgeChannel<
             <Self::Tx as cu29::prelude::BridgeChannelSet>::Id,
             Payload,
         >,
-        msg: &cu29::prelude::CuMsg<Payload>,
+        _msg: &cu29::prelude::CuMsg<Payload>,
     ) -> cu29::CuResult<()>
     where
         Payload: cu29::prelude::CuMsgPayload + 'a,
@@ -194,6 +196,23 @@ impl CuBridge for Lunabase {
         Ok(())
     }
 
+    #[cfg(feature = "resim")]
+    fn receive<'a, Payload>(
+        &mut self,
+        _clock: &cu29::prelude::RobotClock,
+        _channel: &'static cu29::prelude::BridgeChannel<
+            <Self::Rx as cu29::prelude::BridgeChannelSet>::Id,
+            Payload,
+        >,
+        _msg: &mut cu29::prelude::CuMsg<Payload>,
+    ) -> cu29::CuResult<()>
+    where
+        Payload: cu29::prelude::CuMsgPayload + 'a + std::any::Any,
+    {
+        Ok(())
+    }
+
+    #[cfg(not(feature = "resim"))]
     fn receive<'a, Payload>(
         &mut self,
         clock: &cu29::prelude::RobotClock,
@@ -206,79 +225,76 @@ impl CuBridge for Lunabase {
     where
         Payload: cu29::prelude::CuMsgPayload + 'a + std::any::Any,
     {
-        #[cfg(not(feature = "resim"))]
+        use crate::{simple_monitor::ERRORED_TASKS, utils::secs_to_nanos};
+        use common::{FromLunabot, LUNABOT_STAGE};
+        use cu29::CuError;
+
+        // Send heartbeat and robot state (moved from send method since send might not be called)
+        let heartbeat =
+            cu_bincode::encode_to_vec(LUNABOT_STAGE.load(), cu_bincode::config::standard())
+                .unwrap();
+        self.connection.server.set_keep_alive_msg(&heartbeat);
+
+        // Send errored tasks periodically
+        if let Some(errored_tasks) = ERRORED_TASKS.get()
+            && clock.now().as_nanos() - self.last_errored_tasks_packet > secs_to_nanos(3.0)
         {
-            use crate::{simple_monitor::ERRORED_TASKS, utils::secs_to_nanos};
-            use common::{FromLunabot, LUNABOT_STAGE};
-            use cu29::CuError;
-
-            // Send heartbeat and robot state (moved from send method since send might not be called)
-            let heartbeat =
-                cu_bincode::encode_to_vec(LUNABOT_STAGE.load(), cu_bincode::config::standard())
-                    .unwrap();
-            self.connection.server.set_keep_alive_msg(&heartbeat);
-
-            // Send errored tasks periodically
-            if let Some(errored_tasks) = ERRORED_TASKS.get()
-                && clock.now().as_nanos() - self.last_errored_tasks_packet > secs_to_nanos(3.0)
-            {
-                if let Ok(errored_tasks) = errored_tasks.lock() {
-                    let transformed_tasks: std::collections::HashMap<String, String> =
-                        errored_tasks
-                            .iter()
-                            .map(|(_, (task_id, state, name, _instant))| {
-                                (task_id.to_string(), format!("{:?}: {}", state, name))
-                            })
-                            .collect();
-                    let _ = self
-                        .connection
-                        .try_send(FromLunabot::ErroredTasks(transformed_tasks));
-                    self.last_errored_tasks_packet = clock.now().as_nanos();
-                }
-            }
-
-            // Receive messages from lunabase
-            while let Some(incoming_msg) = self.connection.try_recv() {
-                self.message_buffer.push_back(incoming_msg);
-            }
-
-            if self.message_buffer.len() > 5 {
-                eprintln!(
-                    "[WARNING] {} msgs in the from lunabase msg buffer",
-                    self.message_buffer.len()
-                );
-            }
-
-            if !self.connection.is_alive(self.max_pong_delay) {
-                self.message_buffer.clear();
-                // Set disconnect message as payload
-                if std::any::TypeId::of::<Payload>() == std::any::TypeId::of::<FromLunabase>() {
-                    let disconnect_msg = FromLunabase::Disconnect;
-                    let payload_msg = Box::new(disconnect_msg) as Box<dyn std::any::Any>;
-                    if let Ok(downcasted) = payload_msg.downcast::<Payload>() {
-                        msg.set_payload(*downcasted);
-                        msg.metadata.process_time.start = clock.now().into();
-                    }
-                }
-                return Err(CuError::new_with_cause(
-                    "lunabase not connected",
-                    std::io::Error::other("lunabase disconnected - timeout"),
-                ));
-            }
-            // Set the next message from buffer as payload
-            if let Some(next_msg) = self.message_buffer.pop_front() {
-                if std::any::TypeId::of::<Payload>() == std::any::TypeId::of::<FromLunabase>() {
-                    let payload_msg = Box::new(next_msg) as Box<dyn std::any::Any>;
-                    if let Ok(downcasted) = payload_msg.downcast::<Payload>() {
-                        msg.set_payload(*downcasted);
-                        msg.metadata.process_time.start = clock.now().into();
-                    }
-                    println!("{:?}", next_msg);
-                }
-            } else {
-                msg.clear_payload();
+            if let Ok(errored_tasks) = errored_tasks.lock() {
+                let transformed_tasks: std::collections::HashMap<String, String> = errored_tasks
+                    .iter()
+                    .map(|(_, (task_id, state, name, _instant))| {
+                        (task_id.to_string(), format!("{:?}: {}", state, name))
+                    })
+                    .collect();
+                let _ = self
+                    .connection
+                    .try_send(FromLunabot::ErroredTasks(transformed_tasks));
+                self.last_errored_tasks_packet = clock.now().as_nanos();
             }
         }
+
+        // Receive messages from lunabase
+        while let Some(incoming_msg) = self.connection.try_recv() {
+            self.message_buffer.push_back(incoming_msg);
+        }
+
+        if self.message_buffer.len() > 5 {
+            eprintln!(
+                "[WARNING] {} msgs in the from lunabase msg buffer",
+                self.message_buffer.len()
+            );
+        }
+
+        if !self.connection.is_alive(self.max_pong_delay) {
+            self.message_buffer.clear();
+            // Set disconnect message as payload
+            if std::any::TypeId::of::<Payload>() == std::any::TypeId::of::<FromLunabase>() {
+                let disconnect_msg = FromLunabase::Disconnect;
+                let payload_msg = Box::new(disconnect_msg) as Box<dyn std::any::Any>;
+                if let Ok(downcasted) = payload_msg.downcast::<Payload>() {
+                    msg.set_payload(*downcasted);
+                    msg.metadata.process_time.start = clock.now().into();
+                }
+            }
+            return Err(CuError::new_with_cause(
+                "lunabase not connected",
+                std::io::Error::other("lunabase disconnected - timeout"),
+            ));
+        }
+        // Set the next message from buffer as payload
+        if let Some(next_msg) = self.message_buffer.pop_front() {
+            if std::any::TypeId::of::<Payload>() == std::any::TypeId::of::<FromLunabase>() {
+                let payload_msg = Box::new(next_msg) as Box<dyn std::any::Any>;
+                if let Ok(downcasted) = payload_msg.downcast::<Payload>() {
+                    msg.set_payload(*downcasted);
+                    msg.metadata.process_time.start = clock.now().into();
+                }
+                println!("{:?}", next_msg);
+            }
+        } else {
+            msg.clear_payload();
+        }
+
         Ok(())
     }
 }

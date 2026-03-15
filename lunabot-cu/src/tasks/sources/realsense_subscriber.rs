@@ -5,6 +5,7 @@ use cu29::{
     cutask::{CuSrcTask, Freezable},
     prelude::*,
 };
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use iceoryx_types::IceoryxDepthFrame;
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use iceoryx2::{
@@ -14,7 +15,6 @@ use iceoryx2::{
     service::ipc,
 };
 
-#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use crate::payloads::depth_frame::CuDepthFrame;
 
 pub static DEPTH_FRAME_SIZE: usize = 640 * 480;
@@ -22,6 +22,7 @@ pub static DEPTH_FRAME_WIDTH: u32 = 640;
 pub static DEPTH_FRAME_HEIGHT: u32 = 480;
 
 pub struct RealsenseSubscriber {
+    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     last_seen: u64,
     /// subscribes to depth frames published by the realsense external task
     #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
@@ -152,7 +153,7 @@ impl CuSrcTask for RealsenseSubscriber {
 
 #[cfg(any(feature = "resim", feature = "sim"))]
 impl CuSrcTask for RealsenseSubscriber {
-    type Output<'m> = output_msg!((Option<IceoryxDepthFrame<DEPTH_FRAME_SIZE>>, Option<ImuMsg>));
+    type Output<'m> = output_msg!(CuDepthFrame<Vec<u16>>);
     type Resources<'r> = ();
 
     fn new(
@@ -162,7 +163,7 @@ impl CuSrcTask for RealsenseSubscriber {
     where
         Self: Sized,
     {
-        Ok(Self { last_seen: 0 })
+        Ok(Self {})
     }
 
     fn process<'o>(

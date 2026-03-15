@@ -5,10 +5,6 @@ edition = "2024"
 default-run = "lunabot"
 build = "build.rs"
 
-# Enhanced debugging support for procedural macros
-[profile.dev]
-debug = 2
-incremental = false
 
 # The main executable of your application
 [[bin]]

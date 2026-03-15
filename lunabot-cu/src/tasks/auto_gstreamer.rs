@@ -8,8 +8,11 @@ use circular_buffer::CircularBuffer;
 use gstreamer::{BufferRef, Caps, FlowSuccess, Pipeline, parse};
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use gstreamer_app::{AppSink, AppSinkCallbacks};
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use std::str::FromStr;
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use std::sync::{Arc, Mutex};
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use std::time::{Duration, Instant};
 
 #[cfg(any(not(target_os = "linux"), feature = "resim", feature = "sim"))]

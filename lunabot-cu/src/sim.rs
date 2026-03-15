@@ -16,18 +16,16 @@ use crossbeam::atomic::AtomicCell;
 use cu29::prelude::*;
 use cu29_helpers::basic_copper_setup;
 use embedded_common::Direction;
-use iceoryx_types::IceoryxDepthFrame;
 use mujoco_rs::cpp_viewer::MjViewerCpp;
 use mujoco_rs::prelude::*;
 use mujoco_rs::renderer::MjRendererBuilder;
-use nalgebra::{Isometry3, Quaternion, Translation, Translation3, UnitQuaternion, Vector3};
+use nalgebra::{Isometry3, Quaternion, Translation3, UnitQuaternion, Vector3};
 use nalgebra::{SMatrix, SVector};
-use rerun::{Arrows3D, Transform3D};
 use robot_state::RobotState;
 use simple_motion::{ChainBuilder, NodeSerde};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::sync::{OnceLock, RwLock};
+use std::sync::OnceLock;
 use wgsl_pcl::wgsl_setup::{init_gpu_blocking, is_gpu_initialized};
 extern crate cu_bincode as bincode;
 
@@ -307,7 +305,7 @@ fn sim_callback(
                     angular_velocity[2],
                     accel.x,
                     accel.y,
-                    accel.x,
+                    accel.z,
                 ]);
 
                 // we are just going to ignore variances for now
@@ -354,7 +352,7 @@ fn main() {
     }
     // Create mock robot clock for simulation
     let (robot_clock, robot_clock_mock) = RobotClock::mock();
-    let (model, mut viewer, data, mut renderer) = set_up_mujoco();
+    let (_model, mut viewer, data, mut renderer) = set_up_mujoco();
 
     let copper_ctx = basic_copper_setup(
         &PathBuf::from(&logger_path),
@@ -403,15 +401,12 @@ fn main() {
         let _ = rec.recorder.log("actual_depth_camera_pose", &axes);
     }
 
-    let copper_steps_per_physics = COPPER_HZ / PHYSICS_HZ;
-    let physics_steps_per_copper = PHYSICS_HZ / COPPER_HZ;
     let render_interval_ns = 1_000_000_000u64 / RENDER_HZ as u64;
 
     let loop_hz = COPPER_HZ.max(PHYSICS_HZ);
     let loop_duration = std::time::Duration::from_nanos(1_000_000_000 / loop_hz as u64);
 
     let mut last_render_time = std::time::Instant::now();
-    let mut copper_accumulator = 0usize;
     let mut physics_accumulator = 0usize;
 
     let start = std::time::Instant::now();

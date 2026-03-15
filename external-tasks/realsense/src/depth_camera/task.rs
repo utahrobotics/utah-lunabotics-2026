@@ -9,9 +9,9 @@ use crate::{
     iceoryx_utils::{create_depth_frame_publisher, create_node},
 };
 use iceoryx2::{port::publisher::Publisher, service::ipc};
-use iceoryx_types::{IceoryxDepthFrame, ImuMsg};
+use iceoryx_types::IceoryxDepthFrame;
 use realsense_rust::{
-    frame::{self, DepthFrame, PixelKind},
+    frame::{DepthFrame, PixelKind},
     kind::Rs2Format,
     pipeline::{ActivePipeline, FrameWaitError},
 };

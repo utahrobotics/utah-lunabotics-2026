@@ -1,5 +1,5 @@
 use iceoryx2::{node::NodeBuilder, port::publisher::Publisher, prelude::ServiceName, service::ipc};
-use iceoryx_types::{IceoryxDepthFrame, ImuMsg};
+use iceoryx_types::IceoryxDepthFrame;
 
 /// Creates a new iceoryx2 node for IPC services
 pub fn create_node() -> iceoryx2::node::Node<ipc::Service> {

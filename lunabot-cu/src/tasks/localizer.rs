@@ -24,7 +24,7 @@ use cu29::{
 use embedded_common::FromPicoV3;
 use kfilter::measurement::LinearMeasurement;
 use kfilter::system::StepReturn;
-use nalgebra::{Isometry3, SMatrix, SVector, UnitQuaternion, Vector3, Vector6};
+use nalgebra::{Isometry3, SMatrix, SVector, UnitQuaternion, Vector6};
 
 const INPUT_DIM: usize = 1;
 const POSE_MEAS_DIM: usize = 6;
