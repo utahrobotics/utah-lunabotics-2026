@@ -189,7 +189,7 @@ impl CuTask for OccupancyGridTask {
                 .unwrap();
 
             // Log permanent obstacles to Rerun 
-            if let Some(global_map) = GLOBAL_MAP.get() {
+            /*if let Some(global_map) = GLOBAL_MAP.get() {
                 if let Ok(grid) = global_map.read() {
                     let mut points = vec![];
                     let mut colors = vec![];
@@ -221,7 +221,7 @@ impl CuTask for OccupancyGridTask {
                             .unwrap();
                     }
                 }
-            }
+            }*/
         }
 
         Ok(())
