@@ -226,7 +226,9 @@ impl CuTask for AprilDetectionHandler {
     fn postprocess(&mut self, _clock: &RobotClock) -> CuResult<()> {
         // Rerun visualization — runs after the main thread is done with the hot path
         for measurement in &self.result_buf {
-            let iso = measurement.estimated_isometry.to_na();
+            let Some(iso) = measurement.estimated_isometry.to_na() else {
+                continue;
+            };
             if let Some(recorder) = RECORDER.get() {
                 let _ = recorder.recorder.log(
                     "apriltags/robot_pose",
