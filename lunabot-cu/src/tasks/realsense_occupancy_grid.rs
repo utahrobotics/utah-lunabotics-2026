@@ -66,8 +66,7 @@ pub struct OccupancyGridTask {
     max_angular_velocity: f64,
     max_acceleration: f64,
     _min_grad_for_obstacle: f32,
-    artemis_obstacles_enabled: bool,
-    ucf_obstacles_enabled: bool,
+    arena_obstacles: Option<ArenaObstaclesSelection>,
 }
 
 /// Arena obstacle configuration
@@ -75,8 +74,16 @@ pub struct OccupancyGridTask {
 struct ArenaObstacles {
     walls: Vec<(f32, f32, f32, f32)>, // (min_x, min_y, max_x, max_y)
     pillars: Vec<(f32, f32, f32)>,    // (center_x, center_y, radius)
+    pillars_rect: Vec<(f32, f32, f32, f32)>, // (center_x, center_y, width, height)
     boulders: Vec<(f32, f32, f32)>,   // (center_x, center_y, radius)
     craters: Vec<(f32, f32, f32)>,    // (center_x, center_y, radius)
+}
+
+#[derive(Deserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "lowercase")]
+enum ArenaObstaclesSelection {
+    Artemis,
+    Ucf,
 }
 
 
@@ -126,6 +133,7 @@ fn paint_permanent_obstacles(
                     let _ = grid.set_gradient_at(x, y, PERMANENT_GRADIENT);
                 }
             }
+        }
     }
 
     // Paint circular obstacles (pillars, boulders, craters), expanded by robot_radius
@@ -369,18 +377,12 @@ impl CuTask for OccupancyGridTask {
             .and_then(|c| c.get::<f64>("max_depth").expect("failed to deserialize"))
             .unwrap_or(3.0) as f32;
 
-        let artemis_obstacles_enabled = config
+        let arena_obstacles = config
             .and_then(|c| {
-                c.get::<bool>("artemis_obstacles_enabled")
+                c.get_value::<ArenaObstaclesSelection>("arena_obstacles")
                     .expect("failed to deserialize")
             })
-            .unwrap_or(true);
-        let ucf_obstacles_enabled = config
-            .and_then(|c| {
-                c.get::<bool>("ucf_obstacles_enabled")
-                    .expect("failed to deserialize")
-            })
-            .unwrap_or(false);
+            .or(Some(ArenaObstaclesSelection::Artemis));
 
         // use bilateral by default, fall back on gaussian
         let use_bilateral = config
@@ -505,7 +507,7 @@ impl CuTask for OccupancyGridTask {
             };
 
             // Load and paint arena obstacles
-            if let Some(obstacles) = load_arena_obstacles(artemis_obstacles_enabled, ucf_obstacles_enabled) {
+            if let Some(obstacles) = load_arena_obstacles(arena_obstacles) {
                 paint_permanent_obstacles(&mut grid, &obstacles, robot_radius_meters);
 
             } else {
@@ -530,8 +532,7 @@ impl CuTask for OccupancyGridTask {
             max_linear_velocity,
             max_acceleration,
             _min_grad_for_obstacle: 0.0,
-            artemis_obstacles_enabled,
-            ucf_obstacles_enabled,
+            arena_obstacles,
         })
     }
 
@@ -745,18 +746,22 @@ impl CuTask for OccupancyGridTask {
 
 }
 
-fn load_arena_obstacles(artemis_obstacles_enabled: bool, ucf_obstacles_enabled: bool) -> Option<ArenaObstacles> {
-    if artemis_obstacles_enabled {
-        let path = "arena_obstacles/artemis.ron";
-        let contents = std::fs::read_to_string(path).ok()?;
-        ron::de::from_str(&contents).ok()
-    } else if ucf_obstacles_enabled {
-        let path = "arena_obstacles/ucf.ron";
-        let contents = std::fs::read_to_string(path).ok()?;
-        ron::de::from_str(&contents).ok()
-    } else {
-        eprintln!("No arena obstacles enabled, skipping loading");
-        None
+fn load_arena_obstacles(arena_obstacles: Option<ArenaObstaclesSelection>) -> Option<ArenaObstacles> {
+    match arena_obstacles {
+        Some(ArenaObstaclesSelection::Artemis) => {
+            let path = "arena_obstacles/artemis.ron";
+            let contents = std::fs::read_to_string(path).ok()?;
+            ron::de::from_str(&contents).ok()
+        }
+        Some(ArenaObstaclesSelection::Ucf) => {
+            let path = "arena_obstacles/ucf.ron";
+            let contents = std::fs::read_to_string(path).ok()?;
+            ron::de::from_str(&contents).ok()
+        }
+        None => {
+            eprintln!("No arena obstacles enabled, skipping loading");
+            None
+        }
     }
 }
 
