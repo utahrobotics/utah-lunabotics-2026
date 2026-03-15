@@ -14,13 +14,9 @@ use cu29::{
 
 use nalgebra::{Isometry3, UnitQuaternion, Vector3};
 use serde::Deserialize;
-use simple_motion::StaticNode;
 use std::ops::DerefMut;
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use t265_rs::{Pose, T265Manager, VideoFrame};
-
-#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
-use crate::{ROBOT_STATE, utils::swing_twist_decomposition};
 
 pub struct T265Subscriber {
     #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
@@ -37,7 +33,7 @@ pub struct T265Subscriber {
     #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     angular_velocity_variance: f64,
     #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
-    manager: T265Manager,
+    _manager: T265Manager,
     #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     image_rx: Receiver<VideoFrame>,
     #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
@@ -156,7 +152,7 @@ impl CuSrcTask for T265Subscriber {
             last_seen: 0,
             velocity_variance,
             angular_velocity_variance,
-            manager,
+            _manager: manager,
             pose_rx,
             image_rx,
             pool,
@@ -221,8 +217,6 @@ impl CuSrcTask for T265Subscriber {
             eprintln!("WARNING: t265 pose backpressure: {}", self.pose_rx.len())
         }
 
-
-
         if let Ok(Pose {
             translation,
             rotation,
@@ -231,7 +225,7 @@ impl CuSrcTask for T265Subscriber {
             acceleration,
             angular_acceleration,
             timestamp_ns: _,
-            tracker_confidence,
+            tracker_confidence: _,
             mapper_confidence: _,
             tracker_state: _,
             device_id,
