@@ -44,9 +44,9 @@ pub struct DepthToPclAndHeightPipeline {
     workgroup_size_stage1: (u32, u32, u32),
     workgroup_size_stage2: (u32, u32, u32),
     pub map_layout: map_layout::MapLayout,
-    map_layout_buffer: GpuBuffer,
-    map_height_buffer: GpuBuffer,
-    map_width_buffer: GpuBuffer,
+    _map_layout_buffer: GpuBuffer,
+    _map_height_buffer: GpuBuffer,
+    _map_width_buffer: GpuBuffer,
     height_map_buffer: GpuBuffer,
 
     /// Whether the clear affected cells stage is enabled
@@ -370,9 +370,9 @@ impl DepthToPclAndHeightPipeline {
             workgroup_size_stage1: (workgroup_size_stage1.0, workgroup_size_stage1.1, 1),
             workgroup_size_stage2: (workgroup_size_stage2.0, workgroup_size_stage2.1, 1),
             clear_affected_cells_enabled: clear_affected_cells.is_some(),
-            map_width_buffer,
-            map_height_buffer,
-            map_layout_buffer,
+            _map_width_buffer: map_width_buffer,
+            _map_height_buffer: map_height_buffer,
+            _map_layout_buffer: map_layout_buffer,
         })
     }
 

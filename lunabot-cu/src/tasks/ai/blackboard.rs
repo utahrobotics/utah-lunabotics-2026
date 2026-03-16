@@ -50,8 +50,11 @@ pub struct LunabotBlackboard {
 
     /// the calculated path from the path finder job
     pub calculated_path: Option<Vec<Vector2<f32>>>,
+    /// any cell with a greater gradient will be expanded
+    pub obstacle_gradient_threshold_expander: f32,
+    /// threshold considered to be an obstacle by the pathfinder
+    pub obstacle_gradient_threshold_pathfinder: f32,
 
-    pub obstacle_gradient_threshold: f32,
     pub robot_radius: f32,
 }
 
@@ -76,7 +79,8 @@ impl Default for LunabotBlackboard {
             yielded: false,
             path_follower: None,
             rotation_shim: None,
-            obstacle_gradient_threshold: 0.5,
+            obstacle_gradient_threshold_expander: 0.5,
+            obstacle_gradient_threshold_pathfinder: 0.3,
             robot_radius: 0.5,
         }
     }

@@ -2,13 +2,18 @@ use cu_bincode::{Decode, Encode};
 use serde_big_array::BigArray;
 use cu29::cutask::CuMsg;
 use cu29::{
-    CuError, CuResult,
+    CuResult,
     clock::RobotClock,
     config::ComponentConfig,
     cutask::{CuSrcTask, Freezable},
     output_msg,
 };
 
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+
+use cu29::CuError;
+
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use crate::rerun_viz::RECORDER;
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use iceoryx2::node::NodeBuilder;
@@ -18,22 +23,29 @@ use iceoryx2::port::subscriber::Subscriber;
 use iceoryx2::prelude::*;
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use iceoryx2::service::port_factory::publish_subscribe::PortFactory;
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use nalgebra::{SMatrix, SVector};
 use serde::{Deserialize, Serialize};
 
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use crate::ROBOT_STATE;
 use iceoryx_types::ImuMsg;
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use nalgebra::{Quaternion, UnitQuaternion, Vector3};
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use simple_motion::StaticNode;
 
+
+#[cfg(any(feature = "resim", feature = "sim"))]
 pub struct ImuIceoryxReceiver {
-    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+}
+
+
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+pub struct ImuIceoryxReceiver {
     service_name: ServiceName,
-    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     node: iceoryx2::node::Node<ipc::Service>,
-    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     service: Option<PortFactory<ipc::Service, ImuMsg, ()>>,
-    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     subscriber: Option<Subscriber<ipc::Service, ImuMsg, ()>>,
     lidar_node: StaticNode,
     imu_variance: [f64; 81],
@@ -253,33 +265,8 @@ impl CuSrcTask for ImuIceoryxReceiver {
     type Resources<'r> = ();
 
     fn new(_config: Option<&ComponentConfig>, _resources: Self::Resources<'_>) -> CuResult<Self> {
-        let diagonal = SVector::<f64, 9>::from_column_slice(&[
-            0.05 as f64, // Acceleration variance
-            0.05 as f64,
-            0.05 as f64,
-            0.005 as f64, // Orientation variance
-            0.005 as f64,
-            0.005 as f64,
-            0.1 * 1E64 as f64, // Angular velocity variance
-            0.1 * 1E64 as f64,
-            0.1 * 1E64 as f64,
-        ]);
-        let variance: [f64; 81] = SMatrix::<f64, 9, 9>::from_diagonal(&diagonal)
-            .as_slice()
-            .try_into()
-            .expect("Variance matrix in [l2_imu.rs] was not 9x9");
         Ok(Self {
-            lidar_node: ROBOT_STATE
-                .get()
-                .unwrap()
-                .kinematic_root
-                .clone()
-                .get_node_with_name("l2_front")
-                .unwrap(),
-            imu_variance: variance,
-            warmup_samples: Vec::with_capacity(200), // Collect 200 samples for warmup
-            warmup_complete: false,
-            gravity_magnitude: 9.8, // default, replaced after warmup sequence
+
         })
     }
 

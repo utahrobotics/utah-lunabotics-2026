@@ -1,15 +1,23 @@
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+
 use crate::ROBOT_STATE;
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use crate::rerun_viz::{Level, RECORDER};
+
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use cu29::cutask::CuMsg;
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use cu29::{
-    CuError, CuResult,
+    CuError, 
+    CuResult,
     clock::RobotClock,
     config::ComponentConfig,
     cutask::{CuSrcTask, Freezable},
     output_msg,
-    prelude::*,
 };
+use cu29::prelude::*;
 
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use iceoryx_types::{IceoryxPointCloud, PointXYZIR};
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use iceoryx2::node::NodeBuilder;
@@ -20,16 +28,18 @@ use iceoryx2::prelude::*;
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use iceoryx2::service::port_factory::publish_subscribe::PortFactory;
 
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use simple_motion::StaticNode;
 
+#[cfg(any(feature = "resim", feature = "sim"))]
 pub struct PointCloudIceoryxReceiver {
-    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+
+}
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+pub struct PointCloudIceoryxReceiver {
     service_name: ServiceName,
-    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     node: iceoryx2::node::Node<ipc::Service>,
-    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     service: Option<PortFactory<ipc::Service, IceoryxPointCloud, ()>>,
-    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     subscriber: Option<Subscriber<ipc::Service, IceoryxPointCloud, ()>>,
     l2_node: StaticNode,
     last_seen: u64,
@@ -153,19 +163,11 @@ impl CuSrcTask for PointCloudIceoryxReceiver {
 
 #[cfg(any(feature = "resim", feature = "sim"))]
 impl CuSrcTask for PointCloudIceoryxReceiver {
-    type Output<'m> = output_msg!(IceoryxPointCloud);
+    type Output<'m> = output_msg!(iceoryx_types::IceoryxPointCloud);
     type Resources<'r> = ();
 
     fn new(_config: Option<&ComponentConfig>,_resources: Self::Resources<'_>) -> CuResult<Self> {
         Ok(Self {
-            l2_node: ROBOT_STATE
-                .get()
-                .unwrap()
-                .kinematic_root
-                .get_node_with_name("l2_front")
-                .unwrap()
-                .clone(),
-            last_seen: 0,
         })
     }
 

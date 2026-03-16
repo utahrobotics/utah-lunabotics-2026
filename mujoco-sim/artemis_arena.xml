@@ -37,6 +37,11 @@
       </body>
     </replicate>
 
+    <body pos="1.5 1.5 1.0">
+      <joint type="free" />
+      <attach model="rock_rough" prefix="obstructor" />
+    </body>
+
     <light name="sun" directional="true" pos="0 0 10" dir="-0.5 0.1 -0.9"
       diffuse="0.4 0.4 0.4" specular="0.1 0.1 0.1" />
 

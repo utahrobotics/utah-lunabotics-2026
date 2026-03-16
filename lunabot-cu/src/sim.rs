@@ -3,7 +3,9 @@ pub mod comms;
 pub mod rerun_viz;
 
 pub mod bridges;
+pub mod kalman_filtering;
 pub mod pathfinding;
+pub mod payloads;
 pub mod robot_state;
 pub mod simple_monitor;
 pub mod tasks;
@@ -14,18 +16,16 @@ use crossbeam::atomic::AtomicCell;
 use cu29::prelude::*;
 use cu29_helpers::basic_copper_setup;
 use embedded_common::Direction;
-use iceoryx_types::IceoryxDepthFrame;
 use mujoco_rs::cpp_viewer::MjViewerCpp;
 use mujoco_rs::prelude::*;
 use mujoco_rs::renderer::MjRendererBuilder;
-use nalgebra::{Isometry3, Quaternion, Translation, Translation3, UnitQuaternion, Vector3};
+use nalgebra::{Isometry3, Quaternion, Translation3, UnitQuaternion, Vector3};
 use nalgebra::{SMatrix, SVector};
-use rerun::{Arrows3D, Transform3D};
 use robot_state::RobotState;
 use simple_motion::{ChainBuilder, NodeSerde};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::sync::{OnceLock, RwLock};
+use std::sync::OnceLock;
 use wgsl_pcl::wgsl_setup::{init_gpu_blocking, is_gpu_initialized};
 extern crate cu_bincode as bincode;
 
@@ -69,6 +69,7 @@ fn default_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::LunabaseBridgeRxFromLunabaseRx { .. } => SimOverride::ExecuteByRuntime,
         default::SimStep::LunabaseBridgeTxToLunabase { .. } => SimOverride::ExecuteByRuntime,
         default::SimStep::LunabaseBridgeBridge { .. } => SimOverride::ExecuteByRuntime,
+        default::SimStep::DetectorCamT265(..) => SimOverride::ExecutedBySim,
         default::SimStep::__Phantom(_) => SimOverride::ExecutedBySim,
     }
 }
@@ -182,51 +183,42 @@ fn sim_callback(
         default::SimStep::MotorCtrl(..) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamBack(_) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamSide(_) => SimOverride::ExecutedBySim,
+        default::SimStep::DetectorCamT265(..) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamLaptopFront(_) => SimOverride::ExecutedBySim,
         default::SimStep::RealsenseSubscriber(CuTaskCallbackState::Process(_, output)) => {
+            use crate::payloads::depth_frame::{CuDepthFrame, CuDepthFrameFormat};
             use std::sync::atomic::{AtomicU64, Ordering};
             use std::time::SystemTime;
 
             static LAST_OUTPUT_TIME: OnceLock<AtomicU64> = OnceLock::new();
-
             let now_ns = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()
                 .as_nanos() as u64;
-
-            let output_interval_ns = 1_000_000_000 / 10; // output at 10 Hz
             let last_output_time = LAST_OUTPUT_TIME.get_or_init(|| AtomicU64::new(0));
-
             let last = last_output_time.load(Ordering::Relaxed);
-            if now_ns - last > output_interval_ns {
+
+            if now_ns - last > 1_000_000_000 / 10 {
                 last_output_time.store(now_ns, Ordering::Relaxed);
 
-                let depth_image = renderer.depth_flat();
-
-                const DEPTH_SIZE: usize = DEPTH_FRAME_WIDTH as usize * DEPTH_FRAME_HEIGHT as usize;
-                let mut depths = [0u16; DEPTH_SIZE];
-                let depth_scale = 0.001; // 1 unit = 1mm
-
-                if let Some(depth_image) = depth_image {
+                if let Some(depth_image) = renderer.depth_flat() {
+                    let mut depths =
+                        vec![0u16; DEPTH_FRAME_WIDTH as usize * DEPTH_FRAME_HEIGHT as usize];
                     for (i, value) in depth_image.iter().enumerate() {
-                        let depth_mm = (value * 1000.0).clamp(0.0, 65535.0) as u16;
-                        // Mirror the image left to right
                         let row = i / DEPTH_FRAME_WIDTH as usize;
                         let col = i % DEPTH_FRAME_WIDTH as usize;
                         let mirrored_col = DEPTH_FRAME_WIDTH as usize - 1 - col;
-                        let mirrored_idx = row * DEPTH_FRAME_WIDTH as usize + mirrored_col;
-                        depths[mirrored_idx] = depth_mm;
+                        depths[row * DEPTH_FRAME_WIDTH as usize + mirrored_col] =
+                            (value * 1000.0).clamp(0.0, 65535.0) as u16;
                     }
-
-                    let focal_len = (383.0, 383.0);
-
-                    output.set_payload((
-                        Some(IceoryxDepthFrame {
-                            depths,
-                            depth_scale,
-                            focal_len,
-                        }),
-                        None,
+                    output.set_payload(CuDepthFrame::new(
+                        CuDepthFrameFormat {
+                            width: DEPTH_FRAME_WIDTH,
+                            height: DEPTH_FRAME_HEIGHT,
+                            depth_scale: 0.001,
+                            focal_len: (383.0, 383.0),
+                        },
+                        CuHandle::new_detached(depths),
                     ));
                 }
             }
@@ -267,15 +259,16 @@ fn sim_callback(
                 // Offset from MuJoCo body origin to robot center
                 // The kinematic chain in lunabot.ron assumes origin at robot center
                 // mujoco considers the 0,0 of the robot to be the back left corner but we consider it to be the center of the robot
-                let body_origin_to_center = Translation3::new(0.37, -0.18, 0.00);
+                let rotation = UnitQuaternion::from_quaternion(Quaternion::new(
+                    quat[0], quat[1], quat[2], quat[3],
+                ));
+                let body_origin_to_center = Vector3::new(0.37, -0.18, 0.00);
                 let isometry = Isometry3::from_parts(
                     Translation3::from(
-                        Translation3::new(coords[0], coords[1], coords[2]).vector
-                            + body_origin_to_center.vector,
+                        Vector3::new(coords[0], coords[1], coords[2])
+                            + rotation * body_origin_to_center,
                     ),
-                    UnitQuaternion::from_quaternion(Quaternion::new(
-                        quat[0], quat[1], quat[2], quat[3],
-                    )),
+                    rotation,
                 );
                 state.kinematic_root.set_isometry(isometry);
                 output.set_payload(FromLunabot::RobotIsometry {
@@ -312,7 +305,7 @@ fn sim_callback(
                     angular_velocity[2],
                     accel.x,
                     accel.y,
-                    accel.x,
+                    accel.z,
                 ]);
 
                 // we are just going to ignore variances for now
@@ -359,7 +352,7 @@ fn main() {
     }
     // Create mock robot clock for simulation
     let (robot_clock, robot_clock_mock) = RobotClock::mock();
-    let (model, mut viewer, data, mut renderer) = set_up_mujoco();
+    let (_model, mut viewer, data, mut renderer) = set_up_mujoco();
 
     let copper_ctx = basic_copper_setup(
         &PathBuf::from(&logger_path),
@@ -408,15 +401,12 @@ fn main() {
         let _ = rec.recorder.log("actual_depth_camera_pose", &axes);
     }
 
-    let copper_steps_per_physics = COPPER_HZ / PHYSICS_HZ;
-    let physics_steps_per_copper = PHYSICS_HZ / COPPER_HZ;
     let render_interval_ns = 1_000_000_000u64 / RENDER_HZ as u64;
 
     let loop_hz = COPPER_HZ.max(PHYSICS_HZ);
     let loop_duration = std::time::Duration::from_nanos(1_000_000_000 / loop_hz as u64);
 
     let mut last_render_time = std::time::Instant::now();
-    let mut copper_accumulator = 0usize;
     let mut physics_accumulator = 0usize;
 
     let start = std::time::Instant::now();

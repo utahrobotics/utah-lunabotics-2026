@@ -1,45 +1,90 @@
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+use std::sync::Arc;
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+use crossbeam::channel::Receiver;
+
+
 use cu_bincode::{Decode, Encode};
+use cu_sensor_payloads::CuImage;
 use cu_spatial_payloads::EncodableIsometry;
 use cu29::{
     cutask::{CuSrcTask, Freezable},
     prelude::*,
 };
-use iceoryx_types::PoseMsg;
+
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
-use iceoryx2::{
-    node::NodeBuilder,
-    port::subscriber::Subscriber,
-    prelude::{LogLevel, ServiceName, set_log_level},
-    service::ipc,
-};
 use nalgebra::{Isometry3, UnitQuaternion, Vector3};
 use serde::Deserialize;
-use simple_motion::StaticNode;
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+use std::ops::DerefMut;
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+use t265_rs::{Pose, T265Manager, VideoFrame};
+
+#[cfg(all(any(feature = "resim", feature = "sim")))]
+pub struct T265Subscriber {}
 
 
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 pub struct T265Subscriber {
+    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+    last_process_call: std::time::Instant,
     last_seen: u64,
-    /// subscribes to pose frames published by the realsense external task (T265)
-    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
-    pose_subscriber: Subscriber<ipc::Service, PoseMsg, ()>,
 
-    /// Initial yaw offset captured on first pose to align T265's arbitrary tracking frame with world
     #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
-    initial_yaw_offset: Option<f32>,
+    last_seen_img: u64,
 
-    /// we only use the deltas between poses in the localizer
     #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     velocity_variance: f64,
     #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+    pose_variance: f64,
+    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     angular_velocity_variance: f64,
+    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+    _manager: T265Manager,
+    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+    image_rx: Receiver<VideoFrame>,
+    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+    pose_rx: Receiver<Pose>,
+    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+    pool: Arc<CuHostMemoryPool<Vec<u8>>>,
+
+    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+    warmup_ms: usize,
+    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+    first_pose: Option<std::time::Instant>,
+    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+    twist_correction: Option<UnitQuaternion<f64>>,
 }
 
 #[derive(Encode, Decode, Clone, Serialize, Debug, Deserialize)]
 pub struct T265Msg {
+    /// the pose of the robot base
     pub pose: EncodableIsometry,
+    pub pose_variance: f64,
     pub velocity_variance: f64,
     pub angular_velocity_variance: f64,
+    /// always set to the serial number
     pub node_name: String,
+    pub imu_msg: T265IMUMsg,
+}
+
+#[derive(Encode, Decode, Clone, Serialize, Debug, Deserialize)]
+pub struct T265IMUMsg {
+    pub accel: [f32; 3],
+    pub angular_accel: [f32; 3],
+    pub velocity: [f32; 3],
+    pub angular_velocity: [f32; 3],
+}
+
+impl Default for T265IMUMsg {
+    fn default() -> Self {
+        Self {
+            accel: [0.0, 0.0, 0.0],
+            angular_accel: [0.0, 0.0, 0.0],
+            velocity: [0.0, 0.0, 0.0],
+            angular_velocity: [0.0, 0.0, 0.0],
+        }
+    }
 }
 
 impl Default for T265Msg {
@@ -47,8 +92,10 @@ impl Default for T265Msg {
         Self {
             pose: EncodableIsometry::default(),
             velocity_variance: 1.0,
+            pose_variance: 0.5,
             angular_velocity_variance: 1.0,
             node_name: "t265".to_string(),
+            imu_msg: Default::default(),
         }
     }
 }
@@ -57,54 +104,69 @@ impl Freezable for T265Subscriber {}
 
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 impl CuSrcTask for T265Subscriber {
-    type Output<'m> = output_msg!(T265Msg);
+    type Output<'m> = output_msg!(T265Msg, CuImage<Vec<u8>>);
     type Resources<'r> = ();
 
-    fn new(config: Option<&cu29::prelude::ComponentConfig>, _resources: Self::Resources<'_>) -> cu29::CuResult<Self>
+    fn new(
+        config: Option<&cu29::prelude::ComponentConfig>,
+        _resources: Self::Resources<'_>,
+    ) -> cu29::CuResult<Self>
     where
         Self: Sized,
     {
-        let serial_num = config
-            .and_then(|c| c.get::<String>("serial_num").expect("failed to deserialize"))
-            .unwrap_or_else(|| "realsense/t265".to_string());
-        let pose_service_str = format!("realsense/{serial_num}/pose");
-
-        let pose_service_name = ServiceName::new(&pose_service_str)
-            .map_err(|e| CuError::new_with_cause("invalid service name", e))?;
-
-        let node = NodeBuilder::new()
-            .create::<ipc::Service>()
-            .map_err(|e| CuError::new_with_cause("node create faliure", e))?;
-
-        set_log_level(LogLevel::Debug);
-        let pose_service = node
-            .service_builder(&pose_service_name)
-            .publish_subscribe::<PoseMsg>()
-            .enable_safe_overflow(true)
-            .subscriber_max_buffer_size(20)
-            .open_or_create()
-            .map_err(|e| CuError::new_with_cause("service open error", e))?;
-
-        let pose_subscriber = pose_service
-            .subscriber_builder()
-            .buffer_size(19)
-            .create()
-            .map_err(|e| CuError::new_with_cause("subscriber creation error", e))?;
-
         let velocity_variance = config
-            .and_then(|c| c.get::<f64>("t265_velocity_variance").expect("failed to deserialize"))
+            .and_then(|c| {
+                c.get::<f64>("t265_velocity_variance")
+                    .expect("failed to deserialize")
+            })
+            .unwrap_or(1.0);
+
+        let pose_variance = config
+            .and_then(|c| {
+                c.get::<f64>("pose_variance")
+                    .expect("failed to deserialize")
+            })
             .unwrap_or(1.0);
 
         let angular_velocity_variance = config
-            .and_then(|c| c.get::<f64>("t265_angular_velocity_variance").expect("failed to deserialize"))
+            .and_then(|c| {
+                c.get::<f64>("t265_angular_velocity_variance")
+                    .expect("failed to deserialize")
+            })
             .unwrap_or(1.0);
 
+        let mut manager = T265Manager::new().map_err(|e| CuError::from(e.to_string()))?;
+        manager
+            .discover_devices_with_options(true)
+            .map_err(|e| CuError::from(e.to_string()))?;
+        manager
+            .enable_all_video_streams()
+            .map_err(|e| CuError::from(e.to_string()))?;
+
+        let pose_rx = manager
+            .start_all_pose_streams()
+            .map_err(|e| CuError::from(e.to_string()))?;
+        let image_rx = manager
+            .start_all_video_streams()
+            .map_err(|e| CuError::from(e.to_string()))?;
+        const WIDTH: usize = 848;
+        const HEIGHT: usize = 800;
+        let pool = CuHostMemoryPool::new("t265_imgs", 4, || vec![0u8; (WIDTH * HEIGHT) as usize])?;
+
         Ok(Self {
+            last_process_call: std::time::Instant::now(),
+            last_seen_img: 0,
             last_seen: 0,
-            pose_subscriber,
-            initial_yaw_offset: None,
             velocity_variance,
             angular_velocity_variance,
+            _manager: manager,
+            pose_rx,
+            image_rx,
+            pool,
+            pose_variance,
+            warmup_ms: 500,
+            first_pose: None,
+            twist_correction: None,
         })
     }
 
@@ -113,95 +175,157 @@ impl CuSrcTask for T265Subscriber {
         clock: &cu29::prelude::RobotClock,
         new_msg: &mut Self::Output<'o>,
     ) -> cu29::CuResult<()> {
-        new_msg.clear_payload();
-
-        let mut output = None;
-
-        // gather any pending pose samples from the realsense T265 publisher
-        while let Some(sample) = self
-            .pose_subscriber
-            .receive()
-            .map_err(|e| CuError::new_with_cause("subscriber receive failed", e))?
-        {
-            output = Some(sample.payload().clone());
-            self.last_seen = clock.now().into();
+        let start = std::time::Instant::now();
+        if self.last_process_call.elapsed().as_millis() > 5 {
+            eprintln!("[WARNING] process not called for 5 miliseconds: took {}s", self.last_process_call.elapsed().as_secs_f64());
         }
+        self.last_process_call = std::time::Instant::now();
+        new_msg.0.clear_payload();
+        new_msg.1.clear_payload();
 
-        if let Some(PoseMsg {
-            position,
-            quaternion,
-            confidence,
-            serial_num
-        }) = output
-        {
-            // T265 to robot coordinate frame
-
-            use iceoryx_types::T265Confidence;
-            let transformed_translation = Vector3::new(-position[2], position[0], position[1]);
-            let t265_translation = Vector3::new(
-                transformed_translation.x,
-                -transformed_translation.y,
-                transformed_translation.z,
-            );
-
-            let (qx, qy, qz, qw) = (quaternion[0], quaternion[1], quaternion[2], quaternion[3]);
-            let t265_rotation =
-                UnitQuaternion::new_normalize(nalgebra::Quaternion::new(qw, -qz, -qx, qy));
-
-            let t265_pose = Isometry3::from_parts(t265_translation.into(), t265_rotation);
-
-
-
-            // t264 starts with a basically arbitrary "twist" error
-            if self.initial_yaw_offset.is_none() {
-                let initial_yaw = t265_pose.rotation.euler_angles().2;
-                self.initial_yaw_offset = Some(initial_yaw);
+        'image_rx: {
+            if self.image_rx.len() > 5 {
+                eprintln!("WARNING: t265 image backpressure: {}", self.image_rx.len())
             }
+            if let Ok(image) = self.image_rx.try_recv() {
+                self.last_seen_img = clock.now().as_millis();
+                use cu_sensor_payloads::CuImageBufferFormat;
 
-            // align with world frame (robot starts facing +X)
-            let yaw_correction = UnitQuaternion::from_axis_angle(
-                &Vector3::z_axis(),
-                -self.initial_yaw_offset.unwrap(),
+                let Some(handle) = self.pool.acquire() else {
+                    return Err(CuError::from("No handle available for t265"));
+                };
+                // we only want images from the righthand fisheye lense
+                if image.sensor_index == 0 {
+                    break 'image_rx;
+                }
+                handle.with_inner_mut(|inner| {
+                    let dst = inner.deref_mut();
+                    if dst.len() != image.data.len() {
+                        return Err(CuError::from("handle data len doesnt match image data len"));
+                    }
+                    dst.copy_from_slice(&image.data);
+                    Ok(())
+                })?;
+
+                let image = CuImage::new(
+                    CuImageBufferFormat {
+                        width: image.width as u32,
+                        height: image.height as u32,
+                        stride: image.stride as u32,
+                        pixel_format: *b"GRAY",
+                    },
+                    handle,
+                );
+                new_msg.1.set_payload(image);
+            }
+        }
+
+        if self.pose_rx.len() > 5 {
+            eprintln!("WARNING: t265 pose backpressure: {}", self.pose_rx.len())
+        }
+
+        if let Ok(Pose {
+            translation,
+            rotation,
+            velocity,
+            angular_velocity,
+            acceleration,
+            angular_acceleration,
+            timestamp_ns: _,
+            tracker_confidence: _,
+            mapper_confidence: _,
+            tracker_state: _,
+            device_id,
+        }) = self.pose_rx.try_recv()
+        {
+            if self.first_pose.get_or_insert(std::time::Instant::now()).elapsed().as_millis() < self.warmup_ms as u128 {
+                return Err(CuError::new_with_cause(
+                    "Warming up...",
+                    std::io::Error::other("Warming up..."),
+                ));
+            }
+            
+            use nalgebra::Quaternion;
+
+            use crate::ROBOT_STATE;
+            // Coordinate frame transform from T265 to robot (same as translation: [-z, -x, y])
+            // https://stackoverflow.com/questions/18818102/convert-quaternion-representing-rotation-from-one-coordinate-system-to-another
+            let coord_transform =
+                UnitQuaternion::from_quaternion(Quaternion::new(0.5, 0.5, -0.5, -0.5));
+            let q_t265 = UnitQuaternion::from_quaternion(Quaternion::new(
+                rotation[3],
+                rotation[0],
+                rotation[1],
+                rotation[2],
+            ));
+            let q_robot = coord_transform * q_t265 * coord_transform.inverse();
+            let pose = Isometry3::from_parts(
+                Vector3::new(-translation[2], -translation[0], translation[1]).into(),
+                q_robot,
             );
 
-            let corrected_robot_pose =
-                yaw_correction * Isometry3::from_parts(t265_pose.translation, t265_pose.rotation);
-
-            let (velocity_variance, angular_velocity_variance) =
-                if confidence == T265Confidence::High {
-                    (self.velocity_variance, self.angular_velocity_variance)
-                } else if confidence == T265Confidence::Medium {
-                    (
-                        self.velocity_variance * 2.,
-                        self.angular_velocity_variance * 2.,
-                    )
-                } else if confidence == T265Confidence::Low {
-                    (
-                        self.velocity_variance * 5.,
-                        self.angular_velocity_variance * 5.,
-                    )
-                } else {
-                    (
-                        self.velocity_variance * 30.,
-                        self.angular_velocity_variance * 30.,
-                    )
-                };
-
-            let payload = T265Msg {
-                pose: EncodableIsometry::from_na(&corrected_robot_pose.cast::<f64>()),
-                velocity_variance: velocity_variance,
-                angular_velocity_variance: angular_velocity_variance,
-                node_name: serial_num.to_string(),
+            let Some(kinematic_node) = ROBOT_STATE
+                .get()
+                .expect("robot state not initialized")
+                .kinematic_root
+                .get_node_with_name(&device_id)
+            else {
+                return Err(CuError::new_with_cause(
+                    "received pose from unknown device",
+                    std::io::Error::other("received pose from unknown device"),
+                ));
             };
-            new_msg.set_payload(payload);
+
+            let twist_correction = self.twist_correction.unwrap_or_else(|| {
+                use nalgebra::UnitVector3;
+
+                use crate::utils::swing_twist_decomposition;
+
+                let robot_base = pose.cast() * kinematic_node.get_isometry_from_base().inverse();
+                let up:Vector3<f64> = Vector3::z();
+                let (_, twist) = swing_twist_decomposition(&robot_base.rotation, &UnitVector3::new_normalize(up));
+                self.twist_correction = Some(twist.inverse());
+                twist.inverse()
+            });
+
+            let base_twist_corrected_pose = twist_correction * pose.cast() * kinematic_node.get_isometry_from_base().inverse();
+
+
+
+            let msg = T265Msg {
+                pose: EncodableIsometry::from_na(&base_twist_corrected_pose),
+                pose_variance: self.pose_variance,
+                velocity_variance: self.velocity_variance,
+                angular_velocity_variance: self.angular_velocity_variance,
+                node_name: device_id,
+                imu_msg: T265IMUMsg {
+                    accel: acceleration,
+                    angular_accel: angular_acceleration,
+                    velocity,
+                    angular_velocity,
+                },
+            };
+            new_msg.0.set_payload(msg);
+            self.last_seen = clock.now().as_millis();
         }
 
-        if clock.now().as_nanos() - self.last_seen > 500_000_000 {
-            return Err(CuError::new_with_cause(
-                "no pose frames seen in 500 ms",
-                std::io::Error::other("no pose frames seen in 500 ms"),
-            ));
+        if start.elapsed().as_millis() > 1 {
+            eprintln!("failed to run t265 subscriber in under 1 milisecond.");
         }
+        let mut err_msg = None;
+        if clock.now().as_millis() - self.last_seen > 500 {
+            err_msg = Some("no poses seen in 500 ms".to_string());
+        }
+
+        if clock.now().as_millis() - self.last_seen_img > 500 {
+            *err_msg.get_or_insert(String::new()) += " No images seen in 500 ms";
+        }
+
+        if let Some(ref err_msg) = err_msg {
+            return Err(CuError::from(err_msg.as_str()));
+        }
+
+
 
         Ok(())
     }
@@ -209,13 +333,16 @@ impl CuSrcTask for T265Subscriber {
 
 #[cfg(any(feature = "resim", feature = "sim"))]
 impl CuSrcTask for T265Subscriber {
-    type Output<'m> = output_msg!(PoseMsg);
+    type Output<'m> = output_msg!(T265Msg, CuImage<Vec<u8>>);
     type Resources<'r> = ();
-    fn new(config: Option<&cu29::prelude::ComponentConfig>, _resources: Self::Resources<'_>) -> cu29::CuResult<Self>
+    fn new(
+        _config: Option<&cu29::prelude::ComponentConfig>,
+        _resources: Self::Resources<'_>,
+    ) -> cu29::CuResult<Self>
     where
         Self: Sized,
     {
-        Ok(Self { last_seen: 0 })
+        Ok(Self { })
     }
     fn process<'o>(
         &mut self,
