@@ -6,6 +6,7 @@ use crate::pathfinding::flood_fill_escape;
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap, HashSet};
 use std::f32::consts::FRAC_PI_3;
+use std::io;
 
 const SQRT_3: f32 = 1.7320507764816284;
 const SQRT_3_INV: f32 = 1.0 / SQRT_3;
@@ -13,6 +14,7 @@ const GRID_SPACE: f32 = 0.1;
 const ANGLE_SPACE: f32 = FRAC_PI_3;
 
 const STEERING_POWER: f64 = 2000.0;
+const GRADIENT_COST_FACTOR: f32 = 0.5;
 
 type WorldCoord = (f32, f32);
 type WorldPose = (f32, f32, f32); // x, y, theta (rad) (+x = 0)
@@ -233,6 +235,7 @@ fn distance(a: WorldCoord, b: WorldCoord) -> f32 {
     (dx * dx + dy * dy).sqrt()
 }
 
+#[derive(Clone, Copy)]
 struct AStarKey {
     pose: GridPose,
     cost: f32,
@@ -272,18 +275,22 @@ pub fn find_policy(
     map: &OccupancyGrid,
     goal: WorldPose,
     max_acceptable_gradient: f32,
-) -> impl Fn(WorldPose) -> Steering {
+) -> Result<impl Fn(&WorldPose) -> Steering, io::Error> {
 
     let goal_index = cartesian_to_index(goal);
 
     let mut frontier: BinaryHeap<AStarKey> = BinaryHeap::new();
+    let mut frontier_set: HashMap<GridPose, f32> = HashMap::new();
     let mut visited: HashSet<GridPose> = HashSet::new();
     let mut policy: HashMap<GridPose, Steering> = HashMap::new();
     
     frontier.push(AStarKey { pose: goal_index, cost: 0.0 });
+    frontier_set.insert(goal_index, 0.0);
 
     while !frontier.is_empty() {
         let next = frontier.pop().unwrap();
+        frontier_set.remove(&next.pose);
+
         visited.insert(next.pose);
 
         for neighbor in iso_neighbors(map, next.pose) {
@@ -291,17 +298,35 @@ pub fn find_policy(
                 continue;
             }
 
-            // Is it in the frontier?
-            if frontier.iter().map(|x| {x.pose}).any(|x| {x == next.pose}) {
+            let (world_x, world_y, _) = index_to_cartesian(neighbor.2);
+            let gradient = map.gradient_around(world_x, world_y, 1)?.unwrap_or(0.0);
+            let gradient_cost = if gradient > max_acceptable_gradient { f32::INFINITY } else { gradient * GRADIENT_COST_FACTOR };
+            let end_cost = next.cost + neighbor.1 + gradient_cost;
 
+            // Is it in the frontier? If so, update it iff we just found a better path.
+            if let Some(&current_cost) = frontier_set.get(&neighbor.2) {
+                if current_cost > end_cost {
+                    policy.insert(neighbor.2, neighbor.0);
+
+                    frontier.retain(|x| {x.pose != neighbor.2});
+                    frontier.push(AStarKey { pose: neighbor.2, cost: end_cost });
+                    frontier_set.insert(neighbor.2, end_cost);
+                }
+                continue;
             }
 
-            // But wait, the actions are associated with paths, not points. What do you do?
+            policy.insert(neighbor.2, neighbor.0);
+
+            frontier.push(AStarKey { pose: neighbor.2, cost: end_cost });
+            frontier_set.insert(neighbor.2, end_cost);
         }
     }
 
-
-    return |s| {Steering::new(0.0, 0.0, 0.0)}
+    return Ok( move |&x: &WorldPose| {
+        // Voronoi. Consider using interpolation instead.
+        let closest = cartesian_to_index(x);
+        *policy.get(&closest).unwrap_or(&Steering::new(0.0, 0.0, STEERING_POWER))
+    })
 }
 
 fn index_to_cartesian(grid_pose: GridPose) -> WorldPose {
@@ -372,8 +397,10 @@ fn iso_neighbors(map: &OccupancyGrid, pose: GridPose) -> Vec<(Steering, f32, Gri
         // We've rotated the little difference on the end, the rotation doesn't need to be added again
         let result = (pose.0 + dif.0, pose.1 + dif.1, dif.2);
 
-        // TODO steering inputs
-        out.push((Steering::new_ik(0.0, 0.0, 0.0), 1.0, result));
+        if is_iso_point_in_bounds(map, result) {
+            // TODO steering inputs
+            out.push((Steering::new_ik(0.0, 0.0, 0.0), 1.0, result));
+        }
     }
 
     out
