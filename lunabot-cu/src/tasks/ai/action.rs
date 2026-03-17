@@ -122,6 +122,7 @@ impl LunabotAction {
             LunabotAction::CalculatePath => {
                 if let Some(ref local_map) = blackboard.latest_local_map {
                     // if the kinematic root is not initialized, we might as well just blow up because nothing will work anyways
+                    //   ^ I like this reasoning around when to panic, it'd be a good teaching example! --H
                     let current_translation = ROBOT_STATE
                         .get()
                         .unwrap()
@@ -141,15 +142,14 @@ impl LunabotAction {
                         let status = path_finder.get_status();
                         if status == Success {
                             // Job completed successfully, get the path
-                            if let Some(path) = path_finder.get_output() {
+                            if let Some(policy) = path_finder.get_output() {
                                 println!(
-                                    "Path calculation completed with {} waypoints",
-                                    path.len()
+                                    "Navigation policy calculation completed",
                                 );
-                                blackboard.calculated_path = Some(path.clone());
+                                blackboard.calculated_path = Some(policy.clone());
                                 blackboard.path_finder = None;
                                 if let Some(ref follower) = blackboard.path_follower {
-                                    if let Err(e) = follower.send_to_job(path) {
+                                    if let Err(e) = follower.send_to_job(policy) {
                                         eprintln!(
                                             "Failed to send new path to existing follower: {e}"
                                         );
@@ -212,11 +212,10 @@ impl LunabotAction {
                 } else {
                     // Use the calculated path from CalculatePath action
                     if let Some(path) = blackboard.calculated_path.take() {
-                        println!("Starting new follow path job with {} waypoints", path.len());
+                        println!("Starting new follow path job");
                         let mut follower_job = follow_path_job(
                             ROBOT_STATE.get().unwrap().kinematic_root,
                             path,
-                            None,
                             None,
                             None,
                             None,
@@ -266,42 +265,43 @@ impl LunabotAction {
                 Success
             }
             LunabotAction::RotateToFacePath => {
-                if ROBOT_STATE.get().is_none() {
-                    eprintln!(
-                        "Cannot start rotation shim job because ROBOT_STATE is not initialized"
-                    );
-                    Failure
-                } else if let Some(ref mut rotation_shim) = blackboard.rotation_shim {
-                    blackboard.outgoing_steering_msg = rotation_shim.get_output();
-                    let status = rotation_shim.get_status();
-                    if status == Success || status == Failure {
-                        println!(
-                            "Rotate to face path job completed with status: {:?}",
-                            status
-                        );
-                        blackboard.rotation_shim = None;
-                    }
-                    status
-                } else {
-                    // Use the calculated path from CalculatePath action
-                    if let Some(ref path) = blackboard.calculated_path {
-                        let Some(target_yaw) = direction_from_path(path) else {
-                            eprintln!("Calculated path has < 2 nodes");
-                            return (Failure, 0.0);
-                        };
-                        let mut rotation_shim = rotation_shim(target_yaw, 0.1, None, None);
-                        let job_initial_status = rotation_shim.get_status();
-                        blackboard.rotation_shim = Some(rotation_shim);
-                        println!(
-                            "Face path job started with initial status: {:?}",
-                            job_initial_status
-                        );
-                        job_initial_status
-                    } else {
-                        eprintln!("Cannot face path: no calculated path available");
-                        Failure
-                    }
-                }
+                // if ROBOT_STATE.get().is_none() {
+                //     eprintln!(
+                //         "Cannot start rotation shim job because ROBOT_STATE is not initialized"
+                //     );
+                //     Failure
+                // } else if let Some(ref mut rotation_shim) = blackboard.rotation_shim {
+                //     blackboard.outgoing_steering_msg = rotation_shim.get_output();
+                //     let status = rotation_shim.get_status();
+                //     if status == Success || status == Failure {
+                //         println!(
+                //             "Rotate to face path job completed with status: {:?}",
+                //             status
+                //         );
+                //         blackboard.rotation_shim = None;
+                //     }
+                //     status
+                // } else {
+                //     // Use the calculated path from CalculatePath action
+                //     if let Some(ref path) = blackboard.calculated_path {
+                //         let Some(target_yaw) = direction_from_path(path) else {
+                //             eprintln!("Calculated path has < 2 nodes");
+                //             return (Failure, 0.0);
+                //         };
+                //         let mut rotation_shim = rotation_shim(target_yaw, 0.1, None, None);
+                //         let job_initial_status = rotation_shim.get_status();
+                //         blackboard.rotation_shim = Some(rotation_shim);
+                //         println!(
+                //             "Face path job started with initial status: {:?}",
+                //             job_initial_status
+                //         );
+                //         job_initial_status
+                //     } else {
+                //         eprintln!("Cannot face path: no calculated path available");
+                //         Failure
+                //     }
+                // }
+                Failure // Disabled, remove once tested.
             }
         };
         (status, 0.0)

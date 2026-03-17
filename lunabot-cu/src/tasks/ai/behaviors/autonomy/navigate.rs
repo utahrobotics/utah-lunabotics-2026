@@ -10,8 +10,6 @@ pub fn navigate_behavior() -> Behavior<LunabotAction> {
             // one extra yield to avoid busy looping, in case the stage was set in the same tick
             Action(LunabotAction::Yield),
             Action(LunabotAction::CalculatePath),
-            // hale's path follow shouldn't need this
-            // Action(LunabotAction::RotateToFacePath),
             Race(vec![
                 Action(LunabotAction::FollowPath),
                 While(

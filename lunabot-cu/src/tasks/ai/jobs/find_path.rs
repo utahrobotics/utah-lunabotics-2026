@@ -1,10 +1,9 @@
-use crate::pathfinding::OccupancyGrid;
+use crate::pathfinding::{OccupancyGrid, field_dstar::{ActionControl, NavigationPolicy, find_policy}};
 use nalgebra::Vector2;
 use rerun::Vec2D;
 use tasker::tokio::sync::mpsc;
 
 use crate::{
-    pathfinding::field_dstar::find_path_dstar,
     rerun_viz::RECORDER,
     tasks::{ai::jobs::Job, realsense_occupancy_grid::GLOBAL_MAP},
 };
@@ -22,19 +21,19 @@ pub fn find_path_job(
     max_acceptable_gradient_expander: f32,
     max_acceptable_gradient_pathfinder: f32,
     robot_radius: f32,
-) -> Job<Vec<Vector2<f32>>, ()> {
+) -> Job<NavigationPolicy, ()> {
     let (output_tx, output_rx) = mpsc::channel(5);
 
     Job::spawn(
         async move {
-            if let Some(rec) = RECORDER.get() {
-                let _ = rec.recorder.log(
-                    "ai/position",
-                    &rerun::Points2D::new([Vec2D::new(start.x, start.y)])
-                        .with_colors([rerun::Color::from_rgb(0, 255, 0)]),
-                );
-            }
-            let path_result = tasker::tokio::task::spawn_blocking(move || {
+            // if let Some(rec) = RECORDER.get() {
+            //     let _ = rec.recorder.log(
+            //         "ai/position",
+            //         &rerun::Points2D::new([Vec2D::new(start.x, start.y)])
+            //             .with_colors([rerun::Color::from_rgb(0, 255, 0)]),
+            //     );
+            // }
+            let policy_result = tasker::tokio::task::spawn_blocking(move || {
                 let global_map_guard = if let Some(global_map) = GLOBAL_MAP.get() {
                     global_map.read().ok()
                 } else {
@@ -55,33 +54,32 @@ pub fn find_path_job(
                     return None;
                 };
 
-                find_path_dstar(
+                find_policy(
                     &expanded,
-                    [start.x, start.y],
-                    [end.x, end.y],
+                    (end.x, end.y, 0.0),
                     max_acceptable_gradient_pathfinder,
-                )
+                ).ok()
             })
             .await
             .unwrap_or(None);
 
-            let result = if let Some(path) = path_result {
-                if let Some(rec) = RECORDER.get() {
-                    let _ = rec.recorder.log(
-                        "ai/calculated_path",
-                        &rerun::LineStrips2D::new([path
-                            .iter()
-                            .map(|p| Vec2D::new(p.0, p.1))
-                            .collect::<Vec<_>>()])
-                        .with_colors([rerun::Color::from_rgb(0, 200, 0)])
-                        .with_draw_order(100.0),
-                    );
-                }
+            let result = if let Some(policy) = policy_result {
+                // if let Some(rec) = RECORDER.get() {
+                //     let _ = rec.recorder.log(
+                //         "ai/calculated_path",
+                //         &rerun::LineStrips2D::new([path
+                //             .iter()
+                //             .map(|p| Vec2D::new(p.0, p.1))
+                //             .collect::<Vec<_>>()])
+                //         .with_colors([rerun::Color::from_rgb(0, 200, 0)])
+                //         .with_draw_order(100.0),
+                //     );
+                // }
 
-                let vector_path: Vec<Vector2<f32>> =
-                    path.into_iter().map(|(x, y)| Vector2::new(x, y)).collect();
+                // let vector_path: Vec<Vector2<f32>> =
+                //     path.into_iter().map(|(x, y)| Vector2::new(x, y)).collect();
 
-                let _ = output_tx.send(vector_path).await;
+                let _ = output_tx.send(policy).await;
                 bonsai_bt::Status::Success
             } else {
                 bonsai_bt::Status::Failure
