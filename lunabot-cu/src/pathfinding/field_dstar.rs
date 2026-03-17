@@ -265,6 +265,18 @@ impl PartialEq for AStarKey {
 impl Eq for AStarKey {}
 
 
+/// Represents the action that should be performed at a given node.
+#[derive(Clone, Copy, Debug)]
+struct ActionControl {
+    /// omega / (v + omega)
+    ///   where omega is turn rate and v is forward velocity
+    /// 1.0 is full turning CCW, 0.0 is full ahead, and -1.0
+    /// is full turning CW
+    turn_percent: f32,
+    forward: bool,
+}
+
+
 /// Finds a policy (what to do in any state) from an obstacle map, and
 /// a goal. Uses reverse A*, which is fairly inefficient, on a lattice
 /// using motion primitives.
@@ -275,14 +287,14 @@ pub fn find_policy(
     map: &OccupancyGrid,
     goal: WorldPose,
     max_acceptable_gradient: f32,
-) -> Result<impl Fn(&WorldPose) -> Steering, io::Error> {
+) -> Result<impl Fn(&WorldPose) -> Option<ActionControl>, io::Error> {
 
     let goal_index = cartesian_to_index(goal);
 
     let mut frontier: BinaryHeap<AStarKey> = BinaryHeap::new();
     let mut frontier_set: HashMap<GridPose, f32> = HashMap::new();
     let mut visited: HashSet<GridPose> = HashSet::new();
-    let mut policy: HashMap<GridPose, Steering> = HashMap::new();
+    let mut policy: HashMap<GridPose, ActionControl> = HashMap::new();
     
     frontier.push(AStarKey { pose: goal_index, cost: 0.0 });
     frontier_set.insert(goal_index, 0.0);
@@ -325,7 +337,7 @@ pub fn find_policy(
     return Ok( move |&x: &WorldPose| {
         // Voronoi. Consider using interpolation instead.
         let closest = cartesian_to_index(x);
-        *policy.get(&closest).unwrap_or(&Steering::new(0.0, 0.0, STEERING_POWER))
+        policy.get(&closest).map(|v| *v) // Make sure to deref the inside if Some
     })
 }
 
@@ -359,8 +371,8 @@ fn cartesian_to_iso(x: f32, y: f32) -> (f32, f32) {
     )
 }
 
-/// Returns: (Steering, cost weight (path length), end state)
-fn iso_neighbors(map: &OccupancyGrid, pose: GridPose) -> Vec<(Steering, f32, GridPose)> {
+/// Returns: (ActionControl, cost weight (path length), end state)
+fn iso_neighbors(map: &OccupancyGrid, pose: GridPose) -> Vec<(ActionControl, f32, GridPose)> {
     let motion_primitives = [
         (0,1,0),
 
@@ -398,8 +410,20 @@ fn iso_neighbors(map: &OccupancyGrid, pose: GridPose) -> Vec<(Steering, f32, Gri
         let result = (pose.0 + dif.0, pose.1 + dif.1, dif.2);
 
         if is_iso_point_in_bounds(map, result) {
-            // TODO steering inputs
-            out.push((Steering::new_ik(0.0, 0.0, 0.0), 1.0, result));
+            // Determine steering
+            let angle = dif.2 as f32 * ANGLE_SPACE;
+            let (x, y, _) = index_to_cartesian(dif);
+            let arc_length = 
+                if angle.abs() < 1e-16 {
+                    (x.powi(2) + y.powi(2)).sqrt() * angle * 0.5 / (0.5 * angle).sin()
+                } else {
+                    y.abs()
+                }
+            ;
+            let turn_percent = -angle / (arc_length + angle.abs());
+            let forward = y >= 0.0;
+            
+            out.push((ActionControl { turn_percent, forward}, angle.abs() + arc_length.abs(), result));
         }
     }
 
