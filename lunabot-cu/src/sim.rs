@@ -26,6 +26,7 @@ use simple_motion::{ChainBuilder, NodeSerde};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, Ordering};
 use wgsl_pcl::wgsl_setup::{init_gpu_blocking, is_gpu_initialized};
 extern crate cu_bincode as bincode;
 
@@ -232,11 +233,12 @@ fn sim_callback(
             static LAST_LOG_TIME: OnceLock<AtomicU64> = OnceLock::new();
             let log_interval_ns = 1_000_000_000 / 200; // t265 runs at 200 hz
             let last_output_time = LAST_LOG_TIME.get_or_init(|| AtomicU64::new(0));
-
             let now_ns = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()
                 .as_nanos() as u64;
+            output.0.metadata.process_time.start = OptionCuTime::from(Some(CuTime::from_nanos(now_ns)));
+            output.0.metadata.process_time.end = OptionCuTime::from(Some(CuTime::from_nanos(now_ns)));
             let last = last_output_time.load(Ordering::Relaxed);
             if now_ns - last > log_interval_ns
                 && let Some(lunabot_body) = data.body("simplify_lunabot")
@@ -385,7 +387,14 @@ fn main() {
 
     let start = std::time::Instant::now();
 
-    while viewer.running() {
+    let running = Arc::new(AtomicBool::new(true));
+    let running_clone = running.clone();
+    ctrlc::set_handler(move || {
+        running_clone.store(false, Ordering::SeqCst);
+    })
+    .expect("Failed to set Ctrl+C handler");
+
+    while viewer.running() && running.load(Ordering::SeqCst) {
         let loop_start = std::time::Instant::now();
         robot_clock_mock.set_value(start.elapsed().as_nanos() as u64);
 
@@ -420,6 +429,14 @@ fn main() {
             std::thread::sleep(loop_duration - elapsed);
         }
     }
+
+    let mut sim_cb =
+        |step: default::SimStep| -> SimOverride { sim_callback(step, data, &mut renderer) };
+    application
+        .stop_all_tasks(&mut sim_cb)
+        .expect("Failed to stop all tasks.");
+    drop(application);
+    drop(copper_ctx);
 
     debug!("End of log replay.");
 }

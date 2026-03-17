@@ -1,4 +1,7 @@
 use bincode::de::Decoder;
+use bincode::de::read::Reader;
+use bincode::enc::Encoder;
+use bincode::enc::write::Writer;
 use bincode::error::DecodeError;
 use bincode::{Decode, Encode};
 use cu29::prelude::{ArrayLike, CuHandle};
@@ -21,7 +24,7 @@ impl CuDepthFrameFormat {
     }
 }
 
-#[derive(Debug, Default, Clone, Encode)]
+#[derive(Debug, Default, Clone)]
 pub struct CuDepthFrame<A>
 where
     A: ArrayLike<Element = u16>,
@@ -31,11 +34,36 @@ where
     pub buffer_handle: CuHandle<A>,
 }
 
+impl<A> Encode for CuDepthFrame<A>
+where
+    A: ArrayLike<Element = u16>,
+{
+    fn encode<E: Encoder>(&self, encoder: &mut E) -> Result<(), bincode::error::EncodeError> {
+        self.seq.encode(encoder)?;
+        self.format.encode(encoder)?;
+        self.buffer_handle.with_inner(|buf| {
+            let len = buf.len();
+            len.encode(encoder)?;
+            // u16 is plain data; reinterpreting as bytes is safe.
+            let bytes = unsafe {
+                core::slice::from_raw_parts(buf.as_ptr() as *const u8, len * 2)
+            };
+            encoder.writer().write(bytes)
+        })
+    }
+}
+
 impl Decode<()> for CuDepthFrame<Vec<u16>> {
     fn decode<D: Decoder>(decoder: &mut D) -> Result<Self, DecodeError> {
         let seq = u64::decode(decoder)?;
         let format = CuDepthFrameFormat::decode(decoder)?;
-        let buffer = Vec::<u16>::decode(decoder)?;
+        let len = usize::decode(decoder)?;
+        let mut bytes = vec![0u8; len * 2];
+        decoder.reader().read(&mut bytes)?;
+        let buffer: Vec<u16> = bytes
+            .chunks_exact(2)
+            .map(|c| u16::from_ne_bytes([c[0], c[1]]))
+            .collect();
         Ok(Self { seq, format, buffer_handle: CuHandle::new_detached(buffer) })
     }
 }
