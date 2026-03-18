@@ -24,7 +24,6 @@ config/icon="uid://c3b2y3ky1m03k"
 NotificationCanvasGlobal="res://GUI/NotificationSystem/Assets/NotificationCanvas.tscn"
 SettingsMenu="*res://GUI/SettingsMenu/Scene/SettingsMenu.tscn"
 GlobalLunabaseConnection="*uid://ccrcffoncdpkm"
-ControllerIcons="*uid://dwvsxlq6fr7qk"
 
 [display]
 
@@ -33,7 +32,7 @@ window/size/viewport_height=700
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/controller_icons/plugin.cfg", "res://addons/virtual_joystick_plus/plugin.cfg")
+enabled=PackedStringArray("res://addons/virtual_joystick_plus/plugin.cfg")
 
 [file_customization]
 
