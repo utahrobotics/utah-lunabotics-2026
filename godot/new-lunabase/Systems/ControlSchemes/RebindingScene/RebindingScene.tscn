@@ -21,6 +21,30 @@ corner_radius_top_right = 4
 corner_radius_bottom_right = 4
 corner_radius_bottom_left = 4
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_k5k4w"]
+bg_color = Color(0.27359983, 0.5217333, 0.40125072, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.5, 0.8, 1, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_nt7sp"]
+bg_color = Color(0.42055055, 0.6698155, 0.46187788, 0.9019608)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.4, 0.7, 1, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bkado"]
 bg_color = Color(0.91297865, 0.15780154, 0.2832339, 0.8)
 border_width_left = 1
@@ -171,6 +195,8 @@ visible = false
 layout_mode = 2
 theme = ExtResource("3_q0chg")
 theme_override_styles/normal = SubResource("StyleBoxFlat_1i5ij")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_k5k4w")
+theme_override_styles/hover = SubResource("StyleBoxFlat_nt7sp")
 text = "Confirm Bindings"
 
 [node name="SaveBindingsButton" type="Button" parent="LeftColumn/InformationPanel/MarginContainer/VBox" unique_id=809130462]
