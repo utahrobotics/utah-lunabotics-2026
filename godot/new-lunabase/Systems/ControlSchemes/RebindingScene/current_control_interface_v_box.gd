@@ -7,7 +7,6 @@ var regex = RegEx.new()
 var controls = ""
 
 func _ready() -> void:
-	setup()
 	rebinding_scene.new_binding.connect(add_binding_text)
 	rebinding_scene.new_message.connect(append_text)
 	regex.compile(r"\(([^)]*)\)")

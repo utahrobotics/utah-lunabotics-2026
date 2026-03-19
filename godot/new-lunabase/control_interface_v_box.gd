@@ -4,7 +4,7 @@ extends VBoxContainer
 
 func _ready() -> void:
 	populate_control_text()
-	SettingsMenu.control_scheme_switcher.updated_control_scheme.connect(populate_control_text)
+	SettingsMenu.updated_control_scheme.connect(populate_control_text)
 
 
 func populate_control_text():

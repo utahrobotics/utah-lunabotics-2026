@@ -2,13 +2,16 @@ class_name LunabaseHumanController extends Node
 
 @export var actor_path: NodePath
 @export var is_actor_lunabase_connection := true
-var actor: Node
 
 @export var default_path := "res://Systems/CommandPattern/SavedHistory/lunabotHistory.tres"
 
 @export var deadzone: float = 0.2
 
 @onready var speed_slider = $"../VBoxContainer/MainContent/HBoxContainer/RightColumn/SpeedControl/MarginContainer/VBox/SpeedMultiplierSlider"
+
+var actor: Node
+
+var can_send_inputs
 
 var command_recorder: CommandRecorder
 
@@ -34,9 +37,13 @@ func _ready() -> void:
 	
 	command_recorder = CommandRecorder.new(actor, default_path)
 	add_child(command_recorder)
+	SettingsMenu.toggle_can_accept_inputs.connect(set_can_send_inputs)
+
+func set_can_send_inputs(_can_send_inputs):
+	can_send_inputs = _can_send_inputs
 
 func _process(_delta: float) -> void:
-	if not actor:
+	if not actor or not can_send_inputs:
 		return
 	
 	# === STEERING (Keyboard + Gamepad) ===

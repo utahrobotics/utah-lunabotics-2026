@@ -1,11 +1,12 @@
-[gd_scene load_steps=2 format=3 uid="uid://ckw0b1ev05lwy"]
+[gd_scene format=3 uid="uid://ckw0b1ev05lwy"]
 
 [ext_resource type="Script" uid="uid://bfwxau0mdtqc5" path="res://GUI/NotificationSystem/Assets/NotificationCanvas.gd" id="1_1ygk3"]
 
-[node name="CanvasLayer" type="CanvasLayer"]
+[node name="CanvasLayer" type="CanvasLayer" unique_id=327672202]
+visible = false
 script = ExtResource("1_1ygk3")
 
-[node name="NotificationCanvas" type="Control" parent="."]
+[node name="NotificationCanvas" type="Control" parent="." unique_id=362264945]
 layout_mode = 3
 anchors_preset = 1
 anchor_left = 1.0
@@ -16,7 +17,7 @@ grow_horizontal = 0
 mouse_filter = 1
 mouse_behavior_recursive = 2
 
-[node name="ScrollContainer" type="ScrollContainer" parent="NotificationCanvas"]
+[node name="ScrollContainer" type="ScrollContainer" parent="NotificationCanvas" unique_id=2035034701]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -24,11 +25,11 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="VBoxContainer" type="VBoxContainer" parent="NotificationCanvas/ScrollContainer"]
+[node name="VBoxContainer" type="VBoxContainer" parent="NotificationCanvas/ScrollContainer" unique_id=935300687]
 layout_mode = 2
 size_flags_horizontal = 3
 
-[node name="TotalLabel" type="Label" parent="NotificationCanvas"]
+[node name="TotalLabel" type="Label" parent="NotificationCanvas" unique_id=166511454]
 layout_mode = 1
 anchors_preset = 3
 anchor_left = 1.0
@@ -43,7 +44,7 @@ grow_horizontal = 0
 grow_vertical = 0
 text = "Total: 0"
 
-[node name="ClearAllButton" type="Button" parent="NotificationCanvas"]
+[node name="ClearAllButton" type="Button" parent="NotificationCanvas" unique_id=1071090145]
 layout_mode = 1
 anchors_preset = 3
 anchor_left = 1.0

@@ -1,7 +1,8 @@
 extends Control
-
+@onready var current_control_interface_v_box: VBoxContainer = $LeftColumn/CurrentControlsPanel/MarginContainer/CurrentControlInterfaceVBox
 @onready var label = $StatusLabel
 @export var current_scheme: ControlSchemeResource
+
 var is_rebinding: bool = false
 var current_action_to_bind: String = ""
 
@@ -14,8 +15,15 @@ signal input_received
 signal new_message
 
 func _ready() -> void:
+	setup()
+
+func setup():
+	is_rebinding = false
+	current_action_to_bind = ""
+	current_scheme = ControlSchemeResource.new()
 	rebind_all_controls()
 	update_ui()
+	current_control_interface_v_box.setup()
 
 func update_ui():
 	skip_binding_button.visible = is_rebinding
@@ -89,11 +97,13 @@ func _on_skip_binding_button_pressed() -> void:
 	skip_binding()
 
 func _on_rebind_pressed() -> void:
-	get_tree().reload_current_scene()
+	setup()
 
 #TODO COMPLETE
 func _on_confirm_bindings_pressed() -> void:
-	pass # Replace with function body.
+	SettingsMenu.toggle_can_accept_inputs.emit(true)
+	SettingsMenu.updated_control_scheme.emit()
+	self.queue_free()
 
 func _on_save_bindings_button_pressed() -> void:
 	save_binding_to_file()

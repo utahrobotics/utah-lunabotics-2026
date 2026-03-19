@@ -1,12 +1,14 @@
 class_name ControlSchemeSwitcher extends Control
 
-@onready var controller_scheme_option_button: OptionButton = $Panel/VBoxContainer/HBoxContainer/ControllerSchemeOptionButton
-@onready var keyboard_scheme_option_button: OptionButton = $Panel/VBoxContainer/HBoxContainer2/KeyboardSchemeOptionButton
+@onready var controller_scheme_option_button: OptionButton = $VBoxContainer/HBoxContainer/ControllerSchemeOptionButton
+@onready var keyboard_scheme_option_button: OptionButton = $VBoxContainer/HBoxContainer2/KeyboardSchemeOptionButton
 
 @export var controller_path : String = "res://Systems/ControlSchemes/schemes/ControllerSchemes"
 @export var keyboard_path : String = "res://Systems/ControlSchemes/schemes/KeyboardSchemes"
+const REBINDING_SCENE = preload("res://Systems/ControlSchemes/RebindingScene/RebindingScene.tscn")
 
 signal updated_control_scheme
+signal close_settings_menu
 
 var controller_schemes : Array[ControlSchemeResource]
 var keyboard_schemes : Array[ControlSchemeResource]
@@ -34,10 +36,10 @@ func populate_schemes():
 		keyboard_scheme_option_button.add_item(new_resource.scheme_name)
 	_on_keyboard_scheme_option_button_item_selected(0)
 	_on_controller_scheme_option_button_item_selected(0)
-
-func _process(_delta: float) -> void:
-	if Input.is_action_just_pressed("left_wheel"):
-		print("left wheel pressed")
+#
+#func _process(_delta: float) -> void:
+	#if Input.is_action_just_pressed("left_wheel"):
+		#print("left wheel pressed")
 
 func erase_all_action_events():
 	var actions = InputMap.get_actions()
@@ -82,3 +84,8 @@ func _on_controller_scheme_option_button_item_selected(index: int) -> void:
 
 func _on_default_button_pressed() -> void:
 	populate_schemes()
+
+func _on_create_binding_button_pressed() -> void:
+	var bindings_scene = REBINDING_SCENE.instantiate()
+	get_tree().root.add_child(bindings_scene)
+	close_settings_menu.emit()
