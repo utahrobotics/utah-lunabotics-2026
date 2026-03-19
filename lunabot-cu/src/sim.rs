@@ -26,7 +26,9 @@ use simple_motion::{ChainBuilder, NodeSerde};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::OnceLock;
+use std::time::{Duration,Instant};
 use wgsl_pcl::wgsl_setup::{init_gpu_blocking, is_gpu_initialized};
+
 extern crate cu_bincode as bincode;
 
 use crate::rerun_viz::{RECORDER, ROBOT_STRUCTURE};
@@ -166,8 +168,20 @@ fn sim_callback(
         default::SimStep::V3Pico(..) => SimOverride::ExecutedBySim,
         default::SimStep::MotorCtrl(CuTaskCallbackState::Process(input, _)) => {
             if let Some(steering) = input.payload() {
-                let (left, right) = steering.get_left_and_right();
+                let (mut left, mut right) = steering.get_left_and_right();
                 let speed_mult = steering.get_weight();
+               let mut last_nonzero_motor_command = Instant::now();
+
+              if left != 0.0 || right != 0.0{
+                last_nonzero_motor_command = Instant::now();
+               // println!("{:?}",last_nonzero_motor_command.elapsed());
+             }
+             if last_nonzero_motor_command.elapsed() > Duration::from_millis(500){
+                left = 0.0;
+                right = 0.0; 
+              println!("steering packet was dropped :(")
+             }
+
                 // FIXME: probably shouldn't just put a magic number
                 let left = (left * speed_mult) * 0.022;
                 let right = (right * speed_mult) * 0.022;
@@ -178,6 +192,7 @@ fn sim_callback(
                 data.actuator("motor_fr").unwrap().view_mut(data).ctrl[0] = right;
                 data.actuator("motor_br").unwrap().view_mut(data).ctrl[0] = right;
             }
+    
             SimOverride::ExecutedBySim
         }
         default::SimStep::MotorCtrl(..) => SimOverride::ExecutedBySim,

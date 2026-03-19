@@ -74,13 +74,15 @@ func _process(_delta: float) -> void:
 	
 	# Only send steering command if it changed (avoid spamming)
 	# I have had problems where if the trigger is partially pressed it sends a bajillion commands with tiny changes
+	#not true anymore now hehehe -max
 	# this will need to be tested and perhapse rate limited if need be
-	if abs(left_speed - prev_left_speed) > 0.01 or abs(right_speed - prev_right_speed) > 0.01:
-		var cmd := SteeringCommand.new()
-		cmd.direction = Vector2(left_speed, right_speed)
-		command_recorder.execute_and_store(cmd)
-		prev_left_speed = left_speed
-		prev_right_speed = right_speed
+	#if abs(left_speed - prev_left_speed) > 0.01 or abs(right_speed - prev_right_speed) > 0.01:
+	
+	var steercmd := SteeringCommand.new()
+	steercmd.direction = Vector2(left_speed, right_speed)
+	command_recorder.execute_and_store(steercmd)
+	prev_left_speed = left_speed
+	prev_right_speed = right_speed
 		
 	
 	# === LIFT ACTUATORS (Keyboard Q/E + D-pad) ===
