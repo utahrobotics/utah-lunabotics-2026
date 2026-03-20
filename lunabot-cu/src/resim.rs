@@ -30,7 +30,7 @@ const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 
 pub static ROBOT_STATE: OnceLock<RobotState> = OnceLock::new();
 
-pub static TARGET_HZ: usize = 1000000; // MUST BE THE SAME AS THE TARGET HZ IN COPPERCONFIG.RON
+pub static TARGET_HZ: usize = 1000; // MUST BE THE SAME AS THE TARGET HZ IN COPPERCONFIG.RON
 
 #[copper_runtime(config = "copperconfig.ron", sim_mode = true)]
 struct LunabotApplication {}
@@ -63,14 +63,17 @@ fn run_one_copperlist(
     copper_list: CopperList<default::CuStampedDataSet>,
 ) {
     let msgs = &copper_list.msgs;
-    let now = msgs
+    let mut start = msgs
         .get_t_265_subscriber_outputs().0
         .metadata()
         .process_time()
-        .start
-        .unwrap()
-        .as_nanos();
-    robot_clock.set_value(now);
+        .start;
+    if start.is_none() {
+        eprintln!("[RESIM] Process time metadata not set. Ensure that the start task sets the process time.");
+       return;
+    } else {
+        robot_clock.set_value(start.unwrap().as_nanos());
+    }
 
     let mut sim_callback = move |step: default::SimStep| -> SimOverride {
         match step {
@@ -201,6 +204,7 @@ fn main() {
                     std::fs::create_dir_all(parent).expect("Failed to create logs directory");
                 }
             }
+            const LOG_READ_PATH: &'static str = "logs/lunabot.copper";
             // Create mock robot clock for simulation
             let (robot_clock, mut robot_clock_mock) = RobotClock::mock();
 
@@ -240,6 +244,7 @@ fn main() {
                 ))),
             });
 
+            println!("building application");
             let mut application = LunabotApplicationBuilder::new()
                 .with_sim_callback(&mut default_callback)
                 .with_context(&copper_ctx)
@@ -249,9 +254,8 @@ fn main() {
             application
                 .start_all_tasks(&mut default_callback)
                 .expect("Failed to start all tasks.");
-
             let UnifiedLogger::Read(dl) = UnifiedLoggerBuilder::new()
-                .file_base_name(Path::new("logs/lunabot.copper"))
+                .file_base_name(Path::new(LOG_READ_PATH))
                 .build()
                 .expect("Failed to create logger")
             else {

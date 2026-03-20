@@ -147,12 +147,12 @@ impl CuTask for AprilDetectionHandler {
         output.clear_payload();
         let (input1, input2, input3, input4) = input;
 
+        self.result_buf.clear();
+
         // Early exit if nothing to process
         if [input1, input2, input3, input4].iter().all(|i| i.payload().is_none()) {
             return Ok(());
         }
-
-        self.result_buf.clear();
 
         for particular_input in [input1, input2, input3, input4] {
             let Some(dets) = particular_input.payload() else { continue };
