@@ -82,7 +82,7 @@ impl CuSinkTask for MotorController {
 
     fn process(&mut self, _clock: &RobotClock, input: &Self::Input<'_>) -> CuResult<()> {
         if let Some(steering) = input.payload() {
-            let mut last_non_zero_steering_pack  = Instant::now();
+           self.last_non_zero_steering_pack  = Instant::now();
             let new_weight: f32 = steering.get_weight() as f32;
             if (new_weight - self.prev_speed_multi).abs() > 0.0001 {
                 self.prev_speed_multi = new_weight;
@@ -90,14 +90,15 @@ impl CuSinkTask for MotorController {
             }
             let (left, right) = steering.get_left_and_right();
             if left != 0.0 || right != 0.0{
-               last_non_zero_steering_pack = Instant::now();
+               self.last_non_zero_steering_pack = Instant::now();
             }
-            if last_non_zero_steering_pack.elapsed() > Duration::from_millis(500){
+            if self.last_non_zero_steering_pack.elapsed() > Duration::from_millis(500){
                 self.motor_ref.set_speed(0.0,0.0);
                 println!("steering packet was dropped oh no :|");
             }else{
             self.motor_ref.set_speed(left as f32, right as f32);
             }
+            
         }
 
         if let Some(telemetry) = self.motor_ref.get_latest_telemetry() {

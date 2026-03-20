@@ -10,6 +10,7 @@ mod prod_impl {
     use crossbeam::queue::ArrayQueue;
     use crossbeam_channel::Receiver;
     use cu29::prelude::*;
+    use embedded_common::Actuator;
     use embedded_common::ActuatorCommand;
     use embedded_common::FromPicoV3;
     use embedded_common::IMU_READING_DELAY_MS;
@@ -41,6 +42,7 @@ mod prod_impl {
         last_reading: Instant,
         /// prevents us from powercycling a bajillion times in a row
         last_powercycle: Instant,
+        last_non_zero_actuator_pack: Instant,
     }
 
     impl Freezable for V3PicoTask {}
@@ -156,7 +158,8 @@ mod prod_impl {
                 from_pico,
                 serial_port_writer: None,
                 last_reading: Instant::now(),
-                last_powercycle: Instant::now()
+                last_powercycle: Instant::now(),
+                last_non_zero_actuator_pack: Instant::now(),
             })
         }
 
@@ -223,15 +226,68 @@ mod prod_impl {
         /// If there is an actuator command available, and self.serial_port_writer is set, then
         /// the actuator command is written to the serial port.
         /// Messages from the pico are popped off the queue and sent to the downstream task.
+         
+
         fn process<'i, 'o>(
             &mut self,
             _clock: &RobotClock,
             input: &Self::Input<'i>,
             output: &mut Self::Output<'o>,
+
         ) -> CuResult<()> {
+
+         
             if let Some(actuator_cmd) = input.payload()
                 && let Some(ref mut writer) = self.serial_port_writer
             {
+               match actuator_cmd{
+                ActuatorCommand::SetSpeed(speed, actuator )=> {
+                 if *speed > 0 {
+                  self.last_non_zero_actuator_pack = Instant::now();
+                 } 
+                 if self.last_non_zero_actuator_pack.elapsed() < Duration::from_millis(500){
+                    let send_speed_zero_lift = ActuatorCommand::SetSpeed(0,Acuator::Lift);
+                    let set_speed_zero_bucket = ActuatorCommand::SetSpeed(0,Actuator::Bucket);
+
+                    let byte = send_speed_zero_lift.serialize();
+                    let byte = send_speed_zero_bucket.serialize();
+                     let _ = get_tokio_handle().block_on(async {
+                    
+                    if let Err(e) = writer
+                        .write(&ActuatorCommand::serialize(&send_speed_zero_lift))
+                        .await
+                    {
+                        return Err(CuError::new_with_cause("failed to write to serial port", e));
+                    }
+                    if let Err(e) = writer.flush().await {
+                        return Err(CuError::new_with_cause("failed to flush to serial port", e));
+                    }
+                    return Ok(());
+                })?;
+                
+                    let _ = get_tokio_handle().block_on(async { 
+                  if let Err(e) = writer
+                        .write(&ActuatorCommand::serialize(&send_speed_zero_bucket))
+                        .await
+                    {
+                        return Err(CuError::new_with_cause("failed to write to serial port", e));
+                    }
+                    if let Err(e) = writer.flush().await {
+                        return Err(CuError::new_with_cause("failed to flush to serial port", e));
+                    }
+                    return Ok(());
+                })?;
+            
+    
+            }
+
+                }
+                ActuatorCommand::SetDirection(direction,actuator)=>{} 
+                ActuatorCommand::Shake => {}
+                ActuatorCommand::StartPercuss => {}
+                ActuatorCommand::StopPercuss => {}
+                
+               }
                 let _ = get_tokio_handle().block_on(async {
                     if let Err(e) = writer
                         .write(&ActuatorCommand::serialize(&actuator_cmd))
@@ -244,6 +300,7 @@ mod prod_impl {
                     }
                     return Ok(());
                 })?;
+                
             }
             if let Some(reading) = self.from_pico.pop() {
                 output.set_payload(reading);
@@ -251,7 +308,6 @@ mod prod_impl {
             } else {
                 output.clear_payload();
             }
-
             if self.last_reading.elapsed().as_millis() > 1000 {
                 return Err(CuError::new_with_cause("Pico Unresponsive", std::io::Error::other("Pico Unresponsive")));
             }

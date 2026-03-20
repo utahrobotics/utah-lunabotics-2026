@@ -94,11 +94,11 @@ func _process(_delta: float) -> void:
 	elif Input.is_action_pressed("lift_down"):
 		lift_input = -1.0
 	
-	if lift_input != prev_lift_input:
-		var cmd := LiftActuatorsCommand.new()
-		cmd.lift = int(lift_input * 127.0)
-		command_recorder.execute_and_store(cmd)
-		prev_lift_input = lift_input
+	
+	var liftcmd := LiftActuatorsCommand.new()
+	liftcmd.lift = int(lift_input * 127.0)
+	command_recorder.execute_and_store(liftcmd)
+	prev_lift_input = lift_input
 		
 	#=====Speed Slider increment and decrement
 	const SPEED_SLIDER_STEP := 100
@@ -122,11 +122,11 @@ func _process(_delta: float) -> void:
 	elif Input.is_action_pressed("bucket_down"):
 		bucket_input = -1.0
 	
-	if bucket_input != prev_bucket_input:
-		var cmd := BucketActuatorsCommand.new()
-		cmd.bucket = int(bucket_input * 127.0)
-		command_recorder.execute_and_store(cmd)
-		prev_bucket_input = bucket_input
+	#if bucket_input != prev_bucket_input:
+	var buckcmd := BucketActuatorsCommand.new()
+	buckcmd.bucket = int(bucket_input * 127.0)
+	command_recorder.execute_and_store(buckcmd)
+	prev_bucket_input = bucket_input
 	
 	if Input.is_action_just_pressed("continue_mission"):
 		command_recorder.execute_and_store(ContinueMissionCommand.new())

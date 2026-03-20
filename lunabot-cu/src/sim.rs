@@ -26,7 +26,7 @@ use simple_motion::{ChainBuilder, NodeSerde};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::OnceLock;
-use std::time::{Duration,Instant};
+use std::time::{Duration, Instant};
 use wgsl_pcl::wgsl_setup::{init_gpu_blocking, is_gpu_initialized};
 
 extern crate cu_bincode as bincode;
@@ -99,14 +99,20 @@ fn sim_callback(
 
             static LIFT_TARGET: AtomicCell<f64> = AtomicCell::new(0.0);
             static BUCKET_TARGET: AtomicCell<f64> = AtomicCell::new(0.0);
-
+            let mut last_non_zero_act_pack = Instant::now();
             if let Some(actuator_cmd) = input.payload() {
                 match actuator_cmd {
                     embedded_common::ActuatorCommand::SetSpeed(speed, actuator) => match actuator {
                         embedded_common::Actuator::Lift => {
+                            if *speed > 0 {
+                                last_non_zero_act_pack = Instant::now();
+                            }
                             LIFT_SPEED.store(*speed);
                         }
                         embedded_common::Actuator::Bucket => {
+                            if *speed > 0 {
+                                last_non_zero_act_pack = Instant::now();
+                            }
                             BUCKET_SPEED.store(*speed);
                         }
                     },
@@ -123,6 +129,12 @@ fn sim_callback(
                     embedded_common::ActuatorCommand::Shake => {}
                     embedded_common::ActuatorCommand::StartPercuss => {}
                     embedded_common::ActuatorCommand::StopPercuss => {}
+                }
+                // println!("{:?}", last_non_zero_act_pack.elapsed());
+                if last_non_zero_act_pack.elapsed() > Duration::from_millis(500) {
+                    BUCKET_SPEED.store(0);
+                    LIFT_SPEED.store(0);
+                    println!("Acuator Pack was dropped :(")
                 }
             }
 
@@ -167,20 +179,20 @@ fn sim_callback(
         }
         default::SimStep::V3Pico(..) => SimOverride::ExecutedBySim,
         default::SimStep::MotorCtrl(CuTaskCallbackState::Process(input, _)) => {
+            let mut last_nonzero_motor_command = Instant::now();
             if let Some(steering) = input.payload() {
                 let (mut left, mut right) = steering.get_left_and_right();
                 let speed_mult = steering.get_weight();
-               let mut last_nonzero_motor_command = Instant::now();
 
-              if left != 0.0 || right != 0.0{
-                last_nonzero_motor_command = Instant::now();
-               // println!("{:?}",last_nonzero_motor_command.elapsed());
-             }
-             if last_nonzero_motor_command.elapsed() > Duration::from_millis(500){
-                left = 0.0;
-                right = 0.0; 
-              println!("steering packet was dropped :(")
-             }
+                if left != 0.0 || right != 0.0 {
+                    last_nonzero_motor_command = Instant::now();
+                    //println!("{:?}", last_nonzero_motor_command.elapsed());
+                }
+                if last_nonzero_motor_command.elapsed() > Duration::from_millis(500) {
+                    left = 0.0;
+                    right = 0.0;
+                    println!("steering packet was dropped :(")
+                }
 
                 // FIXME: probably shouldn't just put a magic number
                 let left = (left * speed_mult) * 0.022;
@@ -192,7 +204,7 @@ fn sim_callback(
                 data.actuator("motor_fr").unwrap().view_mut(data).ctrl[0] = right;
                 data.actuator("motor_br").unwrap().view_mut(data).ctrl[0] = right;
             }
-    
+
             SimOverride::ExecutedBySim
         }
         default::SimStep::MotorCtrl(..) => SimOverride::ExecutedBySim,

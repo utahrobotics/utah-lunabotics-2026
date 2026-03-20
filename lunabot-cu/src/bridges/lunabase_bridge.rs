@@ -258,7 +258,7 @@ impl CuBridge for Lunabase {
             self.message_buffer.push_back(incoming_msg);
         }
 
-        if self.message_buffer.len() > 5 {
+        if self.message_buffer.len() > 100 {
             eprintln!(
                 "[WARNING] {} msgs in the from lunabase msg buffer",
                 self.message_buffer.len()
