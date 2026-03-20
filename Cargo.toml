@@ -16,7 +16,7 @@ members = [
     "misc/auto-start",
     "misc/wgsl-pcl",
 ]
-exclude = ["misc/usb-reset"]
+exclude = ["misc/usb-reset", "lunabot-embedded", "copper-rs"]
 # Shared dependencies across workspace members
 [workspace.dependencies]
 cu29 = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu29", features = [
@@ -72,6 +72,28 @@ cobs = "0.5.0"
 
 # members
 common = { path = "common" }
+
+# [patch."https://github.com/matthewashton-k/copper-rs.git"]
+# cu29                = { path = "copper-rs/core/cu29" }
+# cu29-runtime        = { path = "copper-rs/core/cu29_runtime" }
+# cu29-derive         = { path = "copper-rs/core/cu29_derive" }
+# cu29-helpers        = { path = "copper-rs/core/cu29_helpers" }
+# cu29-export         = { path = "copper-rs/core/cu29_export" }
+# cu29-traits         = { path = "copper-rs/core/cu29_traits" }
+# cu29-unifiedlog     = { path = "copper-rs/core/cu29_unifiedlog" }
+# cu29-log            = { path = "copper-rs/core/cu29_log" }
+# cu29-log-derive     = { path = "copper-rs/core/cu29_log_derive" }
+# cu29-log-runtime    = { path = "copper-rs/core/cu29_log_runtime" }
+# cu29-clock          = { path = "copper-rs/core/cu29_clock" }
+# cu29-value          = { path = "copper-rs/core/cu29_value" }
+# cu29-intern-strs    = { path = "copper-rs/core/cu29_intern_strs" }
+# cu29-base-derive    = { path = "copper-rs/core/cu29_base_derive" }
+# cu29-soa-derive     = { path = "copper-rs/core/cu29_soa_derive" }
+# cu-sensor-payloads  = { path = "copper-rs/components/payloads/cu_sensor_payloads" }
+# cu-spatial-payloads = { path = "copper-rs/components/payloads/cu_spatial_payloads" }
+# cu-apriltag         = { path = "copper-rs/components/tasks/cu_apriltag" }
+# cu-gstreamer        = { path = "copper-rs/components/sources/cu_gstreamer" }
+
 # Workspace-level metadata
 [workspace.metadata]
 # You can add custom metadata here if needed
