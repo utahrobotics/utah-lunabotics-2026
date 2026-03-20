@@ -165,11 +165,11 @@ impl CuTask for GstToImage {
         input: &Self::Input<'_>,
         output: &mut Self::Output<'_>,
     ) -> CuResult<()> {
-        if input.payload().is_none() {
-            output.clear_payload();
-            return Ok(());
-        }
-        let buffer_hold = input.payload().ok_or(CuError::from("No payload"))?;
+        output.clear_payload();
+  
+        let Some(buffer_hold) = input.payload() else {
+            return Ok(());  
+        };
         let buffer_hold = buffer_hold
             .as_ref()
             .map_readable()

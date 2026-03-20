@@ -325,8 +325,6 @@ impl CuSrcTask for T265Subscriber {
             return Err(CuError::from(err_msg.as_str()));
         }
 
-
-
         Ok(())
     }
 }
