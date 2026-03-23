@@ -1,7 +1,11 @@
 
 (
+    // Arena boundary walls as thin rectangles (thickness ~0.1m)
     walls: [
-        (0.0, 0.0, 4.57, 8.14),
+        (-0.05, -0.05, 4.62, 0.0),    // South wall
+        (-0.05, 8.14, 4.62, 8.19),     // North wall
+        (-0.05, -0.05, 0.0, 8.19),     // West wall
+        (4.57, -0.05, 4.62, 8.19),     // East wall
     ],
 
     // Central support column
