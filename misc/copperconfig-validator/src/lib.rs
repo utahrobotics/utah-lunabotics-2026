@@ -1,7 +1,7 @@
 //! This tool does not guarantee that a config will actually compile, it just checks for cycles and nodes with unused inputs or outputs.
 //! Takes from core/cu29_runtime/src/config.rs to parse a copper config and give useful error messages on if the copperconfig is a valid directed acyclic graph.
-//! The only place copper task graphs differ from normal DAGs is that a task can have multiple input types, but only one output type.
-//!     There can be multiple output edges, i.e. multiple sink tasks can subscribe to the same source task, but that source task cannot have multiple output types.
+//! Tasks can have multiple input types and multiple output types.
+//!     There can be multiple output edges, i.e. multiple sink tasks can subscribe to the same source task.
 //! All tasks must have their inputs and outputs used, dangling edges are an error.
 //! This tool does not check that the types passed tasks are valid, as the error messages reported by the copper runtime for that are useful enough.
 //!
@@ -187,7 +187,6 @@ pub enum ValidationError {
     SourceNotFound(String),
     DestinationNotFound(String),
     InvalidLoggingConfig(String),
-    MultipleOutputTypes(String, Vec<String>),
 }
 
 impl std::fmt::Display for ValidationError {
@@ -218,14 +217,6 @@ impl std::fmt::Display for ValidationError {
                 write!(f, "Destination node '{}' not found", dst.red())
             }
             ValidationError::InvalidLoggingConfig(msg) => write!(f, "{}", msg.red()),
-            ValidationError::MultipleOutputTypes(node, types) => {
-                write!(
-                    f,
-                    "Node '{}' has multiple output types: [{}]. Tasks can only have one output type.",
-                    node.red(),
-                    types.join(", ")
-                )
-            }
         }
     }
 }
@@ -542,9 +533,6 @@ impl ConfigValidator {
             return Err(ValidationError::CycleDetected(cycle));
         }
 
-        // tasks cant have multiple output types
-        self.validate_single_output_type(graph)?;
-
         let (sources, sinks, middle_nodes) = self.categorize_nodes(graph);
 
         println!("[*] {} source(s)", sources.len());
@@ -593,24 +581,6 @@ impl ConfigValidator {
         }
 
         (sources, sinks, middle_nodes)
-    }
-
-    fn validate_single_output_type(&self, graph: &ValidationGraph) -> ValidationResult<()> {
-        for node_idx in graph.node_indices() {
-            let mut output_types = HashSet::new();
-
-            for edge in graph.edges_directed(node_idx, petgraph::Direction::Outgoing) {
-                output_types.insert(edge.weight().msg.clone());
-            }
-
-            if output_types.len() > 1 {
-                let node = &graph[node_idx];
-                let types: Vec<String> = output_types.into_iter().collect();
-                return Err(ValidationError::MultipleOutputTypes(node.id.clone(), types));
-            }
-        }
-
-        Ok(())
     }
 
     fn find_cycle(&self, graph: &ValidationGraph) -> Vec<String> {

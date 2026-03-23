@@ -1,5 +1,6 @@
 use cu_bincode::{Decode, Encode};
 use cu29::cutask::CuMsg;
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use cu29::prelude::*;
 use cu29::{
     CuResult,

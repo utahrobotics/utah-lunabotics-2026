@@ -176,7 +176,8 @@ impl LunabotAction {
                             local_map.clone(),
                             start,
                             end,
-                            blackboard.obstacle_gradient_threshold,
+                            blackboard.obstacle_gradient_threshold_expander,
+                            blackboard.obstacle_gradient_threshold_pathfinder,
                             blackboard.robot_radius,
                         );
                         let initial_status = job.get_status();

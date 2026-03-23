@@ -42,14 +42,21 @@ impl CuTask for LunabotAi {
             })
             .unwrap_or(0.3) as f32;
 
-        let obstacle_gradient_threshold = config
+        let obstacle_gradient_threshold_expander = config
             .and_then(|c| {
-                c.get::<f64>("obstacle_gradient_threshold")
+                c.get::<f64>("obstacle_gradient_threshold_expander")
                     .expect("failed to deserialize")
             })
-            .unwrap_or(0.2) as f32;
+            .unwrap_or(0.5) as f32;
+        let obstacle_gradient_threshold_pathfinder = config
+            .and_then(|c| {
+                c.get::<f64>("obstacle_gradient_threshold_pathfinder")
+                    .expect("failed to deserialize")
+            })
+            .unwrap_or(0.3) as f32;
         let mut blackboard = LunabotBlackboard::default();
-        blackboard.obstacle_gradient_threshold = obstacle_gradient_threshold;
+        blackboard.obstacle_gradient_threshold_expander = obstacle_gradient_threshold_expander;
+        blackboard.obstacle_gradient_threshold_pathfinder = obstacle_gradient_threshold_pathfinder;
         blackboard.robot_radius = robot_radius_meters;
         let behavior = teleop_behavior();
         let bt = BT::new(behavior, blackboard);

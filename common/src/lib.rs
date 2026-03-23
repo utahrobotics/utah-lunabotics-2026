@@ -185,7 +185,6 @@ pub enum FromLunabase {
     LiftActuators(i8),
     BucketActuators(i8),
 
-    #[deprecated]
     LiftShake,
     /// Start autonomous mode, starting navigating to the requested x and y values.
     Navigate((f32, f32)),

@@ -19,11 +19,9 @@ use std::path::Path;
 use crate::ROBOT_STATE;
 use crate::rerun_viz::RECORDER;
 
-
 const LATERAL_VARIANCE_MODIFIER: f64 = 0.05;
 const DEPTH_VARIENCE_MODIFIER: f64 = 0.05;
 const ANGULAR_VARIANCE_MODIFIER: f64 = 0.05;
-
 
 /// Data definition that mirrors the contents of a `.ron` apriltag isometry file.
 /// The field names are intentionally kept simple so that we can be flexible with
@@ -97,7 +95,8 @@ fn load_known_apriltag_isometries() -> CuResult<HashMap<usize, Isometry3<f64>>> 
 #[derive(Default)]
 pub struct AprilDetectionHandler {
     known_tags: HashMap<usize, Isometry3<f64>>,
-    max_distance: f64
+    max_distance: f64,
+    result_buf: Vec<AprilTagMeasurement>,
 }
 
 #[derive(Clone, Copy, Debug, Encode, Decode, Serialize, Deserialize)]
@@ -126,6 +125,7 @@ impl CuTask for AprilDetectionHandler {
         &'m input_msg!(AprilTagDetections),
         &'m input_msg!(AprilTagDetections),
         &'m input_msg!(AprilTagDetections),
+        &'m input_msg!(AprilTagDetections),
     );
     // camera_id, estimated isometry of camera
     type Output<'m> = output_msg!(Vec<AprilTagMeasurement>);
@@ -135,8 +135,7 @@ impl CuTask for AprilDetectionHandler {
     fn new(config: Option<&ComponentConfig>, _resources: Self::Resources<'_>) -> CuResult<Self> {
         let known_tags = load_known_apriltag_isometries()?;
         let max_distance = config.expect("provide a config for apriltag handler").get("max_distance").expect("failed to deserialize").unwrap_or(1.0);
-
-        Ok(Self { known_tags, max_distance })
+        Ok(Self { known_tags, max_distance, result_buf: Vec::new() })
     }
 
     fn process(
@@ -146,100 +145,72 @@ impl CuTask for AprilDetectionHandler {
         output: &mut Self::Output<'_>,
     ) -> CuResult<()> {
         output.clear_payload();
-        let (input1, input2, input3) = input;
+        let (input1, input2, input3, input4) = input;
 
-        let mut result_vec: Vec<AprilTagMeasurement> = Vec::new();
+        self.result_buf.clear();
 
-        for particular_input in [input1, input2, input3] {
-            if let Some(dets) = particular_input.payload() {
-                let camera_id = dets.camera_id.as_ref().clone();
-                for observation in self.cu_detections_to_tag_observations(dets, &camera_id) {
-                    let Some(isometry) = observation.get_isometry_of_observer() else {
-                        eprintln!("tag observed by unknown camera. (make sure the camera node is correct and defined in the chain");
-                        continue;
-                    };
-                    if observation.tag_local_isometry.translation.vector.magnitude() > self.max_distance {
-                        // println!("ignored > max distance");
-                        continue;
-                    }
+        // Early exit if nothing to process
+        if [input1, input2, input3, input4].iter().all(|i| i.payload().is_none()) {
+            return Ok(());
+        }
 
-
-                    // Translational
-                    let position_state: SVector<f64, 3> = isometry.translation.vector;
-
-                    // Make covariance matrix. The eigenvalues associated with eigenvectors of 
-                    // a covarience matrix describe its variance in the directions of those eigenvectors.
-                    // So, a matrix is constructed from orthogonal eigenvectors, and chosen eigenvalues
-                    // This is done with the technique found here (https://math.stackexchange.com/questions/1261462/how-to-reconstruct-a-symmetric-matrix-given-the-eigenvalues-and-eigenvectors)
-                    let lateral_vector_1 = position_state.cross(&SVector::<f64, 3>::new(0.0, 0.0, 1.0));
-                    let lateral_vector_2 = position_state.cross(&lateral_vector_1);
-
-                    let translational_eigenvector_matrix = SMatrix::<f64, 3, 3>::from_columns(&[position_state, lateral_vector_1, lateral_vector_2]);
-
-                    let translational_eigenvalue_matrix = SMatrix::<f64, 3, 3>::from_diagonal(&SVector::<f64, 3>::new(
-                        DEPTH_VARIENCE_MODIFIER, 
-                        LATERAL_VARIANCE_MODIFIER, 
-                        LATERAL_VARIANCE_MODIFIER
-                    ));
-
-                    let position_base_covariance_matrix = 
-                        translational_eigenvector_matrix * 
-                        translational_eigenvalue_matrix * 
-                        translational_eigenvector_matrix.try_inverse().expect("April tag eigenvector matrix was not invertable. Likely a cross product edge case.")
-                    ;
-
-                    // Angular
-                    let orientation_state = 
-                        isometry.rotation.axis()
-                            .and_then(|vec| Some(vec.into_inner()))
-                            .unwrap_or(SVector::<f64, 3>::zeros())
-                        * isometry.rotation.angle()
-                    ;
-
-                    let orientation_base_covarience_matrix = SMatrix::<f64, 3, 3>::from_diagonal(&SVector::<f64, 3>::new(
-                        ANGULAR_VARIANCE_MODIFIER,
-                        ANGULAR_VARIANCE_MODIFIER,
-                        ANGULAR_VARIANCE_MODIFIER
-                    ));
-
-                    // Combination and final prep
-                    let position = [
-                        position_state.x, 
-                        position_state.y,
-                        position_state.z,
-                    ];
-                    let orientation = [
-                        orientation_state.x,
-                        orientation_state.y,
-                        orientation_state.z,
-                    ];
-
-                    let mut combined_covariance = [0.0; 36];
-
-                    for i in 0..3 {
-                        for j in 0..3 {
-                            combined_covariance[6*i + j] = position_base_covariance_matrix[3*i + j];
-                        }
-                    }
-
-                    for i in 0..3 {
-                        for j in 0..3 {
-                            combined_covariance[6*(i+3) + (j+3)] = orientation_base_covarience_matrix[3*i + j];
-                        }
-                    }
-
-                    result_vec.push(AprilTagMeasurement { 
-                        estimated_isometry: EncodableIsometry::from_na(
-                            &Isometry3::from_parts(position.into(), 
-                            UnitQuaternion::from_scaled_axis(orientation.into()))), 
-                        variance: combined_covariance
-                    });
+        for particular_input in [input1, input2, input3, input4] {
+            let Some(dets) = particular_input.payload() else { continue };
+            let camera_id = dets.camera_id.as_ref().clone();
+            for observation in self.cu_detections_to_tag_observations(dets, &camera_id) {
+                let Some(isometry) = observation.get_isometry_of_observer() else {
+                    eprintln!("tag observed by unknown camera. (make sure the camera node is correct and defined in the chain");
+                    continue;
+                };
+                if observation.tag_local_isometry.translation.vector.magnitude() > self.max_distance {
+                    continue;
                 }
+
+                let position_state: SVector<f64, 3> = isometry.translation.vector;
+
+                let lateral_vector_1 = position_state.cross(&SVector::<f64, 3>::new(0.0, 0.0, 1.0));
+                let lateral_vector_2 = position_state.cross(&lateral_vector_1);
+
+                let translational_eigenvector_matrix = SMatrix::<f64, 3, 3>::from_columns(&[position_state, lateral_vector_1, lateral_vector_2]);
+                let translational_eigenvalue_matrix = SMatrix::<f64, 3, 3>::from_diagonal(&SVector::<f64, 3>::new(
+                    DEPTH_VARIENCE_MODIFIER, LATERAL_VARIANCE_MODIFIER, LATERAL_VARIANCE_MODIFIER
+                ));
+                let position_base_covariance_matrix =
+                    translational_eigenvector_matrix *
+                    translational_eigenvalue_matrix *
+                    translational_eigenvector_matrix.try_inverse().expect("April tag eigenvector matrix was not invertable. Likely a cross product edge case.");
+
+                let orientation_state =
+                    isometry.rotation.axis()
+                        .map(|vec| vec.into_inner())
+                        .unwrap_or(SVector::<f64, 3>::zeros())
+                    * isometry.rotation.angle();
+
+                let orientation_base_covarience_matrix = SMatrix::<f64, 3, 3>::from_diagonal(&SVector::<f64, 3>::new(
+                    ANGULAR_VARIANCE_MODIFIER, ANGULAR_VARIANCE_MODIFIER, ANGULAR_VARIANCE_MODIFIER
+                ));
+
+                let mut combined_covariance = [0.0; 36];
+                for i in 0..3 {
+                    for j in 0..3 {
+                        combined_covariance[6*i + j] = position_base_covariance_matrix[3*i + j];
+                        combined_covariance[6*(i+3) + (j+3)] = orientation_base_covarience_matrix[3*i + j];
+                    }
+                }
+
+                self.result_buf.push(AprilTagMeasurement {
+                    estimated_isometry: EncodableIsometry::from_na(
+                        &Isometry3::from_parts(
+                            [position_state.x, position_state.y, position_state.z].into(),
+                            UnitQuaternion::from_scaled_axis(orientation_state.into()),
+                        )),
+                    variance: combined_covariance,
+                });
             }
         }
-        
-        if !result_vec.is_empty() {
-            output.set_payload(result_vec);
+
+        if !self.result_buf.is_empty() {
+            output.set_payload(self.result_buf.clone());
         }
         Ok(())
     }
@@ -253,6 +224,21 @@ impl CuTask for AprilDetectionHandler {
     }
 
     fn postprocess(&mut self, _clock: &RobotClock) -> CuResult<()> {
+        // Rerun visualization — runs after the main thread is done with the hot path
+        for measurement in &self.result_buf {
+            let Some(iso) = measurement.estimated_isometry.to_na() else {
+                continue;
+            };
+            if let Some(recorder) = RECORDER.get() {
+                let _ = recorder.recorder.log(
+                    "apriltags/robot_pose",
+                    &rerun::Transform3D::from_translation_rotation(
+                        iso.translation.vector.cast::<f32>().data.0[0],
+                        rerun::Quaternion::from_xyzw(iso.rotation.as_vector().cast::<f32>().data.0[0]),
+                    ),
+                );
+            }
+        }
         Ok(())
     }
 
@@ -288,7 +274,6 @@ impl AprilDetectionHandler {
         Isometry3::from_parts(physics_translation.into(), physics_rotation)
     }
 
-
     fn cu_detections_to_tag_observations(
         &self,
         dets: &AprilTagDetections,
@@ -307,41 +292,8 @@ impl AprilDetectionHandler {
             };
 
             let tag_local_isometry: Isometry3<f64> = Self::transform_cv_to_physics(pose);
+
             let tag_global_isometry = self.known_tags.get(&id).unwrap();
-
-            let tag_half_size = (0.002, 0.08, 0.08);
-
-            RECORDER
-                .get()
-                .unwrap()
-                .recorder
-                .log(
-                    format!("apriltags/{}/{}/location", camera_id, id),
-                    &Boxes3D::from_centers_and_half_sizes(vec![(0., 0., 0.)], vec![tag_half_size])
-                        .with_colors([rerun::Color::from_rgb(255, 255, 255)])
-                        .with_labels([format!("id: {}", id)]),
-                )
-                .unwrap();
-
-            RECORDER
-                .get()
-                .unwrap()
-                .recorder
-                .log(
-                    format!("apriltags/{}/{}/location", camera_id, id),
-                    &rerun::Transform3D::from_translation_rotation(
-                        tag_global_isometry.translation.vector.cast::<f32>().data.0[0],
-                        rerun::Quaternion::from_xyzw(
-                            tag_global_isometry
-                                .rotation
-                                .as_vector()
-                                .cast::<f32>()
-                                .data
-                                .0[0],
-                        ),
-                    ),
-                )
-                .unwrap();
 
             let yaw_180 = UnitQuaternion::from_euler_angles(0., 0.0, PI);
 
@@ -368,7 +320,6 @@ use nalgebra::{
     Isometry3, Rotation3, UnitQuaternion,
     Vector3,
 };
-use rerun::{Boxes3D};
 
 /// An observation of the global orientation and position
 /// of the camera that observed an apriltag.
@@ -411,7 +362,6 @@ impl TagObservation {
         // inverse of the camera isometry relative to robot base
         let camera_isometry_inverse = camera_node.get_isometry_from_base().inverse();
 
-
         // tag local isometry is the observed location of the tag as if the camera was always at 0,0,0 facing forward
         let inv_rotation = self.tag_local_isometry.rotation.inverse();
 
@@ -421,8 +371,9 @@ impl TagObservation {
                 (inv_rotation * -self.tag_local_isometry.translation.vector).into(),
                 inv_rotation,
             );
-        
+
         // this should be the position of the robot base
-        Some(isometry_of_observer_in_camera_frame * camera_isometry_inverse)
+        let result = isometry_of_observer_in_camera_frame * camera_isometry_inverse;
+        Some(result)
     }
 }

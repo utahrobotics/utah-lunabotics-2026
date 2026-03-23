@@ -5,7 +5,7 @@ use realsense_rust::{
     kind::{Rs2CameraInfo, Rs2Format, Rs2StreamKind},
     pipeline::{ActivePipeline, InactivePipeline},
 };
-use std::sync::mpsc::SyncSender;
+use std::{sync::mpsc::SyncSender, time::Duration};
 
 /// waits for a realsense to be plugged in and then starts a depth camera task that will publish depth frames
 pub fn enumerate_depth_cameras(serial_numbers: &[&str]) {
@@ -100,13 +100,21 @@ pub fn enumerate_depth_cameras(serial_numbers: &[&str]) {
                     );
                     continue;
                 };
-                let Ok(_usb_val) = usb_str.parse::<f32>() else {
+                let Ok(usb_val) = usb_str.parse::<f32>() else {
                     eprintln!(
                         "USB type descriptor for RealSense Camera {} is not f32",
                         current_serial
                     );
                     continue;
                 };
+                if usb_val < 3.0 {
+                    eprintln!(
+                        "RealSense Camera {} is on USB {:.1} — depth stream requires USB 3.0+",
+                        current_serial, usb_val
+                    );
+                    std::thread::sleep(Duration::from_secs(2));
+                    continue;
+                }
 
                 let pipeline_sender = pipeline_sender.clone();
 
@@ -135,6 +143,7 @@ pub fn enumerate_depth_cameras(serial_numbers: &[&str]) {
                     Ok(x) => x,
                     Err(e) => {
                         eprintln!("Failed to start pipeline: {}", e);
+                        std::thread::sleep(Duration::from_secs(2));
                         continue;
                     }
                 };
@@ -151,6 +160,5 @@ pub fn enumerate_depth_cameras(serial_numbers: &[&str]) {
 
 fn enable_d455_streams(config: &mut Config) -> Result<(), ConfigurationError> {
     config.enable_stream(Rs2StreamKind::Depth, None, 640, 480, Rs2Format::Z16, 30)?;
-    config.enable_stream(Rs2StreamKind::Accel, None, 0, 0, Rs2Format::Any, 0)?;
     Ok(())
 }

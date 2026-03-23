@@ -8,8 +8,9 @@
             id: "new_ai",
             type: "crate::tasks::ai::lunabot_ai::LunabotAi",
             config: {
-                "obstacle_gradient_threshold": 0.5,
-                "robot_radius_meters": 0.5,
+                "obstacle_gradient_threshold_expander": 0.9,
+                "obstacle_gradient_threshold_pathfinder": 0.3,
+                "robot_radius_meters": 0.8,
             },
         ),
         // waits for v4l udev add events, and reports them to the camera tasks
@@ -60,9 +61,9 @@
             id: "t265_subscriber",
             type: "crate::tasks::sources::T265Subscriber",
             config: {
-                "serial_num": "929122111514",
                 "t265_velocity_variance": 1.0,
                 "t265_angular_velocity_variance": 1.0,
+                "pose_variance": 0.0005,
             },
             logging: (
                 enabled: true
@@ -159,13 +160,12 @@
             config:{
                 "process_noise_position": 0.5,
                 "process_noise_velocity": 0.5,
-                "process_noise_orientation": 0.5,
-                "process_noise_angular_velocity": 0.5,
+                "process_noise_orientation": 5.01,
+                "process_noise_angular_velocity": 5.01,
                 "process_noise_acceleration": 0.5,
 
                 "initial_covariance": 100.0,
-                // max age (ms) of ICP reading for it to be used in apriltag offset computation
-                "icp_apriltag_max_age_ms": 50.0,
+
             },
 
         ),
@@ -173,7 +173,23 @@
         // receives messages from the ai_source and tells the motors to move accordingly
         (
             id:"motor_ctrl", type:"crate::tasks::sinks::MotorController", config:{
-                "speed_multiplier": 1500
+                "speed_multiplier": 1500,
+                "vesc_pairs": [
+                    {
+                        "id1": 75,
+                        "id2": 110,
+                        "mask1": "Right",
+                        "mask2": "Right",
+                        "command_both": true,
+                    },
+                    {
+                        "id1": 63,
+                        "id2": 74,
+                        "mask1": "Left",
+                        "mask2": "Left",
+                        "command_both": true,
+                    }
+                ],
             },
             run_in_sim: false,
         ),
@@ -188,8 +204,26 @@
             type: "crate::tasks::AprilDetectionHandler",
             config: {
                 // all tags > max_distance away will be ignored
-                "max_distance": 1.0
+                "max_distance": 20.5
             }
+        ),
+        (
+            id: "detector_cam_t265",
+            type: "cu_apriltag::AprilTags",
+            config: {
+                "family": "tag36h11",
+                "tag_size": 0.145,
+                "fx": 1,
+                "fy": 1,
+                "cx": 960.84,
+                "cy": 600.819,
+                "camera_id": "929122111514",
+                "distortion_path": "camera_configs/t265_distortion.ron",
+            },
+            logging: (
+                enabled: true
+            ),
+            background: true,
         )
     ],
     cnx:[
@@ -199,13 +233,16 @@
         (src:"lunabase_bridge/from_lunabase_rx", dst:"new_ai",                  msg:"common::FromLunabase"),
         (src:"localizer",                    dst:"lunabase_bridge/to_lunabase", msg:"common::FromLunabot"),
         // copper doesn't support multiple outputs on a single task so for now we just put them in a tuple and ignore one side
-        (src:"realsense_subscriber",          dst:"occupancy_grid_pipeline", msg:"(Option<iceoryx_types::IceoryxDepthFrame<307200>>, Option<iceoryx_types::ImuMsg>)"),
+        (src:"realsense_subscriber",          dst:"occupancy_grid_pipeline", msg:"crate::payloads::depth_frame::CuDepthFrame<Vec<u16>>"),
         (src:"occupancy_grid_pipeline",       dst:"new_ai",                  msg:"crate::pathfinding::OccupancyGrid"),
         (src:"new_ai",                        dst:"motor_ctrl",              msg:"common::Steering"),
         (src:"new_ai",                        dst:"v3_pico",                 msg:"embedded_common::ActuatorCommand"),
         (src:"v3_pico",                       dst:"localizer",               msg:"embedded_common::FromPicoV3"),
         (src:"detection_handler",             dst: "localizer",              msg:"Vec<crate::tasks::AprilTagMeasurement>"),
         (src:"t265_subscriber",               dst:"localizer",               msg:"crate::tasks::sources::T265Msg"),
+        (src:"t265_subscriber",               dst:"detector_cam_t265",       msg:"cu_sensor_payloads::CuImage<Vec<u8>>"),
+        (src:"detector_cam_t265",             dst: "detection_handler",      msg:"cu_apriltag::AprilTagDetections"),
+
     ],
 
     // comms to lunabase software
@@ -281,5 +318,6 @@
     // if true, each output payload of each will be logged unless a task opts out
         enable_task_logging: true,
         section_size_mib:100,
+        copperlist_count: 4,
     ),
 )
