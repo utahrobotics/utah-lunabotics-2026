@@ -187,7 +187,7 @@ impl CuTask for OccupancyGridTask {
                 )
                 .unwrap();
 
-            // Log permanent obstacles to Rerun 
+            // Log permanent obstacles to Rerun
             /*if let Some(global_map) = GLOBAL_MAP.get() {
                 if let Ok(grid) = global_map.read() {
                     let mut points = vec![];
@@ -198,18 +198,17 @@ impl CuTask for OccupancyGridTask {
                             if idx < grid.gradient_map.len() {
                                 let gradient = grid.gradient_map[idx];
                                 if gradient > PERMANENT_GRADIENT / 2.0 {
-                                    // Only show permanent obstacles - obstacles should have gradient of 10. 
+                                    // Only show permanent obstacles - obstacles should have gradient of 10.
                                     if let Ok((world_x, world_y)) =
                                         grid.cell_to_world(cell_x, cell_y)
                                     {
                                         points.push([world_x, world_y]);
-                                        colors.push([255, 0, 255]); // Bright magenta 
+                                        colors.push([255, 0, 255]); // Bright magenta
                                     }
                                 }
                             }
                         }
                     }
-                    let colors_len = colors.len(); //appease the borrowchecker
                     if !points.is_empty() {
                         logger
                             .recorder

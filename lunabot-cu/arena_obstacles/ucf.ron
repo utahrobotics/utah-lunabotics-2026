@@ -1,7 +1,12 @@
 
 (
+    // Arena boundary walls - positioned outside arena accounting for robot_radius expansion (0.4m default)
+    // After expansion, inner edges will be exactly at arena boundary (0, 0, 4.57, 8.14)
     walls: [
-        (0.0, 0.0, 4.57, 8.14),
+        (-0.5, -0.5, 5.07, -0.4),      // South wall (expands to y=0 inner edge)
+        (-0.5, 8.54, 5.07, 8.64),       // North wall (expands to y=8.14 inner edge)
+        (-0.5, -0.5, -0.4, 8.64),       // West wall (expands to x=0 inner edge)
+        (4.97, -0.5, 5.07, 8.64),       // East wall (expands to x=4.57 inner edge)
     ],
 
     // Central support column
