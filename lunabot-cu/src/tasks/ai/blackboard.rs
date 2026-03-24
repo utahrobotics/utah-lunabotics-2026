@@ -45,6 +45,9 @@ pub struct LunabotBlackboard {
     /// if a path finding job is running, it will be stored here
     pub path_finder: Option<Job<Vec<Vector2<f32>>, ()>>,
 
+    // if we're digging moon dirt, the job will be stored here
+    pub digger: Option<Job<ActuatorCommand, ()>>,
+
     /// rotation shim
     pub rotation_shim: Option<Job<Steering, ()>>,
 
@@ -78,6 +81,7 @@ impl Default for LunabotBlackboard {
             navigate_destination: None,
             yielded: false,
             path_follower: None,
+            digger: None,
             rotation_shim: None,
             obstacle_gradient_threshold_expander: 0.5,
             obstacle_gradient_threshold_pathfinder: 0.3,

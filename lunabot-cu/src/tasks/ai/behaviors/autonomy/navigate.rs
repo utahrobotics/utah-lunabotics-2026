@@ -11,7 +11,7 @@ pub fn navigate_behavior() -> Behavior<LunabotAction> {
             Action(LunabotAction::Yield),
             Action(LunabotAction::CalculatePath),
             // hale's path follow shouldn't need this
-            // Action(LunabotAction::RotateToFacePath),
+            // Action(LunabotAction::RotateToFacePath),,
             Race(vec![
                 Action(LunabotAction::FollowPath),
                 While(
@@ -19,6 +19,8 @@ pub fn navigate_behavior() -> Behavior<LunabotAction> {
                     vec![Wait(1.0), Action(LunabotAction::CalculatePath)],
                 ),
             ]),
+            // dig some dirt now that we're at the target
+            Action(LunabotAction::Dig),
         ])],
     )
 }
