@@ -1,5 +1,7 @@
 extends Control
-@onready var controller: LunabaseHumanController = $LunabaseHumanController
+
+@onready var connection:= GlobalLunabaseConnection
+@onready var controller:= $LunabaseHumanController
 @onready var ip_input: LineEdit = $VBoxContainer/TopBar/MarginContainer/TopPanel/ConnectionGroup/IPInput
 @onready var connect_button: Button = $VBoxContainer/TopBar/MarginContainer/TopPanel/ConnectionGroup/ConnectButton
 @onready var packet_label: Label = $VBoxContainer/TopBar/MarginContainer/TopPanel/StatusGroup/PacketLabel
@@ -33,7 +35,8 @@ enum LunabotStage {
 }
 
 func _ready() -> void:
-	GlobalLunabaseConnection.stage_changed.connect(_on_stage_changed)
+	
+	connection.stage_changed.connect(_on_stage_changed)
 	
 	connect_button.pressed.connect(_on_connect_pressed)
 	soft_stop_button.pressed.connect(_on_soft_stop_pressed)
@@ -83,12 +86,12 @@ func _process(delta: float) -> void:
 			stage_label.modulate = Color.CYAN
 			
 	
-	#location  maybe temporary 
-	var location = GlobalLunabaseConnection.get_location()
+	#location  
+	var location = connection.get_location()
 	location_label.text = "location: [%.2f, %.2f, %.2f]" % [location[0], location[1], location[2]]
 	
-	#orientation label prob only here for debugging purposes 
-	var orientation = GlobalLunabaseConnection.get_orientation()
+	#orientation label 
+	var orientation = connection.get_orientation()
 	orientation_label.text = "orientation: [%.2f, %.2f, %.2f, %.2f]" % [orientation[0], orientation[1], orientation[2], orientation[3]
 ]
  
