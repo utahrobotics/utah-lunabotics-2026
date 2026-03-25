@@ -101,6 +101,9 @@
                 "clear_affected_cells": false,
                 "min_distance_to_clear": 1.5,
 
+                // enable permanent obstacles 
+                "arena_obstacles": "artemis",
+
                 // parameters for when to reset the local map
                 "max_distance_traveled_before_reset": 1.5,
                 "max_rotation_radians_before_reset": 0.1,

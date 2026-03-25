@@ -1,13 +1,13 @@
 use bonsai_bt::Status::{self, *};
 use common::{LUNABOT_STAGE, LunabotStage, Steering};
-use embedded_common::{Actuator, ActuatorCommand};
+use embedded_common::{Actuator, ActuatorCommand, Direction};
 use nalgebra::Vector2;
 
 use crate::{
     ROBOT_STATE,
     tasks::ai::{
         blackboard::LunabotBlackboard,
-        jobs::{direction_from_path, find_path_job, follow_path_job, rotation_shim},
+        jobs::{dig_job, direction_from_path, find_path_job, follow_path_job, rotation_shim},
     },
 };
 static PATHFINDING_GOAL: [f32; 2] = [5.843524, 1.4796992];
@@ -44,6 +44,9 @@ pub enum LunabotAction {
     SetStage(LunabotStage),
     GetUnstuck,
 
+    // dig up some moon dirt
+    Dig,
+
     /// rotate to face a certain direction
     RotateToFacePath,
 
@@ -67,40 +70,28 @@ impl LunabotAction {
             }
             LunabotAction::SetLastBucket => {
                 if let Some(value) = blackboard.last_bucket.take() {
-                    let commands = actuator_commands_from_i8(value, Actuator::Bucket);
                     blackboard
                         .outgoing_actuator_msg_queue
-                        .push_back(commands[0]);
-                    blackboard
-                        .outgoing_actuator_msg_queue
-                        .push_back(commands[1]);
+                        .push_back(actuator_command_from_i8(value, Actuator::Bucket));
                 }
                 Success
             }
             LunabotAction::SetLastLift => {
                 if let Some(value) = blackboard.last_lift.take() {
-                    let commands = actuator_commands_from_i8(value, Actuator::Lift);
                     blackboard
                         .outgoing_actuator_msg_queue
-                        .push_back(commands[0]);
-                    blackboard
-                        .outgoing_actuator_msg_queue
-                        .push_back(commands[1]);
+                        .push_back(actuator_command_from_i8(value, Actuator::Lift));
                 }
                 Success
             }
             LunabotAction::SetBucket(value) => {
-                let [direction, speed] = actuator_commands_from_i8(*value, Actuator::Bucket);
                 blackboard.last_bucket = None;
-                blackboard.outgoing_actuator_msg_queue.push_back(direction);
-                blackboard.outgoing_actuator_msg_queue.push_back(speed);
+                blackboard.outgoing_actuator_msg_queue.push_back(actuator_command_from_i8(*value, Actuator::Bucket));
                 Success
             }
             LunabotAction::SetLift(value) => {
-                let [direction, speed] = actuator_commands_from_i8(*value, Actuator::Lift);
                 blackboard.last_lift = None;
-                blackboard.outgoing_actuator_msg_queue.push_back(direction);
-                blackboard.outgoing_actuator_msg_queue.push_back(speed);
+                blackboard.outgoing_actuator_msg_queue.push_back(actuator_command_from_i8(*value, Actuator::Lift));
                 Success
             }
             LunabotAction::IsSoftStop => match blackboard.current_mission {
@@ -171,7 +162,7 @@ impl LunabotAction {
                         }
                     } else {
                         // Start a new path finder job
-                        println!("Starting path finder job from {:?} to {:?}.", start, end);
+                        // println!("Starting path finder job from {:?} to {:?}.", start, end);
                         let mut job = find_path_job(
                             local_map.clone(),
                             start,
@@ -238,6 +229,40 @@ impl LunabotAction {
             }
             LunabotAction::CheckNavigation => Running,
             LunabotAction::GetUnstuck => todo!(),
+            LunabotAction::Dig => {
+                // Check if we already got a digging job going
+                if let Some(ref mut digger) = blackboard.digger {
+                    while let Some(command) = digger.get_output() {
+                        blackboard.outgoing_actuator_msg_queue.push_back(command);
+                    }
+
+                    let status = digger.get_status();
+                    if status == Success {
+                        // We (hopefully) have a bucket full of moon dirt now
+                        Success
+                    } else if status == Failure {
+                        // Somehow we managed to fuck this one up too
+                        eprintln!("Failed Digging job!");
+                        blackboard.digger = None;
+                        Failure
+                    } else {
+                        // Still digging
+                        Running
+                    }
+                } else {
+                    // Start a new digging job
+                    println!("Starting new digging job.");
+                    let mut job = dig_job();
+                    let initial_status: Status = job.get_status();
+                    blackboard.digger = Some(job);
+                    println!(
+                        "Digging job started with intial status {:?}",
+                        initial_status
+                    );
+
+                    initial_status
+                }
+            }
             LunabotAction::Yield => {
                 if !blackboard.yielded {
                     blackboard.yielded = true;
@@ -308,16 +333,10 @@ impl LunabotAction {
     }
 }
 
-fn actuator_commands_from_i8(value: i8, actuator: Actuator) -> [ActuatorCommand; 2] {
+fn actuator_command_from_i8(value: i8, actuator: Actuator) -> ActuatorCommand {
     if value < 0 {
-        [
-            ActuatorCommand::backward(actuator),
-            ActuatorCommand::set_speed(value as f64 / i8::MIN as f64, actuator),
-        ]
+        ActuatorCommand::set_speed(value as f64 / i8::MIN as f64, actuator, Direction::Backward)
     } else {
-        [
-            ActuatorCommand::forward(actuator),
-            ActuatorCommand::set_speed(value as f64 / i8::MAX as f64, actuator),
-        ]
+        ActuatorCommand::set_speed(value as f64 / i8::MAX as f64, actuator, Direction::Forward)
     }
 }

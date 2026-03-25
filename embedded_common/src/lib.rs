@@ -44,8 +44,7 @@ pub enum Actuator {
     derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
 )]
 pub enum ActuatorCommand {
-    SetSpeed(u16, Actuator),
-    SetDirection(Direction, Actuator),
+    SetSpeed(u16, Actuator, Direction),
     Shake,
     StartPercuss,
     #[default]
@@ -196,57 +195,42 @@ impl FromIMU {
 impl ActuatorCommand {
     pub const SIZE: usize = 5;
     pub fn deserialize(bytes: [u8; Self::SIZE]) -> Result<Self, &'static str> {
-        let actuator = {
-            if bytes[3] == Actuator::Lift as u8 {
-                Actuator::Lift
-            } else if bytes[3] == Actuator::Bucket as u8 {
-                Actuator::Bucket
-            } else if bytes[0] == 2 {
-                // shake command
-                Actuator::Lift
-            } else {
-                return Err("Unknown actuator specifier (not m1 or m2)");
-            }
-        };
         match bytes[0] {
-            tag if tag == 0 => {
+            0 => {
+                let actuator = if bytes[3] == Actuator::Lift as u8 {
+                    Actuator::Lift
+                } else if bytes[3] == Actuator::Bucket as u8 {
+                    Actuator::Bucket
+                } else {
+                    return Err("Unknown actuator specifier (not m1 or m2)");
+                };
                 let speed = u16::from_le_bytes(
                     bytes[1..=2]
                         .try_into()
                         .map_err(|_| "Wrong number of bytes in actuator command")?,
                 );
-                Ok(ActuatorCommand::SetSpeed(speed, actuator))
-            }
-            tag if tag == 1 => {
-                let dir = match bytes[1] {
-                    0 => Direction::Forward,
-                    1 => Direction::Backward,
-                    _ => return Err("Invalid direction value"),
+                let direction = if bytes[4] == Direction::Backward as u8 {
+                    Direction::Backward
+                } else {
+                    Direction::Forward
                 };
-                Ok(ActuatorCommand::SetDirection(dir, actuator))
+                Ok(ActuatorCommand::SetSpeed(speed, actuator, direction))
             }
-            tag if tag == 2 => Ok(ActuatorCommand::Shake),
-            tag if tag == 3 => Ok(ActuatorCommand::StartPercuss),
-            tag if tag == 4 => Ok(ActuatorCommand::StopPercuss),
+            2 => Ok(ActuatorCommand::Shake),
+            3 => Ok(ActuatorCommand::StartPercuss),
+            4 => Ok(ActuatorCommand::StopPercuss),
             _ => Err("Invalid variant tag"),
         }
     }
 
     pub fn serialize(&self) -> [u8; Self::SIZE] {
         match self {
-            ActuatorCommand::SetSpeed(speed, actuator) => {
+            ActuatorCommand::SetSpeed(speed, actuator, direction) => {
                 let mut bytes = [0u8; Self::SIZE];
                 bytes[0] = 0;
                 bytes[1..=2].copy_from_slice(&speed.to_le_bytes());
                 bytes[3] = *actuator as u8;
-                bytes
-            }
-            ActuatorCommand::SetDirection(dir, actuator) => {
-                let mut bytes = [0u8; 5];
-                bytes[0] = 1;
-                bytes[1] = *dir as u8;
-                bytes[2] = 0;
-                bytes[3] = *actuator as u8;
+                bytes[4] = *direction as u8;
                 bytes
             }
             ActuatorCommand::Shake => {
@@ -267,17 +251,10 @@ impl ActuatorCommand {
         }
     }
 
-    pub fn set_speed(mut speed: f64, actuator: Actuator) -> Self {
+    /// Speed is a percentage of the max the actuator can go.
+    pub fn set_speed(mut speed: f64, actuator: Actuator, direction: Direction) -> Self {
         speed = speed.clamp(0.0, 1.0);
-        ActuatorCommand::SetSpeed((speed * u16::MAX as f64) as u16, actuator)
-    }
-
-    pub fn forward(actuator: Actuator) -> Self {
-        ActuatorCommand::SetDirection(Direction::Forward, actuator)
-    }
-
-    pub fn backward(actuator: Actuator) -> Self {
-        ActuatorCommand::SetDirection(Direction::Backward, actuator)
+        ActuatorCommand::SetSpeed((speed * u16::MAX as f64) as u16, actuator, direction)
     }
 }
 
@@ -356,5 +333,165 @@ impl FromPicoV3 {
             3 => Ok(FromPicoV3::Error),
             _ => Err("invalid FromPicoV3 tag"),
         }
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "std")]
+mod tests {
+    use super::*;
+
+    fn roundtrip_angular_rate(x: f32, y: f32, z: f32) {
+        let original = AngularRate { x, y, z };
+        let bytes = original.serialize();
+        let result = AngularRate::deserialize(bytes).unwrap();
+        assert_eq!(original, result);
+    }
+
+    fn roundtrip_accel(x: f32, y: f32, z: f32) {
+        let original = AccelerationNorm { x, y, z };
+        let bytes = original.serialize();
+        let result = AccelerationNorm::deserialize(bytes).unwrap();
+        assert_eq!(original, result);
+    }
+
+    #[test]
+    fn angular_rate_roundtrip() {
+        roundtrip_angular_rate(0.0, 0.0, 0.0);
+        roundtrip_angular_rate(1.5, -2.3, 0.001);
+        roundtrip_angular_rate(f32::MAX, f32::MIN, f32::EPSILON);
+    }
+
+    #[test]
+    fn acceleration_norm_roundtrip() {
+        roundtrip_accel(0.0, -9.81, 0.0);
+        roundtrip_accel(1.0, 2.0, 3.0);
+        roundtrip_accel(f32::MAX, f32::MIN, f32::EPSILON);
+    }
+
+    #[test]
+    fn from_imu_reading_roundtrip() {
+        let rate = AngularRate { x: 0.1, y: 0.2, z: 0.3 };
+        let accel = AccelerationNorm { x: 0.0, y: -9.81, z: 0.0 };
+        let original = FromIMU::Reading(rate, accel);
+        let bytes = original.serialize();
+        let result = FromIMU::deserialize(bytes).unwrap();
+        assert_eq!(original, result);
+    }
+
+    #[test]
+    fn from_imu_no_data_ready_roundtrip() {
+        let original = FromIMU::NoDataReady;
+        let bytes = original.serialize();
+        let result = FromIMU::deserialize(bytes).unwrap();
+        assert_eq!(original, result);
+    }
+
+    #[test]
+    fn from_imu_error_roundtrip() {
+        let original = FromIMU::Error;
+        let bytes = original.serialize();
+        let result = FromIMU::deserialize(bytes).unwrap();
+        assert_eq!(original, result);
+    }
+
+    #[test]
+    fn actuator_reading_roundtrip() {
+        let original = ActuatorReading { m1_reading: 1234, m2_reading: 5678 };
+        let bytes = original.serialize();
+        let result = ActuatorReading::deserialize(bytes);
+        assert_eq!(original, result);
+    }
+
+    #[test]
+    fn actuator_command_set_speed_roundtrip() {
+        for actuator in [Actuator::Lift, Actuator::Bucket] {
+            for direction in [Direction::Forward, Direction::Backward] {
+                let original = ActuatorCommand::SetSpeed(12345, actuator, direction);
+                let bytes = original.serialize();
+                let result = ActuatorCommand::deserialize(bytes).unwrap();
+                assert_eq!(original, result);
+            }
+        }
+    }
+
+    #[test]
+    fn actuator_command_shake_roundtrip() {
+        let original = ActuatorCommand::Shake;
+        let bytes = original.serialize();
+        let result = ActuatorCommand::deserialize(bytes).unwrap();
+        assert_eq!(original, result);
+    }
+
+    #[test]
+    fn actuator_command_percuss_roundtrip() {
+        let start = ActuatorCommand::StartPercuss;
+        assert_eq!(start, ActuatorCommand::deserialize(start.serialize()).unwrap());
+
+        let stop = ActuatorCommand::StopPercuss;
+        assert_eq!(stop, ActuatorCommand::deserialize(stop.serialize()).unwrap());
+    }
+
+    #[test]
+    fn actuator_command_set_speed_helper() {
+        let cmd = ActuatorCommand::set_speed(0.5, Actuator::Lift, Direction::Forward);
+        let bytes = cmd.serialize();
+        let result = ActuatorCommand::deserialize(bytes).unwrap();
+        assert_eq!(cmd, result);
+    }
+
+    #[test]
+    fn from_pico_v3_reading_roundtrip() {
+        let rate = AngularRate { x: 1.0, y: 2.0, z: 3.0 };
+        let accel = AccelerationNorm { x: 0.0, y: -9.81, z: 0.0 };
+        let readings = [
+            FromIMU::Reading(rate, accel),
+            FromIMU::NoDataReady,
+            FromIMU::Error,
+            FromIMU::Reading(
+                AngularRate { x: -1.0, y: 0.0, z: 0.5 },
+                AccelerationNorm { x: 1.0, y: 1.0, z: 1.0 },
+            ),
+        ];
+        let act = ActuatorReading { m1_reading: 100, m2_reading: 200 };
+        let original = FromPicoV3::Reading(readings, act);
+        let bytes = original.serialize();
+        let result = FromPicoV3::deserialize(bytes).unwrap();
+        assert_eq!(original, result);
+    }
+
+    #[test]
+    fn from_pico_v3_error_roundtrip() {
+        let original = FromPicoV3::Error;
+        let bytes = original.serialize();
+        let result = FromPicoV3::deserialize(bytes).unwrap();
+        assert_eq!(original, result);
+    }
+
+    #[test]
+    fn actuator_command_invalid_tag() {
+        let bytes = [255, 0, 0, 0, 0];
+        assert!(ActuatorCommand::deserialize(bytes).is_err());
+    }
+
+    #[test]
+    fn actuator_command_invalid_actuator() {
+        let mut bytes = ActuatorCommand::SetSpeed(100, Actuator::Lift, Direction::Forward).serialize();
+        bytes[3] = 255;
+        assert!(ActuatorCommand::deserialize(bytes).is_err());
+    }
+
+    #[test]
+    fn from_imu_invalid_tag() {
+        let mut bytes = [0u8; FromIMU::SIZE];
+        bytes[0] = 255;
+        assert!(FromIMU::deserialize(bytes).is_err());
+    }
+
+    #[test]
+    fn from_pico_v3_invalid_tag() {
+        let mut bytes = [0u8; FromPicoV3::SIZE];
+        bytes[0] = 255;
+        assert!(FromPicoV3::deserialize(bytes).is_err());
     }
 }

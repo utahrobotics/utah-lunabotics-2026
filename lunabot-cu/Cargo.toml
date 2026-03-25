@@ -124,6 +124,7 @@ t265-rs ={ git = "https://github.com/utahrobotics/t265-rs.git",optional = true }
 mujoco-rs = { version = "2.2.2", features = [
     "cpp-viewer",
     "renderer",
+    "renderer-winit-fallback"
 ], optional = true, default-features = false }
 rand = "0.9.2"
 ctrlc = "3.5.2"

@@ -140,7 +140,7 @@ pub struct IMUReading {
 use std::collections::HashMap;
 
 use bitcode::{Decode, Encode};
-use embedded_common::{Actuator, ActuatorCommand};
+use embedded_common::{Actuator, ActuatorCommand, Direction};
 
 #[repr(u8)]
 #[derive(
@@ -235,35 +235,23 @@ impl FromLunabase {
         FromLunabase::BucketActuators(speed)
     }
 
-    pub fn get_lift_actuator_commands(self) -> Option<[ActuatorCommand; 2]> {
+    pub fn get_lift_actuator_command(self) -> Option<ActuatorCommand> {
         match self {
             FromLunabase::LiftActuators(value) => Some(if value < 0 {
-                [
-                    ActuatorCommand::backward(Actuator::Lift),
-                    ActuatorCommand::set_speed(value as f64 / i8::MIN as f64, Actuator::Lift),
-                ]
+                ActuatorCommand::set_speed(value as f64 / i8::MIN as f64, Actuator::Lift, Direction::Backward)
             } else {
-                [
-                    ActuatorCommand::forward(Actuator::Lift),
-                    ActuatorCommand::set_speed(value as f64 / i8::MAX as f64, Actuator::Lift),
-                ]
+                ActuatorCommand::set_speed(value as f64 / i8::MAX as f64, Actuator::Lift, Direction::Forward)
             }),
             _ => None,
         }
     }
 
-    pub fn get_bucket_actuator_commands(self) -> Option<[ActuatorCommand; 2]> {
+    pub fn get_bucket_actuator_command(self) -> Option<ActuatorCommand> {
         match self {
             FromLunabase::BucketActuators(value) => Some(if value < 0 {
-                [
-                    ActuatorCommand::forward(Actuator::Bucket),
-                    ActuatorCommand::set_speed(value as f64 / i8::MIN as f64, Actuator::Bucket),
-                ]
+                ActuatorCommand::set_speed(value as f64 / i8::MIN as f64, Actuator::Bucket, Direction::Forward)
             } else {
-                [
-                    ActuatorCommand::backward(Actuator::Bucket),
-                    ActuatorCommand::set_speed(value as f64 / i8::MAX as f64, Actuator::Bucket),
-                ]
+                ActuatorCommand::set_speed(value as f64 / i8::MAX as f64, Actuator::Bucket, Direction::Backward)
             }),
             _ => None,
         }

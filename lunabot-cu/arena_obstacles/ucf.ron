@@ -1,0 +1,17 @@
+
+(
+    // UCF arena: 8.1m by 9.14m (x: 0..8.1, y: -4.57..4.57)
+    // rects are centers and half sizes: (center_x, center_y, half_w, half_h)
+    rects: [
+        // walls (0.2m thick, inner edges at arena bounds)
+        (4.05, -4.67, 4.25, 0.1),
+        (4.05, 4.67, 4.25, 0.1), 
+        (-0.1, 0.0, 0.1, 4.77), 
+        (8.2, 0.0, 0.1, 4.77),  
+
+        // center divider wall (10cm thick at y=0) (ish)
+        (4.05, 0.0, 4.05, 0.05),
+    ],
+
+    circles: [],
+)

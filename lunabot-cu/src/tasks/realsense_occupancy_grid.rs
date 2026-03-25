@@ -30,13 +30,15 @@ use wgsl_pcl::gpu_types::AlignedMatrix4;
 use wgsl_pcl::map_layout::MapLayout;
 use wgsl_pcl::wgsl_setup::{get_device, init_gpu_blocking, is_gpu_initialized};
 
+use serde::Deserialize;
+
 use crate::ROBOT_STATE;
 use crate::pathfinding::OccupancyGrid;
+use crate::tasks::{DEPTH_FRAME_HEIGHT, DEPTH_FRAME_WIDTH};
 use crate::payloads::depth_frame::CuDepthFrame;
 use crate::rerun_viz::RECORDER;
-use crate::tasks::{DEPTH_FRAME_HEIGHT, DEPTH_FRAME_WIDTH};
-
 pub static GLOBAL_MAP: OnceLock<Arc<RwLock<OccupancyGrid>>> = OnceLock::new();
+const PERMANENT_GRADIENT: f32 = 10.0;
 
 #[allow(unused)]
 #[allow(unused)]
@@ -60,11 +62,74 @@ pub struct OccupancyGridTask {
     rolling_map_start_position: Isometry3<f64>,
     max_distance_traveled_before_reset: f64,
     max_radians_rotated_before_reset: f64,
-
-    /// pauses obstacle mapper and resets local map if the bot exceeds the speed limit
     max_linear_velocity: f64,
     max_angular_velocity: f64,
     max_acceleration: f64,
+}
+
+/// Arena obstacle configuration
+#[derive(Deserialize, Debug)]
+struct ArenaObstacles {
+    /// (center_x, center_y, half_width, half_height)
+    #[serde(default)]
+    rects: Vec<(f32, f32, f32, f32)>,
+    /// (center_x, center_y, radius)
+    #[serde(default)]
+    circles: Vec<(f32, f32, f32)>,
+}
+
+#[derive(Deserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "lowercase")]
+enum ArenaObstaclesSelection {
+    Artemis,
+    Ucf,
+}
+
+
+
+
+/// Paint known arena obstacles permanently into the occupancy grid.
+/// robot_radius is added to all obstacle extents to account for robot size.
+fn paint_permanent_obstacles(
+    grid: &mut OccupancyGrid,
+    obstacles: &ArenaObstacles,
+    robot_radius: f32,
+) {
+    // paint rects (as centers and half sizes)
+    for &(cx, cy, half_w, half_h) in &obstacles.rects {
+        let min_x = cx - half_w - robot_radius;
+        let max_x = cx + half_w + robot_radius;
+        let min_y = cy - half_h - robot_radius;
+        let max_y = cy + half_h + robot_radius;
+
+        if let (Ok((x1, y1)), Ok((x2, y2))) = (
+            grid.world_to_cell(min_x, min_y),
+            grid.world_to_cell(max_x, max_y),
+        ) {
+            for x in x1..=x2 {
+                for y in y1..=y2 {
+                    let _ = grid.set_gradient_at(x, y, PERMANENT_GRADIENT);
+                }
+            }
+        }
+    }
+    // paint circles
+    for &(cx, cy, radius) in &obstacles.circles {
+        if let Ok((center_x, center_y)) = grid.world_to_cell(cx, cy) {
+            let expanded_radius = radius + robot_radius;
+            let radius_cells = (expanded_radius / grid.layout.cell_size).ceil() as isize;
+
+            for dx in -radius_cells..=radius_cells {
+                for dy in -radius_cells..=radius_cells {
+                    if dx * dx + dy * dy <= radius_cells * radius_cells {
+                        let x = (center_x as isize + dx).max(0) as usize;
+                        let y = (center_y as isize + dy).max(0) as usize;
+                        let _ = grid.set_gradient_at(x, y, PERMANENT_GRADIENT);
+                    }
+                }
+            }
+        }
+    }
 }
 
 impl Freezable for OccupancyGridTask {}
@@ -93,6 +158,40 @@ impl CuTask for OccupancyGridTask {
                     &rerun::Boxes3D::from_centers_and_half_sizes(vec![center], vec![half_size]),
                 )
                 .unwrap();
+
+            // Log permanent obstacles to Rerun
+            /*if let Some(global_map) = GLOBAL_MAP.get() {
+                if let Ok(grid) = global_map.read() {
+                    let mut points = vec![];
+                    let mut colors = vec![];
+                    for cell_y in 0..grid.cells_y() {
+                        for cell_x in 0..grid.cells_x() {
+                            let idx = cell_x + cell_y * grid.cells_x();
+                            if idx < grid.gradient_map.len() {
+                                let gradient = grid.gradient_map[idx];
+                                if gradient > PERMANENT_GRADIENT / 2.0 {
+                                    // Only show permanent obstacles - obstacles should have gradient of 10.
+                                    if let Ok((world_x, world_y)) =
+                                        grid.cell_to_world(cell_x, cell_y)
+                                    {
+                                        points.push([world_x, world_y]);
+                                        colors.push([255, 0, 255]); // Bright magenta
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    if !points.is_empty() {
+                        logger
+                            .recorder
+                            .log_static(
+                                "realsense/permanent_obstacles",
+                                &Points2D::new(points).with_colors(colors),
+                            )
+                            .unwrap();
+                    }
+                }
+            }*/
         }
 
         Ok(())
@@ -248,6 +347,13 @@ impl CuTask for OccupancyGridTask {
             .and_then(|c| c.get::<f64>("max_depth").expect("failed to deserialize"))
             .unwrap_or(3.0) as f32;
 
+        let arena_obstacles = config
+            .and_then(|c| {
+                c.get_value::<ArenaObstaclesSelection>("arena_obstacles")
+                    .expect("failed to deserialize")
+            })
+            .or(Some(ArenaObstaclesSelection::Artemis));
+
         // use bilateral by default, fall back on gaussian
         let use_bilateral = config
             .and_then(|c| {
@@ -288,6 +394,12 @@ impl CuTask for OccupancyGridTask {
                     .expect("failed to deserialize")
             })
             .unwrap_or(std::f64::consts::PI / 4.0);
+        let robot_radius_meters = config
+            .and_then(|c| {
+                c.get::<f64>("robot_radius_meters")
+                    .expect("failed to deserialize")
+            })
+            .unwrap_or(0.4) as f32;
 
         let camera_node = ROBOT_STATE
             .get()
@@ -360,11 +472,21 @@ impl CuTask for OccupancyGridTask {
                 .map_err(|e| CuError::new_with_cause("failed to create thread pool", e))?,
         );
         GLOBAL_MAP.get_or_init(|| {
-            Arc::new(RwLock::new(OccupancyGrid {
+            let mut grid = OccupancyGrid {
                 layout: global_layout.clone(),
                 gradient_map: vec![f32::MIN; global_layout.cells_x() * global_layout.cells_y()],
                 origin: (0.0, 0.0),
-            }))
+            };
+
+            // Load and paint arena obstacles
+            if let Some(obstacles) = load_arena_obstacles(arena_obstacles) {
+                paint_permanent_obstacles(&mut grid, &obstacles, robot_radius_meters);
+
+            } else {
+                eprintln!("[OccupancyGrid] No arena obstacles loaded");
+            }
+
+            Arc::new(RwLock::new(grid))
         });
 
         Ok(Self {
@@ -506,7 +628,7 @@ impl CuTask for OccupancyGridTask {
         let output_buffer = Arc::clone(&self.output_buffer);
         let processing_flag = Arc::clone(&self.processing);
         let layout = self.local_layout;
-
+        
         self.thread_pool.spawn_fifo(move || {
             // Everything that touches the depth buffer happens inside with_inner —
             // no copy, no unsafe transmute of a cloned vec.
@@ -579,7 +701,28 @@ impl CuTask for OccupancyGridTask {
 
         Ok(())
     }
+
 }
+
+fn load_arena_obstacles(arena_obstacles: Option<ArenaObstaclesSelection>) -> Option<ArenaObstacles> {
+    match arena_obstacles {
+        Some(ArenaObstaclesSelection::Artemis) => {
+            let path = "arena_obstacles/artemis.ron";
+            let contents = std::fs::read_to_string(path).ok()?;
+            ron::de::from_str(&contents).ok()
+        }
+        Some(ArenaObstaclesSelection::Ucf) => {
+            let path = "arena_obstacles/ucf.ron";
+            let contents = std::fs::read_to_string(path).ok()?;
+            ron::de::from_str(&contents).ok()
+        }
+        None => {
+            eprintln!("No arena obstacles enabled, skipping loading");
+            None
+        }
+    }
+}
+
 
 fn log_map(
     layout: MapLayout,
@@ -647,10 +790,6 @@ fn log_map(
             }
         }
     }
-    // let _ = logger.recorder.log(
-    //     "obstacle_mapper/raw_height_map",
-    //     &Points3D::new(raw_height_points).with_colors(raw_height_colors),
-    // );
 
     // Log gradient map
     let mut gradient_points = Vec::new();
@@ -676,10 +815,6 @@ fn log_map(
             }
         }
     }
-    // let _ = logger.recorder.log(
-    //     "obstacle_mapper/gradient_map",
-    //     &Points3D::new(gradient_points).with_colors(gradient_colors),
-    // );
 
     // Log blur filtered height map
     let mut blur_height_points = Vec::new();
@@ -704,8 +839,4 @@ fn log_map(
             }
         }
     }
-    // let _ = logger.recorder.log(
-    //     "obstacle_mapper/blur_filtered_height_map",
-    //     &Points3D::new(blur_height_points).with_colors(blur_height_colors),
-    // );
 }
