@@ -1,33 +1,17 @@
 
 (
-    // Arena boundary walls - positioned outside arena accounting for robot_radius expansion (0.4m default)
-    // After expansion, inner edges will be exactly at arena boundary (0, 0, 4.57, 8.14)
-    walls: [
-        (-0.5, -0.5, 5.07, -0.4),      // South wall (expands to y=0 inner edge)
-        (-0.5, 8.54, 5.07, 8.64),       // North wall (expands to y=8.14 inner edge)
-        (-0.5, -0.5, -0.4, 8.64),       // West wall (expands to x=0 inner edge)
-        (4.97, -0.5, 5.07, 8.64),       // East wall (expands to x=4.57 inner edge)
+    // UCF arena: 8.1m by 9.14m (x: 0..8.1, y: -4.57..4.57)
+    // rects are centers and half sizes: (center_x, center_y, half_w, half_h)
+    rects: [
+        // walls (0.2m thick, inner edges at arena bounds)
+        (4.05, -4.67, 4.25, 0.1),
+        (4.05, 4.67, 4.25, 0.1), 
+        (-0.1, 0.0, 0.1, 4.77), 
+        (8.2, 0.0, 0.1, 4.77),  
+
+        // center divider wall (10cm thick at y=0) (ish)
+        (4.05, 0.0, 4.05, 0.05),
     ],
 
-    // Central support column
-    // Defined as (center_x, center_y, width, length) in meters
-    pillars_rect: [ ],
-
-    pillars: [],
-
-    // Boulder obstacles 
-    // Specs: Minimum 3 boulders, 30-40 cm diameter 
-    boulders: [
-        (2.0, 2.5, 0.17),  
-        (3.3, 3.5, 0.19),  
-        (4.0, 1.0, 0.16),  
-    ],
-
-    // Defined as (center_x, center_y, radius) in meters
-    // Specs: Minimum 3 craters, up to 40-50 cm width 
-    craters: [
-        (3.0, 4.5, 0.23),  
-        (3.9, 2.0, 0.21),  
-        (1.6, 3.5, 0.24), 
-    ],
+    circles: [],
 )

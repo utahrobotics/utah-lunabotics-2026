@@ -70,11 +70,12 @@ pub struct OccupancyGridTask {
 /// Arena obstacle configuration
 #[derive(Deserialize, Debug)]
 struct ArenaObstacles {
-    walls: Vec<(f32, f32, f32, f32)>, // (min_x, min_y, max_x, max_y)
-    pillars: Vec<(f32, f32, f32)>,    // (center_x, center_y, radius)
-    pillars_rect: Vec<(f32, f32, f32, f32)>, // (center_x, center_y, width, height)
-    boulders: Vec<(f32, f32, f32)>,   // (center_x, center_y, radius)
-    craters: Vec<(f32, f32, f32)>,    // (center_x, center_y, radius)
+    /// (center_x, center_y, half_width, half_height)
+    #[serde(default)]
+    rects: Vec<(f32, f32, f32, f32)>,
+    /// (center_x, center_y, radius)
+    #[serde(default)]
+    circles: Vec<(f32, f32, f32)>,
 }
 
 #[derive(Deserialize, Debug, Clone, Copy)]
@@ -94,34 +95,12 @@ fn paint_permanent_obstacles(
     obstacles: &ArenaObstacles,
     robot_radius: f32,
 ) {
-    
-    // Paint rectangular walls (expand by robot_radius on all sides)
-    for &(min_x, min_y, max_x, max_y) in &obstacles.walls {
-        let expanded_min_x = min_x - robot_radius;
-        let expanded_min_y = min_y - robot_radius;
-        let expanded_max_x = max_x + robot_radius;
-        let expanded_max_y = max_y + robot_radius;
-
-        if let (Ok((x1, y1)), Ok((x2, y2))) = (
-            grid.world_to_cell(expanded_min_x, expanded_min_y),
-            grid.world_to_cell(expanded_max_x, expanded_max_y),
-        ) {
-            for x in x1..=x2 {
-                for y in y1..=y2 {
-                    let _ = grid.set_gradient_at(x, y, PERMANENT_GRADIENT);
-                }
-            }
-        }
-    }
-
-    // Paint rectangular pillar obstacle (expand by robot_radius on all sides) 
-    for&(cx, cy, w, h) in &obstacles.pillars_rect {
-        let half_w = w / 2.0 + robot_radius;
-        let half_h = h / 2.0 + robot_radius;
-        let min_x = cx - half_w;
-        let max_x = cx + half_w;
-        let min_y = cy - half_h;
-        let max_y = cy + half_h;
+    // paint rects (as centers and half sizes)
+    for &(cx, cy, half_w, half_h) in &obstacles.rects {
+        let min_x = cx - half_w - robot_radius;
+        let max_x = cx + half_w + robot_radius;
+        let min_y = cy - half_h - robot_radius;
+        let max_y = cy + half_h + robot_radius;
 
         if let (Ok((x1, y1)), Ok((x2, y2))) = (
             grid.world_to_cell(min_x, min_y),
@@ -134,15 +113,8 @@ fn paint_permanent_obstacles(
             }
         }
     }
-
-    // Paint circular obstacles (pillars, boulders, craters), expanded by robot_radius
-    let all_circles = obstacles
-        .pillars
-        .iter()
-        .chain(obstacles.boulders.iter())
-        .chain(obstacles.craters.iter());
-
-    for &(cx, cy, radius) in all_circles {
+    // paint circles
+    for &(cx, cy, radius) in &obstacles.circles {
         if let Ok((center_x, center_y)) = grid.world_to_cell(cx, cy) {
             let expanded_radius = radius + robot_radius;
             let radius_cells = (expanded_radius / grid.layout.cell_size).ceil() as isize;
@@ -751,73 +723,6 @@ fn load_arena_obstacles(arena_obstacles: Option<ArenaObstaclesSelection>) -> Opt
     }
 }
 
-impl OccupancyGridTask {
-
-    /// also logs out the global map
-    /// only needs self for access to the global layout
-    fn append_local_to_global(
-        &mut self,
-        local: &OccupancyGrid,
-        global_map: &mut OccupancyGrid,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        for x in 0..local.cells_x() {
-            for y in 0..local.cells_y() {
-                // cell_to_world now returns world coordinates (already includes local map's origin)
-                let Ok(world_coords) = local.cell_to_world(x, y) else {
-                    continue;
-                };
-                let Ok(Some(gradient)) = local.gradient_at(x, y) else {
-                    continue;
-                };
-
-                if !self
-                    .global_layout
-                    .is_in_bounds(world_coords.0, world_coords.1)
-                {
-                    continue;
-                }
-                let Ok((gx, gy)) = global_map.world_to_cell(world_coords.0, world_coords.1) else {
-                    continue;
-                };
-                global_map.set_gradient_at(gx, gy, gradient)?;
-            }
-        }
-
-        if let Some(logger) = RECORDER.get() {
-            let mut global_obstacle_map_points = vec![];
-            let mut global_obstacle_map_colors = vec![];
-            for cell_y in 0..global_map.cells_y() {
-                for cell_x in 0..global_map.cells_x() {
-                    let idx = cell_x + cell_y * global_map.cells_x();
-
-                    if idx < global_map.gradient_map.len() {
-                        let gradient = global_map.gradient_map[idx];
-
-                        if gradient != f32::MIN {
-                            if let Ok((world_x, world_y)) = global_map.cell_to_world(cell_x, cell_y)
-                            {
-                                global_obstacle_map_points.push([world_x, world_y]);
-
-                                let normalized = ((gradient + 1.0) / 4.0).clamp(0.0, 1.0);
-                                global_obstacle_map_colors.push([
-                                    (normalized * 255.0) as u8,
-                                    50,
-                                    ((1.0 - normalized) * 255.0) as u8,
-                                ]);
-                            }
-                        }
-                    }
-                }
-            }
-            let _ = logger.recorder.log(
-                "obstacle_mapper/global_obstacle_map",
-                &Points2D::new(global_obstacle_map_points).with_colors(global_obstacle_map_colors),
-            );
-        }
-
-        Ok(())
-    }
-}
 
 fn log_map(
     layout: MapLayout,
