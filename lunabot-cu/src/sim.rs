@@ -75,10 +75,46 @@ fn default_callback(step: default::SimStep) -> SimOverride {
     }
 }
 
-fn sim_callback(
+/// cached for performance reasons
+struct CachedMjIds {
+    lift_cylinder: MjActuatorDataInfo,
+    bucket_cylinder: MjActuatorDataInfo,
+    motor_fl: MjActuatorDataInfo,
+    motor_bl: MjActuatorDataInfo,
+    motor_fr: MjActuatorDataInfo,
+    motor_br: MjActuatorDataInfo,
+    lunabot_body: MjBodyDataInfo,
+    velocimeter: MjSensorDataInfo,
+    gyro: MjSensorDataInfo,
+    accelerometer: MjSensorDataInfo,
+    depth_buffer: Vec<u16>,
+}
+
+impl CachedMjIds {
+    fn new(data: &MjData<&MjModel>) -> Self {
+        Self {
+            lift_cylinder: data.actuator("lift_cylinder").expect("lift_cylinder actuator not found"),
+            bucket_cylinder: data.actuator("bucket_cylinder").expect("bucket_cylinder actuator not found"),
+            motor_fl: data.actuator("motor_fl").expect("motor_fl actuator not found"),
+            motor_bl: data.actuator("motor_bl").expect("motor_bl actuator not found"),
+            motor_fr: data.actuator("motor_fr").expect("motor_fr actuator not found"),
+            motor_br: data.actuator("motor_br").expect("motor_br actuator not found"),
+            lunabot_body: data.body("simplify_lunabot").expect("simplify_lunabot body not found"),
+            velocimeter: data.sensor("lunabot_velocimeter").expect("lunabot_velocimeter sensor not found"),
+            gyro: data.sensor("lunabot_gyro").expect("lunabot_gyro sensor not found"),
+            accelerometer: data.sensor("lunabot_accelerometer").expect("lunabot_accelerometer sensor not found"),
+            depth_buffer: vec![0u16; DEPTH_FRAME_WIDTH as usize * DEPTH_FRAME_HEIGHT as usize],
+        }
+    }
+}
+
+static T265_NODE_NAME: &str = "929122111514";
+
+fn sim_callback<'a>(
     step: default::SimStep,
-    data: &mut MjData<&MjModel>,
-    renderer: &mut mujoco_rs::renderer::MjRenderer<&MjModel>,
+    data: &mut MjData<&'a MjModel>,
+    renderer: &mut mujoco_rs::renderer::MjRenderer<&'a MjModel>,
+    ids: &mut CachedMjIds,
 ) -> SimOverride {
     match step {
         default::SimStep::UdevMonitor(_) => SimOverride::ExecutedBySim,
@@ -141,10 +177,7 @@ fn sim_callback(
                 lift_target = lift_target.clamp(-1.0, 1.0);
                 LIFT_TARGET.store(lift_target);
             }
-            data.actuator("lift_cylinder")
-                .expect("lift_cylinder actuator not found")
-                .view_mut(data)
-                .ctrl[0] = lift_target;
+            ids.lift_cylinder.view_mut(data).ctrl[0] = lift_target;
 
             let mut bucket_target = BUCKET_TARGET.load();
             if bucket_speed > 0 {
@@ -157,10 +190,7 @@ fn sim_callback(
                 bucket_target = bucket_target.clamp(-1.5, 2.5);
                 BUCKET_TARGET.store(bucket_target);
             }
-            data.actuator("bucket_cylinder")
-                .expect("bucket_cylinder actuator not found")
-                .view_mut(data)
-                .ctrl[0] = bucket_target;
+            ids.bucket_cylinder.view_mut(data).ctrl[0] = bucket_target;
 
             SimOverride::ExecutedBySim
         }
@@ -173,11 +203,11 @@ fn sim_callback(
                 let left = (left * speed_mult) * 0.022;
                 let right = (right * speed_mult) * 0.022;
                 // left vesc
-                data.actuator("motor_fl").unwrap().view_mut(data).ctrl[0] = left;
-                data.actuator("motor_bl").unwrap().view_mut(data).ctrl[0] = left;
+                ids.motor_fl.view_mut(data).ctrl[0] = left;
+                ids.motor_bl.view_mut(data).ctrl[0] = left;
                 // right vesc
-                data.actuator("motor_fr").unwrap().view_mut(data).ctrl[0] = right;
-                data.actuator("motor_br").unwrap().view_mut(data).ctrl[0] = right;
+                ids.motor_fr.view_mut(data).ctrl[0] = right;
+                ids.motor_br.view_mut(data).ctrl[0] = right;
             }
             SimOverride::ExecutedBySim
         }
@@ -202,15 +232,19 @@ fn sim_callback(
             if now_ns - last > 1_000_000_000 / 10 {
                 last_output_time.store(now_ns, Ordering::Relaxed);
 
+                // Sync renderer only when we actually need a depth frame (10 Hz instead of 30 Hz)
+                renderer.sync(data);
+
                 if let Some(depth_image) = renderer.depth_flat() {
-                    let mut depths =
-                        vec![0u16; DEPTH_FRAME_WIDTH as usize * DEPTH_FRAME_HEIGHT as usize];
-                    for (i, value) in depth_image.iter().enumerate() {
-                        let row = i / DEPTH_FRAME_WIDTH as usize;
-                        let col = i % DEPTH_FRAME_WIDTH as usize;
-                        let mirrored_col = DEPTH_FRAME_WIDTH as usize - 1 - col;
-                        depths[row * DEPTH_FRAME_WIDTH as usize + mirrored_col] =
-                            (value * 1000.0).clamp(0.0, 65535.0) as u16;
+                    let width = DEPTH_FRAME_WIDTH as usize;
+                    let depths = &mut ids.depth_buffer;
+                    for row in 0..DEPTH_FRAME_HEIGHT as usize {
+                        let row_offset = row * width;
+                        for col in 0..width {
+                            let mirrored_col = width - 1 - col;
+                            depths[row_offset + mirrored_col] =
+                                (depth_image[row_offset + col] * 1000.0).clamp(0.0, 65535.0) as u16;
+                        }
                     }
                     output.set_payload(CuDepthFrame::new(
                         CuDepthFrameFormat {
@@ -219,7 +253,7 @@ fn sim_callback(
                             depth_scale: 0.001,
                             focal_len: (383.0, 383.0),
                         },
-                        CuHandle::new_detached(depths),
+                        CuHandle::new_detached(depths.clone()),
                     ));
                 }
             }
@@ -240,51 +274,42 @@ fn sim_callback(
             output.0.metadata.process_time.start = OptionCuTime::from(Some(CuTime::from_nanos(now_ns)));
             output.0.metadata.process_time.end = OptionCuTime::from(Some(CuTime::from_nanos(now_ns)));
             let last = last_output_time.load(Ordering::Relaxed);
-            if now_ns - last > log_interval_ns
-                && let Some(lunabot_body) = data.body("simplify_lunabot")
-                && let Some(velocimeter) = data.sensor("lunabot_velocimeter")
-                && let Some(gyro) = data.sensor("lunabot_gyro")
-                && let Some(accel) = data.sensor("lunabot_accelerometer")
-            {
+            if now_ns - last > log_interval_ns {
                 last_output_time.store(now_ns, Ordering::Relaxed);
 
-                let coords = lunabot_body.view(&data).xpos.to_vec();
-                let quat = lunabot_body.view(&data).xquat.to_vec();
-                if coords.len() != 3 || quat.len() != 4 {
+                let body_view = ids.lunabot_body.view(&data);
+                let xpos = body_view.xpos;
+                let xquat = body_view.xquat;
+                if xpos.len() != 3 || xquat.len() != 4 {
                     eprintln!("Unexpected pose buffer len");
                     return SimOverride::ExecutedBySim;
                 }
-                if coords.iter().chain(quat.iter()).any(|x| x.is_nan()) {
+                if xpos.iter().chain(xquat.iter()).any(|x| x.is_nan()) {
+                    return SimOverride::ExecutedBySim;
+                }
+                if xquat.iter().all(|item| *item == 0.0) {
+                    // quat normalization will result in nans
                     return SimOverride::ExecutedBySim;
                 }
                 // Offset from MuJoCo body origin to robot center
                 // The kinematic chain in lunabot.ron assumes origin at robot center
                 // mujoco considers the 0,0 of the robot to be the back left corner but we consider it to be the center of the robot
                 let rotation = UnitQuaternion::from_quaternion(Quaternion::new(
-                    quat[0], quat[1], quat[2], quat[3],
+                    xquat[0], xquat[1], xquat[2], xquat[3],
                 ));
 
-                if quat.iter().all(|item| *item == 0.0 ){
-                    // quat normalization will result in nans
-                    return SimOverride::ExecutedBySim;
-                }
                 let body_origin_to_center = Vector3::new(0.37, -0.18, 0.00);
                 let isometry = Isometry3::from_parts(
                     Translation3::from(
-                        Vector3::new(coords[0], coords[1], coords[2])
+                        Vector3::new(xpos[0], xpos[1], xpos[2])
                             + rotation * body_origin_to_center,
                     ),
                     rotation,
                 );
 
-                // [x,y,z]
-                let _velocity = velocimeter.view(data).data.to_vec();
-
-                let _angular_velocity = gyro.view(data).data.to_vec();
-
-                let acceleration = accel.view(data).data.to_vec();
+                let accel_data = ids.accelerometer.view(data).data;
                 let accel_nalgebra =
-                    Vector3::new(acceleration[0], acceleration[1], acceleration[2]);
+                    Vector3::new(accel_data[0], accel_data[1], accel_data[2]);
                 let gravity = Vector3::new(0.0, 0.0, 9.8);
                 let body_gravity = isometry.rotation * gravity;
                 let _accel = accel_nalgebra - body_gravity;
@@ -293,7 +318,7 @@ fn sim_callback(
                     pose_variance: 0.0005,
                     velocity_variance: 0.0004,
                     angular_velocity_variance: 0.0005,
-                    node_name: "929122111514".to_string(),
+                    node_name: T265_NODE_NAME.to_string(),
                     imu_msg: T265IMUMsg::default(),
                 });
                 output.1.clear_payload();
@@ -329,6 +354,7 @@ fn main() {
     // Create mock robot clock for simulation
     let (robot_clock, robot_clock_mock) = RobotClock::mock();
     let (_model, mut viewer, data, mut renderer) = set_up_mujoco();
+    let mut cached_ids = CachedMjIds::new(data);
 
     let copper_ctx = basic_copper_setup(
         &PathBuf::from(&logger_path),
@@ -361,7 +387,7 @@ fn main() {
         .expect("Failed to create application.");
 
     let mut sim_cb =
-        |step: default::SimStep| -> SimOverride { sim_callback(step, data, &mut renderer) };
+        |step: default::SimStep| -> SimOverride { sim_callback(step, data, &mut renderer, &mut cached_ids) };
 
     application
         .start_all_tasks(&mut sim_cb)
@@ -405,7 +431,7 @@ fn main() {
         }
 
         let mut sim_cb =
-            |step: default::SimStep| -> SimOverride { sim_callback(step, data, &mut renderer) };
+            |step: default::SimStep| -> SimOverride { sim_callback(step, data, &mut renderer, &mut cached_ids) };
         application
             .run_one_iteration(&mut sim_cb)
             .expect("failed to run copper iteration");
@@ -418,7 +444,6 @@ fn main() {
         // Render at RENDER_HZ
         if last_render_time.elapsed().as_nanos() as u64 >= render_interval_ns {
             viewer.sync();
-            renderer.sync(data);
             viewer.render(true);
             last_render_time = std::time::Instant::now();
         }
@@ -431,7 +456,7 @@ fn main() {
     }
 
     let mut sim_cb =
-        |step: default::SimStep| -> SimOverride { sim_callback(step, data, &mut renderer) };
+        |step: default::SimStep| -> SimOverride { sim_callback(step, data, &mut renderer, &mut cached_ids) };
     application
         .stop_all_tasks(&mut sim_cb)
         .expect("Failed to stop all tasks.");
