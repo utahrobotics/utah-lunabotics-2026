@@ -1,6 +1,3 @@
-#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
-use std::time::{Duration,Instant};
-
 use cu29::{
     CuResult,
     clock::RobotClock,
@@ -19,7 +16,6 @@ use crate::motors::{MotorRef, VescIDs, VescPair, enumerate_motors};
 pub struct MotorController {
     motor_ref: &'static MotorRef,
     prev_speed_multi: f32, /*  */
-   last_non_zero_steering_pack: Instant,
 }
 
 impl Freezable for MotorController {}
@@ -33,11 +29,17 @@ impl CuSinkTask for MotorController {
     fn new(config: Option<&ComponentConfig>, _resources: Self::Resources<'_>) -> CuResult<Self> {
         let motor_ref;
         let prev_speed_multi: f32;
-        if let Some(config) = config
-        {
+
+        if let Some(config) = config {
             let mut vesc_ids = VescIDs::default();
-            let speed_multiplier = config.get::<f64>("speed_multiplier").expect("failed to deserialize").unwrap_or(2000.) as f32;
-            let vesc_pairs = config.get_value::<Vec<VescPair>>("vesc_pairs").expect("failed to deserialize vesc pairs").expect("vesc pairs not found");
+            let speed_multiplier = config
+                .get::<f64>("speed_multiplier")
+                .expect("failed to deserialize")
+                .unwrap_or(2000.) as f32;
+            let vesc_pairs = config
+                .get_value::<Vec<VescPair>>("vesc_pairs")
+                .expect("failed to deserialize vesc pairs")
+                .expect("vesc pairs not found");
             prev_speed_multi = speed_multiplier;
             for VescPair {
                 id1,
@@ -68,7 +70,6 @@ impl CuSinkTask for MotorController {
         Ok(Self {
             motor_ref,
             prev_speed_multi,
-            last_non_zero_steering_pack: Instant::now(),
         })
     }
     fn start(&mut self, _clock: &RobotClock) -> CuResult<()> {
@@ -82,23 +83,13 @@ impl CuSinkTask for MotorController {
 
     fn process(&mut self, _clock: &RobotClock, input: &Self::Input<'_>) -> CuResult<()> {
         if let Some(steering) = input.payload() {
-           self.last_non_zero_steering_pack  = Instant::now();
             let new_weight: f32 = steering.get_weight() as f32;
             if (new_weight - self.prev_speed_multi).abs() > 0.0001 {
                 self.prev_speed_multi = new_weight;
                 self.motor_ref.set_speed_multiplier(new_weight);
             }
             let (left, right) = steering.get_left_and_right();
-            if left != 0.0 || right != 0.0{
-               self.last_non_zero_steering_pack = Instant::now();
-            }
-            if self.last_non_zero_steering_pack.elapsed() > Duration::from_millis(500){
-                self.motor_ref.set_speed(0.0,0.0);
-                println!("steering packet was dropped oh no :|");
-            }else{
             self.motor_ref.set_speed(left as f32, right as f32);
-            }
-            
         }
 
         if let Some(telemetry) = self.motor_ref.get_latest_telemetry() {

@@ -20,6 +20,10 @@ var prev_left_speed: float = 0.0
 var prev_right_speed: float = 0.0
 
 
+const throttle_time:float = 0.2
+var time: float = 0;
+
+
 func _ready() -> void:
 	if actor_path:
 		actor = get_node(actor_path)
@@ -30,6 +34,7 @@ func _ready() -> void:
 	
 	command_recorder = CommandRecorder.new(actor, default_path)
 	add_child(command_recorder)
+	
 
 func _process(_delta: float) -> void:
 	if not actor:
@@ -72,18 +77,14 @@ func _process(_delta: float) -> void:
 	left_speed = clamp(left_speed, -1, 1)
 	right_speed = clamp(right_speed, -1, 1)
 	
+	
 	# Only send steering command if it changed (avoid spamming)
 	# I have had problems where if the trigger is partially pressed it sends a bajillion commands with tiny changes
 	#not true anymore now hehehe -max
 	# this will need to be tested and perhapse rate limited if need be
 	#if abs(left_speed - prev_left_speed) > 0.01 or abs(right_speed - prev_right_speed) > 0.01:
 	
-	var steercmd := SteeringCommand.new()
-	steercmd.direction = Vector2(left_speed, right_speed)
-	command_recorder.execute_and_store(steercmd)
-	prev_left_speed = left_speed
-	prev_right_speed = right_speed
-		
+	
 	
 	# === LIFT ACTUATORS (Keyboard Q/E + D-pad) ===
 	# Sim env doesnt have actuators yet, this will need testing in real life
@@ -94,11 +95,7 @@ func _process(_delta: float) -> void:
 	elif Input.is_action_pressed("lift_down"):
 		lift_input = -1.0
 	
-	
-	var liftcmd := LiftActuatorsCommand.new()
-	liftcmd.lift = int(lift_input * 127.0)
-	command_recorder.execute_and_store(liftcmd)
-	prev_lift_input = lift_input
+
 		
 	#=====Speed Slider increment and decrement
 	const SPEED_SLIDER_STEP := 100
@@ -122,11 +119,7 @@ func _process(_delta: float) -> void:
 	elif Input.is_action_pressed("bucket_down"):
 		bucket_input = -1.0
 	
-	#if bucket_input != prev_bucket_input:
-	var buckcmd := BucketActuatorsCommand.new()
-	buckcmd.bucket = int(bucket_input * 127.0)
-	command_recorder.execute_and_store(buckcmd)
-	prev_bucket_input = bucket_input
+	
 	
 	if Input.is_action_just_pressed("continue_mission"):
 		command_recorder.execute_and_store(ContinueMissionCommand.new())
@@ -134,3 +127,26 @@ func _process(_delta: float) -> void:
 		command_recorder.execute_and_store(SoftStopCommand.new())
 	if Input.is_action_just_pressed("autonomy"):
 		command_recorder.execute_and_store(NavigateCommand.new())
+	
+	
+	#throttle for sending packets 
+	time += _delta
+	if(time > throttle_time):
+		#steering
+		var steercmd := SteeringCommand.new()
+		steercmd.direction = Vector2(left_speed, right_speed)
+		command_recorder.execute_and_store(steercmd)
+		prev_left_speed = left_speed
+		prev_right_speed = right_speed
+		#lifts
+		var liftcmd := LiftActuatorsCommand.new()
+		liftcmd.lift = int(lift_input * 127.0)
+		command_recorder.execute_and_store(liftcmd)
+		prev_lift_input = lift_input
+		#buckets
+		var buckcmd := BucketActuatorsCommand.new()
+		buckcmd.bucket = int(bucket_input * 127.0)
+		command_recorder.execute_and_store(buckcmd)
+		prev_bucket_input = bucket_input
+		time -= throttle_time
+		

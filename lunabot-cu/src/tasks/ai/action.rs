@@ -60,7 +60,7 @@ impl LunabotAction {
                 Success
             }
             LunabotAction::SetLastSteering => {
-                if let Some(steering) = blackboard.last_steering {
+                if let Some(steering) = blackboard.last_steering.take() {
                     blackboard.outgoing_steering_msg = Some(steering);
                 }
                 Success
