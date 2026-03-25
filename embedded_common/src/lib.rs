@@ -44,8 +44,7 @@ pub enum Actuator {
     derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
 )]
 pub enum ActuatorCommand {
-    SetSpeed(u16, Actuator),
-    SetDirection(Direction, Actuator),
+    SetSpeed(u16, Actuator, Direction),
     Shake,
     StartPercuss,
     #[default]
@@ -209,44 +208,34 @@ impl ActuatorCommand {
             }
         };
         match bytes[0] {
-            tag if tag == 0 => {
+            0 => {
                 let speed = u16::from_le_bytes(
                     bytes[1..=2]
                         .try_into()
                         .map_err(|_| "Wrong number of bytes in actuator command")?,
                 );
-                Ok(ActuatorCommand::SetSpeed(speed, actuator))
-            }
-            tag if tag == 1 => {
-                let dir = match bytes[1] {
-                    0 => Direction::Forward,
-                    1 => Direction::Backward,
-                    _ => return Err("Invalid direction value"),
+                let direction = if bytes[4] == Direction::Backward as u8 {
+                    Direction::Backward
+                } else {
+                    Direction::Forward
                 };
-                Ok(ActuatorCommand::SetDirection(dir, actuator))
+                Ok(ActuatorCommand::SetSpeed(speed, actuator, direction))
             }
-            tag if tag == 2 => Ok(ActuatorCommand::Shake),
-            tag if tag == 3 => Ok(ActuatorCommand::StartPercuss),
-            tag if tag == 4 => Ok(ActuatorCommand::StopPercuss),
+            2 => Ok(ActuatorCommand::Shake),
+            3 => Ok(ActuatorCommand::StartPercuss),
+            4 => Ok(ActuatorCommand::StopPercuss),
             _ => Err("Invalid variant tag"),
         }
     }
 
     pub fn serialize(&self) -> [u8; Self::SIZE] {
         match self {
-            ActuatorCommand::SetSpeed(speed, actuator) => {
+            ActuatorCommand::SetSpeed(speed, actuator, direction) => {
                 let mut bytes = [0u8; Self::SIZE];
                 bytes[0] = 0;
                 bytes[1..=2].copy_from_slice(&speed.to_le_bytes());
                 bytes[3] = *actuator as u8;
-                bytes
-            }
-            ActuatorCommand::SetDirection(dir, actuator) => {
-                let mut bytes = [0u8; 5];
-                bytes[0] = 1;
-                bytes[1] = *dir as u8;
-                bytes[2] = 0;
-                bytes[3] = *actuator as u8;
+                bytes[4] = *direction as u8;
                 bytes
             }
             ActuatorCommand::Shake => {
@@ -267,17 +256,9 @@ impl ActuatorCommand {
         }
     }
 
-    pub fn set_speed(mut speed: f64, actuator: Actuator) -> Self {
+    pub fn set_speed(mut speed: f64, actuator: Actuator, direction: Direction) -> Self {
         speed = speed.clamp(0.0, 1.0);
-        ActuatorCommand::SetSpeed((speed * u16::MAX as f64) as u16, actuator)
-    }
-
-    pub fn forward(actuator: Actuator) -> Self {
-        ActuatorCommand::SetDirection(Direction::Forward, actuator)
-    }
-
-    pub fn backward(actuator: Actuator) -> Self {
-        ActuatorCommand::SetDirection(Direction::Backward, actuator)
+        ActuatorCommand::SetSpeed((speed * u16::MAX as f64) as u16, actuator, direction)
     }
 }
 

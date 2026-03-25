@@ -137,24 +137,16 @@ fn sim_callback<'a>(
 
             if let Some(actuator_cmd) = input.payload() {
                 match actuator_cmd {
-                    embedded_common::ActuatorCommand::SetSpeed(speed, actuator) => match actuator {
+                    embedded_common::ActuatorCommand::SetSpeed(speed, actuator, direction) => match actuator {
                         embedded_common::Actuator::Lift => {
                             LIFT_SPEED.store(*speed);
+                            LIFT_DIRECTION.store(*direction);
                         }
                         embedded_common::Actuator::Bucket => {
                             BUCKET_SPEED.store(*speed);
+                            BUCKET_DIRECTION.store(*direction);
                         }
                     },
-                    embedded_common::ActuatorCommand::SetDirection(direction, actuator) => {
-                        match actuator {
-                            embedded_common::Actuator::Lift => {
-                                LIFT_DIRECTION.store(*direction);
-                            }
-                            embedded_common::Actuator::Bucket => {
-                                BUCKET_DIRECTION.store(*direction);
-                            }
-                        }
-                    }
                     embedded_common::ActuatorCommand::Shake => {}
                     embedded_common::ActuatorCommand::StartPercuss => {}
                     embedded_common::ActuatorCommand::StopPercuss => {}
