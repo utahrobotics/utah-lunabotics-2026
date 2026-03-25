@@ -1,6 +1,6 @@
 use bonsai_bt::Status::{self, *};
 use common::{LUNABOT_STAGE, LunabotStage, Steering};
-use embedded_common::{Actuator, ActuatorCommand};
+use embedded_common::{Actuator, ActuatorCommand, Direction};
 use nalgebra::Vector2;
 
 use crate::{
@@ -70,40 +70,28 @@ impl LunabotAction {
             }
             LunabotAction::SetLastBucket => {
                 if let Some(value) = blackboard.last_bucket.take() {
-                    let commands = actuator_commands_from_i8(value, Actuator::Bucket);
                     blackboard
                         .outgoing_actuator_msg_queue
-                        .push_back(commands[0]);
-                    blackboard
-                        .outgoing_actuator_msg_queue
-                        .push_back(commands[1]);
+                        .push_back(actuator_command_from_i8(value, Actuator::Bucket));
                 }
                 Success
             }
             LunabotAction::SetLastLift => {
                 if let Some(value) = blackboard.last_lift.take() {
-                    let commands = actuator_commands_from_i8(value, Actuator::Lift);
                     blackboard
                         .outgoing_actuator_msg_queue
-                        .push_back(commands[0]);
-                    blackboard
-                        .outgoing_actuator_msg_queue
-                        .push_back(commands[1]);
+                        .push_back(actuator_command_from_i8(value, Actuator::Lift));
                 }
                 Success
             }
             LunabotAction::SetBucket(value) => {
-                let [direction, speed] = actuator_commands_from_i8(*value, Actuator::Bucket);
                 blackboard.last_bucket = None;
-                blackboard.outgoing_actuator_msg_queue.push_back(direction);
-                blackboard.outgoing_actuator_msg_queue.push_back(speed);
+                blackboard.outgoing_actuator_msg_queue.push_back(actuator_command_from_i8(*value, Actuator::Bucket));
                 Success
             }
             LunabotAction::SetLift(value) => {
-                let [direction, speed] = actuator_commands_from_i8(*value, Actuator::Lift);
                 blackboard.last_lift = None;
-                blackboard.outgoing_actuator_msg_queue.push_back(direction);
-                blackboard.outgoing_actuator_msg_queue.push_back(speed);
+                blackboard.outgoing_actuator_msg_queue.push_back(actuator_command_from_i8(*value, Actuator::Lift));
                 Success
             }
             LunabotAction::IsSoftStop => match blackboard.current_mission {
@@ -174,7 +162,7 @@ impl LunabotAction {
                         }
                     } else {
                         // Start a new path finder job
-                        println!("Starting path finder job from {:?} to {:?}.", start, end);
+                        // println!("Starting path finder job from {:?} to {:?}.", start, end);
                         let mut job = find_path_job(
                             local_map.clone(),
                             start,
@@ -345,16 +333,10 @@ impl LunabotAction {
     }
 }
 
-fn actuator_commands_from_i8(value: i8, actuator: Actuator) -> [ActuatorCommand; 2] {
+fn actuator_command_from_i8(value: i8, actuator: Actuator) -> ActuatorCommand {
     if value < 0 {
-        [
-            ActuatorCommand::backward(actuator),
-            ActuatorCommand::set_speed(value as f64 / i8::MIN as f64, actuator),
-        ]
+        ActuatorCommand::set_speed(value as f64 / i8::MIN as f64, actuator, Direction::Backward)
     } else {
-        [
-            ActuatorCommand::forward(actuator),
-            ActuatorCommand::set_speed(value as f64 / i8::MAX as f64, actuator),
-        ]
+        ActuatorCommand::set_speed(value as f64 / i8::MAX as f64, actuator, Direction::Forward)
     }
 }
