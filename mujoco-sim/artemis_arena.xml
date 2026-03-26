@@ -29,6 +29,14 @@
   </asset>
 
   <worldbody>
+<worldbody>
+
+  <!-- DEBUG MARKERS -->
+  <geom name="corner_1" type="sphere" size="0.08" pos="0 0 0" rgba="1 0 0 1"/>
+  <geom name="corner_2" type="sphere" size="0.08" pos="6.88 0 0" rgba="0 1 0 1"/>
+  <geom name="corner_3" type="sphere" size="0.08" pos="0 5.0 0" rgba="0 0 1 1"/>
+  <geom name="corner_4" type="sphere" size="0.08" pos="6.88 5.0 0" rgba="1 1 0 1"/>
+  <geom name="berm_center" type="sphere" size="0.10" pos="5.38 0.6 0" rgba="1 0 1 1"/>
 
     <replicate count="2" offset="0 0.7 0">
       <body>
