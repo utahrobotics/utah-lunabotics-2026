@@ -190,7 +190,7 @@ impl CuTask for GstToImage {
             .ok_or(CuError::from("Failed to acquire buffer from pool"))?;
         {
             let mut dst = handle
-                .lock()
+                .write()
                 .map_err(|e| CuError::new_with_cause("Failed to lock buffer", std::io::Error::other(e.to_string())))?;
             let dst = dst.deref_mut().deref_mut();
 
