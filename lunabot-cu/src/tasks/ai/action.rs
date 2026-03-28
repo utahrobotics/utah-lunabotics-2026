@@ -67,11 +67,13 @@ impl LunabotAction {
                 Success
             }
             LunabotAction::SetLastSteering => {
-                if let Some(last_pack_time) = blackboard.last_non_zero_pack {
-                    println!("{:?}", last_pack_time.elapsed());
-                    if (last_pack_time.elapsed() > Duration::from_millis(200)) {
+                if let Some(last_steer_pack_time) = blackboard.last_non_zero_steering_pack {
+                    if last_steer_pack_time.elapsed() > Duration::from_millis(500) {
                         blackboard.outgoing_steering_msg = Some(Steering::default());
-                        println!("dropped non zero steering packet :(");
+                        println!(
+                            "dropped non zero steering packet :( {:?}",
+                            last_steer_pack_time.elapsed()
+                        );
 
                         return (Success, 0.0);
                     }
@@ -84,19 +86,46 @@ impl LunabotAction {
             }
 
             LunabotAction::SetLastBucket => {
-                if let Some(value) = blackboard.last_bucket.take() {
-                    blackboard
-                        .outgoing_actuator_msg_queue
-                        .push_back(actuator_command_from_i8(value, Actuator::Bucket));
+                if let Some(last_bucket_pack_time) = blackboard.last_non_zero_bucket_pack {
+                    if last_bucket_pack_time.elapsed() > Duration::from_millis(500) {
+                        println!(
+                            "dropped non zero bucket packer :( {:?}",
+                            last_bucket_pack_time.elapsed()
+                        );
+                        blackboard
+                            .outgoing_actuator_msg_queue
+                            .push_back(actuator_command_from_i8(0, Actuator::Bucket));
+                    }
+
+                    if let Some(value) = blackboard.last_bucket.take() {
+                        blackboard
+                            .outgoing_actuator_msg_queue
+                            .push_back(actuator_command_from_i8(value, Actuator::Bucket));
+                    }
                 }
+
                 Success
             }
+
             LunabotAction::SetLastLift => {
-                if let Some(value) = blackboard.last_lift.take() {
-                    blackboard
-                        .outgoing_actuator_msg_queue
-                        .push_back(actuator_command_from_i8(value, Actuator::Lift));
+                if let Some(last_lift_pack_time) = blackboard.last_non_zero_lift_pack {
+                    if last_lift_pack_time.elapsed() > Duration::from_millis(500) {
+                        println!(
+                            "dropped non zero bucket packer :( {:?}",
+                            last_lift_pack_time.elapsed()
+                        );
+                        blackboard
+                            .outgoing_actuator_msg_queue
+                            .push_back(actuator_command_from_i8(0, Actuator::Lift));
+                    }
+
+                    if let Some(value) = blackboard.last_lift.take() {
+                        blackboard
+                            .outgoing_actuator_msg_queue
+                            .push_back(actuator_command_from_i8(value, Actuator::Lift));
+                    }
                 }
+
                 Success
             }
             LunabotAction::SetBucket(value) => {

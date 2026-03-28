@@ -11,8 +11,8 @@ pub mod simple_monitor;
 pub mod tasks;
 pub mod utils;
 
-use common::FromLunabot;
 use crossbeam::atomic::AtomicCell;
+use cu_spatial_payloads::EncodableIsometry;
 use cu29::prelude::*;
 use cu29_helpers::basic_copper_setup;
 use embedded_common::Direction;
@@ -26,11 +26,12 @@ use simple_motion::{ChainBuilder, NodeSerde};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, Ordering};
 use wgsl_pcl::wgsl_setup::{init_gpu_blocking, is_gpu_initialized};
 extern crate cu_bincode as bincode;
 
 use crate::rerun_viz::{RECORDER, ROBOT_STRUCTURE};
-use crate::tasks::{DEPTH_FRAME_HEIGHT, DEPTH_FRAME_WIDTH};
+use crate::tasks::{DEPTH_FRAME_HEIGHT, DEPTH_FRAME_WIDTH, T265IMUMsg, T265Msg};
 
 const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 
@@ -65,7 +66,7 @@ fn default_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::L2KissIcp(_) => SimOverride::ExecuteByRuntime,
         default::SimStep::OccupancyGridPipeline(_) => SimOverride::ExecuteByRuntime,
         default::SimStep::NewAi(_) => SimOverride::ExecuteByRuntime,
-        default::SimStep::Localizer(_) => SimOverride::ExecutedBySim,
+        default::SimStep::Localizer(_) => SimOverride::ExecuteByRuntime,
         default::SimStep::LunabaseBridgeRxFromLunabaseRx { .. } => SimOverride::ExecuteByRuntime,
         default::SimStep::LunabaseBridgeTxToLunabase { .. } => SimOverride::ExecuteByRuntime,
         default::SimStep::LunabaseBridgeBridge { .. } => SimOverride::ExecuteByRuntime,
@@ -92,16 +93,36 @@ struct CachedMjIds {
 impl CachedMjIds {
     fn new(data: &MjData<&MjModel>) -> Self {
         Self {
-            lift_cylinder: data.actuator("lift_cylinder").expect("lift_cylinder actuator not found"),
-            bucket_cylinder: data.actuator("bucket_cylinder").expect("bucket_cylinder actuator not found"),
-            motor_fl: data.actuator("motor_fl").expect("motor_fl actuator not found"),
-            motor_bl: data.actuator("motor_bl").expect("motor_bl actuator not found"),
-            motor_fr: data.actuator("motor_fr").expect("motor_fr actuator not found"),
-            motor_br: data.actuator("motor_br").expect("motor_br actuator not found"),
-            lunabot_body: data.body("simplify_lunabot").expect("simplify_lunabot body not found"),
-            velocimeter: data.sensor("lunabot_velocimeter").expect("lunabot_velocimeter sensor not found"),
-            gyro: data.sensor("lunabot_gyro").expect("lunabot_gyro sensor not found"),
-            accelerometer: data.sensor("lunabot_accelerometer").expect("lunabot_accelerometer sensor not found"),
+            lift_cylinder: data
+                .actuator("lift_cylinder")
+                .expect("lift_cylinder actuator not found"),
+            bucket_cylinder: data
+                .actuator("bucket_cylinder")
+                .expect("bucket_cylinder actuator not found"),
+            motor_fl: data
+                .actuator("motor_fl")
+                .expect("motor_fl actuator not found"),
+            motor_bl: data
+                .actuator("motor_bl")
+                .expect("motor_bl actuator not found"),
+            motor_fr: data
+                .actuator("motor_fr")
+                .expect("motor_fr actuator not found"),
+            motor_br: data
+                .actuator("motor_br")
+                .expect("motor_br actuator not found"),
+            lunabot_body: data
+                .body("simplify_lunabot")
+                .expect("simplify_lunabot body not found"),
+            velocimeter: data
+                .sensor("lunabot_velocimeter")
+                .expect("lunabot_velocimeter sensor not found"),
+            gyro: data
+                .sensor("lunabot_gyro")
+                .expect("lunabot_gyro sensor not found"),
+            accelerometer: data
+                .sensor("lunabot_accelerometer")
+                .expect("lunabot_accelerometer sensor not found"),
             depth_buffer: vec![0u16; DEPTH_FRAME_WIDTH as usize * DEPTH_FRAME_HEIGHT as usize],
         }
     }
@@ -136,16 +157,18 @@ fn sim_callback<'a>(
 
             if let Some(actuator_cmd) = input.payload() {
                 match actuator_cmd {
-                    embedded_common::ActuatorCommand::SetSpeed(speed, actuator, direction) => match actuator {
-                        embedded_common::Actuator::Lift => {
-                            LIFT_SPEED.store(*speed);
-                            LIFT_DIRECTION.store(*direction);
+                    embedded_common::ActuatorCommand::SetSpeed(speed, actuator, direction) => {
+                        match actuator {
+                            embedded_common::Actuator::Lift => {
+                                LIFT_SPEED.store(*speed);
+                                LIFT_DIRECTION.store(*direction);
+                            }
+                            embedded_common::Actuator::Bucket => {
+                                BUCKET_SPEED.store(*speed);
+                                BUCKET_DIRECTION.store(*direction);
+                            }
                         }
-                        embedded_common::Actuator::Bucket => {
-                            BUCKET_SPEED.store(*speed);
-                            BUCKET_DIRECTION.store(*direction);
-                        }
-                    },
+                    }
                     embedded_common::ActuatorCommand::Shake => {}
                     embedded_common::ActuatorCommand::StartPercuss => {}
                     embedded_common::ActuatorCommand::StopPercuss => {}
@@ -251,23 +274,21 @@ fn sim_callback<'a>(
             SimOverride::ExecutedBySim
         }
         default::SimStep::RealsenseSubscriber(..) => SimOverride::ExecutedBySim,
-        default::SimStep::T265Subscriber(_) => SimOverride::ExecutedBySim,
-        default::SimStep::DetectionHandler(_) => SimOverride::ExecutedBySim,
-        default::SimStep::L2KissIcp(_) => SimOverride::ExecuteByRuntime,
-        default::SimStep::OccupancyGridPipeline(..) => SimOverride::ExecuteByRuntime,
-        default::SimStep::NewAi(_) => SimOverride::ExecuteByRuntime,
-        default::SimStep::Localizer(CuTaskCallbackState::Process(_, output)) => {
+        default::SimStep::T265Subscriber(CuTaskCallbackState::Process(_, output)) => {
             use std::sync::atomic::{AtomicU64, Ordering};
             use std::time::SystemTime;
 
             static LAST_LOG_TIME: OnceLock<AtomicU64> = OnceLock::new();
-
+            let log_interval_ns = 1_000_000_000 / 200; // t265 runs at 200 hz
+            let last_output_time = LAST_LOG_TIME.get_or_init(|| AtomicU64::new(0));
             let now_ns = SystemTime::now()
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()
                 .as_nanos() as u64;
-            output.0.metadata.process_time.start = OptionCuTime::from(Some(CuTime::from_nanos(now_ns)));
-            output.0.metadata.process_time.end = OptionCuTime::from(Some(CuTime::from_nanos(now_ns)));
+            output.0.metadata.process_time.start =
+                OptionCuTime::from(Some(CuTime::from_nanos(now_ns)));
+            output.0.metadata.process_time.end =
+                OptionCuTime::from(Some(CuTime::from_nanos(now_ns)));
             let last = last_output_time.load(Ordering::Relaxed);
             if now_ns - last > log_interval_ns {
                 last_output_time.store(now_ns, Ordering::Relaxed);
@@ -296,20 +317,13 @@ fn sim_callback<'a>(
                 let body_origin_to_center = Vector3::new(0.37, -0.18, 0.00);
                 let isometry = Isometry3::from_parts(
                     Translation3::from(
-                        Vector3::new(xpos[0], xpos[1], xpos[2])
-                            + rotation * body_origin_to_center,
+                        Vector3::new(xpos[0], xpos[1], xpos[2]) + rotation * body_origin_to_center,
                     ),
                     rotation,
                 );
-                state.kinematic_root.set_isometry(isometry);
-                output.set_payload(FromLunabot::RobotIsometry {
-                    origin: isometry.translation.vector.cast::<f32>().data.0[0],
-                    quat: isometry.rotation.as_vector().cast::<f32>().data.0[0],
-                });
 
                 let accel_data = ids.accelerometer.view(data).data;
-                let accel_nalgebra =
-                    Vector3::new(accel_data[0], accel_data[1], accel_data[2]);
+                let accel_nalgebra = Vector3::new(accel_data[0], accel_data[1], accel_data[2]);
                 let gravity = Vector3::new(0.0, 0.0, 9.8);
                 let body_gravity = isometry.rotation * gravity;
                 let _accel = accel_nalgebra - body_gravity;
@@ -325,7 +339,12 @@ fn sim_callback<'a>(
             }
             SimOverride::ExecutedBySim
         }
-        default::SimStep::Localizer(..) => SimOverride::ExecutedBySim,
+        default::SimStep::T265Subscriber(..) => SimOverride::ExecutedBySim,
+        default::SimStep::DetectionHandler(_) => SimOverride::ExecutedBySim,
+        default::SimStep::L2KissIcp(_) => SimOverride::ExecuteByRuntime,
+        default::SimStep::OccupancyGridPipeline(..) => SimOverride::ExecuteByRuntime,
+        default::SimStep::NewAi(_) => SimOverride::ExecuteByRuntime,
+        default::SimStep::Localizer(..) => SimOverride::ExecuteByRuntime,
         default::SimStep::LunabaseBridgeRxFromLunabaseRx { .. } => SimOverride::ExecuteByRuntime,
         default::SimStep::LunabaseBridgeTxToLunabase { .. } => SimOverride::ExecuteByRuntime,
         default::SimStep::LunabaseBridgeBridge { .. } => SimOverride::ExecuteByRuntime,
@@ -381,8 +400,9 @@ fn main() {
         .build()
         .expect("Failed to create application.");
 
-    let mut sim_cb =
-        |step: default::SimStep| -> SimOverride { sim_callback(step, data, &mut renderer, &mut cached_ids) };
+    let mut sim_cb = |step: default::SimStep| -> SimOverride {
+        sim_callback(step, data, &mut renderer, &mut cached_ids)
+    };
 
     application
         .start_all_tasks(&mut sim_cb)
@@ -408,7 +428,14 @@ fn main() {
 
     let start = std::time::Instant::now();
 
-    while viewer.running() {
+    let running = Arc::new(AtomicBool::new(true));
+    let running_clone = running.clone();
+    ctrlc::set_handler(move || {
+        running_clone.store(false, Ordering::SeqCst);
+    })
+    .expect("Failed to set Ctrl+C handler");
+
+    while viewer.running() && running.load(Ordering::SeqCst) {
         let loop_start = std::time::Instant::now();
         robot_clock_mock.set_value(start.elapsed().as_nanos() as u64);
 
@@ -418,8 +445,9 @@ fn main() {
             physics_accumulator -= COPPER_HZ;
         }
 
-        let mut sim_cb =
-            |step: default::SimStep| -> SimOverride { sim_callback(step, data, &mut renderer, &mut cached_ids) };
+        let mut sim_cb = |step: default::SimStep| -> SimOverride {
+            sim_callback(step, data, &mut renderer, &mut cached_ids)
+        };
         application
             .run_one_iteration(&mut sim_cb)
             .expect("failed to run copper iteration");
@@ -443,8 +471,9 @@ fn main() {
         }
     }
 
-    let mut sim_cb =
-        |step: default::SimStep| -> SimOverride { sim_callback(step, data, &mut renderer, &mut cached_ids) };
+    let mut sim_cb = |step: default::SimStep| -> SimOverride {
+        sim_callback(step, data, &mut renderer, &mut cached_ids)
+    };
     application
         .stop_all_tasks(&mut sim_cb)
         .expect("Failed to stop all tasks.");
