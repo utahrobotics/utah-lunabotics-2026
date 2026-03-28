@@ -34,9 +34,9 @@ use serde::Deserialize;
 
 use crate::ROBOT_STATE;
 use crate::pathfinding::OccupancyGrid;
-use crate::tasks::{DEPTH_FRAME_HEIGHT, DEPTH_FRAME_WIDTH};
 use crate::payloads::depth_frame::CuDepthFrame;
 use crate::rerun_viz::RECORDER;
+use crate::tasks::{DEPTH_FRAME_HEIGHT, DEPTH_FRAME_WIDTH};
 pub static GLOBAL_MAP: OnceLock<Arc<RwLock<OccupancyGrid>>> = OnceLock::new();
 const PERMANENT_GRADIENT: f32 = 10.0;
 
@@ -84,9 +84,6 @@ enum ArenaObstaclesSelection {
     Artemis,
     Ucf,
 }
-
-
-
 
 /// Paint known arena obstacles permanently into the occupancy grid.
 /// robot_radius is added to all obstacle extents to account for robot size.
@@ -347,12 +344,10 @@ impl CuTask for OccupancyGridTask {
             .and_then(|c| c.get::<f64>("max_depth").expect("failed to deserialize"))
             .unwrap_or(3.0) as f32;
 
-        let arena_obstacles = config
-            .and_then(|c| {
-                c.get_value::<ArenaObstaclesSelection>("arena_obstacles")
-                    .expect("failed to deserialize")
-            })
-            .or(Some(ArenaObstaclesSelection::Artemis));
+        let arena_obstacles = config.and_then(|c| {
+            c.get_value::<ArenaObstaclesSelection>("arena_obstacles")
+                .expect("failed to deserialize")
+        });
 
         // use bilateral by default, fall back on gaussian
         let use_bilateral = config
@@ -479,9 +474,10 @@ impl CuTask for OccupancyGridTask {
             };
 
             // Load and paint arena obstacles
-            if let Some(obstacles) = load_arena_obstacles(arena_obstacles) {
+            if let Some(arena_obstacles) = arena_obstacles
+                && let Some(obstacles) = load_arena_obstacles(arena_obstacles)
+            {
                 paint_permanent_obstacles(&mut grid, &obstacles, robot_radius_meters);
-
             } else {
                 eprintln!("[OccupancyGrid] No arena obstacles loaded");
             }
@@ -628,7 +624,7 @@ impl CuTask for OccupancyGridTask {
         let output_buffer = Arc::clone(&self.output_buffer);
         let processing_flag = Arc::clone(&self.processing);
         let layout = self.local_layout;
-        
+
         self.thread_pool.spawn_fifo(move || {
             // Everything that touches the depth buffer happens inside with_inner —
             // no copy, no unsafe transmute of a cloned vec.
@@ -643,8 +639,7 @@ impl CuTask for OccupancyGridTask {
                     )
                 };
 
-                if let (Ok((_, obstacle_map)), Some(logger)) = (&process_result, RECORDER.get())
-                {
+                if let (Ok((_, obstacle_map)), Some(logger)) = (&process_result, RECORDER.get()) {
                     let depth_bytes: &[u8] = unsafe {
                         std::slice::from_raw_parts(
                             depths.as_ptr() as *const u8,
@@ -701,28 +696,24 @@ impl CuTask for OccupancyGridTask {
 
         Ok(())
     }
-
 }
 
-fn load_arena_obstacles(arena_obstacles: Option<ArenaObstaclesSelection>) -> Option<ArenaObstacles> {
+fn load_arena_obstacles(
+    arena_obstacles: ArenaObstaclesSelection,
+) -> Option<ArenaObstacles> {
     match arena_obstacles {
-        Some(ArenaObstaclesSelection::Artemis) => {
+        ArenaObstaclesSelection::Artemis => {
             let path = "arena_obstacles/artemis.ron";
             let contents = std::fs::read_to_string(path).ok()?;
             ron::de::from_str(&contents).ok()
         }
-        Some(ArenaObstaclesSelection::Ucf) => {
+        ArenaObstaclesSelection::Ucf => {
             let path = "arena_obstacles/ucf.ron";
             let contents = std::fs::read_to_string(path).ok()?;
             ron::de::from_str(&contents).ok()
         }
-        None => {
-            eprintln!("No arena obstacles enabled, skipping loading");
-            None
-        }
     }
 }
-
 
 fn log_map(
     layout: MapLayout,

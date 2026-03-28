@@ -90,13 +90,19 @@ impl CuMonitor for SimpleMonitor {
 
     fn process_error(&self, taskid: usize, step: CuTaskState, error: &CuError) -> Decision {
         let mut errors = ERRORED_TASKS.get().unwrap().lock().unwrap();
+        let now = Instant::now();
+        if let Some((_, _, _, timestamp)) = errors.get(&taskid) {
+            if now.duration_since(*timestamp) < Duration::from_millis(500) {
+                return Decision::Ignore;
+            }
+        }
         errors.insert(
             taskid,
             (
                 self.tasks[taskid].to_string(),
                 step,
                 error.to_string(),
-                Instant::now(),
+                now,
             ),
         );
         Decision::Ignore
