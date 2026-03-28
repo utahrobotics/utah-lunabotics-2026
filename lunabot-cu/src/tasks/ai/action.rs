@@ -1,4 +1,7 @@
-use std::time::Instant;
+use std::{
+    iter::Successors,
+    time::{Duration, Instant},
+};
 
 use bonsai_bt::Status::{self, *};
 use common::{LUNABOT_STAGE, LunabotStage, Steering};
@@ -13,7 +16,6 @@ use crate::{
     },
 };
 static PATHFINDING_GOAL: [f32; 2] = [5.843524, 1.4796992];
-static LAST_NON_ZERO_STEERING_PACK: OnceLock<Instant> = OnceLock::new();
 #[derive(Clone, Debug, Copy)]
 pub enum LunabotAction {
     Yield,
@@ -65,11 +67,22 @@ impl LunabotAction {
                 Success
             }
             LunabotAction::SetLastSteering => {
-                if let Some(steering) = blackboard.last_steering.take() {
+                if let Some(last_pack_time) = blackboard.last_non_zero_pack {
+                    println!("{:?}", last_pack_time.elapsed());
+                    if (last_pack_time.elapsed() > Duration::from_millis(200)) {
+                        blackboard.outgoing_steering_msg = Some(Steering::default());
+                        println!("dropped non zero steering packet :(");
+
+                        return (Success, 0.0);
+                    }
+                }
+                if let Some(steering) = blackboard.last_steering {
                     blackboard.outgoing_steering_msg = Some(steering);
                 }
+
                 Success
             }
+
             LunabotAction::SetLastBucket => {
                 if let Some(value) = blackboard.last_bucket.take() {
                     blackboard

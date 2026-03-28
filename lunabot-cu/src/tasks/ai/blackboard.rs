@@ -5,7 +5,7 @@ use common::{FromLunabase, LUNABOT_STAGE, LunabotStage, Steering};
 use embedded_common::ActuatorCommand;
 use nalgebra::Vector2;
 use simple_motion::StaticNode;
-
+use std::time::{Instant,Duration};
 use crate::{ROBOT_STATE, tasks::ai::jobs::Job};
 
 #[derive(Debug)]
@@ -59,6 +59,8 @@ pub struct LunabotBlackboard {
     pub obstacle_gradient_threshold_pathfinder: f32,
 
     pub robot_radius: f32,
+    pub last_non_zero_pack: Option<Instant>,
+
 }
 
 impl Default for LunabotBlackboard {
@@ -86,6 +88,7 @@ impl Default for LunabotBlackboard {
             obstacle_gradient_threshold_expander: 0.5,
             obstacle_gradient_threshold_pathfinder: 0.3,
             robot_radius: 0.5,
+            last_non_zero_pack: None,
         }
     }
 }
@@ -102,6 +105,14 @@ impl LunabotBlackboard {
 
         match msg {
             common::FromLunabase::Steering(steering) => {
+                let (left,right) = steering.get_left_and_right();
+                if left != 0.0 || right != 0.0{
+                self.last_non_zero_pack = Some(Instant::now());
+                }
+                else{
+                    self.last_non_zero_pack = None;
+                }
+
                 self.last_steering = Some(*steering);
             }
             common::FromLunabase::Navigate(destination) => {

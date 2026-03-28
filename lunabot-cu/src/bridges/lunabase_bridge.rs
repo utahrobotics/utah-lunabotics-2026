@@ -284,12 +284,15 @@ impl CuBridge for Lunabase {
         // Set the next message from buffer as payload
         if let Some(next_msg) = self.message_buffer.pop_front() {
             if std::any::TypeId::of::<Payload>() == std::any::TypeId::of::<FromLunabase>() {
+                use common::Steering;
+
                 let payload_msg = Box::new(next_msg) as Box<dyn std::any::Any>;
                 if let Ok(downcasted) = payload_msg.downcast::<Payload>() {
                     msg.set_payload(*downcasted);
                     msg.metadata.process_time.start = clock.now().into();
                 }
-                //println!("{:?}", next_msg);
+              
+               // println!("{:?}", next_msg);
             }
         } else {
             msg.clear_payload();

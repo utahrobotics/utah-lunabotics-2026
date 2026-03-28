@@ -19,8 +19,7 @@ var prev_bucket_input: float = 0.0
 var prev_left_speed: float = 0.0
 var prev_right_speed: float = 0.0
 
-
-const throttle_time:float = 0.2
+const throttle_time:float = 0.2;
 var time: float = 0;
 
 
