@@ -1,4 +1,5 @@
 use crate::pathfinding::OccupancyGrid;
+use crate::rerun_viz::{RECORDER, RecorderData};
 
 use std::cmp::Ordering;
 use std::collections::{BinaryHeap, HashMap, HashSet};
@@ -115,7 +116,7 @@ pub fn find_policy(
             }
 
             let (world_x, world_y, _) = index_to_cartesian(neighbor.2);
-            let gradient = map.gradient_around(world_x, world_y, 1)?.unwrap_or(0.0);
+            let gradient = map.gradient_around(world_x, world_y, 1).ok().flatten().unwrap_or(0.0);
             let gradient_cost = if gradient > max_acceptable_gradient { f32::INFINITY } else { gradient * GRADIENT_COST_FACTOR };
             let end_cost = next.cost + neighbor.1 + gradient_cost;
 
