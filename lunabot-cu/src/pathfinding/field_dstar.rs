@@ -47,7 +47,8 @@ pub fn find_path_dstar(
     goal: [f32; 2],
     max_acceptable_gradient: f32,
 ) -> Option<Vec<(f32, f32)>> {
-    // Helper to check gradient
+
+    // Helper to check gradient from both maps (prioritize local)
     let get_gradient = |x: f32, y: f32| -> Option<f32> {
         Some(
             map.gradient_closest_to(x, y)
@@ -58,6 +59,7 @@ pub fn find_path_dstar(
 
     // Handle case where robot starts in obstacle or unknown area
     let mut initial_path = Vec::new();
+    let start_gradient = get_gradient(start[0], start[1]);
     if get_gradient(start[0], start[1])
         .map(|val| {
             if val > max_acceptable_gradient {
@@ -85,7 +87,9 @@ pub fn find_path_dstar(
         [end.0, end.1]
     };
 
+    // if goal is not in bounds of the global map
     if !map.layout.is_in_bounds(goal[0], goal[1]) {
+        eprintln!("[PathFinding] FAILED: Goal is out of bounds");
         return None;
     }
 
@@ -96,6 +100,21 @@ pub fn find_path_dstar(
             false
         }
     };
+
+    // Check if goal is free
+    let goal_gradient = get_gradient(goal[0], goal[1]);
+    let goal_is_free = is_free(goal[0], goal[1]);
+    if !goal_is_free {
+        eprintln!("[PathFinding] FAILED: Goal is blocked (gradient: {:?}, max acceptable: {})",
+                 goal_gradient, max_acceptable_gradient);
+        return None;
+    }
+
+    // Determine which map to use for cell size
+    let cell_size = map.layout.cell_size;
+
+    // Helper to convert world coordinates to grid keys
+    // Prioritize local map, fall back to global map
 
     let to_grid_key = |x: f32, y: f32| -> Option<GridKey> {
         map.world_to_cell(x, y)
@@ -207,6 +226,7 @@ pub fn find_path_dstar(
         }
     }
 
+    eprintln!("[PathFinding] FAILED: No path found (explored {} cells)", closed_set.len());
     None
 }
 

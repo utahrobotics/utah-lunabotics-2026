@@ -1,5 +1,5 @@
 use iceoryx2::{node::NodeBuilder, port::publisher::Publisher, prelude::ServiceName, service::ipc};
-use iceoryx_types::{IceoryxDepthFrame, ImuMsg, PoseMsg};
+use iceoryx_types::IceoryxDepthFrame;
 
 /// Creates a new iceoryx2 node for IPC services
 pub fn create_node() -> iceoryx2::node::Node<ipc::Service> {
@@ -26,42 +26,4 @@ pub fn create_depth_frame_publisher<const SIZE: usize>(
         .publisher_builder()
         .create()
         .expect("Failed to create cloud publisher")
-}
-
-pub fn create_imu_frame_publisher(
-    node: &iceoryx2::node::Node<ipc::Service>,
-    serial: &str,
-) -> Publisher<ipc::Service, ImuMsg, ()> {
-    let depth_service_name = format!("realsense/{}/imu", serial);
-    let depth_service = node
-        .service_builder(&ServiceName::new(&depth_service_name).expect("Invalid service name"))
-        .publish_subscribe::<ImuMsg>()
-        .enable_safe_overflow(true)
-        .subscriber_max_buffer_size(20)
-        .open_or_create()
-        .expect("Failed to create imu service");
-
-    depth_service
-        .publisher_builder()
-        .create()
-        .expect("Failed to create imu publisher")
-}
-
-pub fn create_pose_frame_publisher(
-    node: &iceoryx2::node::Node<ipc::Service>,
-    serial: &str,
-) -> Publisher<ipc::Service, PoseMsg, ()> {
-    let service_name = format!("realsense/{}/pose", serial);
-    let pose_service = node
-        .service_builder(&ServiceName::new(&service_name).expect("Invalid service name"))
-        .publish_subscribe::<PoseMsg>()
-        .enable_safe_overflow(true)
-        .subscriber_max_buffer_size(20)
-        .open_or_create()
-        .expect("Failed to create pose service");
-
-    pose_service
-        .publisher_builder()
-        .create()
-        .expect("Failed to create pose publisher")
 }

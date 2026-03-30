@@ -30,15 +30,16 @@ impl CuSinkTask for MotorController {
         let motor_ref;
         let prev_speed_multi: f32;
 
-        // waiting until copper supports 
-        let vesc_pairs = vec![
-            VescPair { id1: 75, id2: 110, mask1: crate::motors::MotorMask::Right, mask2: crate::motors::MotorMask::Right, command_both: true },
-            VescPair { id1: 63, id2: 74, mask1: crate::motors::MotorMask::Left, mask2: crate::motors::MotorMask::Left, command_both: true }
-        ];
-        if let Some(config) = config
-        {
+        if let Some(config) = config {
             let mut vesc_ids = VescIDs::default();
-            let speed_multiplier = config.get::<f64>("speed_multiplier").expect("failed to deserialize").unwrap_or(2000.) as f32;
+            let speed_multiplier = config
+                .get::<f64>("speed_multiplier")
+                .expect("failed to deserialize")
+                .unwrap_or(2000.) as f32;
+            let vesc_pairs = config
+                .get_value::<Vec<VescPair>>("vesc_pairs")
+                .expect("failed to deserialize vesc pairs")
+                .expect("vesc pairs not found");
             prev_speed_multi = speed_multiplier;
             for VescPair {
                 id1,

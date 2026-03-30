@@ -165,11 +165,11 @@ impl CuTask for GstToImage {
         input: &Self::Input<'_>,
         output: &mut Self::Output<'_>,
     ) -> CuResult<()> {
-        if input.payload().is_none() {
-            output.clear_payload();
-            return Ok(());
-        }
-        let buffer_hold = input.payload().ok_or(CuError::from("No payload"))?;
+        output.clear_payload();
+  
+        let Some(buffer_hold) = input.payload() else {
+            return Ok(());  
+        };
         let buffer_hold = buffer_hold
             .as_ref()
             .map_readable()
@@ -190,7 +190,7 @@ impl CuTask for GstToImage {
             .ok_or(CuError::from("Failed to acquire buffer from pool"))?;
         {
             let mut dst = handle
-                .lock()
+                .write()
                 .map_err(|e| CuError::new_with_cause("Failed to lock buffer", std::io::Error::other(e.to_string())))?;
             let dst = dst.deref_mut().deref_mut();
 

@@ -8,21 +8,22 @@ pub mod robot_state;
 pub mod simple_monitor;
 pub mod tasks;
 pub mod utils;
+pub mod kalman_filtering;
+pub mod payloads;
+
+
 
 use crossbeam::atomic::AtomicCell;
-use crossbeam_channel::{Receiver, Sender};
 use cu29::prelude::*;
 use cu29_export::copperlists_reader;
 use cu29_helpers::basic_copper_setup;
-use embedded_common::{ActuatorCommand, FromPicoV3};
 use nalgebra::{SMatrix, SVector};
 use rerun_viz::{Level, RECORDER};
 use robot_state::RobotState;
-use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
+use simple_motion::{ChainBuilder, NodeSerde};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, OnceLock, RwLock};
+use std::sync::{Arc, OnceLock};
 
-use crate::default::SimStep;
 extern crate cu_bincode as bincode;
 
 const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
@@ -62,14 +63,17 @@ fn run_one_copperlist(
     copper_list: CopperList<default::CuStampedDataSet>,
 ) {
     let msgs = &copper_list.msgs;
-    let now = msgs
-        .get_t_265_subscriber_output()
+    let mut start = msgs
+        .get_t_265_subscriber_outputs().0
         .metadata()
         .process_time()
-        .start
-        .unwrap()
-        .as_nanos();
-    robot_clock.set_value(now);
+        .start;
+    if start.is_none() {
+        eprintln!("[RESIM] Process time metadata not set. Ensure that the start task sets the process time.");
+       return;
+    } else {
+        robot_clock.set_value(start.unwrap().as_nanos());
+    }
 
     let mut sim_callback = move |step: default::SimStep| -> SimOverride {
         match step {
@@ -79,15 +83,12 @@ fn run_one_copperlist(
                 SimOverride::ExecutedBySim
             }
             default::SimStep::UdevMonitor(..) => SimOverride::ExecutedBySim,
-
             default::SimStep::CamSide(..) => SimOverride::ExecutedBySim,
             default::SimStep::CamBack(..) => SimOverride::ExecutedBySim,
-
             default::SimStep::CamLaptopFront(..) => SimOverride::ExecutedBySim,
             default::SimStep::GstConvertBack(..) => SimOverride::ExecutedBySim,
             default::SimStep::GstConvertSide(..) => SimOverride::ExecutedBySim,
             default::SimStep::GstConvertLaptopFront(..) => SimOverride::ExecutedBySim,
-
             default::SimStep::L2Pointcloud(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_l_2_pointcloud_output().clone();
                 output.tov = robot_clock.now().into();
@@ -113,21 +114,18 @@ fn run_one_copperlist(
                 SimOverride::ExecutedBySim
             }
             default::SimStep::L2Pointcloud(..) => SimOverride::ExecutedBySim,
-
             default::SimStep::L2Imu(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_l_2_imu_output().clone();
                 output.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
             default::SimStep::L2Imu(..) => SimOverride::ExecutedBySim,
-
             default::SimStep::V3Pico(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_v_3_pico_output().clone();
                 output.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
             default::SimStep::V3Pico(..) => SimOverride::ExecutedBySim,
-
             default::SimStep::MotorCtrl(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_motor_ctrl_output().clone();
                 output.tov = robot_clock.now().into();
@@ -145,6 +143,12 @@ fn run_one_copperlist(
                 output.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
+            default::SimStep::DetectorCamT265(CuTaskCallbackState::Process(_, output)) => {
+                *output = msgs.get_detector_cam_t_265_output().clone();
+                output.tov = robot_clock.now().into();
+                SimOverride::ExecutedBySim
+            }
+            default::SimStep::DetectorCamT265(..) => SimOverride::ExecutedBySim,
             default::SimStep::DetectorCamSide(..) => SimOverride::ExecutedBySim,
             default::SimStep::DetectorCamLaptopFront(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_detector_cam_laptop_front_output().clone();
@@ -157,30 +161,30 @@ fn run_one_copperlist(
                 SimOverride::ExecutedBySim
             }
             default::SimStep::T265Subscriber(CuTaskCallbackState::Process(_, output)) => {
-                *output = msgs.get_t_265_subscriber_output().clone();
-                output.tov = robot_clock.now().into();
+                let outputs  = msgs.get_t_265_subscriber_outputs().clone();
+                output.0 = outputs.0;
+                output.1 = outputs.1; 
+                output.0.tov = robot_clock.now().into();
+                output.1.tov = robot_clock.now().into();
+
                 SimOverride::ExecutedBySim
             }
             default::SimStep::T265Subscriber(..) => SimOverride::ExecutedBySim,
             default::SimStep::RealsenseSubscriber(..) => SimOverride::ExecutedBySim,
             default::SimStep::DetectorCamLaptopFront(..) => SimOverride::ExecutedBySim,
-            default::SimStep::LunabaseBridgeRxFromLunabaseRx { channel, msg } => {
+            default::SimStep::LunabaseBridgeRxFromLunabaseRx { channel: _, msg } => {
                 *msg = msgs.get_lunabase_bridge_rx_from_lunabase_rx().clone();
                 msg.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
-            default::SimStep::LunabaseBridgeRxFromLunabaseRx { .. } => SimOverride::ExecutedBySim,
-
             default::SimStep::LunabaseBridgeBridge(..) => SimOverride::ExecutedBySim,
             default::SimStep::LunabaseBridgeTxToLunabase { .. } => SimOverride::ExecutedBySim,
-
             default::SimStep::NewAi(..) => SimOverride::ExecuteByRuntime,
             default::SimStep::DetectionHandler(..) => SimOverride::ExecuteByRuntime,
             default::SimStep::L2KissIcp(..) => SimOverride::ExecuteByRuntime,
             default::SimStep::OccupancyGridPipeline(..) => SimOverride::ExecuteByRuntime,
             default::SimStep::Localizer(..) => SimOverride::ExecuteByRuntime,
             default::SimStep::__Phantom(..) => SimOverride::ExecuteByRuntime,
-            _ => SimOverride::ExecuteByRuntime,
         }
     };
 
@@ -200,6 +204,7 @@ fn main() {
                     std::fs::create_dir_all(parent).expect("Failed to create logs directory");
                 }
             }
+            const LOG_READ_PATH: &'static str = "logs/lunabot.copper";
             // Create mock robot clock for simulation
             let (robot_clock, mut robot_clock_mock) = RobotClock::mock();
 
@@ -239,6 +244,7 @@ fn main() {
                 ))),
             });
 
+            println!("building application");
             let mut application = LunabotApplicationBuilder::new()
                 .with_sim_callback(&mut default_callback)
                 .with_context(&copper_ctx)
@@ -248,9 +254,8 @@ fn main() {
             application
                 .start_all_tasks(&mut default_callback)
                 .expect("Failed to start all tasks.");
-
             let UnifiedLogger::Read(dl) = UnifiedLoggerBuilder::new()
-                .file_base_name(Path::new("logs/lunabot.copper"))
+                .file_base_name(Path::new(LOG_READ_PATH))
                 .build()
                 .expect("Failed to create logger")
             else {

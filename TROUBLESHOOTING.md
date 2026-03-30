@@ -59,3 +59,6 @@ error: custom attribute panicked
    |
    = help: message: index out of bounds: the len is 0 but the index is 0
 ```
+
+#### Background Tasks not behaving as expected
+I currently have a performance boost that is a little hacky but it prevents the async task process from being called unless there is an input ready to be consumed. In 90 percent of cases this should be fine but if you have an async task that still is doing meaningful work when there isnt an input then this will be a problem.

@@ -1,7 +1,7 @@
-use bonsai_bt::Behavior::{self, Action, If, Race, Sequence, Wait, WaitForever, WhenAny, While};
+use bonsai_bt::Behavior::{self, Action, Race, Sequence, Wait, WaitForever, While};
 use common::Steering;
 
-use crate::tasks::ai::{action::LunabotAction, behaviors::with_timeout};
+use crate::tasks::ai::action::LunabotAction;
 
 pub fn navigate_behavior() -> Behavior<LunabotAction> {
     While(
@@ -11,7 +11,7 @@ pub fn navigate_behavior() -> Behavior<LunabotAction> {
             Action(LunabotAction::Yield),
             Action(LunabotAction::CalculatePath),
             // hale's path follow shouldn't need this
-            // Action(LunabotAction::RotateToFacePath),
+            // Action(LunabotAction::RotateToFacePath),,
             Race(vec![
                 Action(LunabotAction::FollowPath),
                 While(
@@ -19,10 +19,13 @@ pub fn navigate_behavior() -> Behavior<LunabotAction> {
                     vec![Wait(1.0), Action(LunabotAction::CalculatePath)],
                 ),
             ]),
+            // dig some dirt now that we're at the target
+            Action(LunabotAction::Dig),
         ])],
     )
 }
 
+#[allow(unused)]
 fn set_stage(stage: common::LunabotStage) -> Behavior<LunabotAction> {
     Sequence(vec![Action(LunabotAction::SetStage(stage))])
 }

@@ -6,6 +6,7 @@ extends Node
 var command_history: Array[Command] = []
 
 # ACTOR NEEDS TO BE ASSIGNED (This is whatever object will act on execution)
+## Currently assigned to GlobalLunabaseConnection
 var actor: Node
 var default_path := "res://Systems/CommandPattern/SavedHistory/defaultHistory.tres"
 
@@ -18,6 +19,12 @@ var record_start_time := 0
 var replay_index := 0
 var replay_start_time := 0
 var is_replaying := false
+@export var throttle_inputs := true
+@export var throttle_time_ms = 200
+
+var time := 0.0
+
+var throttled_inputs : Array[Command]
 
 # Calls the command and appends it to the command history
 func execute_and_store(cmd: Command):
@@ -27,7 +34,12 @@ func execute_and_store(cmd: Command):
 		record_start_time = Time.get_ticks_msec()
 		
 	cmd.timestamp = Time.get_ticks_msec() - record_start_time
-	cmd.execute(actor)
+	
+	if throttle_inputs:
+		throttled_inputs.append(cmd)
+	else:
+		# Input isn't throttled and is executed immediately
+		cmd.execute(actor)
 	command_history.append(cmd)
 
 # Saves the current history to a given path
@@ -90,3 +102,23 @@ func _process(_delta):
 		print("Replay finished")
 		is_replaying = false
 		set_process(false)
+	
+	if throttled_inputs:
+		handle_throttle(_delta)
+
+func handle_throttle(_delta):
+	time += _delta
+	
+	# Returns if it isn't time to send packets
+	if time < throttle_time_ms:
+		return
+	
+	for command in throttled_inputs:
+		# TODO Add checker. If input was previouslyt set to 0 and current command is also 0 then don't execute.
+		# TODO possibly create an array of commands with 0 values, if command is 0 and in array then drop. If command is non 0 and is in array then delete entry in array
+		print("command executed")
+		command.execute(actor)
+	
+	# Remove all throttled inputs
+	throttled_inputs.clear()
+	time = 0
