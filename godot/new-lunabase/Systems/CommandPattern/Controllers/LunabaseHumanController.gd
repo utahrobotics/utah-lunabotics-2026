@@ -1,13 +1,17 @@
 class_name LunabaseHumanController extends Node
 
-# This should be the GlobalLunabaseConnection
-var actor: Node
+@export var actor_path: NodePath
+@export var is_actor_lunabase_connection := true
 
 @export var default_path := "res://Systems/CommandPattern/SavedHistory/lunabotHistory.tres"
 
 @export var deadzone: float = 0.2
 
 @onready var speed_slider = $"../VBoxContainer/MainContent/HBoxContainer/RightColumn/SpeedControl/MarginContainer/VBox/SpeedMultiplierSlider"
+
+var actor: Node
+
+var can_send_inputs
 
 var command_recorder: CommandRecorder
 
@@ -19,12 +23,16 @@ var prev_bucket_input: float = 0.0
 var prev_left_speed: float = 0.0
 var prev_right_speed: float = 0.0
 
-const throttle_time:float = 0.2;
-var time: float = 0;
+# When touch UI is active skip this node's processing.
+var suppress_for_touch_ui: bool = false
 
 
 func _ready() -> void:
-	actor = GlobalLunabaseConnection
+	if actor_path:
+		actor = get_node(actor_path)
+	
+	if is_actor_lunabase_connection:
+		actor = GlobalLunabaseConnection
 	
 	if not actor:
 		push_error("LunabaseHumanController: No actor assigned or path invalid!")
@@ -32,10 +40,13 @@ func _ready() -> void:
 	
 	command_recorder = CommandRecorder.new(actor, default_path)
 	add_child(command_recorder)
-	
+	SettingsMenu.toggle_can_accept_inputs.connect(set_can_send_inputs)
+
+func set_can_send_inputs(_can_send_inputs):
+	can_send_inputs = _can_send_inputs
 
 func _process(_delta: float) -> void:
-	if not actor:
+	if suppress_for_touch_ui or not actor or not can_send_inputs:
 		return
 	
 	# === STEERING (Keyboard + Gamepad) ===
@@ -75,14 +86,16 @@ func _process(_delta: float) -> void:
 	left_speed = clamp(left_speed, -1, 1)
 	right_speed = clamp(right_speed, -1, 1)
 	
-	
 	# Only send steering command if it changed (avoid spamming)
 	# I have had problems where if the trigger is partially pressed it sends a bajillion commands with tiny changes
-	#not true anymore now hehehe -max
 	# this will need to be tested and perhapse rate limited if need be
-	#if abs(left_speed - prev_left_speed) > 0.01 or abs(right_speed - prev_right_speed) > 0.01:
-	
-	
+	if abs(left_speed - prev_left_speed) > 0.01 or abs(right_speed - prev_right_speed) > 0.01:
+		var cmd := SteeringCommand.new()
+		cmd.direction = Vector2(left_speed, right_speed)
+		command_recorder.execute_and_store(cmd)
+		prev_left_speed = left_speed
+		prev_right_speed = right_speed
+		
 	
 	# === LIFT ACTUATORS (Keyboard Q/E + D-pad) ===
 	# Sim env doesnt have actuators yet, this will need testing in real life
@@ -93,7 +106,11 @@ func _process(_delta: float) -> void:
 	elif Input.is_action_pressed("lift_down"):
 		lift_input = -1.0
 	
-
+	if lift_input != prev_lift_input:
+		var cmd := LiftActuatorsCommand.new()
+		cmd.lift = int(lift_input * 127.0)
+		command_recorder.execute_and_store(cmd)
+		prev_lift_input = lift_input
 		
 	#=====Speed Slider increment and decrement
 	const SPEED_SLIDER_STEP := 100
@@ -117,6 +134,11 @@ func _process(_delta: float) -> void:
 	elif Input.is_action_pressed("bucket_down"):
 		bucket_input = -1.0
 	
+	if bucket_input != prev_bucket_input:
+		var cmd := BucketActuatorsCommand.new()
+		cmd.bucket = int(bucket_input * 127.0)
+		command_recorder.execute_and_store(cmd)
+		prev_bucket_input = bucket_input
 	
 	if Input.is_action_just_pressed("continue_mission"):
 		command_recorder.execute_and_store(ContinueMissionCommand.new())
@@ -124,26 +146,3 @@ func _process(_delta: float) -> void:
 		command_recorder.execute_and_store(SoftStopCommand.new())
 	if Input.is_action_just_pressed("autonomy"):
 		command_recorder.execute_and_store(NavigateCommand.new())
-	
-	
-	#throttle for sending packets 
-	time += _delta
-	if(time > throttle_time):
-		#steering
-		var steercmd := SteeringCommand.new()
-		steercmd.direction = Vector2(left_speed, right_speed)
-		command_recorder.execute_and_store(steercmd)
-		prev_left_speed = left_speed
-		prev_right_speed = right_speed
-		#lifts
-		var liftcmd := LiftActuatorsCommand.new()
-		liftcmd.lift = int(lift_input * 127.0)
-		command_recorder.execute_and_store(liftcmd)
-		prev_lift_input = lift_input
-		#buckets
-		var buckcmd := BucketActuatorsCommand.new()
-		buckcmd.bucket = int(bucket_input * 127.0)
-		command_recorder.execute_and_store(buckcmd)
-		prev_bucket_input = bucket_input
-		time -= throttle_time
-		
