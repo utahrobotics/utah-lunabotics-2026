@@ -35,7 +35,6 @@ enum LunabotStage {
 }
 
 func _ready() -> void:
-	
 	connection.stage_changed.connect(_on_stage_changed)
 	
 	connect_button.pressed.connect(_on_connect_pressed)

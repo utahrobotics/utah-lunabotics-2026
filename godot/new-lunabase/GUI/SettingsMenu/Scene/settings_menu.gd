@@ -5,6 +5,15 @@ class_name SettingsMenuHandler extends Node
 
 signal toggle_can_accept_inputs
 signal updated_control_scheme
+signal touch_screen_controls_changed(enabled: bool)
+
+var touch_screen_controls_enabled: bool = false
+
+func set_touch_screen_controls(enabled: bool) -> void:
+	if touch_screen_controls_enabled == enabled:
+		return
+	touch_screen_controls_enabled = enabled
+	touch_screen_controls_changed.emit(enabled)
 
 func _ready() -> void:
 	control_scheme_switcher.updated_control_scheme.connect(_on_controls_updated)
@@ -21,3 +30,5 @@ func toggle_menu_visibility(menu : Control, make_visible : bool):
 
 func _on_settings_button_toggled(toggled_on: bool = false) -> void:
 	toggle_menu_visibility(panel, toggled_on)
+	if toggled_on:
+		control_scheme_switcher.sync_touch_controls_from_settings()

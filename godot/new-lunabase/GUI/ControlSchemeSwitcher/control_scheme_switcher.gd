@@ -2,6 +2,7 @@ class_name ControlSchemeSwitcher extends Control
 
 @onready var controller_scheme_option_button: OptionButton = $VBoxContainer/HBoxContainer/ControllerSchemeOptionButton
 @onready var keyboard_scheme_option_button: OptionButton = $VBoxContainer/HBoxContainer2/KeyboardSchemeOptionButton
+@onready var touch_controls_check: CheckButton = $VBoxContainer/HBoxContainer3/TouchControlsCheckButton
 
 @export var controller_path : String = "res://Systems/ControlSchemes/schemes/ControllerSchemes"
 @export var keyboard_path : String = "res://Systems/ControlSchemes/schemes/KeyboardSchemes"
@@ -18,6 +19,16 @@ var controller_prev_index := -1
 
 func _ready() -> void:
 	populate_schemes()
+	sync_touch_controls_from_settings()
+
+
+func sync_touch_controls_from_settings() -> void:
+	if touch_controls_check:
+		touch_controls_check.set_pressed_no_signal(SettingsMenu.touch_screen_controls_enabled)
+
+
+func _on_touch_controls_check_toggled(pressed: bool) -> void:
+	SettingsMenu.set_touch_screen_controls(pressed)
 
 func populate_schemes():
 	controller_scheme_option_button.clear()

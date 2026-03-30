@@ -12,7 +12,7 @@ corner_radius_bottom_left = 10
 
 [node name="Panel" type="Panel" unique_id=1001667156]
 offset_right = 660.0
-offset_bottom = 204.0
+offset_bottom = 260.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_5b5wv")
 script = ExtResource("1_5b5wv")
 
@@ -48,6 +48,18 @@ text = "Keyboard Scheme: "
 [node name="KeyboardSchemeOptionButton" type="OptionButton" parent="VBoxContainer/HBoxContainer2" unique_id=98250649]
 layout_mode = 2
 
+[node name="HBoxContainer3" type="HBoxContainer" parent="VBoxContainer" unique_id=2100440001]
+layout_mode = 2
+alignment = 1
+
+[node name="Label" type="Label" parent="VBoxContainer/HBoxContainer3" unique_id=2100440002]
+layout_mode = 2
+text = "Touch screen controls:"
+
+[node name="TouchControlsCheckButton" type="CheckButton" parent="VBoxContainer/HBoxContainer3" unique_id=2100440003]
+layout_mode = 2
+text = "Show on-screen touch controls"
+
 [node name="DefaultButton" type="Button" parent="." unique_id=169126372]
 layout_mode = 1
 anchors_preset = 3
@@ -78,3 +90,4 @@ theme = ExtResource("2_5lhh3")
 text = "Create custom binding"
 
 [connection signal="pressed" from="CreateBindingButton" to="." method="_on_create_binding_button_pressed"]
+[connection signal="toggled" from="VBoxContainer/HBoxContainer3/TouchControlsCheckButton" to="." method="_on_touch_controls_check_toggled"]

@@ -7,6 +7,7 @@
 [ext_resource type="Texture2D" uid="uid://c3b2y3ky1m03k" path="res://Assets/icons/USR-Icon.png" id="3_w6ul0"]
 [ext_resource type="PackedScene" uid="uid://dhg4sb4ifrvh8" path="res://GUI/PitchAndRollProposal/Testing/FlightSim/UIAttitude/UIAttitude.tscn" id="4_3r4oj"]
 [ext_resource type="PackedScene" uid="uid://d0gs2f7n7wdhm" path="res://newWindow.tscn" id="5_33q4t"]
+[ext_resource type="PackedScene" uid="uid://brxomw6fjys4e" path="res://GUI/TouchpadController/touchpad_scene.tscn" id="6_touchpad"]
 
 [node name="MainControl" type="Control" unique_id=1904223292]
 layout_mode = 3
@@ -336,6 +337,9 @@ text = "AUTONOMOUS"
 
 [node name="LunabaseHumanController" type="Node" parent="." unique_id=1500504990]
 script = ExtResource("2")
+
+[node name="TouchpadScene" parent="." unique_id=1904223293 instance=ExtResource("6_touchpad")]
+visible = false
 
 [node name="Node2D" parent="." unique_id=946412652 instance=ExtResource("5_33q4t")]
 visible = false

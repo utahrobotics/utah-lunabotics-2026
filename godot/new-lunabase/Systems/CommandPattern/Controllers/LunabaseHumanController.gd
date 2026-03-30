@@ -23,6 +23,9 @@ var prev_bucket_input: float = 0.0
 var prev_left_speed: float = 0.0
 var prev_right_speed: float = 0.0
 
+# When touch UI is active skip this node's processing.
+var suppress_for_touch_ui: bool = false
+
 
 func _ready() -> void:
 	if actor_path:
@@ -43,7 +46,7 @@ func set_can_send_inputs(_can_send_inputs):
 	can_send_inputs = _can_send_inputs
 
 func _process(_delta: float) -> void:
-	if not actor or not can_send_inputs:
+	if suppress_for_touch_ui or not actor or not can_send_inputs:
 		return
 	
 	# === STEERING (Keyboard + Gamepad) ===

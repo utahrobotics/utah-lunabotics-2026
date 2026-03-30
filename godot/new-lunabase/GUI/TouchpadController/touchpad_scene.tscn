@@ -94,4 +94,6 @@ script = ExtResource("5_ppx5i")
 [connection signal="pressed" from="IncDecPanel/VBoxContainer/HBoxContainer/PreviousButton" to="." method="_on_previous_button_pressed"]
 [connection signal="pressed" from="IncDecPanel/VBoxContainer/HBoxContainer/Nextbutton" to="." method="_on_nextbutton_pressed"]
 [connection signal="button_down" from="IncDecPanel/VBoxContainer/VBoxContainer/Increment" to="." method="_on_increment_button_down"]
+[connection signal="button_up" from="IncDecPanel/VBoxContainer/VBoxContainer/Increment" to="." method="_on_increment_button_up"]
 [connection signal="button_down" from="IncDecPanel/VBoxContainer/VBoxContainer/Decrement" to="." method="_on_decrement_button_down"]
+[connection signal="button_up" from="IncDecPanel/VBoxContainer/VBoxContainer/Decrement" to="." method="_on_decrement_button_up"]
