@@ -7,7 +7,9 @@ use crate::{
     ROBOT_STATE,
     tasks::ai::{
         blackboard::LunabotBlackboard,
-        jobs::{dig_job, direction_from_path, find_path_job, follow_path_job, rotation_shim},
+        jobs::{
+            dig_job, direction_from_path, dump_job, find_path_job, follow_path_job, rotation_shim,
+        },
     },
 };
 static PATHFINDING_GOAL: [f32; 2] = [5.843524, 1.4796992];
@@ -46,6 +48,7 @@ pub enum LunabotAction {
 
     // dig up some moon dirt
     Dig,
+    Dump,
 
     /// rotate to face a certain direction
     RotateToFacePath,
@@ -86,12 +89,16 @@ impl LunabotAction {
             }
             LunabotAction::SetBucket(value) => {
                 blackboard.last_bucket = None;
-                blackboard.outgoing_actuator_msg_queue.push_back(actuator_command_from_i8(*value, Actuator::Bucket));
+                blackboard
+                    .outgoing_actuator_msg_queue
+                    .push_back(actuator_command_from_i8(*value, Actuator::Bucket));
                 Success
             }
             LunabotAction::SetLift(value) => {
                 blackboard.last_lift = None;
-                blackboard.outgoing_actuator_msg_queue.push_back(actuator_command_from_i8(*value, Actuator::Lift));
+                blackboard
+                    .outgoing_actuator_msg_queue
+                    .push_back(actuator_command_from_i8(*value, Actuator::Lift));
                 Success
             }
             LunabotAction::IsSoftStop => match blackboard.current_mission {
@@ -251,12 +258,43 @@ impl LunabotAction {
                     }
                 } else {
                     // Start a new digging job
-                    println!("Starting new digging job.");
                     let mut job = dig_job();
                     let initial_status: Status = job.get_status();
                     blackboard.digger = Some(job);
                     println!(
                         "Digging job started with intial status {:?}",
+                        initial_status
+                    );
+
+                    initial_status
+                }
+            }
+            LunabotAction::Dump => {
+                // Check if we already got a dumping job going
+                if let Some(ref mut dumper) = blackboard.dumper {
+                    while let Some(command) = dumper.get_output() {
+                        blackboard.outgoing_actuator_msg_queue.push_back(command);
+                    }
+
+                    let status = dumper.get_status();
+                    if status == Success {
+                        Success
+                    } else if status == Failure {
+                        //
+                        eprintln!("Failed Dumping job!");
+                        blackboard.dumper = None;
+                        Failure
+                    } else {
+                        // Still digging
+                        Running
+                    }
+                } else {
+                    // Start a new digging job
+                    let mut job = dump_job();
+                    let initial_status: Status = job.get_status();
+                    blackboard.dumper = Some(job);
+                    println!(
+                        "Dumping job started with intial status {:?}",
                         initial_status
                     );
 
