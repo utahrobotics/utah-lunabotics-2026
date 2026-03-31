@@ -85,6 +85,9 @@ func stop_replay():
 	print("Replay stopped!")
 
 func _process(_delta):
+	if throttled_inputs:
+		handle_throttle(_delta)
+
 	if not is_replaying:
 		return
 	
@@ -103,9 +106,7 @@ func _process(_delta):
 		is_replaying = false
 		set_process(false)
 	
-	if throttled_inputs:
-		handle_throttle(_delta)
-
+	
 func handle_throttle(_delta):
 	time += _delta
 	
