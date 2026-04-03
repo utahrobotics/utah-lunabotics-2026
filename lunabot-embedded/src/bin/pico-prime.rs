@@ -14,7 +14,7 @@ use embassy_usb::{
     UsbDevice,
     class::cdc_acm::{CdcAcmClass, Receiver, Sender, State},
 };
-use embedded_common::MAX_MESSAGE_SIZE;
+use embedded_common::{ActuatorCommand, MAX_MESSAGE_SIZE};
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
 
@@ -92,23 +92,43 @@ async fn usb_tx_loop(mut writer: Sender<'static, Driver<'static, USB>>) {
 
 #[embassy_executor::task]
 async fn usb_rx_loop(mut reader: Receiver<'static, Driver<'static, USB>>) {
-    // probably some optimizations you can do here to calculate the max overhead we would need for COBS, making this buf smaller.
-    let mut decoded_buf = [0u8; MAX_MESSAGE_SIZE * 2];
+    let mut decoded_buf = [0u8; MAX_MESSAGE_SIZE];
     let mut encoded_buf = [0u8; PACKET_SIZE as usize];
     let mut decoder = cobs::CobsDecoder::new(&mut decoded_buf);
     loop {
         reader.wait_connection().await;
         while let Ok(n) = reader.read_packet(&mut encoded_buf).await {
-            match decoder.push(&encoded_buf[0..n]) {
-                Ok(Some(report)) => defmt::todo!(),
-                Ok(None) => defmt::todo!(),
-                Err(_) => defmt::todo!(),
+            let mut remaining = &encoded_buf[..n];
+            while !remaining.is_empty() {
+                match decoder.push(remaining) {
+                    Ok(Some(report)) => {
+                        let frame = &decoder.dest()[..report.frame_size()];
+                        if let Ok(frame_bytes) = <[u8; ActuatorCommand::SIZE]>::try_from(frame) {
+                            match ActuatorCommand::deserialize(frame_bytes) {
+                                Ok(cmd) => info!("received command: {}", cmd),
+                                Err(e) => warn!("failed to deserialize ActuatorCommand: {}", e),
+                            }
+                        } else {
+                            warn!(
+                                "unexpected frame size: {} (expected {})",
+                                report.frame_size(),
+                                ActuatorCommand::SIZE
+                            );
+                        }
+                        // advance past consumed bytes, reset decoder for next frame
+                        remaining = &remaining[report.parsed_size()..];
+                        decoder = cobs::CobsDecoder::new(&mut decoded_buf);
+                    }
+                    Ok(None) => break, // need more data
+                    Err(_) => {
+                        warn!("COBS decode error, resetting decoder");
+                        decoder = cobs::CobsDecoder::new(&mut decoded_buf);
+                        break;
+                    }
+                }
             }
         }
     }
-    // read from host, decode, error handle
-    // push stuff to a queue to be sent to the secondary pico if nescessary
-    // control the actuators based on the command read from the host
 }
 
 type MyUsbDriver = Driver<'static, USB>;
