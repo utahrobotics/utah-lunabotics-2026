@@ -10,7 +10,7 @@ use crossbeam_channel::{Receiver, Sender};
 use cu29::prelude::*;
 use cu29_export::run_cli;
 use cu29_helpers::basic_copper_setup;
-use embedded_common::{ActuatorCommand, FromPicoV3};
+use embedded_common::{ActuatorCommand, FromPico};
 use launcher::ProcessCommand;
 use simple_motion::{ChainBuilder, NodeSerde, StaticNode};
 use std::path::{Path, PathBuf};

@@ -16,7 +16,7 @@ pub const MAX_MESSAGE_SIZE: usize = 265;
 
 const _: () = assert!(FromIMU::SIZE <= MAX_MESSAGE_SIZE, "FromIMU exceeds MAX_MESSAGE_SIZE");
 const _: () = assert!(ActuatorCommand::SIZE <= MAX_MESSAGE_SIZE, "ActuatorCommand exceeds MAX_MESSAGE_SIZE");
-const _: () = assert!(FromPicoV3::SIZE <= MAX_MESSAGE_SIZE, "FromPicoV3 exceeds MAX_MESSAGE_SIZE");
+const _: () = assert!(FromPico::SIZE <= MAX_MESSAGE_SIZE, "FromPicoV3 exceeds MAX_MESSAGE_SIZE");
 
 
 #[cfg(feature="std")]
@@ -98,7 +98,7 @@ pub enum FromIMU {
     feature = "std",
     derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
 )]
-pub enum FromPicoV3 {
+pub enum FromPico {
     Reading([FromIMU; 4], ActuatorReading),
     #[default]
     Error,
@@ -309,7 +309,7 @@ impl ActuatorReading {
     }
 }
 
-impl FromPicoV3 {
+impl FromPico {
     /// 1 tag + 4 FromImu (4×25) + 1 ActuatorReading (4)  = 105 bytes
     pub const SIZE: usize = 105;
 
@@ -317,7 +317,7 @@ impl FromPicoV3 {
         let mut bytes = [0u8; Self::SIZE];
 
         match self {
-            FromPicoV3::Reading(readings, act) => {
+            FromPico::Reading(readings, act) => {
                 bytes[0] = 0;
                 for (i, r) in readings.iter().enumerate() {
                     let start = 1 + i * FromIMU::SIZE;
@@ -326,7 +326,7 @@ impl FromPicoV3 {
                 }
                 bytes[Self::SIZE - 4..].copy_from_slice(&act.serialize());
             }
-            FromPicoV3::Error => bytes[0] = 3,
+            FromPico::Error => bytes[0] = 3,
         }
         bytes
     }
@@ -347,9 +347,9 @@ impl FromPicoV3 {
                     .map_err(|_| "act slice")?;
 
                 let act = ActuatorReading::deserialize(act_bytes);
-                Ok(FromPicoV3::Reading(readings, act))
+                Ok(FromPico::Reading(readings, act))
             }
-            3 => Ok(FromPicoV3::Error),
+            3 => Ok(FromPico::Error),
             _ => Err("invalid FromPicoV3 tag"),
         }
     }
@@ -473,17 +473,17 @@ mod tests {
             ),
         ];
         let act = ActuatorReading { m1_reading: 100, m2_reading: 200 };
-        let original = FromPicoV3::Reading(readings, act);
+        let original = FromPico::Reading(readings, act);
         let bytes = original.serialize();
-        let result = FromPicoV3::deserialize(bytes).unwrap();
+        let result = FromPico::deserialize(bytes).unwrap();
         assert_eq!(original, result);
     }
 
     #[test]
     fn from_pico_v3_error_roundtrip() {
-        let original = FromPicoV3::Error;
+        let original = FromPico::Error;
         let bytes = original.serialize();
-        let result = FromPicoV3::deserialize(bytes).unwrap();
+        let result = FromPico::deserialize(bytes).unwrap();
         assert_eq!(original, result);
     }
 
@@ -509,8 +509,8 @@ mod tests {
 
     #[test]
     fn from_pico_v3_invalid_tag() {
-        let mut bytes = [0u8; FromPicoV3::SIZE];
+        let mut bytes = [0u8; FromPico::SIZE];
         bytes[0] = 255;
-        assert!(FromPicoV3::deserialize(bytes).is_err());
+        assert!(FromPico::deserialize(bytes).is_err());
     }
 }

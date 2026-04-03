@@ -11,7 +11,7 @@ mod prod_impl {
     use crossbeam_channel::Receiver;
     use cu29::prelude::*;
     use embedded_common::ActuatorCommand;
-    use embedded_common::FromPicoV3;
+    use embedded_common::FromPico;
     use embedded_common::IMU_READING_DELAY_MS;
     use futures_util::StreamExt;
     use std::time::Instant;
@@ -38,7 +38,7 @@ mod prod_impl {
         cmd_tx: Option<tokio::sync::mpsc::Sender<[u8; ActuatorCommand::SIZE]>>,
 
         /// Message queue read from the pico
-        from_pico: Arc<&'static ArrayQueue<FromPicoV3>>,
+        from_pico: Arc<&'static ArrayQueue<FromPico>>,
         last_reading: Instant,
         /// prevents us from powercycling a bajillion times in a row
         last_powercycle: Instant,
@@ -52,7 +52,7 @@ mod prod_impl {
         // the reason this is a tuple is a hack to get around the fact that copper doesnt support one task
         // having multiple outputs in the same way it does multiple inputs
         type Input<'m> = input_msg!(embedded_common::ActuatorCommand);
-        type Output<'m> = output_msg!(FromPicoV3);
+        type Output<'m> = output_msg!(FromPico);
         type Resources<'r> = ();
 
         fn new(config: Option<&ComponentConfig>, _resources: Self::Resources<'_>) -> CuResult<Self>
@@ -300,7 +300,7 @@ mod prod_impl {
             CobsCodec,
         >,
         is_broken_tx: tokio::sync::watch::Sender<bool>,
-        from_pico: Arc<&'static ArrayQueue<FromPicoV3>>,
+        from_pico: Arc<&'static ArrayQueue<FromPico>>,
     ) -> tokio::task::JoinHandle<()> {
         get_tokio_handle().spawn(async move {
             let mut no_reading_count = 0;
@@ -331,7 +331,7 @@ mod prod_impl {
                     eprintln!("not 105 bytes");
                     continue;
                 };
-                let Ok(reading) = FromPicoV3::deserialize(reading) else {
+                let Ok(reading) = FromPico::deserialize(reading) else {
                     eprintln!("Failed to deserialize message from picov3 serial port");
                     let _ = is_broken_tx.send(true);
                     break;
@@ -413,7 +413,7 @@ pub use resim_impl::*;
 #[cfg(not(feature = "production"))]
 mod resim_impl {
     use cu29::{cutask::CuTask, prelude::*};
-    use embedded_common::FromPicoV3;
+    use embedded_common::FromPico;
 
     pub struct V3PicoTask {}
     impl Freezable for V3PicoTask {}
