@@ -14,7 +14,7 @@ members = [
     "lunabase-lib",
     "misc/quic",
     "misc/auto-start",
-    "misc/wgsl-pcl",
+    "misc/wgsl-pcl", "misc/multiplexed-camera-viewer",
 ]
 exclude = ["misc/usb-reset", "lunabot-embedded", "copper-rs"]
 # Shared dependencies across workspace members
