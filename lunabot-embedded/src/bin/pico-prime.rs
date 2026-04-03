@@ -12,7 +12,10 @@ use embassy_rp::{
     usb::{Driver, InterruptHandler},
 };
 use embassy_time::Timer;
-use embassy_usb::class::cdc_acm::{CdcAcmClass, State};
+use embassy_usb::{
+    UsbDevice,
+    class::cdc_acm::{CdcAcmClass, State},
+};
 use embedded_hal_1::i2c::I2c;
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
@@ -26,7 +29,7 @@ bind_interrupts!(struct Irqs {
 });
 
 #[embassy_executor::main]
-async fn main(_spawner: Spawner) {
+async fn main(spawner: Spawner) -> ! {
     let p = embassy_rp::init(Default::default());
 
     // Create the driver, from the HAL.
@@ -69,11 +72,14 @@ async fn main(_spawner: Spawner) {
     let usb = builder.build();
 
     // Run the USB device.
-    spawner.spawn(unwrap!(usb_task(usb)));
+    spawner.spawn(usb_task(usb)).unwrap();
 
     info!("Hello World!");
+    loop {}
 }
 
+type MyUsbDriver = Driver<'static, USB>;
+type MyUsbDevice = UsbDevice<'static, MyUsbDriver>;
 #[embassy_executor::task]
 async fn usb_task(mut usb: MyUsbDevice) -> ! {
     usb.run().await
