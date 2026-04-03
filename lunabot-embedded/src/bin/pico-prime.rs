@@ -14,6 +14,7 @@ use embassy_usb::{
     UsbDevice,
     class::cdc_acm::{CdcAcmClass, Receiver, Sender, State},
 };
+use embedded_common::MAX_MESSAGE_SIZE;
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
 
@@ -25,7 +26,6 @@ bind_interrupts!(struct Irqs {
     USBCTRL_IRQ => InterruptHandler<USB>;
 });
 
-static MAX_MESSAGE_SIZE: usize = 256;
 static PACKET_SIZE: u16 = 64;
 
 #[embassy_executor::main]

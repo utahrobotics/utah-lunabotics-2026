@@ -3,6 +3,11 @@
 use core::ops::Not;
 
 pub const IMU_READING_DELAY_MS: u64 = 10;
+pub const MAX_MESSAGE_SIZE: usize = 265;
+
+const _: () = assert!(FromIMU::SIZE <= MAX_MESSAGE_SIZE, "FromIMU exceeds MAX_MESSAGE_SIZE");
+const _: () = assert!(ActuatorCommand::SIZE <= MAX_MESSAGE_SIZE, "ActuatorCommand exceeds MAX_MESSAGE_SIZE");
+const _: () = assert!(FromPicoV3::SIZE <= MAX_MESSAGE_SIZE, "FromPicoV3 exceeds MAX_MESSAGE_SIZE");
 
 
 #[cfg(feature="std")]
