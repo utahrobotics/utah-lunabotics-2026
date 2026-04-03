@@ -26,6 +26,7 @@ bind_interrupts!(struct Irqs {
 });
 
 static MAX_MESSAGE_SIZE: usize = 256;
+static PACKET_SIZE: u16 = 64;
 
 #[embassy_executor::main]
 async fn main(spawner: Spawner) -> ! {
@@ -65,7 +66,7 @@ async fn main(spawner: Spawner) -> ! {
     let class: CdcAcmClass<'_, Driver<'_, USB>> = {
         static STATE: StaticCell<State> = StaticCell::new();
         let state = STATE.init(State::new());
-        CdcAcmClass::new(&mut builder, state, 64)
+        CdcAcmClass::new(&mut builder, state, PACKET_SIZE)
     };
 
     let (class_tx, class_rx) = class.split();
@@ -92,9 +93,19 @@ async fn usb_tx_loop(mut writer: Sender<'static, Driver<'static, USB>>) {
 #[embassy_executor::task]
 async fn usb_rx_loop(mut reader: Receiver<'static, Driver<'static, USB>>) {
     // probably some optimizations you can do here to calculate the max overhead we would need for COBS, making this buf smaller.
-    let mut decoder_buf = [0u8; MAX_MESSAGE_SIZE * 2];
-    let mut decoder = cobs::CobsDecoder::new(&mut decoder_buf);
-
+    let mut decoded_buf = [0u8; MAX_MESSAGE_SIZE * 2];
+    let mut encoded_buf = [0u8; PACKET_SIZE as usize];
+    let mut decoder = cobs::CobsDecoder::new(&mut decoded_buf);
+    loop {
+        reader.wait_connection().await;
+        while let Ok(n) = reader.read_packet(&mut encoded_buf).await {
+            match decoder.push(&encoded_buf[0..n]) {
+                Ok(Some(report)) => defmt::todo!(),
+                Ok(None) => defmt::todo!(),
+                Err(_) => defmt::todo!(),
+            }
+        }
+    }
     // read from host, decode, error handle
     // push stuff to a queue to be sent to the secondary pico if nescessary
     // control the actuators based on the command read from the host
