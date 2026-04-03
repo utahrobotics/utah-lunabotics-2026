@@ -7,16 +7,13 @@ use defmt::*;
 use embassy_executor::Spawner;
 use embassy_rp::{
     bind_interrupts,
-    i2c::{self, Config},
     peripherals::USB,
     usb::{Driver, InterruptHandler},
 };
-use embassy_time::Timer;
 use embassy_usb::{
     UsbDevice,
-    class::cdc_acm::{CdcAcmClass, State},
+    class::cdc_acm::{CdcAcmClass, Receiver, Sender, State},
 };
-use embedded_hal_1::i2c::I2c;
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
 
@@ -27,6 +24,8 @@ use {defmt_rtt as _, panic_probe as _};
 bind_interrupts!(struct Irqs {
     USBCTRL_IRQ => InterruptHandler<USB>;
 });
+
+static MAX_MESSAGE_SIZE: usize = 256;
 
 #[embassy_executor::main]
 async fn main(spawner: Spawner) -> ! {
@@ -43,6 +42,7 @@ async fn main(spawner: Spawner) -> ! {
         config.max_packet_size_0 = 64;
         config
     };
+
     // Create embassy-usb DeviceBuilder using the driver and config.
     // It needs some buffers for building the descriptors.
     let mut builder = {
@@ -62,20 +62,42 @@ async fn main(spawner: Spawner) -> ! {
     };
 
     // Create classes on the builder.
-    let mut class = {
+    let class: CdcAcmClass<'_, Driver<'_, USB>> = {
         static STATE: StaticCell<State> = StaticCell::new();
         let state = STATE.init(State::new());
         CdcAcmClass::new(&mut builder, state, 64)
     };
+
+    let (class_tx, class_rx) = class.split();
 
     // Build the builder.
     let usb = builder.build();
 
     // Run the USB device.
     spawner.spawn(usb_task(usb)).unwrap();
+    spawner.spawn(usb_tx_loop(class_tx)).unwrap();
+    spawner.spawn(usb_rx_loop(class_rx)).unwrap();
 
     info!("Hello World!");
     loop {}
+}
+
+#[embassy_executor::task]
+async fn usb_tx_loop(mut writer: Sender<'static, Driver<'static, USB>>) {
+    // check if there is anything available from the secondary pico over UART (or maybe request information from the secondary pico?)
+    // read (and decode?) the information off the secondary pico
+    // send it over usb to the host
+}
+
+#[embassy_executor::task]
+async fn usb_rx_loop(mut reader: Receiver<'static, Driver<'static, USB>>) {
+    // probably some optimizations you can do here to calculate the max overhead we would need for COBS, making this buf smaller.
+    let mut decoder_buf = [0u8; MAX_MESSAGE_SIZE * 2];
+    let mut decoder = cobs::CobsDecoder::new(&mut decoder_buf);
+
+    // read from host, decode, error handle
+    // push stuff to a queue to be sent to the secondary pico if nescessary
+    // control the actuators based on the command read from the host
 }
 
 type MyUsbDriver = Driver<'static, USB>;
