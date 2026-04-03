@@ -1,13 +1,15 @@
 #![no_std]
 
+// When using defmt-03 feature, re-export defmt 0.3 under the name `defmt`
+// so that derive(defmt::Format) works uniformly
+#[cfg(feature = "defmt-03")]
+extern crate defmt_03 as defmt;
+
 use core::ops::Not;
 
 pub const PRIME_PICO_SERIAL: &'static str = "USR-PICO-PRIME";
 pub const SECONDARY_PICO_SERIAL: &'static str = "USR-PICO-SECONDARY";
 pub const TERI_PICO_SERIAL: &'static str = "USR-PICO-TERI";
-
-
-
 
 pub const IMU_READING_DELAY_MS: u64 = 10;
 pub const MAX_MESSAGE_SIZE: usize = 265;
@@ -24,7 +26,7 @@ extern crate cu_bincode as bincode;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[repr(u8)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(any(feature = "defmt", feature = "defmt-03"), derive(defmt::Format))]
 #[cfg_attr(
     feature = "std",
     derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
@@ -35,7 +37,7 @@ pub enum Direction {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(any(feature = "defmt", feature = "defmt-03"), derive(defmt::Format))]
 #[repr(u8)]
 /// Used to specify which actuator a command is meant for.
 #[cfg_attr(
@@ -52,7 +54,7 @@ pub enum Actuator {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(any(feature = "defmt", feature = "defmt-03"), derive(defmt::Format))]
 #[cfg_attr(
     feature = "std",
     derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
@@ -67,7 +69,7 @@ pub enum ActuatorCommand {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(any(feature = "defmt", feature = "defmt-03"), derive(defmt::Format))]
 /// adc readings
 #[cfg_attr(
     feature = "std",
@@ -79,7 +81,7 @@ pub struct ActuatorReading {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(any(feature = "defmt", feature = "defmt-03"), derive(defmt::Format))]
 #[cfg_attr(
     feature = "std",
     derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
@@ -91,7 +93,7 @@ pub enum FromIMU {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(any(feature = "defmt", feature = "defmt-03"), derive(defmt::Format))]
 #[cfg_attr(
     feature = "std",
     derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
@@ -104,7 +106,7 @@ pub enum FromPicoV3 {
 
 /// Radians per second
 #[derive(Clone, Copy, Debug, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(any(feature = "defmt", feature = "defmt-03"), derive(defmt::Format))]
 #[cfg_attr(
     feature = "std",
     derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
@@ -119,7 +121,7 @@ pub struct AngularRate {
 ///
 /// In the default orientation, should be [0.0, -9.81, 0.0]
 #[derive(Clone, Copy, Debug, PartialEq)]
-#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg_attr(any(feature = "defmt", feature = "defmt-03"), derive(defmt::Format))]
 #[cfg_attr(
     feature = "std",
     derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)

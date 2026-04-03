@@ -1,0 +1,41 @@
+[package]
+name = "v3pico"
+version = "0.1.0"
+edition = "2021"
+
+
+[dependencies]
+cortex-m = { version = "0.7.6", features = ["inline-asm"] }
+cortex-m-rt = "0.7.0"
+defmt-rtt = "0.4"
+panic-probe = { version = "0.3", features = ["print-defmt"] }
+
+# We're using a Pico by default on this template
+rp-pico = "0.9"
+
+# but you can use any BSP. Uncomment this to use the pro_micro_rp2040 BSP instead
+# sparkfun-pro-micro-rp2040 = "0.8"
+
+# If you're not going to use a Board Support Package you'll need these:
+# rp2040-hal = { version="0.10", features=["rt", "critical-section-impl"] }
+# rp2040-boot2 = "0.3"
+
+panic-semihosting = "0.6.0"
+embassy-executor.workspace = true
+embassy-rp.workspace = true
+embassy-usb.workspace = true
+embassy-futures.workspace = true
+static_cell = "2.1.0"
+portable-atomic = { version = "1.5", features = ["critical-section"] }
+embassy-time.workspace = true
+lsm6dsox.workspace = true
+#heapless.workspace = true
+# embassy-usb-logger = "0.4.0"
+defmt.workspace = true
+embedded_common.workspace = true
+
+cyw43.workspace = true
+cyw43-pio.workspace = true
+rand.workspace = true
+embassy-sync.workspace = true
+cobs = { version = "0.3.0", features = ["defmt"], default-features = false }

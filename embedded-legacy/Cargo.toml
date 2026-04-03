@@ -1,0 +1,86 @@
+[workspace]
+members = [
+    "v3pico",
+    "lsm6dsox",
+    "actuator"]
+resolver = "2"
+exclude = []
+
+[workspace.dependencies]
+lsm6dsox = { path = "lsm6dsox" }
+defmt = "0.3.10"
+embedded_common = { path = "../embedded_common", features = ["defmt-03"] }
+cyw43 = { version = "0.3.0", features = ["defmt", "firmware-logs"] }
+cyw43-pio = { version = "0.3.0", features = ["defmt"] }
+embassy-net = { version = "0.6.0", features = ["defmt", "tcp", "udp", "raw", "dhcpv4", "medium-ethernet", "dns", "proto-ipv4", "proto-ipv6", "multicast"] }
+rand = { version = "0.8.5", default-features = false }
+embassy-rp = { version = "0.3.0", features = [
+    "defmt",
+    "unstable-pac",
+    "time-driver",
+    "critical-section-impl",
+    "rp2040",
+] }
+embassy-executor = { version = "0.7.0", features = [
+    "task-arena-size-98304",
+    "arch-cortex-m",
+    "executor-thread",
+    "executor-interrupt",
+    "defmt",
+] }
+embassy-usb = { version = "0.4.0", features = ["defmt"] }
+embassy-futures = { version = "0.1.0" }
+embassy-time = "0.4.0"
+embassy-sync = "0.6.2"
+
+# cargo build/run
+[profile.dev]
+codegen-units = 1
+debug = 2
+debug-assertions = true
+incremental = false
+opt-level = 3
+overflow-checks = true
+
+# cargo build/run --release
+[profile.release]
+codegen-units = 1
+debug = 2
+debug-assertions = false
+incremental = false
+lto = 'fat'
+opt-level = 3
+overflow-checks = false
+
+# do not optimize proc-macro crates = faster builds from scratch
+[profile.dev.build-override]
+codegen-units = 8
+debug = false
+debug-assertions = false
+opt-level = 0
+overflow-checks = false
+
+[profile.release.build-override]
+codegen-units = 8
+debug = false
+debug-assertions = false
+opt-level = 0
+overflow-checks = false
+
+# cargo test
+[profile.test]
+codegen-units = 1
+debug = 2
+debug-assertions = true
+incremental = false
+opt-level = 3
+overflow-checks = true
+
+# cargo test --release
+[profile.bench]
+codegen-units = 1
+debug = 2
+debug-assertions = false
+incremental = false
+lto = 'fat'
+opt-level = 3
