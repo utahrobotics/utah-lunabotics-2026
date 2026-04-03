@@ -189,7 +189,7 @@ mod prod_impl {
             };
 
             let port = get_tokio_handle().block_on(async {
-                let port = match tokio_serial::new(&path_str, 9600)
+                let port = match tokio_serial::new(&path_str, 115200)
                     .flow_control(tokio_serial::FlowControl::None)
                     .open_native_async()
                 {
