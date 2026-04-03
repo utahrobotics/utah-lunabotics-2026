@@ -7,6 +7,13 @@
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hgbih"]
 bg_color = Color(0.59987265, 0.5918262, 0.5979706, 0.22352941)
 
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_85h60"]
+bg_color = Color(1, 1, 1, 1)
+corner_radius_top_left = 20
+corner_radius_top_right = 20
+corner_radius_bottom_right = 20
+corner_radius_bottom_left = 20
+
 [node name="SettingsMenu" type="CanvasLayer" unique_id=1631071603]
 script = ExtResource("1_c6bo6")
 
@@ -68,21 +75,24 @@ offset_bottom = 130.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="SettingsButton" type="Button" parent="Control" unique_id=386834087]
+[node name="Behind Icon" type="Panel" parent="Control" unique_id=185379264]
+layout_mode = 0
+offset_left = 1154.0
+offset_top = 44.0
+offset_right = 1194.0
+offset_bottom = 84.0
+theme_override_styles/panel = SubResource("StyleBoxFlat_85h60")
+
+[node name="SettingsButton" type="Button" parent="Control/Behind Icon" unique_id=386834087]
 z_index = 10
 z_as_relative = false
 layout_mode = 1
-anchors_preset = 1
-anchor_left = 1.0
-anchor_right = 1.0
-offset_left = -104.0
-offset_top = 43.0
-offset_right = -4.0
-offset_bottom = 143.0
-grow_horizontal = 0
+offset_left = 1.0
+offset_right = 40.0
+offset_bottom = 42.038963
 toggle_mode = true
 icon = ExtResource("3_85h60")
 flat = true
 expand_icon = true
 
-[connection signal="toggled" from="Control/SettingsButton" to="." method="_on_settings_button_toggled"]
+[connection signal="toggled" from="Control/Behind Icon/SettingsButton" to="." method="_on_settings_button_toggled"]
