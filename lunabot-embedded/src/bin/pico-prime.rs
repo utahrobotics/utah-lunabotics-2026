@@ -10,11 +10,12 @@ use embassy_rp::{
     peripherals::USB,
     usb::{Driver, InterruptHandler},
 };
+use embassy_time::{Duration, Timer};
 use embassy_usb::{
     UsbDevice,
     class::cdc_acm::{CdcAcmClass, Receiver, Sender, State},
 };
-use embedded_common::{ActuatorCommand, MAX_MESSAGE_SIZE};
+use embedded_common::{ActuatorCommand, FromPicoV3, MAX_MESSAGE_SIZE};
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
 
@@ -31,14 +32,13 @@ static PACKET_SIZE: u16 = 64;
 #[embassy_executor::main]
 async fn main(spawner: Spawner) -> ! {
     let p = embassy_rp::init(Default::default());
-
     // Create the driver, from the HAL.
     let driver = Driver::new(p.USB, Irqs);
     let config = {
         let mut config = embassy_usb::Config::new(0xc0de, 0xcafe);
         config.manufacturer = Some("USR");
-        config.product = Some("USR-PICO-PRIME");
-        config.serial_number = Some("USR-PICO-PRIME");
+        config.product = Some(embedded_common::PRIME_PICO_SERIAL);
+        config.serial_number = Some(embedded_common::PRIME_PICO_SERIAL);
         config.max_power = 100;
         config.max_packet_size_0 = 64;
         config
@@ -69,18 +69,19 @@ async fn main(spawner: Spawner) -> ! {
         CdcAcmClass::new(&mut builder, state, PACKET_SIZE)
     };
 
-    let (class_tx, class_rx) = class.split();
-
     // Build the builder.
     let usb = builder.build();
 
+    info!("about to spawn usb task");
     // Run the USB device.
     spawner.spawn(usb_task(usb)).unwrap();
+
+    let (class_tx, class_rx) = class.split();
+
     spawner.spawn(usb_tx_loop(class_tx)).unwrap();
     spawner.spawn(usb_rx_loop(class_rx)).unwrap();
-
-    info!("Hello World!");
-    loop {}
+    core::future::pending::<()>().await;
+    defmt::unreachable!()
 }
 
 #[embassy_executor::task]
@@ -88,6 +89,22 @@ async fn usb_tx_loop(mut writer: Sender<'static, Driver<'static, USB>>) {
     // check if there is anything available from the secondary pico over UART (or maybe request information from the secondary pico?)
     // read (and decode?) the information off the secondary pico
     // send it over usb to the host
+    loop {
+        writer.wait_connection().await;
+        'writer: while writer.dtr() {
+            let mut stuffed = [0u8; cobs::max_encoding_length(FromPicoV3::SIZE) + 1];
+            let serialized = FromPicoV3::Error.serialize();
+            let len = cobs::encode(&serialized, &mut stuffed);
+            for chunk in stuffed[..len + 1].chunks(16) {
+                if let Err(e) = writer.write_packet(chunk).await {
+                    error!("{:?}", e);
+                    break 'writer;
+                }
+            }
+            Timer::after(Duration::from_millis(100)).await;
+        }
+        Timer::after(Duration::from_millis(200)).await;
+    }
 }
 
 #[embassy_executor::task]

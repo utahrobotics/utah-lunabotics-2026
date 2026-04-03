@@ -2,6 +2,13 @@
 
 use core::ops::Not;
 
+pub const PRIME_PICO_SERIAL: &'static str = "USR-PICO-PRIME";
+pub const SECONDARY_PICO_SERIAL: &'static str = "USR-PICO-SECONDARY";
+pub const TERI_PICO_SERIAL: &'static str = "USR-PICO-TERI";
+
+
+
+
 pub const IMU_READING_DELAY_MS: u64 = 10;
 pub const MAX_MESSAGE_SIZE: usize = 265;
 
