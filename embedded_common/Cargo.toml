@@ -5,9 +5,10 @@ edition = "2024"
 
 [features]
 std = ["serde", "cu-bincode"]
-defmt = []
+defmt = ["dep:defmt"]
 
 
 [dependencies]
 serde = { workspace = true, optional = true }
+defmt = {version = "1.0.1" , optional = true}
 cu-bincode = { workspace = true, optional = true }

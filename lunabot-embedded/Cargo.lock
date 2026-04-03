@@ -634,6 +634,9 @@ dependencies = [
 [[package]]
 name = "embedded_common"
 version = "0.1.0"
+dependencies = [
+ "defmt",
+]
 
 [[package]]
 name = "ena"
