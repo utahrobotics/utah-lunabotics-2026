@@ -47,6 +47,8 @@ pub enum Actuator {
     Lift = 0,
     /// the bucket
     Bucket = 1,
+    /// the dumper
+    Dumper = 2
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
@@ -55,6 +57,7 @@ pub enum Actuator {
     feature = "std",
     derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
 )]
+
 pub enum ActuatorCommand {
     SetSpeed(u16, Actuator, Direction),
     Shake,
@@ -213,8 +216,10 @@ impl ActuatorCommand {
                     Actuator::Lift
                 } else if bytes[3] == Actuator::Bucket as u8 {
                     Actuator::Bucket
+                } else if bytes[3] == Actuator::Dumper as u8 {
+                    Actuator::Dumper
                 } else {
-                    return Err("Unknown actuator specifier (not m1 or m2)");
+                    return Err("Unknown actuator specifier");
                 };
                 let speed = u16::from_le_bytes(
                     bytes[1..=2]
@@ -417,7 +422,7 @@ mod tests {
 
     #[test]
     fn actuator_command_set_speed_roundtrip() {
-        for actuator in [Actuator::Lift, Actuator::Bucket] {
+        for actuator in [Actuator::Lift, Actuator::Bucket, Actuator::Dumper] {
             for direction in [Direction::Forward, Direction::Backward] {
                 let original = ActuatorCommand::SetSpeed(12345, actuator, direction);
                 let bytes = original.serialize();

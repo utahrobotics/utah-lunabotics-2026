@@ -237,7 +237,7 @@ mod prod_impl {
             spawn_reader_thread(reader, is_broken_tx.clone(), self.from_pico.clone());
 
             let (cmd_tx, cmd_rx) = tokio::sync::mpsc::channel::<[u8; ActuatorCommand::SIZE]>(4);
-            spawn_writer_task(writer, cmd_rx, is_broken_tx);
+            spawn_writer_task(writer, cmd_rx, is_broken_tx, self.teri_mode);
 
             self.is_broken = Some(is_broken_rx);
             self.cmd_tx = Some(cmd_tx);
@@ -349,18 +349,34 @@ mod prod_impl {
         mut writer: WriteHalf<BufStream<SerialStream>>,
         mut cmd_rx: tokio::sync::mpsc::Receiver<[u8; ActuatorCommand::SIZE]>,
         is_broken_tx: tokio::sync::watch::Sender<bool>,
+        teri_mode: bool,
     ) -> tokio::task::JoinHandle<()> {
         get_tokio_handle().spawn(async move {
             while let Some(data) = cmd_rx.recv().await {
-                if let Err(e) = writer.write_all(&data).await {
-                    eprintln!("[PICO] Failed to write to serial port: {e}");
-                    let _ = is_broken_tx.send(true);
-                    break;
-                }
-                if let Err(e) = writer.flush().await {
-                    eprintln!("[PICO] Failed to flush serial port: {e}");
-                    let _ = is_broken_tx.send(true);
-                    break;
+                if teri_mode{
+                    if let Err(e) = writer.write_all(&data).await {
+                        eprintln!("[PICO] Failed to write to serial port: {e}");
+                        let _ = is_broken_tx.send(true);
+                        break;
+                    }
+                    if let Err(e) = writer.flush().await {
+                        eprintln!("[PICO] Failed to flush serial port: {e}");
+                        let _ = is_broken_tx.send(true);
+                        break;
+                    }
+                } else {
+                    let mut encoded = cobs::encode_vec(&data);
+                    encoded.push(0u8);
+                    if let Err(e) = writer.write_all(&encoded).await {
+                        eprintln!("[PICO] Failed to write to serial port: {e}");
+                        let _ = is_broken_tx.send(true);
+                        break;
+                    }
+                    if let Err(e) = writer.flush().await {
+                        eprintln!("[PICO] Failed to flush serial port: {e}");
+                        let _ = is_broken_tx.send(true);
+                        break;
+                    }
                 }
             }
         })
