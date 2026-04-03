@@ -19,8 +19,9 @@ pub fn navigate_behavior() -> Behavior<LunabotAction> {
                     vec![Wait(1.0), Action(LunabotAction::CalculatePath)],
                 ),
             ]),
-            // dig some dirt now that we're at the target
+            // dig/dump dirt (test for now but refactor into a continous dig, path, dump, path loop later)
             Action(LunabotAction::Dig),
+            Action(LunabotAction::Dump),
         ])],
     )
 }

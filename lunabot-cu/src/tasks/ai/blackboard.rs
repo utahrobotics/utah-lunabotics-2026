@@ -47,6 +47,7 @@ pub struct LunabotBlackboard {
 
     // if we're digging moon dirt, the job will be stored here
     pub digger: Option<Job<ActuatorCommand, ()>>,
+    pub dumper: Option<Job<ActuatorCommand, ()>>,
 
     /// rotation shim
     pub rotation_shim: Option<Job<Steering, ()>>,
@@ -82,6 +83,7 @@ impl Default for LunabotBlackboard {
             yielded: false,
             path_follower: None,
             digger: None,
+            dumper: None,
             rotation_shim: None,
             obstacle_gradient_threshold_expander: 0.5,
             obstacle_gradient_threshold_pathfinder: 0.3,
