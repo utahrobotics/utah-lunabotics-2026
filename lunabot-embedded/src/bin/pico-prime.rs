@@ -15,7 +15,7 @@ use embassy_usb::{
     UsbDevice,
     class::cdc_acm::{CdcAcmClass, Receiver, Sender, State},
 };
-use embedded_common::{ActuatorCommand, FromPicoV3, MAX_MESSAGE_SIZE};
+use embedded_common::{ActuatorCommand, FromPico, MAX_MESSAGE_SIZE};
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
 
@@ -92,8 +92,8 @@ async fn usb_tx_loop(mut writer: Sender<'static, Driver<'static, USB>>) {
     loop {
         writer.wait_connection().await;
         'writer: while writer.dtr() {
-            let mut stuffed = [0u8; cobs::max_encoding_length(FromPicoV3::SIZE) + 1];
-            let serialized = FromPicoV3::Error.serialize();
+            let mut stuffed = [0u8; cobs::max_encoding_length(FromPico::SIZE) + 1];
+            let serialized = FromPico::Error.serialize();
             let len = cobs::encode(&serialized, &mut stuffed);
             for chunk in stuffed[..len + 1].chunks(16) {
                 if let Err(e) = writer.write_packet(chunk).await {
