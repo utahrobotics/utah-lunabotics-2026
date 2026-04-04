@@ -1,6 +1,4 @@
-use std::thread::sleep;
-
-use bonsai_bt::Status::{Running, Success};
+use bonsai_bt::Status::{Success};
 use embedded_common::{Actuator, ActuatorCommand, Direction};
 use tasker::tokio::{self, sync::mpsc};
 

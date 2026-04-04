@@ -294,10 +294,10 @@
                 "fy":1056.50,
                 "cx":913.26,
                 "cy":604.28,
-                "width":1920,
-                "height":1200,
+                "width":640,
+                "height":480,
                 "udp_host":"127.0.0.1",
-                "udp_port":5003,
+                "udp_port":4001,
             },
         ),
         (
@@ -312,7 +312,7 @@
                 "width":1280,
                 "height":720,
                 "udp_host":"127.0.0.1",
-                "udp_port":5006,
+                "udp_port":4000,
             }
         ),
     ],
@@ -323,6 +323,6 @@
     // if true, each output payload of each will be logged unless a task opts out
         enable_task_logging: true,
         section_size_mib:100,
-        copperlist_count: 4,
+        copperlist_count: 20,
     ),
 )
