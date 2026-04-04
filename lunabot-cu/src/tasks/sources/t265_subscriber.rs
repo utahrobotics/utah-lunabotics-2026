@@ -20,6 +20,9 @@ use std::ops::DerefMut;
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use t265_rs::{Pose, T265Manager, VideoFrame};
 
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+use crate::ROBOT_STATE;
+
 #[cfg(all(any(feature = "resim", feature = "sim")))]
 pub struct T265Subscriber {}
 
@@ -196,6 +199,9 @@ impl CuSrcTask for T265Subscriber {
                 };
                 // we only want images from the righthand fisheye lense
                 if image.sensor_index == 0 {
+                    break 'image_rx;
+                }
+                if ROBOT_STATE.get().unwrap().kinematic_root.get_node_with_name(&image.device_id).is_none() {
                     break 'image_rx;
                 }
                 handle.with_inner_mut(|inner| {
