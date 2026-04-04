@@ -174,7 +174,7 @@ async fn usb_tx_loop(
         writer.wait_connection().await;
         'writer: while writer.dtr() {
             let mut stuffed = [0u8; cobs::max_encoding_length(FromPico::SIZE) + 1];
-            // for now just always spit out an error. from faults on an empty iterator will just return picoerror::other.
+            // for now just always spit out an error. from_faults on an empty iterator will just return picoerror::other.
             let err = PicoError::from_faults(
                 fault_detectors
                     .iter()

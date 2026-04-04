@@ -167,11 +167,18 @@ fn sim_callback<'a>(
                                 BUCKET_SPEED.store(*speed);
                                 BUCKET_DIRECTION.store(*direction);
                             }
+                            embedded_common::Actuator::Dumper => {
+
+                            }
                         }
                     }
                     embedded_common::ActuatorCommand::Shake => {}
                     embedded_common::ActuatorCommand::StartPercuss => {}
                     embedded_common::ActuatorCommand::StopPercuss => {}
+                    embedded_common::ActuatorCommand::StopAll => {
+                        LIFT_SPEED.store(0);
+                        BUCKET_SPEED.store(0);
+                    }
                 }
             }
 

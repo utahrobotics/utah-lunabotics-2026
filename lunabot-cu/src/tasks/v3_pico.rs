@@ -423,7 +423,7 @@ mod resim_impl {
         // the reason this is a tuple is a hack to get around the fact that copper doesnt support one task having multiple outputs in the same way it does multiple inputs
         type Input<'m> = input_msg!(embedded_common::ActuatorCommand);
         // output is the FromPicoV3 struct serialized as bytes
-        type Output<'m> = output_msg!(FromPicoV3);
+        type Output<'m> = output_msg!(FromPico);
         type Resources<'r> = ();
         fn new(_config: Option<&ComponentConfig>, _resources: Self::Resources<'_>) -> CuResult<Self>
         where
