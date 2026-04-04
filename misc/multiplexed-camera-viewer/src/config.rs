@@ -3,14 +3,14 @@ static CONFIG_STR: &'static str = include_str!("../camera_layout.ron");
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GridLayout {
-    dimensions: (usize, usize),
-    feed_descriptors: Vec<CameraFeed>,
+    pub dimensions: (usize, usize),
+    pub feed_descriptors: Vec<CameraFeed>,
 }
 
 #[derive(Serialize, Debug, Deserialize)]
 pub struct CameraFeed {
-    id: String,
-    address: String,
+    pub id: String,
+    pub address: String,
 }
 
 pub fn get_config() -> Result<GridLayout, ron::Error> {
