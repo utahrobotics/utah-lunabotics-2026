@@ -1,5 +1,11 @@
 # Installation
-As of now, only the stable release of Godot 4.5 is needed
+As of now, only the stable release of Godot 4.6 is needed
+
+Since we are using GDExtension to use Rust be sure to do set it up
+
+Go to
+> lunabase-lib
+and run cargo build. Do this any time the lib.rs for godot is updated
 
 # Contributing
 

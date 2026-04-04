@@ -199,7 +199,9 @@
         // uses async tasks to communicate with the pico on the v3 pcb that electrical team designed.
         // controls actuators and sends imu data to the localizer
         (
-            id:"v3_pico", type: "crate::tasks::V3PicoTask", config:{}
+            id:"v3_pico", type: "crate::tasks::V3PicoTask", config:{
+                "teri_mode": false,
+            }
         ),
         // handles apriltag detections from all the cameras, combining them and then sending them over to the localizer
         (
@@ -240,7 +242,7 @@
         (src:"occupancy_grid_pipeline",       dst:"new_ai",                  msg:"crate::pathfinding::OccupancyGrid"),
         (src:"new_ai",                        dst:"motor_ctrl",              msg:"common::Steering"),
         (src:"new_ai",                        dst:"v3_pico",                 msg:"embedded_common::ActuatorCommand"),
-        (src:"v3_pico",                       dst:"localizer",               msg:"embedded_common::FromPicoV3"),
+        (src:"v3_pico",                       dst:"localizer",               msg:"embedded_common::FromPico"),
         (src:"detection_handler",             dst: "localizer",              msg:"Vec<crate::tasks::AprilTagMeasurement>"),
         (src:"t265_subscriber",               dst:"localizer",               msg:"crate::tasks::sources::T265Msg"),
         (src:"t265_subscriber",               dst:"detector_cam_t265",       msg:"cu_sensor_payloads::CuImage<Vec<u8>>"),

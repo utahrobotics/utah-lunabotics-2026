@@ -1,0 +1,37 @@
+[package]
+name = "actuator"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+embassy-embedded-hal = { version = "0.3.0",features = ["defmt"] }
+embassy-sync = { version = "0.6.2", features = ["defmt"] }
+embassy-executor = { version = "0.7.0", features = ["arch-cortex-m", "executor-thread", "executor-interrupt", "defmt"] }
+embassy-time = { version = "0.4.0",features = ["defmt", "defmt-timestamp-uptime"] }
+embassy-rp = { version = "0.4.0",features = ["defmt", "unstable-pac", "time-driver", "critical-section-impl", "rp2040"] }
+embassy-usb = { version = "0.4.0", features = ["defmt"] }
+embassy-futures = { version = "0.1.0"}
+
+defmt = "0.3"
+defmt-rtt = "0.4"
+fixed = "1.23.1"
+fixed-macro = "1.2"
+
+cortex-m = { version = "0.7.6", features = ["inline-asm"] }
+cortex-m-rt = "0.7.0"
+critical-section = "1.1"
+portable-atomic = { version = "1.5", features = ["critical-section"] }
+panic-probe = { version = "0.3", features = ["print-defmt"] }
+static_cell = "2.1.0"
+embedded_common.workspace = true
+
+[profile.release]
+lto = true
+opt-level = "s"
+incremental = false
+codegen-units = 1
+# note: debug = true is okay - debuginfo isn't flashed to the device!
+debug = true
+
+[profile.dev]
+lto = true

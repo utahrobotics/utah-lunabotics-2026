@@ -18,6 +18,10 @@ class_name ControlSchemeResource extends Resource
 @export var increment_speed  : Array[InputEvent]
 @export var decrement_speed  : Array[InputEvent]
 
+func update_action(action_name: String, events: Array[InputEvent]):
+	if action_name in self:
+		set(action_name, events)
+
 func get_all_actions() -> Dictionary:
 	var all_actions : Dictionary = {}
 	all_actions["left_wheel"] = left_wheel_axis

@@ -11,9 +11,10 @@ mod prod_impl {
     use crossbeam_channel::Receiver;
     use cu29::prelude::*;
     use embedded_common::ActuatorCommand;
-    use embedded_common::FromPicoV3;
+    use embedded_common::FromPico;
     use embedded_common::IMU_READING_DELAY_MS;
     use futures_util::StreamExt;
+    use std::time::Instant;
     use tasker::get_tokio_handle;
     use tasker::tokio;
     use tasker::tokio::io::AsyncWriteExt;
@@ -27,20 +28,21 @@ mod prod_impl {
     use udev::EventType;
     use udev::MonitorBuilder;
     use udev::Udev;
-    use std::time::Instant;
     pub static LAST_RESET: OnceLock<AtomicCell<Instant>> = OnceLock::new();
 
     pub struct V3PicoTask {
         /// when a v3 pico is connected, it's serial port will be available on this rx
         path_rx: Receiver<String>,
         is_broken: Option<tokio::sync::watch::Receiver<bool>>,
-        serial_port_writer: Option<WriteHalf<BufStream<SerialStream>>>,
+        /// Channel to send actuator commands to the async writer task
+        cmd_tx: Option<tokio::sync::mpsc::Sender<[u8; ActuatorCommand::SIZE]>>,
 
         /// Message queue read from the pico
-        from_pico: Arc<&'static ArrayQueue<FromPicoV3>>,
+        from_pico: Arc<&'static ArrayQueue<FromPico>>,
         last_reading: Instant,
         /// prevents us from powercycling a bajillion times in a row
         last_powercycle: Instant,
+        teri_mode: bool,
     }
 
     impl Freezable for V3PicoTask {}
@@ -49,16 +51,20 @@ mod prod_impl {
         // input is the actuator command as bytes
         // the reason this is a tuple is a hack to get around the fact that copper doesnt support one task
         // having multiple outputs in the same way it does multiple inputs
-        type Input<'m> = input_msg!(
-            embedded_common::ActuatorCommand
-        );
-        type Output<'m> = output_msg!(FromPicoV3);
+        type Input<'m> = input_msg!(embedded_common::ActuatorCommand);
+        type Output<'m> = output_msg!(FromPico);
         type Resources<'r> = ();
 
-        fn new(_config: Option<&ComponentConfig>, _resources: Self::Resources<'_>) -> CuResult<Self>
+        fn new(config: Option<&ComponentConfig>, _resources: Self::Resources<'_>) -> CuResult<Self>
         where
             Self: Sized,
         {
+            let teri_mode = if let Some(config) = config {
+                config.get::<bool>("teri_mode")?.unwrap_or(false)
+            } else {
+                false
+            };
+
             let (path_tx, path_rx) = crossbeam_channel::bounded(1);
             std::thread::spawn(move || {
                 let mut monitor = match MonitorBuilder::new() {
@@ -125,27 +131,40 @@ mod prod_impl {
                         let Some(path_str) = path.to_str() else {
                             return;
                         };
-                        let Some(serial_cstr) = device.property_value("ID_SERIAL") else {
+                        let Some(serial_cstr) = device.property_value("ID_SERIAL_SHORT") else {
                             return;
                         };
                         let Some(serial) = serial_cstr.to_str() else {
                             eprintln!("Failed to parse serial of device {}", path_str);
                             return;
                         };
-                        match serial.strip_prefix("USR_V3PICO_") {
-                            Some(_) => {
+                        match serial {
+                            embedded_common::PRIME_PICO_SERIAL => {
+                                if teri_mode {
+                                    eprintln!("[PICO] Teri mode expected, but non teri pico was detected");
+                                    return;
+                                }
                                 if path_tx.send(path.to_string_lossy().to_string()).is_err() {
-                                    eprintln!("Couldn't send controller path");
+                                    eprintln!("[PICO] Couldn't send controller path");
                                 }
                                 println!("[Info] Opened pico");
                             }
-                            None if serial == "USR_V3PICO" => {
-                                println!(
-                                    "Actuator controller at path {} has no serial number",
-                                    path.to_string_lossy()
-                                );
+                            embedded_common::SECONDARY_PICO_SERIAL => {
+                                eprintln!("[PICO] Unexpeced serial (is the secondary pico connected but not the prime pico?");
                             }
-                            None => {} // Device doesn't match, silently ignore
+                            embedded_common::TERI_PICO_SERIAL => {
+                                if teri_mode {
+                                    if path_tx.send(path.to_string_lossy().to_string()).is_err() {
+                                        eprintln!("[PICO] Couldn't send controller path");
+                                    }
+                                    println!("[Info] Opened pico");
+                                } else {
+                                    eprintln!("[PICO] TERI mode pico detected when teri mode isnt activated");
+                                }
+                            }
+                            _ => {
+
+                            }
                         }
                     })
             });
@@ -154,9 +173,10 @@ mod prod_impl {
                 path_rx,
                 is_broken: None,
                 from_pico,
-                serial_port_writer: None,
+                cmd_tx: None,
                 last_reading: Instant::now(),
-                last_powercycle: Instant::now()
+                last_powercycle: Instant::now(),
+                teri_mode,
             })
         }
 
@@ -169,8 +189,8 @@ mod prod_impl {
             };
 
             let port = get_tokio_handle().block_on(async {
-                let port = match tokio_serial::new(&path_str, 150000)
-                    .flow_control(tokio_serial::FlowControl::Hardware)
+                let port = match tokio_serial::new(&path_str, 115200)
+                    .flow_control(tokio_serial::FlowControl::None)
                     .open_native_async()
                 {
                     Ok(mut x) => {
@@ -214,14 +234,17 @@ mod prod_impl {
                 CobsCodec,
             > = FramedRead::new(reader, CobsCodec {});
             let (is_broken_tx, is_broken_rx) = watch::channel(false);
-            spawn_reader_thread(reader, is_broken_tx, self.from_pico.clone());
+            spawn_reader_thread(reader, is_broken_tx.clone(), self.from_pico.clone());
+
+            let (cmd_tx, cmd_rx) = tokio::sync::mpsc::channel::<[u8; ActuatorCommand::SIZE]>(4);
+            spawn_writer_task(writer, cmd_rx, is_broken_tx, self.teri_mode);
+
             self.is_broken = Some(is_broken_rx);
-            self.serial_port_writer = Some(writer);
+            self.cmd_tx = Some(cmd_tx);
             Ok(())
         }
 
-        /// If there is an actuator command available, and self.serial_port_writer is set, then
-        /// the actuator command is written to the serial port.
+        /// Sends actuator commands to the async writer task via channel.
         /// Messages from the pico are popped off the queue and sent to the downstream task.
         fn process<'i, 'o>(
             &mut self,
@@ -230,20 +253,12 @@ mod prod_impl {
             output: &mut Self::Output<'o>,
         ) -> CuResult<()> {
             if let Some(actuator_cmd) = input.payload()
-                && let Some(ref mut writer) = self.serial_port_writer
+                && let Some(ref cmd_tx) = self.cmd_tx
             {
-                let _ = get_tokio_handle().block_on(async {
-                    if let Err(e) = writer
-                        .write(&ActuatorCommand::serialize(&actuator_cmd))
-                        .await
-                    {
-                        return Err(CuError::new_with_cause("failed to write to serial port", e));
-                    }
-                    if let Err(e) = writer.flush().await {
-                        return Err(CuError::new_with_cause("failed to flush to serial port", e));
-                    }
-                    return Ok(());
-                })?;
+                let serialized = ActuatorCommand::serialize(&actuator_cmd);
+                if let Err(_) = cmd_tx.try_send(serialized) {
+                    eprintln!("[PICO] Command channel full or closed, dropping command");
+                }
             }
             if let Some(reading) = self.from_pico.pop() {
                 output.set_payload(reading);
@@ -253,7 +268,10 @@ mod prod_impl {
             }
 
             if self.last_reading.elapsed().as_millis() > 1000 {
-                return Err(CuError::new_with_cause("Pico Unresponsive", std::io::Error::other("Pico Unresponsive")));
+                return Err(CuError::new_with_cause(
+                    "Pico Unresponsive",
+                    std::io::Error::other("Pico Unresponsive"),
+                ));
             }
             Ok(())
         }
@@ -282,7 +300,7 @@ mod prod_impl {
             CobsCodec,
         >,
         is_broken_tx: tokio::sync::watch::Sender<bool>,
-        from_pico: Arc<&'static ArrayQueue<FromPicoV3>>,
+        from_pico: Arc<&'static ArrayQueue<FromPico>>,
     ) -> tokio::task::JoinHandle<()> {
         get_tokio_handle().spawn(async move {
             let mut no_reading_count = 0;
@@ -313,7 +331,7 @@ mod prod_impl {
                     eprintln!("not 105 bytes");
                     continue;
                 };
-                let Ok(reading) = FromPicoV3::deserialize(reading) else {
+                let Ok(reading) = FromPico::deserialize(reading) else {
                     eprintln!("Failed to deserialize message from picov3 serial port");
                     let _ = is_broken_tx.send(true);
                     break;
@@ -326,21 +344,59 @@ mod prod_impl {
             }
         })
     }
-    impl V3PicoTask {
+    /// Receives actuator commands from the channel and writes them to the serial port
+    fn spawn_writer_task(
+        mut writer: WriteHalf<BufStream<SerialStream>>,
+        mut cmd_rx: tokio::sync::mpsc::Receiver<[u8; ActuatorCommand::SIZE]>,
+        is_broken_tx: tokio::sync::watch::Sender<bool>,
+        teri_mode: bool,
+    ) -> tokio::task::JoinHandle<()> {
+        get_tokio_handle().spawn(async move {
+            while let Some(data) = cmd_rx.recv().await {
+                if teri_mode{
+                    if let Err(e) = writer.write_all(&data).await {
+                        eprintln!("[PICO] Failed to write to serial port: {e}");
+                        let _ = is_broken_tx.send(true);
+                        break;
+                    }
+                    if let Err(e) = writer.flush().await {
+                        eprintln!("[PICO] Failed to flush serial port: {e}");
+                        let _ = is_broken_tx.send(true);
+                        break;
+                    }
+                } else {
+                    let mut encoded = cobs::encode_vec(&data);
+                    encoded.push(0u8);
+                    if let Err(e) = writer.write_all(&encoded).await {
+                        eprintln!("[PICO] Failed to write to serial port: {e}");
+                        let _ = is_broken_tx.send(true);
+                        break;
+                    }
+                    if let Err(e) = writer.flush().await {
+                        eprintln!("[PICO] Failed to flush serial port: {e}");
+                        let _ = is_broken_tx.send(true);
+                        break;
+                    }
+                }
+            }
+        })
+    }
 
+    impl V3PicoTask {
         /// install this binary from misc/usb-reset
         fn powercycle_ioctl(&mut self) {
             if self.last_powercycle.elapsed().as_secs() > 1 {
                 eprintln!("Pico broken, powercycling");
                 get_tokio_handle().spawn(async {
                     match std::process::Command::new("usb-reset")
-                        .arg("v3pico").spawn() {
-                            Ok(_) => {
-                            },
-                            Err(e) => {
-                                println!("Ioctl failed: {e}");
-                            },
+                        .arg("v3pico")
+                        .spawn()
+                    {
+                        Ok(_) => {}
+                        Err(e) => {
+                            println!("Ioctl failed: {e}");
                         }
+                    }
                 });
                 self.last_powercycle = Instant::now();
             }
@@ -357,7 +413,7 @@ pub use resim_impl::*;
 #[cfg(not(feature = "production"))]
 mod resim_impl {
     use cu29::{cutask::CuTask, prelude::*};
-    use embedded_common::FromPicoV3;
+    use embedded_common::FromPico;
 
     pub struct V3PicoTask {}
     impl Freezable for V3PicoTask {}
@@ -367,7 +423,7 @@ mod resim_impl {
         // the reason this is a tuple is a hack to get around the fact that copper doesnt support one task having multiple outputs in the same way it does multiple inputs
         type Input<'m> = input_msg!(embedded_common::ActuatorCommand);
         // output is the FromPicoV3 struct serialized as bytes
-        type Output<'m> = output_msg!(FromPicoV3);
+        type Output<'m> = output_msg!(FromPico);
         type Resources<'r> = ();
         fn new(_config: Option<&ComponentConfig>, _resources: Self::Resources<'_>) -> CuResult<Self>
         where

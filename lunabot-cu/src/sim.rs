@@ -93,16 +93,36 @@ struct CachedMjIds {
 impl CachedMjIds {
     fn new(data: &MjData<&MjModel>) -> Self {
         Self {
-            lift_cylinder: data.actuator("lift_cylinder").expect("lift_cylinder actuator not found"),
-            bucket_cylinder: data.actuator("bucket_cylinder").expect("bucket_cylinder actuator not found"),
-            motor_fl: data.actuator("motor_fl").expect("motor_fl actuator not found"),
-            motor_bl: data.actuator("motor_bl").expect("motor_bl actuator not found"),
-            motor_fr: data.actuator("motor_fr").expect("motor_fr actuator not found"),
-            motor_br: data.actuator("motor_br").expect("motor_br actuator not found"),
-            lunabot_body: data.body("simplify_lunabot").expect("simplify_lunabot body not found"),
-            velocimeter: data.sensor("lunabot_velocimeter").expect("lunabot_velocimeter sensor not found"),
-            gyro: data.sensor("lunabot_gyro").expect("lunabot_gyro sensor not found"),
-            accelerometer: data.sensor("lunabot_accelerometer").expect("lunabot_accelerometer sensor not found"),
+            lift_cylinder: data
+                .actuator("lift_cylinder")
+                .expect("lift_cylinder actuator not found"),
+            bucket_cylinder: data
+                .actuator("bucket_cylinder")
+                .expect("bucket_cylinder actuator not found"),
+            motor_fl: data
+                .actuator("motor_fl")
+                .expect("motor_fl actuator not found"),
+            motor_bl: data
+                .actuator("motor_bl")
+                .expect("motor_bl actuator not found"),
+            motor_fr: data
+                .actuator("motor_fr")
+                .expect("motor_fr actuator not found"),
+            motor_br: data
+                .actuator("motor_br")
+                .expect("motor_br actuator not found"),
+            lunabot_body: data
+                .body("simplify_lunabot")
+                .expect("simplify_lunabot body not found"),
+            velocimeter: data
+                .sensor("lunabot_velocimeter")
+                .expect("lunabot_velocimeter sensor not found"),
+            gyro: data
+                .sensor("lunabot_gyro")
+                .expect("lunabot_gyro sensor not found"),
+            accelerometer: data
+                .sensor("lunabot_accelerometer")
+                .expect("lunabot_accelerometer sensor not found"),
             depth_buffer: vec![0u16; DEPTH_FRAME_WIDTH as usize * DEPTH_FRAME_HEIGHT as usize],
         }
     }
@@ -137,19 +157,28 @@ fn sim_callback<'a>(
 
             if let Some(actuator_cmd) = input.payload() {
                 match actuator_cmd {
-                    embedded_common::ActuatorCommand::SetSpeed(speed, actuator, direction) => match actuator {
-                        embedded_common::Actuator::Lift => {
-                            LIFT_SPEED.store(*speed);
-                            LIFT_DIRECTION.store(*direction);
+                    embedded_common::ActuatorCommand::SetSpeed(speed, actuator, direction) => {
+                        match actuator {
+                            embedded_common::Actuator::Lift => {
+                                LIFT_SPEED.store(*speed);
+                                LIFT_DIRECTION.store(*direction);
+                            }
+                            embedded_common::Actuator::Bucket => {
+                                BUCKET_SPEED.store(*speed);
+                                BUCKET_DIRECTION.store(*direction);
+                            }
+                            embedded_common::Actuator::Dumper => {
+
+                            }
                         }
-                        embedded_common::Actuator::Bucket => {
-                            BUCKET_SPEED.store(*speed);
-                            BUCKET_DIRECTION.store(*direction);
-                        }
-                    },
+                    }
                     embedded_common::ActuatorCommand::Shake => {}
                     embedded_common::ActuatorCommand::StartPercuss => {}
                     embedded_common::ActuatorCommand::StopPercuss => {}
+                    embedded_common::ActuatorCommand::StopAll => {
+                        LIFT_SPEED.store(0);
+                        BUCKET_SPEED.store(0);
+                    }
                 }
             }
 
@@ -263,8 +292,10 @@ fn sim_callback<'a>(
                 .duration_since(SystemTime::UNIX_EPOCH)
                 .unwrap()
                 .as_nanos() as u64;
-            output.0.metadata.process_time.start = OptionCuTime::from(Some(CuTime::from_nanos(now_ns)));
-            output.0.metadata.process_time.end = OptionCuTime::from(Some(CuTime::from_nanos(now_ns)));
+            output.0.metadata.process_time.start =
+                OptionCuTime::from(Some(CuTime::from_nanos(now_ns)));
+            output.0.metadata.process_time.end =
+                OptionCuTime::from(Some(CuTime::from_nanos(now_ns)));
             let last = last_output_time.load(Ordering::Relaxed);
             if now_ns - last > log_interval_ns {
                 last_output_time.store(now_ns, Ordering::Relaxed);
@@ -293,15 +324,13 @@ fn sim_callback<'a>(
                 let body_origin_to_center = Vector3::new(0.37, -0.18, 0.00);
                 let isometry = Isometry3::from_parts(
                     Translation3::from(
-                        Vector3::new(xpos[0], xpos[1], xpos[2])
-                            + rotation * body_origin_to_center,
+                        Vector3::new(xpos[0], xpos[1], xpos[2]) + rotation * body_origin_to_center,
                     ),
                     rotation,
                 );
 
                 let accel_data = ids.accelerometer.view(data).data;
-                let accel_nalgebra =
-                    Vector3::new(accel_data[0], accel_data[1], accel_data[2]);
+                let accel_nalgebra = Vector3::new(accel_data[0], accel_data[1], accel_data[2]);
                 let gravity = Vector3::new(0.0, 0.0, 9.8);
                 let body_gravity = isometry.rotation * gravity;
                 let _accel = accel_nalgebra - body_gravity;
@@ -378,8 +407,9 @@ fn main() {
         .build()
         .expect("Failed to create application.");
 
-    let mut sim_cb =
-        |step: default::SimStep| -> SimOverride { sim_callback(step, data, &mut renderer, &mut cached_ids) };
+    let mut sim_cb = |step: default::SimStep| -> SimOverride {
+        sim_callback(step, data, &mut renderer, &mut cached_ids)
+    };
 
     application
         .start_all_tasks(&mut sim_cb)
@@ -422,8 +452,9 @@ fn main() {
             physics_accumulator -= COPPER_HZ;
         }
 
-        let mut sim_cb =
-            |step: default::SimStep| -> SimOverride { sim_callback(step, data, &mut renderer, &mut cached_ids) };
+        let mut sim_cb = |step: default::SimStep| -> SimOverride {
+            sim_callback(step, data, &mut renderer, &mut cached_ids)
+        };
         application
             .run_one_iteration(&mut sim_cb)
             .expect("failed to run copper iteration");
@@ -447,8 +478,9 @@ fn main() {
         }
     }
 
-    let mut sim_cb =
-        |step: default::SimStep| -> SimOverride { sim_callback(step, data, &mut renderer, &mut cached_ids) };
+    let mut sim_cb = |step: default::SimStep| -> SimOverride {
+        sim_callback(step, data, &mut renderer, &mut cached_ids)
+    };
     application
         .stop_all_tasks(&mut sim_cb)
         .expect("Failed to stop all tasks.");

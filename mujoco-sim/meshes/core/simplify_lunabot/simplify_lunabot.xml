@@ -88,7 +88,7 @@
   </asset>
 
   <worldbody>
-    <body name="simplify_lunabot" pos="1 1 0.4" euler="0 0 0 ">
+    <body name="simplify_lunabot" pos=".5 1.5 0.4" euler="0 0 0 ">
       <!-- Center of mass explicitly defined based on actual mass distribution -->
       <inertial mass="90" pos="0.4 -0.10 0.09" diaginertia="1 1 1" />
       <joint type="free" />

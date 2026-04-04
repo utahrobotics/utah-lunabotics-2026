@@ -1,0 +1,70 @@
+[gd_scene format=3 uid="uid://buo5ncrpuluwh"]
+
+[ext_resource type="Script" uid="uid://dcgtlcycl0twd" path="res://GUI/MapSystem/Arena_Popup.gd" id="1_87x0i"]
+[ext_resource type="Texture2D" uid="uid://b4fj1qd51gjks" path="res://Assets/Maps/ucf.png" id="2_1610t"]
+[ext_resource type="Texture2D" uid="uid://c3b2y3ky1m03k" path="res://Assets/icons/USR-Icon.png" id="3_x0vsi"]
+[ext_resource type="Texture2D" uid="uid://b8fyvsigu0r8h" path="res://Assets/Maps/Screenshot From 2026-01-14 21-57-20.png" id="4_h6673"]
+
+[node name="ArenaMap" type="Control" unique_id=1557496579]
+layout_mode = 3
+anchor_right = 0.23300001
+anchor_bottom = 0.397
+offset_right = 0.3999939
+offset_bottom = 0.099975586
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 1
+script = ExtResource("1_87x0i")
+
+[node name="Artemis" type="TextureRect" parent="." unique_id=1969194002]
+layout_mode = 1
+offset_right = 688.0
+offset_bottom = 500.0
+scale = Vector2(0.4, 0.4)
+texture = ExtResource("4_h6673")
+expand_mode = 1
+
+[node name="origin" type="Control" parent="Artemis" unique_id=1537755202]
+anchors_preset = 0
+offset_left = -42.50003
+offset_top = 445.0
+offset_right = -2.5000305
+offset_bottom = 485.0
+pivot_offset = Vector2(50, 50)
+
+[node name="TrailMarkerArtemis" type="Line2D" parent="Artemis/origin" unique_id=1160674964]
+position = Vector2(50, 50)
+scale = Vector2(0.9999998, 0.9999998)
+
+[node name="LocationArtemis" type="TextureRect" parent="Artemis/origin" unique_id=370658672]
+layout_mode = 0
+offset_right = 100.0
+offset_bottom = 100.0
+texture = ExtResource("3_x0vsi")
+expand_mode = 1
+
+[node name="Ucf" type="TextureRect" parent="." unique_id=221225568]
+layout_mode = 1
+offset_right = 814.0
+offset_bottom = 914.0
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_1610t")
+expand_mode = 1
+
+[node name="Origin" type="Control" parent="Ucf" unique_id=1856979022]
+anchors_preset = 0
+offset_left = 40.0
+offset_top = 413.33334
+offset_right = 80.0
+offset_bottom = 453.33334
+pivot_offset = Vector2(50, 50)
+
+[node name="TrailMarkerUcf" type="Line2D" parent="Ucf/Origin" unique_id=1985587690]
+position = Vector2(50, 50)
+
+[node name="LocationUcf" type="TextureRect" parent="Ucf/Origin" unique_id=1462280992]
+layout_mode = 0
+offset_right = 100.0
+offset_bottom = 100.00003
+texture = ExtResource("3_x0vsi")
+expand_mode = 1

@@ -21,7 +21,7 @@ use cu29::{
     cutask::{CuMsg, Freezable},
     input_msg,
 };
-use embedded_common::FromPicoV3;
+use embedded_common::FromPico;
 use kfilter::measurement::LinearMeasurement;
 use kfilter::system::StepReturn;
 use nalgebra::{Isometry3, SMatrix, SVector, UnitQuaternion, Vector6};
@@ -259,7 +259,7 @@ impl CuTask for Localizer {
     type Input<'m> = input_msg!('m,
         ImuMeasurement,
         IcpMeasurement,
-        FromPicoV3,
+        FromPico,
         Vec<AprilTagMeasurement>,
         T265Msg
     );
