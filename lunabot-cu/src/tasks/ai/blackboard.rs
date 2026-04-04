@@ -6,7 +6,7 @@ use common::{FromLunabase, LUNABOT_STAGE, LunabotStage, Steering};
 use embedded_common::ActuatorCommand;
 use nalgebra::Vector2;
 use simple_motion::StaticNode;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 #[derive(Debug)]
 pub struct LunabotBlackboard {
