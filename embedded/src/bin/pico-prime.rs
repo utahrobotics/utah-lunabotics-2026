@@ -48,6 +48,9 @@ struct ActuatorDriver<'a> {
 
 impl<'a> ActuatorDriver<'a> {
     fn drive(&mut self, speed: u16, direction: Direction) {
+        if speed != 0 {
+            self.sleep.set_high();
+        }
         match direction {
             Direction::Forward => self.dir.set_high(),
             Direction::Backward => self.dir.set_low(),
