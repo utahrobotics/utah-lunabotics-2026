@@ -4,7 +4,7 @@ extends Node2D
 @export var behavior_tree_nodes : Array[DirectedNode]
 var timer: float = 0.0
 var interval: float = 4.0
-var state: LunabaseConnection
+var state: LunabaseConnection = GlobalLunabaseConnection
 
 func set_node_active(num: int) :
 

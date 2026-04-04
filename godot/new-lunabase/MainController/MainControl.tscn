@@ -1,0 +1,375 @@
+[gd_scene format=3 uid="uid://cxqk5j2vp8obb"]
+
+[ext_resource type="Script" uid="uid://lfb3k4n5gotg" path="res://MainController/MainControl.gd" id="1"]
+[ext_resource type="Script" uid="uid://cyolsda2lojye" path="res://Systems/CommandPattern/Controllers/LunabaseHumanController.gd" id="2"]
+[ext_resource type="Script" uid="uid://y314st0yvl0o" path="res://MainController/control_interface_v_box.gd" id="2_pnl2l"]
+[ext_resource type="Theme" uid="uid://ch0wy8wvjrnow" path="res://Assets/UI/LunabaseButton.tres" id="2_v411p"]
+[ext_resource type="Texture2D" uid="uid://c3b2y3ky1m03k" path="res://Assets/icons/USR-Icon.png" id="3_w6ul0"]
+[ext_resource type="PackedScene" uid="uid://dhg4sb4ifrvh8" path="res://GUI/PitchAndRollProposal/Testing/FlightSim/UIAttitude/UIAttitude.tscn" id="4_3r4oj"]
+[ext_resource type="PackedScene" uid="uid://d0gs2f7n7wdhm" path="res://newWindow.tscn" id="5_33q4t"]
+[ext_resource type="PackedScene" uid="uid://buo5ncrpuluwh" path="res://GUI/ArenaMap/ArenaMap.tscn" id="6_moxsj"]
+[ext_resource type="PackedScene" uid="uid://brxomw6fjys4e" path="res://GUI/TouchpadController/touchpad_scene.tscn" id="6_touchpad"]
+[ext_resource type="Script" uid="uid://bgn22i7ngljkr" path="res://MainController/maps_option_button.gd" id="7_xxe4i"]
+
+[node name="MainControl" type="Control" unique_id=1904223292]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1")
+
+[node name="Background" type="ColorRect" parent="." unique_id=460170741]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.08, 0.09, 0.12, 1)
+
+[node name="GridPattern" type="ColorRect" parent="Background" unique_id=580752212]
+modulate = Color(1, 1, 1, 0.03)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="." unique_id=1551339850]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 0
+
+[node name="TopBar" type="PanelContainer" parent="VBoxContainer" unique_id=15493284]
+custom_minimum_size = Vector2(0, 45)
+layout_mode = 2
+
+[node name="StyleBoxFlat" type="StyleBoxFlat" parent="VBoxContainer/TopBar" unique_id=194954835]
+_import_path = NodePath("")
+bg_color = Color(0.11, 0.12, 0.16, 0.95)
+border_width_bottom = 2
+border_color = Color(0.2, 0.5, 0.9, 0.3)
+
+[node name="MarginContainer" type="MarginContainer" parent="VBoxContainer/TopBar" unique_id=1195380664]
+layout_mode = 2
+theme_override_constants/margin_left = 15
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 15
+theme_override_constants/margin_bottom = 8
+
+[node name="TopPanel" type="HBoxContainer" parent="VBoxContainer/TopBar/MarginContainer" unique_id=125279212]
+layout_mode = 2
+theme_override_constants/separation = 15
+
+[node name="ConnectionGroup" type="HBoxContainer" parent="VBoxContainer/TopBar/MarginContainer/TopPanel" unique_id=1525739883]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Label" type="Label" parent="VBoxContainer/TopBar/MarginContainer/TopPanel/ConnectionGroup" unique_id=2026956013]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.7, 0.75, 0.8, 1)
+theme_override_font_sizes/font_size = 12
+text = "IP ADDRESS"
+vertical_alignment = 1
+
+[node name="IPInput" type="LineEdit" parent="VBoxContainer/TopBar/MarginContainer/TopPanel/ConnectionGroup" unique_id=129496267]
+custom_minimum_size = Vector2(150, 28)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.95, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "127.0.0.1"
+placeholder_text = "127.0.0.1"
+
+[node name="ConnectButton" type="Button" parent="VBoxContainer/TopBar/MarginContainer/TopPanel/ConnectionGroup" unique_id=123997984]
+custom_minimum_size = Vector2(100, 28)
+layout_mode = 2
+theme = ExtResource("2_v411p")
+theme_override_colors/font_color = Color(0.1, 0.1, 0.15, 1)
+theme_override_font_sizes/font_size = 12
+text = "CONNECT"
+
+[node name="Spacer" type="Control" parent="VBoxContainer/TopBar/MarginContainer/TopPanel" unique_id=592198024]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="StatusGroup" type="HBoxContainer" parent="VBoxContainer/TopBar/MarginContainer/TopPanel" unique_id=785758792]
+layout_mode = 2
+theme_override_constants/separation = 20
+
+[node name="location_label" type="Label" parent="VBoxContainer/TopBar/MarginContainer/TopPanel/StatusGroup" unique_id=990106036]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.5, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 12
+text = "📍 UNKNOWN"
+vertical_alignment = 1
+
+[node name="PacketLabel" type="Label" parent="VBoxContainer/TopBar/MarginContainer/TopPanel/StatusGroup" unique_id=288089297]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.4, 0.9, 0.5, 1)
+theme_override_font_sizes/font_size = 12
+text = "⚡ 0ms"
+vertical_alignment = 1
+
+[node name="StageLabel" type="Label" parent="VBoxContainer/TopBar/MarginContainer/TopPanel/StatusGroup" unique_id=2122338661]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.7, 0.4, 1)
+theme_override_font_sizes/font_size = 12
+text = "⚙ UNKNOWN"
+vertical_alignment = 1
+
+[node name="SpeedLabel" type="Label" parent="VBoxContainer/TopBar/MarginContainer/TopPanel/StatusGroup" unique_id=896658918]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.5, 0.9, 1)
+theme_override_font_sizes/font_size = 12
+text = "⚡ UNKNOWN"
+vertical_alignment = 1
+
+[node name="MainContent" type="MarginContainer" parent="VBoxContainer" unique_id=1819028519]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/margin_left = 15
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 15
+theme_override_constants/margin_bottom = 12
+
+[node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer/MainContent" unique_id=1054965053]
+layout_mode = 2
+theme_override_constants/separation = 15
+
+[node name="LeftColumn" type="VBoxContainer" parent="VBoxContainer/MainContent/HBoxContainer" unique_id=856686899]
+custom_minimum_size = Vector2(350, 0)
+layout_mode = 2
+theme_override_constants/separation = 15
+
+[node name="ControlsPanel" type="PanelContainer" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn" unique_id=339335488]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="MarginContainer" type="MarginContainer" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel" unique_id=1531443267]
+layout_mode = 2
+size_flags_vertical = 0
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 18
+
+[node name="ControlInterfaceVBox" type="VBoxContainer" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer" unique_id=1949022318]
+layout_mode = 2
+size_flags_vertical = 0
+theme_override_constants/separation = 15
+script = ExtResource("2_pnl2l")
+
+[node name="Title" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/ControlInterfaceVBox" unique_id=717054381]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.6, 1, 1)
+theme_override_font_sizes/font_size = 16
+text = "CONTROL INTERFACE"
+
+[node name="Divider" type="ColorRect" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/ControlInterfaceVBox" unique_id=1274341835]
+custom_minimum_size = Vector2(0, 2)
+layout_mode = 2
+color = Color(0.2, 0.5, 0.9, 0.2)
+
+[node name="ScrollContainer" type="ScrollContainer" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/ControlInterfaceVBox" unique_id=2142096388]
+custom_minimum_size = Vector2(0, 275)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ControlsLabel" type="RichTextLabel" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ControlsPanel/MarginContainer/ControlInterfaceVBox/ScrollContainer" unique_id=722369990]
+custom_minimum_size = Vector2(0, 280)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 6
+bbcode_enabled = true
+
+[node name="ErrorsPanel" type="PanelContainer" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn" unique_id=1453449401]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="MarginContainer" type="MarginContainer" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ErrorsPanel" unique_id=130375395]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 15
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 15
+
+[node name="VBox" type="VBoxContainer" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ErrorsPanel/MarginContainer" unique_id=2094598252]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ErrorsPanel/MarginContainer/VBox" unique_id=881273906]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.4, 0.4, 1)
+theme_override_font_sizes/font_size = 14
+text = "SYSTEM DIAGNOSTICS"
+
+[node name="Divider" type="ColorRect" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ErrorsPanel/MarginContainer/VBox" unique_id=139549440]
+custom_minimum_size = Vector2(0, 2)
+layout_mode = 2
+color = Color(1, 0.3, 0.3, 0.2)
+
+[node name="ScrollContainer" type="ScrollContainer" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ErrorsPanel/MarginContainer/VBox" unique_id=132942059]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ErroredTasksLabel" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn/ErrorsPanel/MarginContainer/VBox/ScrollContainer" unique_id=1105282363]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.5, 0.9, 0.5, 1)
+theme_override_font_sizes/font_size = 12
+text = "✓ No errors detected"
+autowrap_mode = 3
+
+[node name="CenterColumn" type="VBoxContainer" parent="VBoxContainer/MainContent/HBoxContainer" unique_id=690483984]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 15
+
+[node name="Map Panel" type="Panel" parent="VBoxContainer/MainContent/HBoxContainer/CenterColumn" unique_id=1896710441]
+custom_minimum_size = Vector2(0, 330)
+layout_mode = 2
+
+[node name="ArenaMap" parent="VBoxContainer/MainContent/HBoxContainer/CenterColumn/Map Panel" unique_id=1557496579 instance=ExtResource("6_moxsj")]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 0
+anchor_right = 0.0
+anchor_bottom = 0.0
+offset_left = 179.0
+offset_top = 22.0
+offset_right = 179.0
+offset_bottom = 22.0
+grow_horizontal = 1
+grow_vertical = 1
+
+[node name="UIAttitude" parent="VBoxContainer/MainContent/HBoxContainer/CenterColumn" unique_id=1693065779 instance=ExtResource("4_3r4oj")]
+custom_minimum_size = Vector2(0, 130)
+layout_mode = 2
+
+[node name="OrientationPanel" type="PanelContainer" parent="VBoxContainer/MainContent/HBoxContainer/CenterColumn" unique_id=1629187079]
+layout_mode = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="VBoxContainer/MainContent/HBoxContainer/CenterColumn/OrientationPanel" unique_id=1440976672]
+layout_mode = 2
+theme_override_constants/margin_left = 15
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 15
+theme_override_constants/margin_bottom = 12
+
+[node name="OrientationLabel" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/CenterColumn/OrientationPanel/MarginContainer" unique_id=131960049]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.5, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "ORIENTATION: UNKNOWN"
+horizontal_alignment = 1
+
+[node name="RightColumn" type="VBoxContainer" parent="VBoxContainer/MainContent/HBoxContainer" unique_id=1091366724]
+custom_minimum_size = Vector2(180, 0)
+layout_mode = 2
+theme_override_constants/separation = 15
+
+[node name="LogoContainer" type="CenterContainer" parent="VBoxContainer/MainContent/HBoxContainer/RightColumn" unique_id=922206054]
+layout_mode = 2
+
+[node name="TextureRect" type="TextureRect" parent="VBoxContainer/MainContent/HBoxContainer/RightColumn/LogoContainer" unique_id=505693720]
+custom_minimum_size = Vector2(120, 120)
+layout_mode = 2
+texture = ExtResource("3_w6ul0")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="SpeedControl" type="PanelContainer" parent="VBoxContainer/MainContent/HBoxContainer/RightColumn" unique_id=1965745589]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="MarginContainer" type="MarginContainer" parent="VBoxContainer/MainContent/HBoxContainer/RightColumn/SpeedControl" unique_id=1348005549]
+layout_mode = 2
+theme_override_constants/margin_left = 15
+theme_override_constants/margin_top = 15
+theme_override_constants/margin_right = 15
+theme_override_constants/margin_bottom = 15
+
+[node name="VBox" type="VBoxContainer" parent="VBoxContainer/MainContent/HBoxContainer/RightColumn/SpeedControl/MarginContainer" unique_id=2103663791]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Label" type="Label" parent="VBoxContainer/MainContent/HBoxContainer/RightColumn/SpeedControl/MarginContainer/VBox" unique_id=321873389]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.9, 0.5, 0.9, 1)
+theme_override_font_sizes/font_size = 13
+text = "SPEED CONTROL"
+horizontal_alignment = 1
+
+[node name="SpeedMultiplierSlider" type="HSlider" parent="VBoxContainer/MainContent/HBoxContainer/RightColumn/SpeedControl/MarginContainer/VBox" unique_id=520994470]
+layout_mode = 2
+size_flags_horizontal = 3
+max_value = 7000.0
+
+[node name="MapsOptionButton" type="OptionButton" parent="VBoxContainer/MainContent/HBoxContainer/RightColumn/SpeedControl/MarginContainer/VBox" unique_id=1490037921]
+layout_mode = 2
+selected = 0
+item_count = 3
+popup/item_0/text = "Maps OFF"
+popup/item_0/id = 0
+popup/item_1/text = "Artemis Map"
+popup/item_1/id = 1
+popup/item_2/text = "Ucf Map"
+popup/item_2/id = 2
+script = ExtResource("7_xxe4i")
+
+[node name="BottomBar" type="PanelContainer" parent="VBoxContainer" unique_id=1900845456]
+custom_minimum_size = Vector2(0, 60)
+layout_mode = 2
+
+[node name="MarginContainer" type="MarginContainer" parent="VBoxContainer/BottomBar" unique_id=68665855]
+layout_mode = 2
+theme_override_constants/margin_left = 15
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 15
+theme_override_constants/margin_bottom = 10
+
+[node name="BottomPanel" type="HBoxContainer" parent="VBoxContainer/BottomBar/MarginContainer" unique_id=1258111932]
+layout_mode = 2
+theme_override_constants/separation = 15
+alignment = 1
+
+[node name="SoftStopButton" type="Button" parent="VBoxContainer/BottomBar/MarginContainer/BottomPanel" unique_id=225006071]
+custom_minimum_size = Vector2(150, 40)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.3, 0.3, 1)
+theme_override_font_sizes/font_size = 13
+text = "SOFT STOP"
+
+[node name="ManualButton" type="Button" parent="VBoxContainer/BottomBar/MarginContainer/BottomPanel" unique_id=840464859]
+custom_minimum_size = Vector2(150, 40)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.7, 1, 1)
+theme_override_font_sizes/font_size = 13
+text = "MANUAL MODE"
+
+[node name="AutonomousButton" type="Button" parent="VBoxContainer/BottomBar/MarginContainer/BottomPanel" unique_id=236745287]
+custom_minimum_size = Vector2(150, 40)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.5, 0.9, 0.5, 1)
+theme_override_font_sizes/font_size = 13
+text = "AUTONOMOUS"
+
+[node name="LunabaseHumanController" type="Node" parent="." unique_id=1500504990]
+script = ExtResource("2")
+
+[node name="TouchpadScene" parent="." unique_id=1904223293 instance=ExtResource("6_touchpad")]
+visible = false
+
+[node name="Node2D" parent="." unique_id=946412652 instance=ExtResource("5_33q4t")]
+visible = false
+
+[connection signal="value_changed" from="VBoxContainer/MainContent/HBoxContainer/RightColumn/SpeedControl/MarginContainer/VBox/SpeedMultiplierSlider" to="." method="_on_speed_multiplier_slider_value_changed"]

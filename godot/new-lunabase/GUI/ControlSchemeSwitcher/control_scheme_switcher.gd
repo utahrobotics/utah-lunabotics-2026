@@ -1,10 +1,15 @@
-extends Control
+class_name ControlSchemeSwitcher extends Control
 
-@onready var controller_scheme_option_button: OptionButton = $Panel/VBoxContainer/HBoxContainer/ControllerSchemeOptionButton
-@onready var keyboard_scheme_option_button: OptionButton = $Panel/VBoxContainer/HBoxContainer2/KeyboardSchemeOptionButton
+@onready var controller_scheme_option_button: OptionButton = $VBoxContainer/HBoxContainer/ControllerSchemeOptionButton
+@onready var keyboard_scheme_option_button: OptionButton = $VBoxContainer/HBoxContainer2/KeyboardSchemeOptionButton
+@onready var touch_controls_check: CheckButton = $VBoxContainer/HBoxContainer3/TouchControlsCheckButton
 
 @export var controller_path : String = "res://Systems/ControlSchemes/schemes/ControllerSchemes"
 @export var keyboard_path : String = "res://Systems/ControlSchemes/schemes/KeyboardSchemes"
+const REBINDING_SCENE = preload("res://Systems/ControlSchemes/RebindingScene/RebindingScene.tscn")
+
+signal updated_control_scheme
+signal close_settings_menu
 
 var controller_schemes : Array[ControlSchemeResource]
 var keyboard_schemes : Array[ControlSchemeResource]
@@ -14,6 +19,16 @@ var controller_prev_index := -1
 
 func _ready() -> void:
 	populate_schemes()
+	sync_touch_controls_from_settings()
+
+
+func sync_touch_controls_from_settings() -> void:
+	if touch_controls_check:
+		touch_controls_check.set_pressed_no_signal(SettingsMenu.touch_screen_controls_enabled)
+
+
+func _on_touch_controls_check_toggled(pressed: bool) -> void:
+	SettingsMenu.set_touch_screen_controls(pressed)
 
 func populate_schemes():
 	controller_scheme_option_button.clear()
@@ -31,10 +46,11 @@ func populate_schemes():
 		keyboard_schemes.append(new_resource)
 		keyboard_scheme_option_button.add_item(new_resource.scheme_name)
 	_on_keyboard_scheme_option_button_item_selected(0)
-
-func _process(_delta: float) -> void:
-	if Input.is_action_just_pressed("left_wheel"):
-		print("left wheel pressed")
+	_on_controller_scheme_option_button_item_selected(0)
+#
+#func _process(_delta: float) -> void:
+	#if Input.is_action_just_pressed("left_wheel"):
+		#print("left wheel pressed")
 
 func erase_all_action_events():
 	var actions = InputMap.get_actions()
@@ -60,6 +76,8 @@ func populate_from_scheme(new_scheme : ControlSchemeResource):
 			if event is InputEvent and not null:
 				print("adding event ", event, "to action ", action)
 				InputMap.action_add_event(action, event)
+	
+	updated_control_scheme.emit()
 
 func _on_keyboard_scheme_option_button_item_selected(index: int) -> void:
 	if keyboard_prev_index >= 0:
@@ -73,3 +91,12 @@ func _on_controller_scheme_option_button_item_selected(index: int) -> void:
 		unload_scheme(controller_schemes[controller_prev_index])
 	populate_from_scheme(controller_schemes[index])
 	controller_prev_index = index
+
+
+func _on_default_button_pressed() -> void:
+	populate_schemes()
+
+func _on_create_binding_button_pressed() -> void:
+	var bindings_scene = REBINDING_SCENE.instantiate()
+	get_tree().root.add_child(bindings_scene)
+	close_settings_menu.emit()

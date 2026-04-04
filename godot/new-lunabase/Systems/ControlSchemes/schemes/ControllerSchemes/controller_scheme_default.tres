@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="ControlSchemeResource" load_steps=13 format=3 uid="uid://8u5und3iwc0v"]
+[gd_resource type="Resource" script_class="ControlSchemeResource" format=3 uid="uid://8u5und3iwc0v"]
 
 [ext_resource type="Script" uid="uid://cojf71u62eagl" path="res://Systems/ControlSchemes/scheme_resource.gd" id="1_4f6eg"]
 
@@ -38,7 +38,7 @@ axis_value = 1.0
 
 [resource]
 script = ExtResource("1_4f6eg")
-scheme_name = "Original Controller Scheme"
+scheme_name = "Trigger Steer"
 move_left = Array[InputEvent]([SubResource("InputEventJoypadMotion_c7c8q")])
 move_right = Array[InputEvent]([SubResource("InputEventJoypadMotion_uej3p")])
 move_forward = Array[InputEvent]([SubResource("InputEventJoypadMotion_xgh0w")])

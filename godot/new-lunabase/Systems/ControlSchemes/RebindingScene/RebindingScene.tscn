@@ -1,0 +1,254 @@
+[gd_scene format=3 uid="uid://cdvqtvgkhmt3y"]
+
+[ext_resource type="Script" uid="uid://b4le2rystnbi5" path="res://Systems/ControlSchemes/RebindingScene/rebinding_scene.gd" id="1_8b06h"]
+[ext_resource type="Script" uid="uid://cojf71u62eagl" path="res://Systems/ControlSchemes/scheme_resource.gd" id="2_gsjyf"]
+[ext_resource type="Theme" uid="uid://ch0wy8wvjrnow" path="res://Assets/UI/LunabaseButton.tres" id="3_q0chg"]
+[ext_resource type="Script" uid="uid://cjrkh0keqx332" path="res://Systems/ControlSchemes/RebindingScene/current_control_interface_v_box.gd" id="4_bkado"]
+
+[sub_resource type="Resource" id="Resource_q0chg"]
+script = ExtResource("2_gsjyf")
+metadata/_custom_type_script = "uid://cojf71u62eagl"
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_1i5ij"]
+bg_color = Color(0.2876246, 0.5804122, 0.3991268, 0.8)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.3, 0.6, 1, 0.9)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_k5k4w"]
+bg_color = Color(0.27359983, 0.5217333, 0.40125072, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.5, 0.8, 1, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_nt7sp"]
+bg_color = Color(0.42055055, 0.6698155, 0.46187788, 0.9019608)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.4, 0.7, 1, 1)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bkado"]
+bg_color = Color(0.91297865, 0.15780154, 0.2832339, 0.8)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.3, 0.6, 1, 0.9)
+corner_radius_top_left = 4
+corner_radius_top_right = 4
+corner_radius_bottom_right = 4
+corner_radius_bottom_left = 4
+
+[node name="RebindingScene" type="Control" unique_id=469081535]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_8b06h")
+current_scheme = SubResource("Resource_q0chg")
+
+[node name="Background" type="ColorRect" parent="." unique_id=788778466]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.08, 0.09, 0.12, 1)
+
+[node name="GridPattern" type="ColorRect" parent="Background" unique_id=488395495]
+modulate = Color(1, 1, 1, 0.03)
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="StatusLabel" type="Label" parent="." unique_id=1114637315]
+layout_mode = 1
+anchors_preset = 6
+anchor_left = 1.0
+anchor_top = 0.5
+anchor_right = 1.0
+anchor_bottom = 0.5
+offset_left = -741.0
+offset_top = -112.0
+offset_right = -161.0
+offset_bottom = 105.0
+grow_horizontal = 0
+grow_vertical = 2
+theme_override_font_sizes/font_size = 32
+text = "LOREM IPSUM MINEN LOWER LISPSUM"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="LeftColumn" type="VBoxContainer" parent="." unique_id=33289352]
+custom_minimum_size = Vector2(350, 0)
+layout_mode = 1
+anchors_preset = 9
+anchor_bottom = 1.0
+offset_right = 200.0
+grow_vertical = 2
+theme_override_constants/separation = 15
+
+[node name="CurrentControlsPanel" type="PanelContainer" parent="LeftColumn" unique_id=1920564744]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="MarginContainer" type="MarginContainer" parent="LeftColumn/CurrentControlsPanel" unique_id=849066225]
+layout_mode = 2
+size_flags_vertical = 0
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 18
+
+[node name="CurrentControlInterfaceVBox" type="VBoxContainer" parent="LeftColumn/CurrentControlsPanel/MarginContainer" unique_id=1358758063]
+layout_mode = 2
+size_flags_vertical = 0
+theme_override_constants/separation = 15
+script = ExtResource("4_bkado")
+
+[node name="Title" type="Label" parent="LeftColumn/CurrentControlsPanel/MarginContainer/CurrentControlInterfaceVBox" unique_id=1862120128]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.2, 0.6, 1, 1)
+theme_override_font_sizes/font_size = 16
+text = "CURRENT BINDINGS"
+
+[node name="Divider" type="ColorRect" parent="LeftColumn/CurrentControlsPanel/MarginContainer/CurrentControlInterfaceVBox" unique_id=453147896]
+custom_minimum_size = Vector2(0, 2)
+layout_mode = 2
+color = Color(0.2, 0.5, 0.9, 0.2)
+
+[node name="ScrollContainer" type="ScrollContainer" parent="LeftColumn/CurrentControlsPanel/MarginContainer/CurrentControlInterfaceVBox" unique_id=284034329]
+custom_minimum_size = Vector2(0, 370)
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ControlsLabel" type="RichTextLabel" parent="LeftColumn/CurrentControlsPanel/MarginContainer/CurrentControlInterfaceVBox/ScrollContainer" unique_id=393526543]
+custom_minimum_size = Vector2(0, 280)
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+focus_mode = 2
+bbcode_enabled = true
+scroll_following = true
+scroll_following_visible_characters = true
+selection_enabled = true
+
+[node name="InformationPanel" type="PanelContainer" parent="LeftColumn" unique_id=1640026315]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="MarginContainer" type="MarginContainer" parent="LeftColumn/InformationPanel" unique_id=1161467170]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 15
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 15
+
+[node name="VBox" type="VBoxContainer" parent="LeftColumn/InformationPanel/MarginContainer" unique_id=1426765069]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="LeftColumn/InformationPanel/MarginContainer/VBox" unique_id=531042790]
+layout_mode = 2
+theme = ExtResource("3_q0chg")
+theme_override_font_sizes/font_size = 14
+text = "HELPERS"
+
+[node name="Divider" type="ColorRect" parent="LeftColumn/InformationPanel/MarginContainer/VBox" unique_id=1399893732]
+custom_minimum_size = Vector2(0, 2)
+layout_mode = 2
+color = Color(0.18039216, 0.42352942, 0.7490196, 1)
+
+[node name="SkipBindingButton" type="Button" parent="LeftColumn/InformationPanel/MarginContainer/VBox" unique_id=1381887498]
+layout_mode = 2
+theme = ExtResource("3_q0chg")
+text = "Skip Binding"
+
+[node name="ConfirmBindings" type="Button" parent="LeftColumn/InformationPanel/MarginContainer/VBox" unique_id=1175312335]
+visible = false
+layout_mode = 2
+theme = ExtResource("3_q0chg")
+theme_override_styles/normal = SubResource("StyleBoxFlat_1i5ij")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_k5k4w")
+theme_override_styles/hover = SubResource("StyleBoxFlat_nt7sp")
+text = "Confirm Bindings"
+
+[node name="SaveBindingsButton" type="Button" parent="LeftColumn/InformationPanel/MarginContainer/VBox" unique_id=809130462]
+visible = false
+layout_mode = 2
+theme = ExtResource("3_q0chg")
+text = "Save Bindings to File"
+
+[node name="Spacer" type="Control" parent="LeftColumn/InformationPanel/MarginContainer/VBox" unique_id=384349717]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+
+[node name="Rebind" type="Button" parent="LeftColumn/InformationPanel/MarginContainer/VBox" unique_id=372954996]
+layout_mode = 2
+theme = ExtResource("3_q0chg")
+theme_override_styles/normal = SubResource("StyleBoxFlat_bkado")
+text = "Restart Binding"
+
+[node name="Info" type="PanelContainer" parent="." unique_id=661645865]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -435.0
+offset_top = 13.0
+offset_right = -12.0
+offset_bottom = 207.0
+grow_horizontal = 0
+size_flags_vertical = 3
+
+[node name="MarginContainer" type="MarginContainer" parent="Info" unique_id=955947016]
+layout_mode = 2
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 15
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 15
+
+[node name="VBox" type="VBoxContainer" parent="Info/MarginContainer" unique_id=108798846]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="Info/MarginContainer/VBox" unique_id=38016255]
+layout_mode = 2
+theme = ExtResource("3_q0chg")
+theme_override_colors/font_color = Color(1, 0.4, 0.4, 1)
+theme_override_font_sizes/font_size = 14
+text = "Warning, using custom bindings will overwrite the default schemes. If you want to revert to a previous scheme select it from the settings menu. 
+
+As of now custom bindings aren't saved between sessions, but you can save them to a file that can be added to  res://Systems/ControlSchemes/schemes/ in the corresponding godot folder to save."
+autowrap_mode = 3
+
+[connection signal="pressed" from="LeftColumn/InformationPanel/MarginContainer/VBox/SkipBindingButton" to="." method="_on_skip_binding_button_pressed"]
+[connection signal="pressed" from="LeftColumn/InformationPanel/MarginContainer/VBox/ConfirmBindings" to="." method="_on_confirm_bindings_pressed"]
+[connection signal="pressed" from="LeftColumn/InformationPanel/MarginContainer/VBox/SaveBindingsButton" to="." method="_on_save_bindings_button_pressed"]
+[connection signal="pressed" from="LeftColumn/InformationPanel/MarginContainer/VBox/Rebind" to="." method="_on_rebind_pressed"]
