@@ -183,7 +183,7 @@ async fn usb_tx_loop(
             );
             let serialized = FromPico::Error(err).serialize();
             let len = cobs::encode(&serialized, &mut stuffed);
-            for chunk in stuffed[..len + 1].chunks(16) {
+            for chunk in stuffed[..len + 1].chunks(64) {
                 if let Err(e) = writer.write_packet(chunk).await {
                     error!("[COBS ERROR] {:?}", e);
                     break 'writer;
@@ -228,13 +228,13 @@ async fn usb_rx_loop(
                                             }
                                         }
                                         ActuatorCommand::Shake => {
-                                            warn!("Fuck you");
+                                            warn!("Shake unimplemented");
                                         }
                                         ActuatorCommand::StartPercuss => {
-                                            warn!("Fuck you");
+                                            warn!("Percussor unimplemented");
                                         }
                                         ActuatorCommand::StopPercuss => {
-                                            warn!("Fuck you")
+                                            warn!("Percussor unimplemented");
                                         }
                                         ActuatorCommand::StopAll => {
                                             actuators.iter_mut().for_each(|controller| {
