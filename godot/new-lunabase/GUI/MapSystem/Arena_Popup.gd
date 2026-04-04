@@ -1,8 +1,5 @@
 extends Control
 
-@onready var panel: Panel = $Panel
-@onready var button: Button = $Panel/Button 
-@onready var ArenaText: RichTextLabel = $Panel/ArenaText
 @onready var LocationLunabotArtemis := $Artemis/origin/LocationArtemis
 @onready var LocationLunabotUcf := $Ucf/Origin/LocationUcf
 @onready var connection := GlobalLunabaseConnection
@@ -11,53 +8,59 @@ extends Control
 @onready var TrailArtemis:= $Artemis/origin/TrailMarkerArtemis
 @onready var TrailUcf:= $Ucf/Origin/TrailMarkerUcf
 
+@export var artemis_pixels_per_unit: float = 100.0
+@export var ucf_pixels_per_unit: float = 100.0
+@export var snail_trail_length := 1000.0
 
-
-var arena = false
+enum MAP {OFF, ARTEMIS, UCF}
 
 var connectionToBase: LunabaseConnection
 var location: PackedFloat32Array
 
+var current_map : MAP = MAP.OFF
 
-func _on_button_toggled(is_button_toggled: bool) -> void:
-	Ucf.visible = is_button_toggled && !arena
-	Artemis.visible = is_button_toggled && arena
-
-	
 func _ready() -> void:
 	TrailUcf.default_color = Color(0.76, 0.0, 0.0, 1.0) 
-	TrailArtemis.default_color = Color(0.629, 0.0, 0.0, 1.0) 
-	pass
+	TrailArtemis.default_color = Color(0.629, 0.0, 0.0, 1.0)
+	update_state()
 	
 func _process(_delta: float) -> void:
 	var locationValues = connection.get_location()
 	updateLunabotLocation(locationValues)
-	
 
-func _on_button_for_arena_toggled(toggled_on: bool) -> void:
-	if (toggled_on):
-		arena = true
-	else :
-		arena = false
+func update_map(new_map):
+	current_map = new_map
+	update_state()
 
+func update_state():
+	Artemis.visible = (current_map == MAP.ARTEMIS)
+	Ucf.visible = (current_map == MAP.UCF)
 
+func update_ufc(x, y):
+	var p2 := _world_to_map_pixels(x, y, ucf_pixels_per_unit)
+	LocationLunabotUcf.position = p2
+	TrailUcf.add_point(p2)
+	if(TrailUcf.points.size() > 1000):
+		TrailUcf.remove_point(0)
+
+func update_artmis(x, y):
+	var p := _world_to_map_pixels(x, y, artemis_pixels_per_unit)
+	LocationLunabotArtemis.position = p
+	TrailArtemis.add_point(p)
+	if(TrailArtemis.points.size() > snail_trail_length): # change the > x if you want the snail trail to last longer
+		TrailArtemis.remove_point(0) #or just comment out if you want it to stay
 
 func updateLunabotLocation(values: PackedFloat32Array ) -> void:
 	if(values.size() < 2):
 		return 
 	var x: float = values[0] 
 	var y: float = values[1] 
-
 	
-	if (arena == true):
-		LocationLunabotArtemis.position = Vector2(x * 100,-y * 100)
-		TrailArtemis.add_point(Vector2(x*100,-y*100))
-		if(TrailArtemis.points.size() > 1000): # change the > x if you want the snail trail to last longer
-			TrailArtemis.remove_point(0) #or just comment out if you want it to stay
-		
-	if(arena == false):
-		LocationLunabotUcf.position = Vector2(x * 100,-y * 100 )
-		TrailUcf.add_point(Vector2(x*100,-y*100))
-		if(TrailUcf.points.size() > 1000):
-			TrailUcf.remove_point(0)
-		
+	if current_map == MAP.ARTEMIS:
+		update_artmis(x,y)
+	elif current_map == MAP.UCF:
+		update_ufc(x, y)
+
+
+func _world_to_map_pixels(world_x: float, world_y: float, pixels_per_unit: float) -> Vector2:
+	return Vector2(world_x * pixels_per_unit, -world_y * pixels_per_unit)

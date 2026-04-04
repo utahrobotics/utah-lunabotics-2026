@@ -14,7 +14,7 @@ extends Control
 @onready var speed_slider: HSlider = $VBoxContainer/MainContent/HBoxContainer/RightColumn/SpeedControl/MarginContainer/VBox/SpeedMultiplierSlider
 @onready var location_label: Label = $VBoxContainer/TopBar/MarginContainer/TopPanel/StatusGroup/location_label
 @onready var orientation_label: Label = $VBoxContainer/MainContent/HBoxContainer/CenterColumn/OrientationPanel/MarginContainer/OrientationLabel
-@onready var PitchAndRollGUI: Control = $VBoxContainer/MainContent/HBoxContainer/CenterColumn/AttitudeContainer/UIAttitude
+@onready var PitchAndRollGUI: Control = $VBoxContainer/MainContent/HBoxContainer/CenterColumn/UIAttitude
 var command_recorder: CommandRecorder
 
 #Speed Slider
