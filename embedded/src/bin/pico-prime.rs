@@ -1,5 +1,3 @@
-//! Template
-
 #![no_std]
 #![no_main]
 
@@ -23,11 +21,6 @@ use embedded_common::{
 };
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
-
-// something to read from usb
-// something to forward to other pico
-// something to read from sensors or other things
-
 bind_interrupts!(struct Irqs {
     USBCTRL_IRQ => InterruptHandler<USB>;
 });
@@ -70,6 +63,8 @@ impl<'a> ActuatorDriver<'a> {
 #[embassy_executor::main]
 async fn main(spawner: Spawner) -> ! {
     let p = embassy_rp::init(Default::default());
+
+    // motor_flt pins
     let driver_fault_detectors: [FaultDetector<'_>; 3] = [
         FaultDetector {
             fault: Input::new(p.PIN_10, embassy_rp::gpio::Pull::Up),
@@ -113,7 +108,6 @@ async fn main(spawner: Spawner) -> ! {
         // },
     ];
 
-    // Create the driver, from the HAL.
     let driver = Driver::new(p.USB, Irqs);
     let config = {
         let mut config = embassy_usb::Config::new(0xc0de, 0xcafe);
@@ -125,8 +119,6 @@ async fn main(spawner: Spawner) -> ! {
         config
     };
 
-    // Create embassy-usb DeviceBuilder using the driver and config.
-    // It needs some buffers for building the descriptors.
     let mut builder = {
         static CONFIG_DESCRIPTOR: StaticCell<[u8; 256]> = StaticCell::new();
         static BOS_DESCRIPTOR: StaticCell<[u8; 256]> = StaticCell::new();
@@ -143,18 +135,15 @@ async fn main(spawner: Spawner) -> ! {
         builder
     };
 
-    // Create classes on the builder.
     let class: CdcAcmClass<'_, Driver<'_, USB>> = {
         static STATE: StaticCell<State> = StaticCell::new();
         let state = STATE.init(State::new());
         CdcAcmClass::new(&mut builder, state, PACKET_SIZE)
     };
 
-    // Build the builder.
     let usb = builder.build();
 
     info!("about to spawn usb task");
-    // Run the USB device.
     spawner.spawn(usb_task(usb)).unwrap();
 
     let (class_tx, class_rx) = class.split();
