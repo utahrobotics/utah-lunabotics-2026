@@ -18,15 +18,10 @@ var speed_slider: HSlider
 
 var actor: Node
 
-var can_send_inputs
+var can_send_inputs := true
 
 var command_recorder: CommandRecorder
 
-var prev_lift_input: float = 0.0
-var prev_bucket_input: float = 0.0
-
-var prev_left_speed: float = 0.0
-var prev_right_speed: float = 0.0
 
 
 func _ready() -> void:
@@ -82,19 +77,14 @@ func _process(_delta: float) -> void:
 	left_speed = clamp(left_speed, -1, 1)
 	right_speed = clamp(right_speed, -1, 1)
 
-	if abs(left_speed - prev_left_speed) > 0.01 or abs(right_speed - prev_right_speed) > 0.01:
-		var cmd := SteeringCommand.new()
-		cmd.direction = Vector2(left_speed, right_speed)
-		command_recorder.execute_and_store(cmd)
-		prev_left_speed = left_speed
-		prev_right_speed = right_speed
+	var steer_cmd := SteeringCommand.new()
+	steer_cmd.direction = Vector2(left_speed, right_speed)
+	command_recorder.execute_and_store(steer_cmd)
 
 	var lift_input: float = touch_lift
-	if lift_input != prev_lift_input:
-		var lift_cmd := LiftActuatorsCommand.new()
-		lift_cmd.lift = int(lift_input * 127.0)
-		command_recorder.execute_and_store(lift_cmd)
-		prev_lift_input = lift_input
+	var lift_cmd := LiftActuatorsCommand.new()
+	lift_cmd.lift = int(lift_input * 127.0)
+	command_recorder.execute_and_store(lift_cmd)
 
 	const SPEED_SLIDER_STEP := 100
 	if speed_slider and Input.is_action_pressed("increment_speed"):
@@ -111,11 +101,9 @@ func _process(_delta: float) -> void:
 		)
 
 	var bucket_input: float = touch_bucket
-	if bucket_input != prev_bucket_input:
-		var bucket_cmd := BucketActuatorsCommand.new()
-		bucket_cmd.bucket = int(bucket_input * 127.0)
-		command_recorder.execute_and_store(bucket_cmd)
-		prev_bucket_input = bucket_input
+	var bucket_cmd := BucketActuatorsCommand.new()
+	bucket_cmd.bucket = int(bucket_input * 127.0)
+	command_recorder.execute_and_store(bucket_cmd)
 
 	if Input.is_action_just_pressed("continue_mission"):
 		command_recorder.execute_and_store(ContinueMissionCommand.new())

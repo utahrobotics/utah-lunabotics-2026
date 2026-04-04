@@ -11,17 +11,10 @@ class_name LunabaseHumanController extends Node
 
 var actor: Node
 
-var can_send_inputs
+## False while rebinding etc.; must default true or no commands run until something emits `toggle_can_accept_inputs`.
+var can_send_inputs := true
 
 var command_recorder: CommandRecorder
-
-# track previous state to detect button releases
-var prev_lift_input: float = 0.0
-var prev_bucket_input: float = 0.0
-
-# previous steering to avoid sending duplicate commands
-var prev_left_speed: float = 0.0
-var prev_right_speed: float = 0.0
 
 # When touch UI is active skip this node's processing.
 var suppress_for_touch_ui: bool = false
@@ -38,6 +31,7 @@ func _ready() -> void:
 		push_error("LunabaseHumanController: No actor assigned or path invalid!")
 		return
 	
+	# Command recorder is initialized here. 
 	command_recorder = CommandRecorder.new(actor, default_path)
 	add_child(command_recorder)
 	SettingsMenu.toggle_can_accept_inputs.connect(set_can_send_inputs)
@@ -85,17 +79,11 @@ func _process(_delta: float) -> void:
 	
 	left_speed = clamp(left_speed, -1, 1)
 	right_speed = clamp(right_speed, -1, 1)
-	
-	# Only send steering command if it changed (avoid spamming)
-	# I have had problems where if the trigger is partially pressed it sends a bajillion commands with tiny changes
-	# this will need to be tested and perhapse rate limited if need be
-	if abs(left_speed - prev_left_speed) > 0.01 or abs(right_speed - prev_right_speed) > 0.01:
-		var cmd := SteeringCommand.new()
-		cmd.direction = Vector2(left_speed, right_speed)
-		command_recorder.execute_and_store(cmd)
-		prev_left_speed = left_speed
-		prev_right_speed = right_speed
-		
+	# Queue every frame while held; CommandRecorder throttles and repeats non-zero at throttle_time_ms.
+	var steer_cmd := SteeringCommand.new()
+	steer_cmd.direction = Vector2(left_speed, right_speed)
+	command_recorder.execute_and_store(steer_cmd)
+
 	
 	# === LIFT ACTUATORS (Keyboard Q/E + D-pad) ===
 	# Sim env doesnt have actuators yet, this will need testing in real life
@@ -106,11 +94,9 @@ func _process(_delta: float) -> void:
 	elif Input.is_action_pressed("lift_down"):
 		lift_input = -1.0
 	
-	if lift_input != prev_lift_input:
-		var cmd := LiftActuatorsCommand.new()
-		cmd.lift = int(lift_input * 127.0)
-		command_recorder.execute_and_store(cmd)
-		prev_lift_input = lift_input
+	var lift_cmd := LiftActuatorsCommand.new()
+	lift_cmd.lift = int(lift_input * 127.0)
+	command_recorder.execute_and_store(lift_cmd)
 		
 	#=====Speed Slider increment and decrement
 	const SPEED_SLIDER_STEP := 100
@@ -134,11 +120,9 @@ func _process(_delta: float) -> void:
 	elif Input.is_action_pressed("bucket_down"):
 		bucket_input = -1.0
 	
-	if bucket_input != prev_bucket_input:
-		var cmd := BucketActuatorsCommand.new()
-		cmd.bucket = int(bucket_input * 127.0)
-		command_recorder.execute_and_store(cmd)
-		prev_bucket_input = bucket_input
+	var bucket_cmd := BucketActuatorsCommand.new()
+	bucket_cmd.bucket = int(bucket_input * 127.0)
+	command_recorder.execute_and_store(bucket_cmd)
 	
 	if Input.is_action_just_pressed("continue_mission"):
 		command_recorder.execute_and_store(ContinueMissionCommand.new())

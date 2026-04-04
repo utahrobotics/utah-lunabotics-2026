@@ -20,7 +20,8 @@ var replay_index := 0
 var replay_start_time := 0
 var is_replaying := false
 @export var throttle_inputs := true
-@export var throttle_time_ms = 200
+# Default throttle time set to 100ms
+@export var throttle_time_ms = 100
 @export var zero_keepalive_time_ms = 1500
 
 var throttle_elapsed_ms := 0.0
@@ -82,6 +83,10 @@ func clear_history():
 	print("clearing command history")
 	stop_replay()
 	command_history.clear()
+	pending_commands.clear()
+	last_sent_commands.clear()
+	last_sent_time_ms.clear()
+	throttle_elapsed_ms = 0.0
 
 func stop_replay():
 	is_replaying = false
@@ -109,7 +114,7 @@ func _process(_delta):
 	if replay_index >= command_history.size():
 		print("Replay finished")
 		is_replaying = false
-		set_process(false)
+		_refresh_processing_state()
 	
 	
 func handle_throttle(_delta):
@@ -153,6 +158,7 @@ func _send_zero_keepalives_if_needed() -> void:
 
 
 func _execute_and_log(cmd: Command) -> void:
+	print("executing command!", cmd)
 	if command_history.is_empty():
 		print("Starting new command history")
 		replay_index = 0
@@ -177,14 +183,13 @@ func _should_send(stream_key: String, cmd: Command) -> bool:
 		return true
 	var previous: Command = last_sent_commands[stream_key]
 	if _commands_equivalent(previous, cmd):
-		# Suppress exact duplicates, especially repeated zeros.
-		return false
-	
-	# If both are zero, only send sparse keepalive zeros.
-	if _is_zero_command(previous) and _is_zero_command(cmd):
+		# Zeros: do not spam; receiver + zero_keepalive handles refresh.
+		if _is_zero_command(cmd):
+			return false
+		# Same non-zero held: re-send each throttle window so hardware keeps seeing commands.
 		var now_ms: int = Time.get_ticks_msec()
-		var elapsed_since_last: int = now_ms - int(last_sent_time_ms.get(stream_key, now_ms))
-		return elapsed_since_last >= zero_keepalive_time_ms
+		var elapsed_since_last: int = now_ms - int(last_sent_time_ms.get(stream_key, 0))
+		return elapsed_since_last >= throttle_time_ms
 	return true
 
 
