@@ -16,7 +16,7 @@ members = [
     "misc/auto-start",
     "misc/wgsl-pcl",
 ]
-exclude = ["misc/usb-reset", "lunabot-embedded", "copper-rs", "embedded-legacy"]
+exclude = ["misc/usb-reset", "embedded", "copper-rs", "embedded-legacy"]
 # Shared dependencies across workspace members
 [workspace.dependencies]
 cu29 = { git = "https://github.com/matthewashton-k/copper-rs.git", branch = "master", package = "cu29", features = [
