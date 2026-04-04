@@ -156,8 +156,8 @@ pub fn spawn_receiver(address: &str, frame: SharedFrame, active: Arc<AtomicBool>
     });
 }
 
-const MAX_TEX_WIDTH: usize = 426;
-const MAX_TEX_HEIGHT: usize = 240;
+const MAX_TEX_WIDTH: usize = 426*2;
+const MAX_TEX_HEIGHT: usize = 240*2;
 
 fn try_decode(
     decoder: &mut ffmpeg::decoder::Video,

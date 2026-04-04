@@ -12,3 +12,4 @@ ron = "0.12.1"
 webrtc-util = "0.17.1"
 serde = { version = "1.0.228", features = ["derive"] }
 ffmpeg-next = "8.1.0"
+egui_tiles = "0.15.0"
