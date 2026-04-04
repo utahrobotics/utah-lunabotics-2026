@@ -396,6 +396,7 @@ async fn motor_controller_loop(mut class: Receiver<'static, Driver<'static, USB>
                                 info!("stopping percussor");
                                 percussor.set_low();
                             }
+                            ActuatorCommand::StopAll => {}
                         }
                     } else {
                         warn!("failed to deserialize actuator command: {:?}", cmd_buf);
