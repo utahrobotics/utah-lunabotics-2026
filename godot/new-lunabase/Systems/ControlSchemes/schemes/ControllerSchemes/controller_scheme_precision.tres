@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="ControlSchemeResource" load_steps=11 format=3 uid="uid://ocq8nj7hqfr7"]
+[gd_resource type="Resource" script_class="ControlSchemeResource" format=3 uid="uid://ocq8nj7hqfr7"]
 
 [ext_resource type="Script" uid="uid://cojf71u62eagl" path="res://Systems/ControlSchemes/scheme_resource.gd" id="1_0mr7s"]
 
@@ -38,7 +38,7 @@ axis_value = -1.0
 
 [resource]
 script = ExtResource("1_0mr7s")
-scheme_name = "New Control Layout"
+scheme_name = "Differential Steering"
 left_wheel_axis = Array[InputEvent]([SubResource("InputEventJoypadMotion_kxk82")])
 right_wheel_axis = Array[InputEvent]([SubResource("InputEventJoypadMotion_yhdsm")])
 continue_mission = Array[InputEvent]([SubResource("InputEventJoypadButton_sqnyb")])

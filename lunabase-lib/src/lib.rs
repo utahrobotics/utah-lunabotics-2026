@@ -194,7 +194,7 @@ impl LunabaseConnection {
                 Err(e) => {
                     godot_warn!("Failed to send steering packet: {e}");
                 }
-            }
+          }
         } else {
             godot_warn!("Cannot send steering: not connected");
         }
