@@ -4,3 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+eframe = "0.34.1"
+egui = "0.34.1"
+openh264 = "0.9.3"
+rtp = "0.17.1"
+egui_extras = {version = "0.34.1", features = ["default", "all_loaders"] }
+ron = "0.12.1"
+serde = { version = "1.0.228", features = ["derive"] }

@@ -1,0 +1,18 @@
+GridLayout(
+    // layout of camera feeds to display
+    dimensions: (2,2),
+    feed_descriptors: [
+        CameraFeed (
+            id: "Front",
+            address: "127.0.0.1:4000",
+        ),
+        CameraFeed (
+            id: "T265Left",
+            address: "127.0.0.1:4001",
+        ),
+        CameraFeed (
+            id: "T265Right",
+            address: "127.0.0.1:4002",
+        )
+    ]
+)
