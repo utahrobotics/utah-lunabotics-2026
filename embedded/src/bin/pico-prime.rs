@@ -26,6 +26,7 @@ bind_interrupts!(struct Irqs {
 });
 
 static PACKET_SIZE: u16 = 64;
+const POLL_INTERVAL_MS: u64 = 100;
 
 struct FaultDetector<'a> {
     fault: Input<'a>,
@@ -181,11 +182,14 @@ async fn usb_tx_loop(
             let len = cobs::encode(&serialized, &mut stuffed);
             for chunk in stuffed[..len + 1].chunks(16) {
                 if let Err(e) = writer.write_packet(chunk).await {
-                    error!("{:?}", e);
+                    error!("[COBS ERROR] {:?}", e);
                     break 'writer;
                 }
             }
-            Timer::after(Duration::from_millis(100)).await;
+
+            // TODO: once secondary pico is implemented, read any sensor stuff off of it and send it over to the host here
+
+            Timer::after(Duration::from_millis(POLL_INTERVAL_MS)).await;
         }
         Timer::after(Duration::from_millis(200)).await;
     }
