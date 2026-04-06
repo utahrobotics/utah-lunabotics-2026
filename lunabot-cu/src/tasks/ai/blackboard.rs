@@ -1,12 +1,25 @@
 use std::collections::VecDeque;
+use std::ops::Deref;
+use std::sync::{Arc, OnceLock, RwLock};
 
 use crate::pathfinding::OccupancyGrid;
+use crate::tasks::GLOBAL_MAP;
+use crate::utils::rwlock_write_unpoison;
 use crate::{ROBOT_STATE, tasks::ai::jobs::Job};
 use common::{FromLunabase, LUNABOT_STAGE, LunabotStage, Steering};
 use embedded_common::ActuatorCommand;
 use nalgebra::Vector2;
 use simple_motion::StaticNode;
 use std::time::Instant;
+
+/// do not hold onto the locks for too long, it could stall the pipeline.
+/// this could be an atomic cell but there might be heap data in it eventually
+pub static BLACKBOARD_SHARED: OnceLock<Arc<RwLock<BlackboardShared>>> = OnceLock::new();
+
+#[derive(Debug)]
+pub struct BlackboardShared {
+    pub reset_obstacles: bool,
+}
 
 #[derive(Debug)]
 pub struct LunabotBlackboard {
@@ -63,6 +76,8 @@ pub struct LunabotBlackboard {
     pub last_non_zero_steering_pack: Option<Instant>,
     pub last_non_zero_lift_pack: Option<Instant>,
     pub last_non_zero_bucket_pack: Option<Instant>,
+
+    pub blackboard_shared: Arc<RwLock<BlackboardShared>>
 }
 
 impl Default for LunabotBlackboard {
@@ -94,6 +109,7 @@ impl Default for LunabotBlackboard {
             last_non_zero_steering_pack: None,
             last_non_zero_lift_pack: None,
             last_non_zero_bucket_pack: None,
+            blackboard_shared: Arc::new(RwLock::new(BlackboardShared { reset_obstacles: false }))
         }
     }
 }
@@ -150,6 +166,10 @@ impl LunabotBlackboard {
             common::FromLunabase::Manual => {
                 self.current_mission = LunabotStage::Manual;
                 LUNABOT_STAGE.store(LunabotStage::Manual);
+            }
+            common::FromLunabase::ResetObstacles => {
+                self.latest_local_map = None;
+                rwlock_write_unpoison(self.blackboard_shared.deref()).reset_obstacles = true;
             }
             _ => {}
         }

@@ -1,10 +1,10 @@
 use std::sync::OnceLock;
-
 use crate::ROBOT_STATE;
 use crate::kalman_filtering::{
     GlobalMeasurementFilter, MEKF, RelativeMeasurementFilter, STATE_DIM_GLOBAL, STATE_DIM_LOCAL,
     quaternion_error,
 };
+
 use crate::rerun_viz;
 use crate::rerun_viz::RECORDER;
 use crate::robot_state::RobotState;

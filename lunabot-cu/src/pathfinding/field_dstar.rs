@@ -59,7 +59,6 @@ pub fn find_path_dstar(
 
     // Handle case where robot starts in obstacle or unknown area
     let mut initial_path = Vec::new();
-    let start_gradient = get_gradient(start[0], start[1]);
     if get_gradient(start[0], start[1])
         .map(|val| {
             if val > max_acceptable_gradient {
@@ -109,9 +108,6 @@ pub fn find_path_dstar(
                  goal_gradient, max_acceptable_gradient);
         return None;
     }
-
-    // Determine which map to use for cell size
-    let cell_size = map.layout.cell_size;
 
     // Helper to convert world coordinates to grid keys
     // Prioritize local map, fall back to global map

@@ -1,13 +1,16 @@
 use std::collections::HashMap;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
 use std::sync::{Arc, Mutex};
-use std::thread::JoinHandle;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
-use cu_bincode::error::DecodeError;
-use common::{FromLunabase, FromLunabot, LunabotStage, Steering};
+use common::{
+    COMMAND_STREAM_ID, ERROR_STREAM_ID, FromLunabase, FromLunabot, LunabotStage, POSE_STREAM_ID,
+    Steering,
+};
 use godot::prelude::*;
-use quic::QuicClient;
+use quic::KeepAliveState;
+use quic::client::QuicClient;
+use tasker::{get_tokio_handle, tokio};
 
 struct LunabaseExtension;
 
@@ -22,37 +25,32 @@ struct LunabaseConnection {
     #[export]
     default_address: GString,
 
-    // <outgoing type, incoming type>
-    client: Option<QuicClient<FromLunabase, FromLunabot>>,
+    outgoing: Option<tokio::sync::mpsc::UnboundedSender<FromLunabase>>,
+    ka_state: Arc<Mutex<Option<Arc<Mutex<KeepAliveState<LunabotStage>>>>>>,
     last_packet_time: Instant,
     current_stage: LunabotStage,
-    recv_thread: Option<JoinHandle<()>>,
 
     errored_tasks: Arc<Mutex<HashMap<String, String>>>,
     current_weight: f64,
     global_position: Arc<Mutex<[f32; 3]>>,
     orientation: Arc<Mutex<[f32; 4]>>,
-   // velocity_base: Arc<Mutex<[f32;3]>>,
-   // acceleration_base: Arc<Mutex<[f32;3]>>,
 }
 
 #[godot_api]
 impl INode for LunabaseConnection {
     fn init(base: Base<Node>) -> Self {
+        tasker::get_tokio_handle();
         LunabaseConnection {
-            errored_tasks: Arc::new(Mutex::new(HashMap::new())),
             base,
             default_address: GString::from("127.0.0.1"),
-            client: None,
-            recv_thread: None,
+            outgoing: None,
+            ka_state: Arc::new(Mutex::new(None)),
             last_packet_time: Instant::now(),
             current_stage: LunabotStage::SoftStop,
             current_weight: 1250.0,
+            errored_tasks: Arc::new(Mutex::new(HashMap::new())),
             global_position: Arc::new(Mutex::new([0.0; 3])),
             orientation: Arc::new(Mutex::new([0.0; 4])),
-           // velocity_base: Arc::new(Mutex::new([0.0;3])),
-            // acceleration_base: Arc::new(Mutex::new([0.0;3])),
-
         }
     }
 
@@ -62,20 +60,19 @@ impl INode for LunabaseConnection {
     }
 
     fn process(&mut self, _delta: f64) {
-        if let Some(ref client) = self.client {
-            if let Some(encoded_stage) = client.get_last_keep_alive_msg() {
+        let guard = self.ka_state.lock().unwrap();
+        if let Some(ref state_arc) = *guard {
+            let state = state_arc.lock().unwrap();
+            if let Some(stage) = state.last_msg() {
+                drop(state);
+                drop(guard);
                 self.last_packet_time = Instant::now();
                 self.base_mut().emit_signal("packet_received", &[]);
 
-                let reported_lunabot_stage: Result<(LunabotStage, usize), DecodeError> =
-                    cu_bincode::borrow_decode_from_slice(&encoded_stage, cu_bincode::config::standard());
-
-                if let Ok((stage, _)) = reported_lunabot_stage {
-                    if stage != self.current_stage {
-                        self.current_stage = stage;
-                        self.base_mut()
-                            .emit_signal("stage_changed", &[Variant::from(stage as i32)]);
-                    }
+                if stage != self.current_stage {
+                    self.current_stage = stage;
+                    self.base_mut()
+                        .emit_signal("stage_changed", &[Variant::from(stage as i32)]);
                 }
             }
         }
@@ -91,71 +88,141 @@ impl LunabaseConnection {
     fn stage_changed(stage: i32);
 
     fn connect_to_address(&mut self, address_str: String) {
-        let lunabot_address = {
-            if let Ok(addr) = address_str.parse::<Ipv4Addr>() {
+        let addr = match address_str.parse::<Ipv4Addr>() {
+            Ok(addr) => {
                 godot_warn!("Connecting to: {address_str}");
-                Some(addr)
-            } else {
+                addr
+            }
+            Err(_) => {
                 godot_error!("Failed to parse address: {address_str}");
                 return;
             }
         };
 
-        if let Some(addr) = lunabot_address {
-            let socket_addr = SocketAddr::V4(SocketAddrV4::new(addr, common::ports::TELEOP));
+        let server_addr = SocketAddr::V4(SocketAddrV4::new(addr, common::ports::TELEOP));
 
-            match QuicClient::connect(socket_addr) {
-                Ok(client) => {
-                    let cleint_c = client.clone();
-                    let errored_tasks = self.errored_tasks.clone();
-                    let global_position = self.global_position.clone();
-                    let orientation = self.orientation.clone();
-                   // let velocity_base = self.velocity_base.clone();
-                   //let acceleration_base = self.acceleration_base.clone();
-                    let recv_thread = std::thread::spawn(move || {
-                        loop {
-                            match cleint_c.recv() {
-                                Ok(msg) => match msg {
-                                    FromLunabot::RobotIsometry { origin, quat } => {
-                                        if let Ok(mut pos) = global_position.lock() {
-                                            *pos = origin;
-                                        }
-                                        if let Ok(mut rotation) = orientation.lock() {
-                                            *rotation = quat;
-                                        }
-                                    }
-                                    FromLunabot::ArmAngles { .. } => {}
-                                    //FromLunabot::RobotMotion {velocity,acceleration} => {
-                                    //    if let Ok(mut velo) = velocity_base.lock(){
-                                    //     *velo = velocity;
-                                    //    }
-                                    //    if let Ok(mut acel) = acceleration_base.lock(){
-                                    //     *acel = acceleration;
-                                    //    }
+        let (tx_outgoing, rx_outgoing) = tokio::sync::mpsc::unbounded_channel::<FromLunabase>();
 
-                                    // }
-                                    FromLunabot::ErroredTasks(hash_map) => {
-                                        if let Ok(mut guard) = errored_tasks.lock() {
-                                            *guard = hash_map;
-                                        }
-                                    }
-                                },
-                                Err(e) => {
-                                    eprintln!("Failed to receive message from server: {}", e);
-                                    std::thread::sleep(Duration::from_millis(5));
+        let ka_state = self.ka_state.clone();
+        let errored_tasks = self.errored_tasks.clone();
+        let global_position = self.global_position.clone();
+        let orientation = self.orientation.clone();
+
+        get_tokio_handle().spawn(async move {
+            let bind: SocketAddr = "0.0.0.0:0".parse().unwrap();
+            let client = match QuicClient::connect_insecure(
+                bind,
+                server_addr,
+                "lunabot",
+                LunabotStage::SoftStop,
+            )
+            .await
+            {
+                Ok(c) => c,
+                Err(e) => {
+                    eprintln!("[LunabaseConnection] Connect failed: {e}");
+                    return;
+                }
+            };
+
+            // Open 3 multiplexed streams
+            let command_stream = match client
+                .open_bi::<FromLunabase, FromLunabot, { COMMAND_STREAM_ID }>()
+                .await
+            {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("[LunabaseConnection] open command stream failed: {e}");
+                    return;
+                }
+            };
+
+            let pose_stream = match client
+                .open_bi::<FromLunabase, FromLunabot, { POSE_STREAM_ID }>()
+                .await
+            {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("[LunabaseConnection] open pose stream failed: {e}");
+                    return;
+                }
+            };
+
+            let error_stream = match client
+                .open_bi::<FromLunabase, FromLunabot, { ERROR_STREAM_ID }>()
+                .await
+            {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("[LunabaseConnection] open error stream failed: {e}");
+                    return;
+                }
+            };
+
+            // Share the keep-alive state so process() can read it
+            *ka_state.lock().unwrap() = Some(client.keep_alive.shared_state());
+
+            // Recv pose data (RobotIsometry, ArmAngles)
+            let global_position_c = global_position.clone();
+            let orientation_c = orientation.clone();
+            tokio::spawn(async move {
+                loop {
+                    match pose_stream.recv().await {
+                        Ok(msg) => match msg {
+                            FromLunabot::RobotIsometry { origin, quat } => {
+                                if let Ok(mut pos) = global_position_c.lock() {
+                                    *pos = origin;
+                                }
+                                if let Ok(mut rot) = orientation_c.lock() {
+                                    *rot = quat;
                                 }
                             }
+                            FromLunabot::ArmAngles { .. } => {}
+                            _ => {}
+                        },
+                        Err(e) => {
+                            eprintln!("[LunabaseConnection] Pose recv error: {e}");
+                            break;
                         }
-                    });
-                    self.client = Some(client);
-                    self.recv_thread = Some(recv_thread);
-                    godot_print!("Successfully connected to {address_str}");
+                    }
                 }
-                Err(e) => {
-                    godot_error!("Failed to create client: {}", e);
+            });
+
+            // Recv error messages (ErroredTasks)
+            tokio::spawn(async move {
+                loop {
+                    match error_stream.recv().await {
+                        Ok(FromLunabot::ErroredTasks(map)) => {
+                            if let Ok(mut guard) = errored_tasks.lock() {
+                                *guard = map;
+                            }
+                        }
+                        Ok(_) => {}
+                        Err(e) => {
+                            eprintln!("[LunabaseConnection] Error recv error: {e}");
+                            break;
+                        }
+                    }
                 }
-            }
-        }
+            });
+
+            // Send commands on command stream
+            let mut rx = rx_outgoing;
+            tokio::spawn(async move {
+                while let Some(msg) = rx.recv().await {
+                    if let Err(e) = command_stream.send(&msg).await {
+                        eprintln!("[LunabaseConnection] Send error: {e}");
+                        break;
+                    }
+                }
+            });
+
+            // Keep client alive (owns the QUIC connection + KeepAlive background task)
+            std::future::pending::<()>().await;
+        });
+
+        self.outgoing = Some(tx_outgoing);
+        godot_print!("Connection initiated to {address_str}");
     }
 
     #[func]
@@ -166,12 +233,14 @@ impl LunabaseConnection {
 
     #[func]
     fn get_ms_since_last_packet(&self) -> i64 {
-        if let Some(ref client) = self.client {
-            if let Some(time_since) = client.time_since_last_keep_alive() {
-                time_since.as_millis() as i64
-            } else {
-                99999 // lmao
-            }
+        let guard = self.ka_state.lock().unwrap();
+        if let Some(ref state_arc) = *guard {
+            state_arc
+                .lock()
+                .unwrap()
+                .time_since_last()
+                .map(|d| d.as_millis() as i64)
+                .unwrap_or(99999)
         } else {
             99999
         }
@@ -182,97 +251,54 @@ impl LunabaseConnection {
         self.current_stage as i32
     }
 
+    fn send_msg(&self, msg: FromLunabase) {
+        if let Some(ref tx) = self.outgoing {
+            if let Err(e) = tx.send(msg) {
+                godot_warn!("Failed to send message: {e}");
+            }
+        } else {
+            godot_warn!("Cannot send: not connected");
+        }
+    }
+
     #[func]
     fn execute_steering(&self, left: f64, right: f64) {
-        if let Some(ref client) = self.client {
-            match client.send(FromLunabase::Steering(Steering::new(
-                left,
-                right,
-                self.current_weight,
-            ))) {
-                Ok(_) => {}
-                Err(e) => {
-                    godot_warn!("Failed to send steering packet: {e}");
-                }
-          }
-        } else {
-            godot_warn!("Cannot send steering: not connected");
-        }
+        self.send_msg(FromLunabase::Steering(Steering::new(
+            left,
+            right,
+            self.current_weight,
+        )));
     }
 
     #[func]
     fn send_lift_actuators(&self, speed: f64) {
-        if let Some(ref client) = self.client {
-            match client.send(FromLunabase::set_lift_actuator(speed)) {
-                Ok(_) => {}
-                Err(e) => {
-                    godot_warn!("Failed to send lift actuator packet: {e}");
-                }
-            }
-        } else {
-            godot_warn!("Cannot send lift actuators: not connected");
-        }
+        self.send_msg(FromLunabase::set_lift_actuator(speed));
+    }
+
+    #[func]
+    fn send_reset_obstacles(&self) {
+        self.send_msg(FromLunabase::ResetObstacles);
     }
 
     #[func]
     fn send_bucket_actuators(&self, speed: f64) {
-        if let Some(ref client) = self.client {
-            match client.send(FromLunabase::set_bucket_actuator(speed)) {
-                Ok(_) => {}
-                Err(e) => {
-                    godot_warn!("Failed to send bucket actuator packet: {e}");
-                }
-            }
-        } else {
-            godot_warn!("Cannot send bucket actuators: not connected");
-        }
+        self.send_msg(FromLunabase::set_bucket_actuator(speed));
     }
 
     #[func]
     fn send_soft_stop(&self) {
-        if let Some(ref client) = self.client {
-            match client.send(FromLunabase::SoftStop) {
-                Ok(_) => {
-                    godot_print!("Sent SoftStop command");
-                }
-                Err(e) => {
-                    godot_warn!("Failed to send soft stop packet: {e}");
-                }
-            }
-        } else {
-            godot_warn!("Cannot send soft stop: not connected");
-        }
+        self.send_msg(FromLunabase::SoftStop);
     }
 
     /// continue mission means manual
     #[func]
     fn send_continue_mission(&self) {
-        if let Some(ref client) = self.client {
-            match client.send(FromLunabase::Manual) {
-                Ok(_) => {
-                    godot_print!("Sent Manual command");
-                }
-                Err(e) => {
-                    godot_warn!("Failed to send continue mission packet: {e}");
-                }
-            }
-        } else {
-            godot_warn!("Cannot send continue mission: not connected");
-        }
+        self.send_msg(FromLunabase::Manual);
     }
 
     #[func]
     fn send_start_autonomy(&self) {
-        if let Some(ref client) = self.client {
-            match client.send(FromLunabase::Navigate((0.0, 0.0))) {
-                Ok(_) => {
-                    godot_print!("Sent Navigate command");
-                }
-                Err(e) => {
-                    godot_warn!("Cannot send start Autonomy command: {e}");
-                }
-            }
-        }
+        self.send_msg(FromLunabase::Navigate((0.0, 0.0)));
     }
 
     #[func]
@@ -289,23 +315,14 @@ impl LunabaseConnection {
     #[func]
     fn set_speed(&mut self, weight: f64) -> f64 {
         self.current_weight = weight;
-        if let Some(ref client) = self.client {
-            match client.send(FromLunabase::Steering(Steering::new(
-                0.0,
-                0.0,
-                self.current_weight,
-            ))) {
-                Ok(_) => {}
-                Err(e) => {
-                    godot_warn!("Failed to send (weight) steering packet: {e}");
-                }
-            }
-        } else {
-            godot_warn!("Cannot send steering: not connected");
-        }
-
+        self.send_msg(FromLunabase::Steering(Steering::new(
+            0.0,
+            0.0,
+            self.current_weight,
+        )));
         self.current_weight
     }
+
     #[func]
     fn get_orientation(&mut self) -> PackedFloat32Array {
         let mut values_sent = PackedFloat32Array::new();
@@ -315,12 +332,10 @@ impl LunabaseConnection {
             values_sent.push(orientation_values[1]);
             values_sent.push(orientation_values[2]);
             values_sent.push(orientation_values[3]);
-           
         }
-        
-       
         values_sent
     }
+
     #[func]
     fn get_location(&mut self) -> PackedFloat32Array {
         let mut values_sent = PackedFloat32Array::new();
@@ -329,34 +344,7 @@ impl LunabaseConnection {
             values_sent.push(position[0]);
             values_sent.push(position[1]);
             values_sent.push(position[2]);
-           
         }
-        
-        
         values_sent
-       
     }
-    // #[func]
-    // fn get_velocity(&mut self) -> PackedFloat32Array {
-    //     let mut values_sent = PackedFloat32Array::new();
-    //     if let Ok(velo) = self.velocity_base.lock() {
-    //         values_sent.clear();
-    //         values_sent.push(velo[0]);
-    //         values_sent.push(velo[1]);
-    //         values_sent.push(velo[2]);
-    //     }
-    //     values_sent
-    // }
-
-    // #[func]
-    // fn get_acceleration(&mut self) -> PackedFloat32Array{
-    //    let mut values_sent = PackedFloat32Array::new();
-    //    if let Ok(accel ) = self.acceleration_base.lock(){
-    //      values_sent.clear();
-    //      values_sent.push(accel[0]);
-    //      values_sent.push(accel[1]);
-    //      values_sent.push(accel[2]);
-    //    }
-    //    values_sent
-    // }
 }

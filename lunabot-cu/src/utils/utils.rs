@@ -1,6 +1,6 @@
 #![allow(unused)]
 
-use std::ops::{Add, Mul, Sub};
+use std::{ops::{Add, Mul, Sub}, sync::{RwLock, RwLockReadGuard, RwLockWriteGuard}};
 
 use crossbeam::atomic::AtomicCell;
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
@@ -12,6 +12,7 @@ use nalgebra::{
 use common::Steering;
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use udev::Event;
+use wgsl_pcl::pipelines::filters::GaussianOptions;
 
 pub fn nanos_to_secs(nanos: u64) -> f64 {
     nanos as f64 / 1_000_000_000.0
@@ -37,6 +38,26 @@ where
 {
     let diff = to - from;
     from + diff * lerp_value(delta, weight)
+}
+
+pub fn rwlock_read_unpoison<T>(lock: &RwLock<T>) -> RwLockReadGuard<'_, T> {
+    match lock.read() {
+        Ok(guard) => guard,
+        Err(poison) => {
+            lock.clear_poison();
+            poison.into_inner()
+        },
+    }
+}
+
+pub fn rwlock_write_unpoison<T>(lock: &RwLock<T>) -> RwLockWriteGuard<'_, T> {
+    match lock.write() {
+        Ok(guard) => guard,
+        Err(poison) => {
+            lock.clear_poison();
+            poison.into_inner()
+        },
+    }
 }
 
 /// Decomposes the `src` quaternion into two quaternions: the `twist` quaternion is the rotation around the `axis` vector, and the `swing` quaternion is the remaining rotation.

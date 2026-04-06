@@ -257,6 +257,7 @@
             type: "crate::bridges::lunabase_bridge::Lunabase",
             config: {
                 "max_pong_delay_ms": 500,
+                "keep_alive_interval_ms": 20,
             },
             run_in_sim: true,
             channels: [

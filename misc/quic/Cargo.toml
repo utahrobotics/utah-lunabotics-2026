@@ -4,9 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-cu-bincode = { workspace = true, features = ["derive", "serde"] }
-cobs.workspace = true
+cobs = "0.5.1"
+cu-bincode = "2.0.2"
 quinn = "0.11.9"
-rcgen = "0.14.5"
-tasker = { path = "../tasker" }
-uuid = { version = "1.4", features = ["v4", "serde", "fast-rng"] }
+rcgen = { version = "0.14.7"}
+tasker = {path = "/home/matthew_a/utah-lunabotics-2026/misc/tasker"}

@@ -19,6 +19,7 @@ use cu29::prelude::*;
 use nalgebra::Isometry3;
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
+use std::ops::Deref;
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use wgsl_pcl::pipelines::depth_to_obstacle::ClearAffectedCellsOptions;
 use wgsl_pcl::pipelines::filters::*;
@@ -36,7 +37,9 @@ use crate::ROBOT_STATE;
 use crate::pathfinding::OccupancyGrid;
 use crate::payloads::depth_frame::CuDepthFrame;
 use crate::rerun_viz::RECORDER;
+use crate::tasks::ai::blackboard::BLACKBOARD_SHARED;
 use crate::tasks::{DEPTH_FRAME_HEIGHT, DEPTH_FRAME_WIDTH};
+use crate::utils::{rwlock_read_unpoison, rwlock_write_unpoison};
 pub static GLOBAL_MAP: OnceLock<Arc<RwLock<OccupancyGrid>>> = OnceLock::new();
 const PERMANENT_GRADIENT: f32 = 10.0;
 
@@ -65,6 +68,8 @@ pub struct OccupancyGridTask {
     max_linear_velocity: f64,
     max_angular_velocity: f64,
     max_acceleration: f64,
+    arena_obstacles: Option<ArenaObstaclesSelection>,
+    robot_radius_meters: f32,
 }
 
 /// Arena obstacle configuration
@@ -499,6 +504,8 @@ impl CuTask for OccupancyGridTask {
             max_angular_velocity,
             max_linear_velocity,
             max_acceleration,
+            arena_obstacles,
+            robot_radius_meters,
         })
     }
     fn process<'i, 'o>(
@@ -508,6 +515,32 @@ impl CuTask for OccupancyGridTask {
         output: &mut Self::Output<'o>,
     ) -> CuResult<()> {
         let mut output_buf = self.output_buffer.lock().unwrap();
+
+        if let Some(blackboard) = BLACKBOARD_SHARED.get() && let Ok(guard) = blackboard.try_read() && guard.reset_obstacles {
+            drop(guard);
+
+            // reset global map (non-blocking will retry next cycle if lock is held)
+            if let Some(global) = GLOBAL_MAP.get()
+                && let Ok(mut global_guard) = global.try_write()
+            {
+                global_guard.gradient_map.fill(f32::MIN);
+                if let Some(arena_obstacles) = self.arena_obstacles
+                    && let Some(obstacles) = load_arena_obstacles(arena_obstacles)
+                {
+                    paint_permanent_obstacles(&mut global_guard, &obstacles, self.robot_radius_meters);
+                }
+
+                self.depth_projector_pipeline
+                    .lock()
+                    .unwrap()
+                    .clear_map(get_device());
+                self.rolling_map_start_position = self.camera_node.get_global_isometry();
+
+                if let Ok(mut bb) = blackboard.try_write() {
+                    bb.reset_obstacles = false;
+                }
+            }
+        }
 
         if let Some(grid) = output_buf.take()
             && let Some(global) = GLOBAL_MAP.get()

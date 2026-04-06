@@ -12,6 +12,7 @@ extends Control
 @onready var errored_tasks_label: Label = $VBoxContainer/MainContent/HBoxContainer/LeftColumn/ErrorsPanel/MarginContainer/VBox/ScrollContainer/ErroredTasksLabel
 @onready var speed_label: Label = $VBoxContainer/TopBar/MarginContainer/TopPanel/StatusGroup/SpeedLabel
 @onready var speed_slider: HSlider = $VBoxContainer/MainContent/HBoxContainer/RightColumn/SpeedControl/MarginContainer/VBox/SpeedMultiplierSlider
+@onready var reset_obstacles_button: Button = $VBoxContainer/MainContent/HBoxContainer/RightColumn/SpeedControl/MarginContainer/VBox/ResetObstaclesButton
 @onready var location_label: Label = $VBoxContainer/TopBar/MarginContainer/TopPanel/StatusGroup/location_label
 @onready var orientation_label: Label = $VBoxContainer/MainContent/HBoxContainer/CenterColumn/OrientationPanel/MarginContainer/OrientationLabel
 @onready var PitchAndRollGUI: Control = $VBoxContainer/MainContent/HBoxContainer/CenterColumn/UIAttitude
@@ -41,8 +42,9 @@ func _ready() -> void:
 	soft_stop_button.pressed.connect(_on_soft_stop_pressed)
 	manual_button.pressed.connect(_on_manual_pressed)
 	autonomous_button.pressed.connect(_on_autonomous_pressed)
-	
-	
+	reset_obstacles_button.pressed.connect(_on_reset_obstacles_pressed)
+
+
 	speed_slider.value = 0;
 	var new_weight = GlobalLunabaseConnection.set_speed(weight)
 	
@@ -134,6 +136,11 @@ func _on_manual_pressed() -> void:
 func _on_autonomous_pressed() -> void:
 	print("Sending Navigate command (Autonomous mode)")
 	controller.command_recorder.execute_and_store(NavigateCommand.new())
+
+
+func _on_reset_obstacles_pressed() -> void:
+	print("Sending ResetObstacles command")
+	controller.command_recorder.execute_and_store(ResetObstaclesCommand.new())
 	
 
 func _on_speed_multiplier_slider_value_changed(value: float) -> void:

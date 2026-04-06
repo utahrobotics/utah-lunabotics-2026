@@ -7,8 +7,7 @@ edition = "2024"
 godot = "0.4.0"
 common = { path = "../common" }
 quic = { path = "../misc/quic" }
-cu-bincode.workspace = true
-crossbeam-channel.workspace = true
+tasker = { path = "../misc/tasker" }
 
 [lib]
 crate-type = ["cdylib"] # Compile this crate to a dynamic C library.

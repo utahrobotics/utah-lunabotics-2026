@@ -200,6 +200,9 @@ pub enum FromLunabase {
     /// disconnect events are technically not from the lunabase, they are manually enqueued in the lunabase copper task
     /// when the last seen packet from the lunabase exceeds the timeout
     Disconnect,
+
+    /// resets the obstacle map
+    ResetObstacles
 }
 
 impl ToString for FromLunabase {
@@ -283,8 +286,10 @@ pub enum FromLunabot {
     //     velocity:[f32;3],
     //     acceleration: [f32;3],
     // },
+    /// Error messages from monitored tasks
     ErroredTasks(HashMap<String, String>),
 }
+
 
 impl Default for FromLunabot {
     fn default() -> Self {

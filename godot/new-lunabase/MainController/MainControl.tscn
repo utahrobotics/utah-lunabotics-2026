@@ -326,6 +326,10 @@ popup/item_2/text = "Ucf Map"
 popup/item_2/id = 2
 script = ExtResource("7_xxe4i")
 
+[node name="ResetObstaclesButton" type="Button" parent="VBoxContainer/MainContent/HBoxContainer/RightColumn/SpeedControl/MarginContainer/VBox" unique_id=395387319]
+layout_mode = 2
+text = "Reset Obstacles"
+
 [node name="BottomBar" type="PanelContainer" parent="VBoxContainer" unique_id=1900845456]
 custom_minimum_size = Vector2(0, 60)
 layout_mode = 2

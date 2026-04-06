@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use bonsai_bt::{BT, Event, UpdateArgs};
 use common::{FromLunabase, Steering};
 use cu29::prelude::*;
@@ -10,7 +12,7 @@ use embedded_common::ActuatorCommand;
 use crate::pathfinding::OccupancyGrid;
 use crate::tasks::ai::action::LunabotAction;
 use crate::tasks::ai::behaviors::teleop::teleop_behavior;
-use crate::tasks::ai::blackboard::LunabotBlackboard;
+use crate::tasks::ai::blackboard::{BLACKBOARD_SHARED, LunabotBlackboard};
 use crate::utils::nanos_to_secs;
 
 pub struct LunabotAi {
@@ -55,6 +57,7 @@ impl CuTask for LunabotAi {
             })
             .unwrap_or(0.3) as f32;
         let mut blackboard = LunabotBlackboard::default();
+        BLACKBOARD_SHARED.get_or_init(|| Arc::clone(&blackboard.blackboard_shared));
         blackboard.obstacle_gradient_threshold_expander = obstacle_gradient_threshold_expander;
         blackboard.obstacle_gradient_threshold_pathfinder = obstacle_gradient_threshold_pathfinder;
         blackboard.robot_radius = robot_radius_meters;

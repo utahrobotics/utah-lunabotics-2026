@@ -75,12 +75,18 @@ impl CuBridge for Lunabase {
         use cu29::CuError;
 
         let max_pong_delay = if let Some(cfg) = config {
-            Duration::from_millis(cfg.get("max_pong_delay_ms").unwrap().unwrap_or(1000))
+            Duration::from_millis(cfg.get("max_pong_delay_ms").unwrap().unwrap_or(500))
         } else {
-            Duration::from_millis(1000)
+            Duration::from_millis(500)
         };
 
-        let connection = LunabaseConnection::new()
+        let keep_alive_interval_ms = if let Some(cfg) = config {
+            Duration::from_millis(cfg.get("keep_alive_interval_ms").unwrap().unwrap_or(30))
+        } else {
+            Duration::from_millis(30)
+        };
+
+        let connection = LunabaseConnection::new(keep_alive_interval_ms)
             .map_err(|e| CuError::from(format!("Failed to create LunabaseConnection: {}", e)))?;
 
         Ok(Self {
@@ -123,10 +129,7 @@ impl CuBridge for Lunabase {
         use crate::{simple_monitor::ERRORED_TASKS, utils::secs_to_nanos};
         use common::{FromLunabot, LUNABOT_STAGE};
 
-        let heartbeat =
-            cu_bincode::encode_to_vec(LUNABOT_STAGE.load(), cu_bincode::config::standard())
-                .unwrap();
-        self.connection.server.set_keep_alive_msg(&heartbeat);
+        self.connection.set_keep_alive_msg(LUNABOT_STAGE.load());
 
         if let Some(errored_tasks) = ERRORED_TASKS.get()
             && clock.now().as_nanos() - self.last_errored_tasks_packet > secs_to_nanos(3.0)
@@ -230,10 +233,7 @@ impl CuBridge for Lunabase {
         use cu29::CuError;
 
         // Send heartbeat and robot state (moved from send method since send might not be called)
-        let heartbeat =
-            cu_bincode::encode_to_vec(LUNABOT_STAGE.load(), cu_bincode::config::standard())
-                .unwrap();
-        self.connection.server.set_keep_alive_msg(&heartbeat);
+        self.connection.set_keep_alive_msg(LUNABOT_STAGE.load());
 
         // Send errored tasks periodically
         if let Some(errored_tasks) = ERRORED_TASKS.get()
@@ -284,15 +284,12 @@ impl CuBridge for Lunabase {
         // Set the next message from buffer as payload
         if let Some(next_msg) = self.message_buffer.pop_front() {
             if std::any::TypeId::of::<Payload>() == std::any::TypeId::of::<FromLunabase>() {
-                use common::Steering;
-
                 let payload_msg = Box::new(next_msg) as Box<dyn std::any::Any>;
                 if let Ok(downcasted) = payload_msg.downcast::<Payload>() {
                     msg.set_payload(*downcasted);
                     msg.metadata.process_time.start = clock.now().into();
                 }
-
-                // println!("{:?}", next_msg);
+                // println!("[LUNABASE BRIDGE] recved msg: {:?}", next_msg);
             }
         } else {
             msg.clear_payload();
