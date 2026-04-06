@@ -90,14 +90,7 @@ impl LunabaseConnection {
     /// Check if the connection is alive based on the last seen timestamp.
     pub fn is_alive(&self, timeout: Duration) -> bool {
         if let Some(timestamp) = self.time_since_last_seen() {
-            let val = timestamp < timeout;
-            if !val {
-                eprintln!(
-                    "last seen: {:?}, timeout: {:?}",
-                    timestamp, timeout
-                );
-            }
-            val
+            timestamp < timeout
         } else {
             false
         }
