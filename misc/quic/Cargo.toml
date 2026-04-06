@@ -8,4 +8,4 @@ cobs = "0.5.1"
 cu-bincode = "2.0.2"
 quinn = "0.11.9"
 rcgen = { version = "0.14.7"}
-tasker = {path = "/home/matthew_a/utah-lunabotics-2026/misc/tasker"}
+tasker = {path = "../tasker"}
