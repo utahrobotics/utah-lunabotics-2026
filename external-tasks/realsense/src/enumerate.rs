@@ -107,14 +107,14 @@ pub fn enumerate_depth_cameras(serial_numbers: &[&str]) {
                     );
                     continue;
                 };
-                if usb_val < 3.0 {
-                    eprintln!(
-                        "RealSense Camera {} is on USB {:.1} — depth stream requires USB 3.0+",
-                        current_serial, usb_val
-                    );
-                    std::thread::sleep(Duration::from_secs(2));
-                    continue;
-                }
+                // if usb_val < 3.0 {
+                //     eprintln!(
+                //         "RealSense Camera {} is on USB {:.1} — depth stream requires USB 3.0+",
+                //         current_serial, usb_val
+                //     );
+                //     std::thread::sleep(Duration::from_secs(2));
+                //     continue;
+                // }
 
                 let pipeline_sender = pipeline_sender.clone();
 

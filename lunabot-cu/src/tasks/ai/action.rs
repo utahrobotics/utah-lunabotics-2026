@@ -68,7 +68,7 @@ impl LunabotAction {
             }
             LunabotAction::SetLastSteering => {
                 if let Some(last_steer_pack_time) = blackboard.last_non_zero_steering_pack {
-                    if last_steer_pack_time.elapsed() > Duration::from_millis(500) {
+                    if last_steer_pack_time.elapsed() > Duration::from_millis(200) {
                         blackboard.outgoing_steering_msg = Some(Steering::default());
                         println!(
                             "dropped non zero steering packet :( {:?}",

@@ -13,6 +13,10 @@ GridLayout(
         CameraFeed (
             id: "T265Right",
             address: "127.0.0.1:4002",
+        ),
+        CameraFeed (
+            id: "ObstacleMap",
+            address: "127.0.0.1:5000",
         )
     ]
 )

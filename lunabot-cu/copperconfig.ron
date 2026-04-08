@@ -50,7 +50,9 @@
             id:"realsense_subscriber",
             type: "crate::tasks::sources::RealsenseSubscriber",
             config: {
-                "serial_num": "044422250424",
+                // "serial_num": "044422250424",
+                // dust protected cam
+                "serial_num": "341222301328",
                 // "serial_num": "311322302990",
                 "camera_node": "upper_depth_camera"
             },
@@ -229,6 +231,18 @@
                 enabled: true
             ),
             background: true,
+        ),
+        (
+            id: "obstacle_gstreamer",
+            type: "crate::tasks::ObstacleStreamer",
+            config: {
+                "width": 520,
+                "height": 600,
+                "fps": 30,
+                "host": "127.0.0.1",
+                "port": 5000,
+                "bitrate": 2000,
+            }
         )
     ],
     cnx:[
@@ -247,7 +261,7 @@
         (src:"t265_subscriber",               dst:"localizer",               msg:"crate::tasks::sources::T265Msg"),
         (src:"t265_subscriber",               dst:"detector_cam_t265",       msg:"cu_sensor_payloads::CuImage<Vec<u8>>"),
         (src:"detector_cam_t265",             dst: "detection_handler",      msg:"cu_apriltag::AprilTagDetections"),
-
+        (src:"occupancy_grid_pipeline",       dst: "obstacle_gstreamer",     msg:"crate::pathfinding::OccupancyGrid"),
     ],
 
     // comms to lunabase software

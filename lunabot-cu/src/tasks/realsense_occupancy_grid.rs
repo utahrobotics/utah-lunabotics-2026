@@ -19,7 +19,6 @@ use cu29::prelude::*;
 use nalgebra::Isometry3;
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
-use std::ops::Deref;
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use wgsl_pcl::pipelines::depth_to_obstacle::ClearAffectedCellsOptions;
 use wgsl_pcl::pipelines::filters::*;
@@ -39,7 +38,6 @@ use crate::payloads::depth_frame::CuDepthFrame;
 use crate::rerun_viz::RECORDER;
 use crate::tasks::ai::blackboard::BLACKBOARD_SHARED;
 use crate::tasks::{DEPTH_FRAME_HEIGHT, DEPTH_FRAME_WIDTH};
-use crate::utils::{rwlock_read_unpoison, rwlock_write_unpoison};
 pub static GLOBAL_MAP: OnceLock<Arc<RwLock<OccupancyGrid>>> = OnceLock::new();
 const PERMANENT_GRADIENT: f32 = 10.0;
 

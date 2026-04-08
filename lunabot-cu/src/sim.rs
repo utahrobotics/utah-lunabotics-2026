@@ -71,6 +71,8 @@ fn default_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::LunabaseBridgeTxToLunabase { .. } => SimOverride::ExecuteByRuntime,
         default::SimStep::LunabaseBridgeBridge { .. } => SimOverride::ExecuteByRuntime,
         default::SimStep::DetectorCamT265(..) => SimOverride::ExecutedBySim,
+        default::SimStep::ObstacleGstreamer(..) => SimOverride::ExecuteByRuntime,
+
         default::SimStep::__Phantom(_) => SimOverride::ExecutedBySim,
     }
 }
@@ -346,6 +348,7 @@ fn sim_callback<'a>(
             }
             SimOverride::ExecutedBySim
         }
+        default::SimStep::ObstacleGstreamer(..) => SimOverride::ExecuteByRuntime,
         default::SimStep::T265Subscriber(..) => SimOverride::ExecutedBySim,
         default::SimStep::DetectionHandler(_) => SimOverride::ExecutedBySim,
         default::SimStep::L2KissIcp(_) => SimOverride::ExecuteByRuntime,

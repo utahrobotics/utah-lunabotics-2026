@@ -22,6 +22,7 @@ production = [
     "cu-apriltag/hardware",
     "udev",
     "gstreamer",
+    "gstreamer-video",
     "gstreamer-app",
     "cu-gstreamer",
     "circular-buffer",
@@ -113,6 +114,7 @@ bonsai-bt = { git = "https://github.com/utahrobotics/bonsai.git" }
 # production hardware feature only
 udev = { version = "0.9", features = ["mio10"], optional = true }
 gstreamer = { version = "0.24.0", optional = true }
+gstreamer-video = { version = "0.24.0", optional = true }
 circular-buffer = { version = "1.1.0", optional = true }
 gstreamer-app = { version = "0.24.0", optional = true }
 cu-gstreamer = { workspace = true, optional = true }

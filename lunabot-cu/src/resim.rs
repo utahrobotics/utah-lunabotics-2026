@@ -53,6 +53,8 @@ fn default_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::DetectorCamLaptopFront(_) => SimOverride::ExecutedBySim,
         default::SimStep::RealsenseSubscriber(_) => SimOverride::ExecutedBySim,
         default::SimStep::T265Subscriber(_) => SimOverride::ExecutedBySim,
+        default::SimStep::ObstacleGstreamer(..) => SimOverride::ExecutedBySim,
+
         _ => SimOverride::ExecuteByRuntime,
     }
 }
@@ -89,6 +91,7 @@ fn run_one_copperlist(
             default::SimStep::GstConvertBack(..) => SimOverride::ExecutedBySim,
             default::SimStep::GstConvertSide(..) => SimOverride::ExecutedBySim,
             default::SimStep::GstConvertLaptopFront(..) => SimOverride::ExecutedBySim,
+            default::SimStep::ObstacleGstreamer(..) => SimOverride::ExecutedBySim,
             default::SimStep::L2Pointcloud(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_l_2_pointcloud_output().clone();
                 output.tov = robot_clock.now().into();
