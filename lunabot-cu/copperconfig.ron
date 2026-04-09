@@ -69,6 +69,9 @@
                 "t265_velocity_variance": 1.0,
                 "t265_angular_velocity_variance": 1.0,
                 "pose_variance": 0.0005,
+                "left_serial": "142122111023",
+                "right_serial": "142122110508",
+                "rear_serial": "929122111514",
             },
             logging: (
                 enabled: true
@@ -215,7 +218,43 @@
             }
         ),
         (
-            id: "detector_cam_t265",
+            id: "detector_cam_t265_left",
+            type: "cu_apriltag::AprilTags",
+            config: {
+                "family": "tag36h11",
+                "tag_size": 0.145,
+                "fx": 1,
+                "fy": 1,
+                "cx": 960.84,
+                "cy": 600.819,
+                "camera_id": "142122111023",
+                "distortion_path": "camera_configs/t265_distortion.ron",
+            },
+            logging: (
+                enabled: true
+            ),
+            background: true,
+        ),
+        (
+            id: "detector_cam_t265_right",
+            type: "cu_apriltag::AprilTags",
+            config: {
+                "family": "tag36h11",
+                "tag_size": 0.145,
+                "fx": 1,
+                "fy": 1,
+                "cx": 960.84,
+                "cy": 600.819,
+                "camera_id": "142122110508",
+                "distortion_path": "camera_configs/t265_distortion.ron",
+            },
+            logging: (
+                enabled: true
+            ),
+            background: true,
+        ),
+        (
+            id: "detector_cam_t265_rear",
             type: "cu_apriltag::AprilTags",
             config: {
                 "family": "tag36h11",
@@ -257,10 +296,16 @@
         (src:"new_ai",                        dst:"motor_ctrl",              msg:"common::Steering"),
         (src:"new_ai",                        dst:"v3_pico",                 msg:"embedded_common::ActuatorCommand"),
         (src:"v3_pico",                       dst:"localizer",               msg:"embedded_common::FromPico"),
-        (src:"detection_handler",             dst: "localizer",              msg:"Vec<crate::tasks::AprilTagMeasurement>"),
-        (src:"t265_subscriber",               dst:"localizer",               msg:"crate::tasks::sources::T265Msg"),
-        (src:"t265_subscriber",               dst:"detector_cam_t265",       msg:"cu_sensor_payloads::CuImage<Vec<u8>>"),
-        (src:"detector_cam_t265",             dst: "detection_handler",      msg:"cu_apriltag::AprilTagDetections"),
+        (src:"detection_handler",             dst:"localizer",               msg:"Vec<crate::tasks::AprilTagMeasurement>"),
+        (src:"t265_subscriber",               dst:"localizer",               msg:"crate::tasks::sources::T265Msg", src_port: Some(0)),
+        (src:"t265_subscriber",               dst:"detector_cam_t265_left",  msg:"cu_sensor_payloads::CuImage<Vec<u8>>", src_port: Some(1)),
+        (src:"t265_subscriber",               dst:"detector_cam_t265_right", msg:"cu_sensor_payloads::CuImage<Vec<u8>>", src_port: Some(2)),
+        (src:"t265_subscriber",               dst:"detector_cam_t265_rear",  msg:"cu_sensor_payloads::CuImage<Vec<u8>>", src_port: Some(3)),
+
+        (src:"detector_cam_t265_left",        dst:"detection_handler",       msg:"cu_apriltag::AprilTagDetections"),
+        (src:"detector_cam_t265_right",       dst:"detection_handler",       msg:"cu_apriltag::AprilTagDetections"),
+        (src:"detector_cam_t265_rear",        dst:"detection_handler",       msg:"cu_apriltag::AprilTagDetections"),
+
         (src:"occupancy_grid_pipeline",       dst: "obstacle_gstreamer",     msg:"crate::pathfinding::OccupancyGrid"),
     ],
 

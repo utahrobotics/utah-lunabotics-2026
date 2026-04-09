@@ -1,8 +1,7 @@
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
-use std::sync::Arc;
-#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use crossbeam::channel::Receiver;
-
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+use std::{collections::HashMap, sync::Arc};
 
 use cu_bincode::{Decode, Encode};
 use cu_sensor_payloads::CuImage;
@@ -26,37 +25,45 @@ use crate::ROBOT_STATE;
 #[cfg(all(any(feature = "resim", feature = "sim")))]
 pub struct T265Subscriber {}
 
-
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 pub struct T265Subscriber {
-    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     last_process_call: std::time::Instant,
     last_seen: u64,
-
-    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     last_seen_img: u64,
 
-    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     velocity_variance: f64,
-    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     pose_variance: f64,
-    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     angular_velocity_variance: f64,
-    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     _manager: T265Manager,
-    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     image_rx: Receiver<VideoFrame>,
-    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     pose_rx: Receiver<Pose>,
-    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
     pool: Arc<CuHostMemoryPool<Vec<u8>>>,
 
-    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
-    warmup_ms: usize,
-    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
-    first_pose: Option<std::time::Instant>,
-    #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+    /// serial, warmupstate
+    warmup_states: HashMap<String, WarmupState>,
+
+    pub left_serial: String,
+    pub right_serial: String,
+    pub rear_serial: String,
+}
+
+#[derive(Clone)]
+pub struct WarmupState {
+    done: bool,
+    current_pose_count: usize,
+    warmup_pose_count: usize,
     twist_correction: Option<UnitQuaternion<f64>>,
+}
+
+impl Default for WarmupState {
+    fn default() -> Self {
+        Self {
+            done: false,
+            current_pose_count: 0,
+            warmup_pose_count: 100,
+            twist_correction: Default::default(),
+        }
+    }
 }
 
 #[derive(Encode, Decode, Clone, Serialize, Debug, Deserialize)]
@@ -107,7 +114,13 @@ impl Freezable for T265Subscriber {}
 
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 impl CuSrcTask for T265Subscriber {
-    type Output<'m> = output_msg!(T265Msg, CuImage<Vec<u8>>);
+    // combined t265 messages, left hand side t265, right hand side t265, rear t265
+    type Output<'m> = output_msg!(
+        T265Msg,
+        CuImage<Vec<u8>>,
+        CuImage<Vec<u8>>,
+        CuImage<Vec<u8>>
+    );
     type Resources<'r> = ();
 
     fn new(
@@ -138,6 +151,26 @@ impl CuSrcTask for T265Subscriber {
             })
             .unwrap_or(1.0);
 
+        let left_serial = config
+            .and_then(|c| {
+                c.get::<String>("left_serial")
+                    .expect("failed to deserialize")
+            })
+            .expect("Please provide left t261 serial");
+        let right_serial = config
+            .and_then(|c| {
+                c.get::<String>("right_serial")
+                    .expect("failed to deserialize")
+            })
+            .expect("Please provide right t261 serial");
+
+        let rear_serial = config
+            .and_then(|c| {
+                c.get::<String>("rear_serial")
+                    .expect("failed to deserialize")
+            })
+            .expect("Please provide right t261 serial");
+
         let mut manager = T265Manager::new().map_err(|e| CuError::from(e.to_string()))?;
         manager
             .discover_devices_with_options(true)
@@ -154,7 +187,7 @@ impl CuSrcTask for T265Subscriber {
             .map_err(|e| CuError::from(e.to_string()))?;
         const WIDTH: usize = 848;
         const HEIGHT: usize = 800;
-        let pool = CuHostMemoryPool::new("t265_imgs", 4, || vec![0u8; (WIDTH * HEIGHT) as usize])?;
+        let pool = CuHostMemoryPool::new("t265_imgs", 8, || vec![0u8; (WIDTH * HEIGHT) as usize])?;
 
         Ok(Self {
             last_process_call: std::time::Instant::now(),
@@ -167,9 +200,15 @@ impl CuSrcTask for T265Subscriber {
             image_rx,
             pool,
             pose_variance,
-            warmup_ms: 500,
-            first_pose: None,
-            twist_correction: None,
+            warmup_states: [
+                (left_serial.clone(), WarmupState::default()),
+                (right_serial.clone(), WarmupState::default()),
+                (rear_serial.clone(), WarmupState::default()),
+            ]
+            .into(),
+            left_serial,
+            right_serial,
+            rear_serial,
         })
     }
 
@@ -180,7 +219,10 @@ impl CuSrcTask for T265Subscriber {
     ) -> cu29::CuResult<()> {
         let start = std::time::Instant::now();
         if self.last_process_call.elapsed().as_millis() > 5 {
-            eprintln!("[WARNING] process not called for 5 miliseconds: took {}s", self.last_process_call.elapsed().as_secs_f64());
+            eprintln!(
+                "[WARNING] process not called for 5 miliseconds: took {}s",
+                self.last_process_call.elapsed().as_secs_f64()
+            );
         }
         self.last_process_call = std::time::Instant::now();
         new_msg.0.clear_payload();
@@ -201,7 +243,13 @@ impl CuSrcTask for T265Subscriber {
                 if image.sensor_index == 0 {
                     break 'image_rx;
                 }
-                if ROBOT_STATE.get().unwrap().kinematic_root.get_node_with_name(&image.device_id).is_none() {
+                if ROBOT_STATE
+                    .get()
+                    .unwrap()
+                    .kinematic_root
+                    .get_node_with_name(&image.device_id)
+                    .is_none()
+                {
                     break 'image_rx;
                 }
                 handle.with_inner_mut(|inner| {
@@ -213,7 +261,7 @@ impl CuSrcTask for T265Subscriber {
                     Ok(())
                 })?;
 
-                let image = CuImage::new(
+                let cu_image_handle = CuImage::new(
                     CuImageBufferFormat {
                         width: image.width as u32,
                         height: image.height as u32,
@@ -222,7 +270,15 @@ impl CuSrcTask for T265Subscriber {
                     },
                     handle,
                 );
-                new_msg.1.set_payload(image);
+                if image.device_id == self.left_serial {
+                    new_msg.1.set_payload(cu_image_handle);
+                } else if image.device_id == self.right_serial {
+                    new_msg.2.set_payload(cu_image_handle);
+                } else if image.device_id == self.rear_serial {
+                    new_msg.3.set_payload(cu_image_handle);
+                } else {
+                    eprintln!("[T265 SUBSCRIBER] Unknown serial on image");
+                }
             }
         }
 
@@ -244,13 +300,17 @@ impl CuSrcTask for T265Subscriber {
             device_id,
         }) = self.pose_rx.try_recv()
         {
-            if self.first_pose.get_or_insert(std::time::Instant::now()).elapsed().as_millis() < self.warmup_ms as u128 {
-                return Err(CuError::new_with_cause(
-                    "Warming up...",
-                    std::io::Error::other("Warming up..."),
-                ));
+            let Some(warmup_state) = self.warmup_states.get_mut(&device_id) else {
+                return Err(CuError::from(format!("Unknown serial {device_id}")));
+            };
+            if !warmup_state.done && warmup_state.current_pose_count < warmup_state.warmup_pose_count {
+                warmup_state.current_pose_count += 1;
+                return Err(CuError::from(format!("{device_id} warming up")));
+            } else {
+                // its just nice to stop counting, not that it actually changes performance in any way
+                warmup_state.done = true;
             }
-            
+
             use nalgebra::Quaternion;
 
             use crate::ROBOT_STATE;
@@ -282,21 +342,23 @@ impl CuSrcTask for T265Subscriber {
                 ));
             };
 
-            let twist_correction = self.twist_correction.unwrap_or_else(|| {
+            let twist_correction = warmup_state.twist_correction.unwrap_or_else(|| {
                 use nalgebra::UnitVector3;
 
                 use crate::utils::swing_twist_decomposition;
 
                 let robot_base = pose.cast() * kinematic_node.get_isometry_from_base().inverse();
-                let up:Vector3<f64> = Vector3::z();
-                let (_, twist) = swing_twist_decomposition(&robot_base.rotation, &UnitVector3::new_normalize(up));
-                self.twist_correction = Some(twist.inverse());
+                let up: Vector3<f64> = Vector3::z();
+                let (_, twist) = swing_twist_decomposition(
+                    &robot_base.rotation,
+                    &UnitVector3::new_normalize(up),
+                );
+                warmup_state.twist_correction = Some(twist.inverse());
                 twist.inverse()
             });
 
-            let base_twist_corrected_pose = twist_correction * pose.cast() * kinematic_node.get_isometry_from_base().inverse();
-
-
+            let base_twist_corrected_pose =
+                twist_correction * pose.cast() * kinematic_node.get_isometry_from_base().inverse();
 
             let msg = T265Msg {
                 pose: EncodableIsometry::from_na(&base_twist_corrected_pose),
@@ -337,7 +399,12 @@ impl CuSrcTask for T265Subscriber {
 
 #[cfg(any(feature = "resim", feature = "sim"))]
 impl CuSrcTask for T265Subscriber {
-    type Output<'m> = output_msg!(T265Msg, CuImage<Vec<u8>>);
+    type Output<'m> = output_msg!(
+        T265Msg,
+        CuImage<Vec<u8>>,
+        CuImage<Vec<u8>>,
+        CuImage<Vec<u8>>
+    );
     type Resources<'r> = ();
     fn new(
         _config: Option<&cu29::prelude::ComponentConfig>,
@@ -346,7 +413,7 @@ impl CuSrcTask for T265Subscriber {
     where
         Self: Sized,
     {
-        Ok(Self { })
+        Ok(Self {})
     }
     fn process<'o>(
         &mut self,

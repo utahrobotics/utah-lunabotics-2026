@@ -126,6 +126,8 @@ impl CuTask for AprilDetectionHandler {
         &'m input_msg!(AprilTagDetections),
         &'m input_msg!(AprilTagDetections),
         &'m input_msg!(AprilTagDetections),
+        &'m input_msg!(AprilTagDetections),
+        &'m input_msg!(AprilTagDetections),
     );
     // camera_id, estimated isometry of camera
     type Output<'m> = output_msg!(Vec<AprilTagMeasurement>);
@@ -145,12 +147,12 @@ impl CuTask for AprilDetectionHandler {
         output: &mut Self::Output<'_>,
     ) -> CuResult<()> {
         output.clear_payload();
-        let (input1, input2, input3, input4) = input;
+        let (input1, input2, input3, input4, input5, input6) = input;
 
         self.result_buf.clear();
 
         // Early exit if nothing to process
-        if [input1, input2, input3, input4].iter().all(|i| i.payload().is_none()) {
+        if [input1, input2, input3, input4, input5, input6].iter().all(|i| i.payload().is_none()) {
             return Ok(());
         }
 
