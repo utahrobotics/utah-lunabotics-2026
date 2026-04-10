@@ -57,7 +57,7 @@
                 "camera_node": "upper_depth_camera"
             },
             logging: (
-                enabled: true
+                enabled: true,
             ),
             run_in_sim: false
         ),
@@ -74,7 +74,9 @@
                 "rear_serial": "929122111514",
             },
             logging: (
-                enabled: true
+                enabled: true,
+                // disable logging for images (it takes too long)
+                disabled_slots: [1,2,3]
             ),
             run_in_sim: false
         ),
@@ -282,6 +284,30 @@
                 "port": 5000,
                 "bitrate": 2000,
             }
+        ),
+        (
+            id: "t265_left_gstreamer",
+            type: "crate::tasks::T265Streamer",
+            config: {
+                "width": 848,
+                "height": 800,
+                "fps": 30,
+                "host": "127.0.0.1",
+                "port": 5001,
+                "bitrate": 2000,
+            }
+        ),
+        (
+            id: "t265_right_gstreamer",
+            type: "crate::tasks::T265Streamer",
+            config: {
+                "width": 848,
+                "height": 800,
+                "fps": 30,
+                "host": "127.0.0.1",
+                "port": 5002,
+                "bitrate": 2000,
+            }
         )
     ],
     cnx:[
@@ -305,6 +331,10 @@
         (src:"detector_cam_t265_left",        dst:"detection_handler",       msg:"cu_apriltag::AprilTagDetections"),
         (src:"detector_cam_t265_right",       dst:"detection_handler",       msg:"cu_apriltag::AprilTagDetections"),
         (src:"detector_cam_t265_rear",        dst:"detection_handler",       msg:"cu_apriltag::AprilTagDetections"),
+
+        (src:"t265_subscriber", dst:"t265_left_gstreamer", msg:"cu_sensor_payloads::CuImage<Vec<u8>>", src_port: Some(1)),
+        (src:"t265_subscriber", dst:"t265_right_gstreamer", msg:"cu_sensor_payloads::CuImage<Vec<u8>>", src_port: Some(2)),
+
 
         (src:"occupancy_grid_pipeline",       dst: "obstacle_gstreamer",     msg:"crate::pathfinding::OccupancyGrid"),
     ],
@@ -342,7 +372,7 @@
                 "width":1920,
                 "height":1200,
                 "udp_host":"192.168.0.108",
-                "udp_port":5004,
+                "udp_port":4000,
             },
         ),
         (
@@ -372,7 +402,7 @@
                 "width":1280,
                 "height":720,
                 "udp_host":"127.0.0.1",
-                "udp_port":4000,
+                "udp_port":4002,
             }
         ),
     ],
@@ -380,9 +410,9 @@
     // monitor:(type:"cu_consolemon::CuConsoleMon"),
     monitor: (type:"simple_monitor::SimpleMonitor"),
     logging:(
-    // if true, each output payload of each will be logged unless a task opts out
+        // if true, each output payload of each will be logged unless a task opts out
         enable_task_logging: true,
-        section_size_mib:100,
+        section_size_mib: 100,
         copperlist_count: 20,
     ),
 )

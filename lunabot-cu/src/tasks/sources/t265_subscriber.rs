@@ -1,7 +1,7 @@
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use crossbeam::channel::Receiver;
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, ops::Deref, sync::Arc};
 
 use cu_bincode::{Decode, Encode};
 use cu_sensor_payloads::CuImage;
@@ -187,7 +187,7 @@ impl CuSrcTask for T265Subscriber {
             .map_err(|e| CuError::from(e.to_string()))?;
         const WIDTH: usize = 848;
         const HEIGHT: usize = 800;
-        let pool = CuHostMemoryPool::new("t265_imgs", 8, || vec![0u8; (WIDTH * HEIGHT) as usize])?;
+        let pool = CuHostMemoryPool::new("t265_imgs", 12, || vec![0u8; (WIDTH * HEIGHT) as usize])?;
 
         Ok(Self {
             last_process_call: std::time::Instant::now(),
@@ -217,7 +217,6 @@ impl CuSrcTask for T265Subscriber {
         clock: &cu29::prelude::RobotClock,
         new_msg: &mut Self::Output<'o>,
     ) -> cu29::CuResult<()> {
-        let start = std::time::Instant::now();
         if self.last_process_call.elapsed().as_millis() > 5 {
             eprintln!(
                 "[WARNING] process not called for 5 miliseconds: took {}s",
@@ -230,19 +229,20 @@ impl CuSrcTask for T265Subscriber {
 
         'image_rx: {
             if self.image_rx.len() > 5 {
-                eprintln!("WARNING: t265 image backpressure: {}", self.image_rx.len())
+                eprintln!("WARNING: t265 image backpressure: {}", self.image_rx.len());
+                while self.image_rx.len() > 1 {
+                    let _ = self.image_rx.try_recv();
+                }
             }
-            if let Ok(image) = self.image_rx.try_recv() {
-                self.last_seen_img = clock.now().as_millis();
-                use cu_sensor_payloads::CuImageBufferFormat;
-
-                let Some(handle) = self.pool.acquire() else {
-                    return Err(CuError::from("No handle available for t265"));
-                };
-                // we only want images from the righthand fisheye lense
+            if let Ok(mut image) = self.image_rx.try_recv() {
                 if image.sensor_index == 0 {
                     break 'image_rx;
                 }
+                self.last_seen_img = clock.now().as_millis();
+                use cu_sensor_payloads::CuImageBufferFormat;
+                let Some(handle) = self.pool.acquire() else {
+                    return Err(CuError::from("No handle available for t265"));
+                };
                 if ROBOT_STATE
                     .get()
                     .unwrap()
@@ -253,11 +253,21 @@ impl CuSrcTask for T265Subscriber {
                     break 'image_rx;
                 }
                 handle.with_inner_mut(|inner| {
-                    let dst = inner.deref_mut();
-                    if dst.len() != image.data.len() {
-                        return Err(CuError::from("handle data len doesnt match image data len"));
+                    match inner {
+                        CuHandleInner::Pooled(reusable) => {
+                            let dst: &mut Vec<u8> = reusable.deref_mut();
+                            if dst.len() != image.data.len() {
+                                return Err(CuError::from("length mismatch"));
+                            }
+                            std::mem::swap(dst, &mut image.data);
+                        }
+                        CuHandleInner::Detached(v) => {
+                            if v.len() != image.data.len() {
+                                return Err(CuError::from("length mismatch"));
+                            }
+                            std::mem::swap(v, &mut image.data);
+                        }
                     }
-                    dst.copy_from_slice(&image.data);
                     Ok(())
                 })?;
 
@@ -270,6 +280,7 @@ impl CuSrcTask for T265Subscriber {
                     },
                     handle,
                 );
+
                 if image.device_id == self.left_serial {
                     new_msg.1.set_payload(cu_image_handle);
                 } else if image.device_id == self.right_serial {
@@ -279,11 +290,16 @@ impl CuSrcTask for T265Subscriber {
                 } else {
                     eprintln!("[T265 SUBSCRIBER] Unknown serial on image");
                 }
+
             }
         }
 
         if self.pose_rx.len() > 5 {
-            eprintln!("WARNING: t265 pose backpressure: {}", self.pose_rx.len())
+            eprintln!("WARNING: t265 pose backpressure: {}", self.pose_rx.len());
+            // drain off backpressure
+            while self.pose_rx.len() > 1 {
+                let _ = self.pose_rx.try_recv();
+            }
         }
 
         if let Ok(Pose {
@@ -303,7 +319,9 @@ impl CuSrcTask for T265Subscriber {
             let Some(warmup_state) = self.warmup_states.get_mut(&device_id) else {
                 return Err(CuError::from(format!("Unknown serial {device_id}")));
             };
-            if !warmup_state.done && warmup_state.current_pose_count < warmup_state.warmup_pose_count {
+            if !warmup_state.done
+                && warmup_state.current_pose_count < warmup_state.warmup_pose_count
+            {
                 warmup_state.current_pose_count += 1;
                 return Err(CuError::from(format!("{device_id} warming up")));
             } else {
@@ -359,7 +377,6 @@ impl CuSrcTask for T265Subscriber {
 
             let base_twist_corrected_pose =
                 twist_correction * pose.cast() * kinematic_node.get_isometry_from_base().inverse();
-
             let msg = T265Msg {
                 pose: EncodableIsometry::from_na(&base_twist_corrected_pose),
                 pose_variance: self.pose_variance,
@@ -377,9 +394,6 @@ impl CuSrcTask for T265Subscriber {
             self.last_seen = clock.now().as_millis();
         }
 
-        if start.elapsed().as_millis() > 1 {
-            eprintln!("failed to run t265 subscriber in under 1 milisecond.");
-        }
         let mut err_msg = None;
         if clock.now().as_millis() - self.last_seen > 500 {
             err_msg = Some("no poses seen in 500 ms".to_string());

@@ -9,6 +9,7 @@ pub mod sinks;
 pub mod sources;
 pub mod v3_pico;
 pub mod obstacle_gstreamer;
+pub mod t265_gstreamer;
 
 pub use april_detection_handler::*;
 pub use auto_gstreamer::*;
@@ -20,3 +21,4 @@ pub use sinks::*;
 pub use sources::*;
 pub use v3_pico::*;
 pub use obstacle_gstreamer::implementation::*;
+pub use t265_gstreamer::implementation::*;
