@@ -4,7 +4,7 @@ GridLayout(
     feed_descriptors: [
         CameraFeed (
             id: "Front",
-            address: "127.0.0.1:4000",
+            address: "127.0.0.1:4002",
         ),
         CameraFeed (
             id: "ObstacleMap",

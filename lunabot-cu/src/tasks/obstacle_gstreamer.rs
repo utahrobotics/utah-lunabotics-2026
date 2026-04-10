@@ -83,19 +83,19 @@ impl CuSinkTask for ObstacleStreamer {
             .property("bitrate", bitrate)
             .build()
             .map_err(|e| CuError::from(e.message.to_string()))?;
-        let payload_enc = ElementFactory::make("rtph264pay")
+        let muxer = ElementFactory::make("mpegtsmux")
             .build()
             .map_err(|e| CuError::from(e.message.to_string()))?;
-        let udp_sink = ElementFactory::make("udpsink")
+        let tcp_sink = ElementFactory::make("tcpserversink")
             .property("host", host)
             .property("port", port)
             .property("sync", false)
             .build()
             .map_err(|e| CuError::from(e.message.to_string()))?;
         pipeline
-            .add_many([appsrc.upcast_ref(), &videoconvert, &encoder, &payload_enc, &udp_sink])
+            .add_many([appsrc.upcast_ref(), &videoconvert, &encoder, &muxer, &tcp_sink])
             .map_err(|e| CuError::from(e.message.to_string()))?;
-        gstreamer::Element::link_many([appsrc.upcast_ref(), &videoconvert, &encoder, &payload_enc, &udp_sink])
+        gstreamer::Element::link_many([appsrc.upcast_ref(), &videoconvert, &encoder, &muxer, &tcp_sink])
             .map_err(|e| CuError::from(e.message.to_string()))?;
 
         let vid_w = width as usize;
