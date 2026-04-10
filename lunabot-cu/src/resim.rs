@@ -54,6 +54,8 @@ fn default_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::RealsenseSubscriber(_) => SimOverride::ExecutedBySim,
         default::SimStep::T265Subscriber(_) => SimOverride::ExecutedBySim,
         default::SimStep::ObstacleGstreamer(..) => SimOverride::ExecutedBySim,
+        default::SimStep::T265LeftGstreamer(..) => SimOverride::ExecutedBySim,
+        default::SimStep::T265RightGstreamer(..) => SimOverride::ExecutedBySim,
 
         _ => SimOverride::ExecuteByRuntime,
     }
@@ -92,6 +94,8 @@ fn run_one_copperlist(
             default::SimStep::GstConvertSide(..) => SimOverride::ExecutedBySim,
             default::SimStep::GstConvertLaptopFront(..) => SimOverride::ExecutedBySim,
             default::SimStep::ObstacleGstreamer(..) => SimOverride::ExecutedBySim,
+            default::SimStep::T265LeftGstreamer(..) => SimOverride::ExecutedBySim,
+            default::SimStep::T265RightGstreamer(..) => SimOverride::ExecutedBySim,
             default::SimStep::L2Pointcloud(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_l_2_pointcloud_output().clone();
                 output.tov = robot_clock.now().into();
@@ -146,12 +150,24 @@ fn run_one_copperlist(
                 output.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
-            default::SimStep::DetectorCamT265(CuTaskCallbackState::Process(_, output)) => {
-                *output = msgs.get_detector_cam_t_265_output().clone();
+            default::SimStep::DetectorCamT265Left(CuTaskCallbackState::Process(_, output)) => {
+                *output = msgs.get_detector_cam_t_265_left_output().clone();
                 output.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
-            default::SimStep::DetectorCamT265(..) => SimOverride::ExecutedBySim,
+            default::SimStep::DetectorCamT265Left(..) => SimOverride::ExecutedBySim,
+            default::SimStep::DetectorCamT265Right(CuTaskCallbackState::Process(_, output)) => {
+                *output = msgs.get_detector_cam_t_265_right_output().clone();
+                output.tov = robot_clock.now().into();
+                SimOverride::ExecutedBySim
+            }
+            default::SimStep::DetectorCamT265Right(..) => SimOverride::ExecutedBySim,
+            default::SimStep::DetectorCamT265Rear(CuTaskCallbackState::Process(_, output)) => {
+                *output = msgs.get_detector_cam_t_265_rear_output().clone();
+                output.tov = robot_clock.now().into();
+                SimOverride::ExecutedBySim
+            }
+            default::SimStep::DetectorCamT265Rear(..) => SimOverride::ExecutedBySim,
             default::SimStep::DetectorCamSide(..) => SimOverride::ExecutedBySim,
             default::SimStep::DetectorCamLaptopFront(CuTaskCallbackState::Process(_, output)) => {
                 *output = msgs.get_detector_cam_laptop_front_output().clone();

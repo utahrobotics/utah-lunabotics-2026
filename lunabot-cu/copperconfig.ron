@@ -175,9 +175,10 @@
                 "process_noise_acceleration": 0.5,
 
                 "initial_covariance": 100.0,
-
             },
-
+            logging: (
+                enabled: false
+            )
         ),
 
         // receives messages from the ai_source and tells the motors to move accordingly

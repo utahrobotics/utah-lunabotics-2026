@@ -47,6 +47,7 @@ pub struct T265Subscriber {
     pub rear_serial: String,
 }
 
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 #[derive(Clone)]
 pub struct WarmupState {
     done: bool,
@@ -55,6 +56,7 @@ pub struct WarmupState {
     twist_correction: Option<UnitQuaternion<f64>>,
 }
 
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 impl Default for WarmupState {
     fn default() -> Self {
         Self {
