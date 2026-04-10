@@ -312,7 +312,7 @@ horizontal_alignment = 1
 [node name="SpeedMultiplierSlider" type="HSlider" parent="VBoxContainer/MainContent/HBoxContainer/RightColumn/SpeedControl/MarginContainer/VBox" unique_id=520994470]
 layout_mode = 2
 size_flags_horizontal = 3
-max_value = 7000.0
+max_value = 12000.0
 
 [node name="MapsOptionButton" type="OptionButton" parent="VBoxContainer/MainContent/HBoxContainer/RightColumn/SpeedControl/MarginContainer/VBox" unique_id=1490037921]
 layout_mode = 2

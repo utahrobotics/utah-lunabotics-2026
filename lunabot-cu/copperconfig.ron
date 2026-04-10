@@ -50,12 +50,14 @@
             id:"realsense_subscriber",
             type: "crate::tasks::sources::RealsenseSubscriber",
             config: {
-                "serial_num": "044422250424",
+                // "serial_num": "044422250424",
+                // dust protected cam
+                "serial_num": "341222301328",
                 // "serial_num": "311322302990",
                 "camera_node": "upper_depth_camera"
             },
             logging: (
-                enabled: true
+                enabled: true,
             ),
             run_in_sim: false
         ),
@@ -67,9 +69,14 @@
                 "t265_velocity_variance": 1.0,
                 "t265_angular_velocity_variance": 1.0,
                 "pose_variance": 0.0005,
+                "left_serial": "142122111023",
+                "right_serial": "142122110508",
+                "rear_serial": "929122111514",
             },
             logging: (
-                enabled: true
+                enabled: true,
+                // disable logging for images (it takes too long)
+                disabled_slots: [1,2,3]
             ),
             run_in_sim: false
         ),
@@ -168,9 +175,10 @@
                 "process_noise_acceleration": 0.5,
 
                 "initial_covariance": 100.0,
-
             },
-
+            logging: (
+                enabled: false
+            )
         ),
 
         // receives messages from the ai_source and tells the motors to move accordingly
@@ -213,7 +221,43 @@
             }
         ),
         (
-            id: "detector_cam_t265",
+            id: "detector_cam_t265_left",
+            type: "cu_apriltag::AprilTags",
+            config: {
+                "family": "tag36h11",
+                "tag_size": 0.145,
+                "fx": 1,
+                "fy": 1,
+                "cx": 960.84,
+                "cy": 600.819,
+                "camera_id": "142122111023",
+                "distortion_path": "camera_configs/t265_distortion.ron",
+            },
+            logging: (
+                enabled: true
+            ),
+            background: true,
+        ),
+        (
+            id: "detector_cam_t265_right",
+            type: "cu_apriltag::AprilTags",
+            config: {
+                "family": "tag36h11",
+                "tag_size": 0.145,
+                "fx": 1,
+                "fy": 1,
+                "cx": 960.84,
+                "cy": 600.819,
+                "camera_id": "142122110508",
+                "distortion_path": "camera_configs/t265_distortion.ron",
+            },
+            logging: (
+                enabled: true
+            ),
+            background: true,
+        ),
+        (
+            id: "detector_cam_t265_rear",
             type: "cu_apriltag::AprilTags",
             config: {
                 "family": "tag36h11",
@@ -229,6 +273,42 @@
                 enabled: true
             ),
             background: true,
+        ),
+        (
+            id: "obstacle_gstreamer",
+            type: "crate::tasks::ObstacleStreamer",
+            config: {
+                "width": 520,
+                "height": 600,
+                "fps": 30,
+                "host": "127.0.0.1",
+                "port": 5000,
+                "bitrate": 2000,
+            }
+        ),
+        (
+            id: "t265_left_gstreamer",
+            type: "crate::tasks::T265Streamer",
+            config: {
+                "width": 848,
+                "height": 800,
+                "fps": 30,
+                "host": "127.0.0.1",
+                "port": 5001,
+                "bitrate": 2000,
+            }
+        ),
+        (
+            id: "t265_right_gstreamer",
+            type: "crate::tasks::T265Streamer",
+            config: {
+                "width": 848,
+                "height": 800,
+                "fps": 30,
+                "host": "127.0.0.1",
+                "port": 5002,
+                "bitrate": 2000,
+            }
         )
     ],
     cnx:[
@@ -243,11 +323,21 @@
         (src:"new_ai",                        dst:"motor_ctrl",              msg:"common::Steering"),
         (src:"new_ai",                        dst:"v3_pico",                 msg:"embedded_common::ActuatorCommand"),
         (src:"v3_pico",                       dst:"localizer",               msg:"embedded_common::FromPico"),
-        (src:"detection_handler",             dst: "localizer",              msg:"Vec<crate::tasks::AprilTagMeasurement>"),
-        (src:"t265_subscriber",               dst:"localizer",               msg:"crate::tasks::sources::T265Msg"),
-        (src:"t265_subscriber",               dst:"detector_cam_t265",       msg:"cu_sensor_payloads::CuImage<Vec<u8>>"),
-        (src:"detector_cam_t265",             dst: "detection_handler",      msg:"cu_apriltag::AprilTagDetections"),
+        (src:"detection_handler",             dst:"localizer",               msg:"Vec<crate::tasks::AprilTagMeasurement>"),
+        (src:"t265_subscriber",               dst:"localizer",               msg:"crate::tasks::sources::T265Msg", src_port: Some(0)),
+        (src:"t265_subscriber",               dst:"detector_cam_t265_left",  msg:"cu_sensor_payloads::CuImage<Vec<u8>>", src_port: Some(1)),
+        (src:"t265_subscriber",               dst:"detector_cam_t265_right", msg:"cu_sensor_payloads::CuImage<Vec<u8>>", src_port: Some(2)),
+        (src:"t265_subscriber",               dst:"detector_cam_t265_rear",  msg:"cu_sensor_payloads::CuImage<Vec<u8>>", src_port: Some(3)),
 
+        (src:"detector_cam_t265_left",        dst:"detection_handler",       msg:"cu_apriltag::AprilTagDetections"),
+        (src:"detector_cam_t265_right",       dst:"detection_handler",       msg:"cu_apriltag::AprilTagDetections"),
+        (src:"detector_cam_t265_rear",        dst:"detection_handler",       msg:"cu_apriltag::AprilTagDetections"),
+
+        (src:"t265_subscriber", dst:"t265_left_gstreamer", msg:"cu_sensor_payloads::CuImage<Vec<u8>>", src_port: Some(1)),
+        (src:"t265_subscriber", dst:"t265_right_gstreamer", msg:"cu_sensor_payloads::CuImage<Vec<u8>>", src_port: Some(2)),
+
+
+        (src:"occupancy_grid_pipeline",       dst: "obstacle_gstreamer",     msg:"crate::pathfinding::OccupancyGrid"),
     ],
 
     // comms to lunabase software
@@ -270,7 +360,7 @@
     includes:[
         // starts a gstreamer pipeline that waits for a message from udev_monitor and then starts the pipeline accordingly
         // sends frames through a dynamic threshold and then to the apriltag detector, then to the detection handler.
-        // frames are streamed over udp to the host and port specified in the config
+        // frames are streamed over tcp to the host and port specified in the config
         (
             path:"camera_configs/camera_template_gstreamer.ron",
             params:{
@@ -282,8 +372,8 @@
                 "cy":600.819,
                 "width":1920,
                 "height":1200,
-                "udp_host":"192.168.0.108",
-                "udp_port":5004,
+                "tcp_host":"192.168.0.108",
+                "tcp_port":4000,
             },
         ),
         (
@@ -297,8 +387,8 @@
                 "cy":604.28,
                 "width":640,
                 "height":480,
-                "udp_host":"127.0.0.1",
-                "udp_port":4001,
+                "tcp_host":"127.0.0.1",
+                "tcp_port":4001,
             },
         ),
         (
@@ -312,8 +402,8 @@
                 "cy":340.819,
                 "width":1280,
                 "height":720,
-                "udp_host":"127.0.0.1",
-                "udp_port":4000,
+                "tcp_host":"127.0.0.1",
+                "tcp_port":4002,
             }
         ),
     ],
@@ -321,9 +411,9 @@
     // monitor:(type:"cu_consolemon::CuConsoleMon"),
     monitor: (type:"simple_monitor::SimpleMonitor"),
     logging:(
-    // if true, each output payload of each will be logged unless a task opts out
+        // if true, each output payload of each will be logged unless a task opts out
         enable_task_logging: true,
-        section_size_mib:100,
+        section_size_mib: 100,
         copperlist_count: 20,
     ),
 )
