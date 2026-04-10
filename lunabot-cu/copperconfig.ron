@@ -360,7 +360,7 @@
     includes:[
         // starts a gstreamer pipeline that waits for a message from udev_monitor and then starts the pipeline accordingly
         // sends frames through a dynamic threshold and then to the apriltag detector, then to the detection handler.
-        // frames are streamed over udp to the host and port specified in the config
+        // frames are streamed over tcp to the host and port specified in the config
         (
             path:"camera_configs/camera_template_gstreamer.ron",
             params:{
@@ -372,8 +372,8 @@
                 "cy":600.819,
                 "width":1920,
                 "height":1200,
-                "udp_host":"192.168.0.108",
-                "udp_port":4000,
+                "tcp_host":"192.168.0.108",
+                "tcp_port":4000,
             },
         ),
         (
@@ -387,8 +387,8 @@
                 "cy":604.28,
                 "width":640,
                 "height":480,
-                "udp_host":"127.0.0.1",
-                "udp_port":4001,
+                "tcp_host":"127.0.0.1",
+                "tcp_port":4001,
             },
         ),
         (
@@ -402,8 +402,8 @@
                 "cy":340.819,
                 "width":1280,
                 "height":720,
-                "udp_host":"127.0.0.1",
-                "udp_port":4002,
+                "tcp_host":"127.0.0.1",
+                "tcp_port":4002,
             }
         ),
     ],
