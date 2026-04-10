@@ -173,74 +173,62 @@ pub mod implementation {
             Ok(())
         }
 
-fn process<'i>(
-    &mut self,
-    _clock: &cu29::prelude::RobotClock,
-    input: &Self::Input<'i>,
-) -> cu29::CuResult<()> {
-    let Some(img) = input.payload() else {
-        return Ok(());
-    };
+        fn process<'i>(
+            &mut self,
+            _clock: &cu29::prelude::RobotClock,
+            input: &Self::Input<'i>,
+        ) -> cu29::CuResult<()> {
+            let Some(img) = input.payload() else {
+                return Ok(());
+            };
 
-    let total = std::time::Instant::now();
+            let src_stride = img.format.stride as usize;
 
-    let src_stride = img.format.stride as usize;
+            let mut buffer = self
+                .buffer_pool
+                .acquire_buffer(None)
+                .map_err(|_| CuError::from("failed to acquire buffer from pool"))?;
 
-    let t = std::time::Instant::now();
-    let mut buffer = self
-        .buffer_pool
-        .acquire_buffer(None)
-        .map_err(|_| CuError::from("failed to acquire buffer from pool"))?;
-    if t.elapsed().as_millis() > 1 { eprintln!("acquire_buffer took {:?}", t.elapsed()); }
+            {
+                let buffer = buffer.get_mut().unwrap();
+                buffer.set_pts(
+                    self.frame_count
+                        * gstreamer::ClockTime::from_nseconds(1_000_000_000 / self.fps as u64),
+                );
 
-    {
-        let buffer = buffer.get_mut().unwrap();
-        buffer.set_pts(
-            self.frame_count
-                * gstreamer::ClockTime::from_nseconds(1_000_000_000 / self.fps as u64),
-        );
+                let mut vframe = gstreamer_video::VideoFrameRef::from_buffer_ref_writable(
+                    buffer,
+                    &self.video_info,
+                )
+                .map_err(|_| CuError::from("failed to map video frame"))?;
 
-        let mut vframe = gstreamer_video::VideoFrameRef::from_buffer_ref_writable(
-            buffer,
-            &self.video_info,
-        )
-        .map_err(|_| CuError::from("failed to map video frame"))?;
+                let dest_stride = vframe.plane_stride()[0] as usize;
+                let width = vframe.width() as usize;
+                let height = vframe.height() as usize;
+                let dest = vframe.plane_data_mut(0).unwrap();
 
-        let dest_stride = vframe.plane_stride()[0] as usize;
-        let width = vframe.width() as usize;
-        let height = vframe.height() as usize;
-        let dest = vframe.plane_data_mut(0).unwrap();
-
-        let t = std::time::Instant::now();
-        img.buffer_handle.with_inner(|buf: &CuHandleInner<Vec<u8>>| {
-            let src: &[u8] = buf.deref();
-            let t_cpy = std::time::Instant::now();
-            if src_stride == dest_stride {
-                dest[..height * dest_stride]
-                    .copy_from_slice(&src[..height * src_stride]);
-            } else {
-                for row in 0..height {
-                    dest[row * dest_stride..row * dest_stride + width]
-                        .copy_from_slice(&src[row * src_stride..row * src_stride + width]);
-                }
+                img.buffer_handle.with_inner(|buf: &CuHandleInner<Vec<u8>>| {
+                    let src: &[u8] = buf.deref();
+                    if src_stride == dest_stride {
+                        dest[..height * dest_stride]
+                            .copy_from_slice(&src[..height * src_stride]);
+                    } else {
+                        for row in 0..height {
+                            dest[row * dest_stride..row * dest_stride + width]
+                                .copy_from_slice(&src[row * src_stride..row * src_stride + width]);
+                        }
+                    }
+                });
             }
-            if t_cpy.elapsed().as_millis() > 1 { eprintln!("memcpy took {:?}", t_cpy.elapsed()); }
-        });
-        if t.elapsed().as_millis() > 1 { eprintln!("with_inner (lock + copy) took {:?}", t.elapsed()); }
-    }
 
-    self.frame_count += 1;
+            self.frame_count += 1;
 
-    let t = std::time::Instant::now();
-    if self.appsrc.push_buffer(buffer).is_err() {
-        eprintln!("[T265Streamer] Failed to push buffer");
-    }
-    if t.elapsed().as_millis() > 1 { eprintln!("push_buffer took {:?}", t.elapsed()); }
+            if self.appsrc.push_buffer(buffer).is_err() {
+                eprintln!("[T265Streamer] Failed to push buffer");
+            }
 
-    if total.elapsed().as_millis() > 1 { eprintln!("process total took {:?}", total.elapsed()); }
-
-    Ok(())
-}
+            Ok(())
+        }
 
         fn stop(&mut self, _clock: &cu29::prelude::RobotClock) -> cu29::CuResult<()> {
             let _ = self.pipeline.set_state(gstreamer::State::Null);

@@ -171,7 +171,7 @@ impl CuSrcTask for T265Subscriber {
                 c.get::<String>("rear_serial")
                     .expect("failed to deserialize")
             })
-            .expect("Please provide right t261 serial");
+            .expect("Please provide rear t261 serial");
 
         let mut manager = T265Manager::new().map_err(|e| CuError::from(e.to_string()))?;
         manager
@@ -228,6 +228,7 @@ impl CuSrcTask for T265Subscriber {
         self.last_process_call = std::time::Instant::now();
         new_msg.0.clear_payload();
         new_msg.1.clear_payload();
+        new_msg.2.clear_payload();
 
         'image_rx: {
             if self.image_rx.len() > 5 {

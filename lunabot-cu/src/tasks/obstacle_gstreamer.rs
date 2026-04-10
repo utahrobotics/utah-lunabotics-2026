@@ -279,10 +279,7 @@ impl CuSinkTask for ObstacleStreamer {
         _clock: &RobotClock,
         _input: &Self::Input<'_>,
     ) -> CuResult<()> {
-        Err(CuError::new_with_cause(
-            "no frames received",
-            std::io::Error::other("no frames received"),
-        ))
+        Ok(())
     }
 
     fn stop(&mut self, _clock: &RobotClock) -> CuResult<()> {
