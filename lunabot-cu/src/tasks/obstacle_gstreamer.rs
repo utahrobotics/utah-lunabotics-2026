@@ -227,7 +227,6 @@ pub mod implementation {
             _clock: &cu29::prelude::RobotClock,
             input: &Self::Input<'i>,
         ) -> cu29::CuResult<()> {
-            println!("processing this bitch");
             *rwlock_write_unpoison(&*self.latest_path) = input.1.payload().cloned();
 
             let Some(new_grid) = input.0.payload() else {
