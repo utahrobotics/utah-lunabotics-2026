@@ -330,6 +330,11 @@ script = ExtResource("7_xxe4i")
 layout_mode = 2
 text = "Reset Obstacles"
 
+[node name="EnableApriltagsButton" type="CheckButton" parent="VBoxContainer/MainContent/HBoxContainer/RightColumn/SpeedControl/MarginContainer/VBox" unique_id=1842851223]
+layout_mode = 2
+button_pressed = true
+text = "Enable Apriltags"
+
 [node name="BottomBar" type="PanelContainer" parent="VBoxContainer" unique_id=1900845456]
 custom_minimum_size = Vector2(0, 60)
 layout_mode = 2

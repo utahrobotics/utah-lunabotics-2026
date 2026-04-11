@@ -76,7 +76,7 @@ pub struct LunabotBlackboard {
     pub last_non_zero_steering_pack: Option<Instant>,
     pub last_non_zero_lift_pack: Option<Instant>,
     pub last_non_zero_bucket_pack: Option<Instant>,
-    
+
     /// don't hold onto guards for too long
     pub blackboard_shared: Arc<RwLock<BlackboardShared>>,
 }

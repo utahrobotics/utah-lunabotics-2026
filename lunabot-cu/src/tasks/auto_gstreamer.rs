@@ -20,6 +20,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::tasks::NewDevice;
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+use crate::tasks::ai::blackboard::BLACKBOARD_SHARED;
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+use crate::utils::rwlock_read_unpoison;
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 pub use cu_gstreamer::CuGstBuffer;
 
 pub type CuDefaultAutoGStreamer = CuAutoGStreamer<16>;
@@ -99,6 +103,12 @@ impl<const N: usize> CuTask for CuAutoGStreamer<N> {
         input: &Self::Input<'_>,
         output: &mut Self::Output<'_>,
     ) -> CuResult<()> {
+        output.clear_payload();
+
+        if let Some(bb) = BLACKBOARD_SHARED.get() && !rwlock_read_unpoison(&bb).enable_apriltags {
+            return Ok(());
+        }
+
         if let Some(dev) = input.payload() {
             if *dev.port == self.desired_port {
                 println!(
@@ -108,8 +118,6 @@ impl<const N: usize> CuTask for CuAutoGStreamer<N> {
                 self.pending_dev_path = Some(dev.dev_path.to_string());
             }
         }
-
-        output.clear_payload();
 
         if let Some(buffer) = self.circular_buffer.lock().unwrap().pop_front() {
             output.tov = clock.now().into();

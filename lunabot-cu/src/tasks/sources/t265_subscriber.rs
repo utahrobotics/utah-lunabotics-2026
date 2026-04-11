@@ -1,7 +1,7 @@
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use crossbeam::channel::Receiver;
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
-use std::{collections::HashMap, ops::Deref, sync::Arc};
+use std::{collections::HashMap,sync::Arc};
 
 use cu_bincode::{Decode, Encode};
 use cu_sensor_payloads::CuImage;
