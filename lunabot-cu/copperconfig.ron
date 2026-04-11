@@ -336,8 +336,8 @@
         (src:"t265_subscriber", dst:"t265_left_gstreamer", msg:"cu_sensor_payloads::CuImage<Vec<u8>>", src_port: Some(1)),
         (src:"t265_subscriber", dst:"t265_right_gstreamer", msg:"cu_sensor_payloads::CuImage<Vec<u8>>", src_port: Some(2)),
 
-
         (src:"occupancy_grid_pipeline",       dst: "obstacle_gstreamer",     msg:"crate::pathfinding::OccupancyGrid"),
+        (src:"new_ai",                        dst: "obstacle_gstreamer",     msg:"Vec<[f32; 2]>"),
     ],
 
     // comms to lunabase software

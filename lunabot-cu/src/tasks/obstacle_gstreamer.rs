@@ -21,7 +21,7 @@ pub mod implementation {
     impl Freezable for ObstacleStreamer {}
 
     impl CuSinkTask for ObstacleStreamer {
-        type Input<'m> = input_msg!(OccupancyGrid);
+        type Input<'m> = input_msg!('m, OccupancyGrid, Vec<[f32;2]>);
 
         type Resources<'r> = ();
 
@@ -217,7 +217,7 @@ pub mod implementation {
             _clock: &cu29::prelude::RobotClock,
             input: &Self::Input<'i>,
         ) -> cu29::CuResult<()> {
-            let Some(new_grid) = input.payload() else {
+            let Some(new_grid) = input.0.payload() else {
                 return Ok(());
             };
             if self.grid_queue.push(new_grid.clone()).is_err() {
@@ -279,7 +279,7 @@ pub mod implementation {
     impl Freezable for ObstacleStreamer {}
 
     impl CuSinkTask for ObstacleStreamer {
-        type Input<'m> = input_msg!(OccupancyGrid);
+        type Input<'m> = input_msg!('m, OccupancyGrid, Vec<[f32;2]>);
         type Resources<'r> = ();
 
         fn new(_cfg: Option<&ComponentConfig>, _resources: Self::Resources<'_>) -> CuResult<Self> {

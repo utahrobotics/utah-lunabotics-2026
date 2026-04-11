@@ -26,8 +26,8 @@ impl CuTask for LunabotAi {
     // the occupancy grid recved here is the local occupancy grid
     type Input<'m> = input_msg!('m, FromLunabase, OccupancyGrid);
 
-    // (Steering, ActuatorCommand)
-    type Output<'m> = (CuMsg<Steering>, CuMsg<ActuatorCommand>);
+    // (Steering, ActuatorCommand, calculated path)
+    type Output<'m> = (CuMsg<Steering>, CuMsg<ActuatorCommand>, CuMsg<Vec<[f32; 2]>>);
     type Resources<'r> = ();
 
     fn new(
@@ -105,6 +105,11 @@ impl CuTask for LunabotAi {
         }
         if let Some(steering_cmd) = self.bt.blackboard_mut().outgoing_steering_msg.take() {
             output.0.set_payload(steering_cmd);
+        }
+        if let Some(ref latest_calculated_path) = self.bt.blackboard().calculated_path {
+            output.2.set_payload(latest_calculated_path.iter().map(|node| {
+                [node.x, node.y]
+            }).collect());
         }
         Ok(())
     }
