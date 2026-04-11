@@ -10,6 +10,6 @@ thiserror.workspace = true
 bytemuck.workspace = true
 cu-bincode = { workspace = true, features = ["derive", "serde"] }
 serde.workspace = true
-wgpu = "27.0.1"
+wgpu = "28"
 futures = "0.3"
 nalgebra.workspace = true

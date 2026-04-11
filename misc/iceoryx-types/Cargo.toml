@@ -13,6 +13,6 @@ production = ["iceoryx2"]
 serde-big-array.workspace = true
 iceoryx2 = { workspace = true, optional = true }
 cu-bincode.workspace = true
-serde = { version = "1", features = ["derive"] }
+serde.workspace = true
 nalgebra.workspace = true
 common.workspace = true

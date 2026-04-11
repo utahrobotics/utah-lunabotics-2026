@@ -4,8 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-cobs = "0.5.1"
-cu-bincode = "2.0.2"
+cobs.workspace = true
+cu-bincode.workspace = true
 quinn = "0.11.9"
 rcgen = { version = "0.14.7"}
 tasker = {path = "../tasker"}

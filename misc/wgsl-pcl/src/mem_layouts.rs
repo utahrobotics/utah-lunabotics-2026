@@ -3,11 +3,6 @@ use anyhow::Result;
 use std::num::NonZeroU32;
 use wgpu::{BindGroup, BindingResource, BindingType, BufferUsages, ShaderStages};
 
-pub struct PushConstantRangesBuilder {
-    #[allow(dead_code)]
-    ranges: Vec<wgpu::PushConstantRange>,
-}
-
 pub struct BindGroupLayoutBuilder<'a> {
     entries: Vec<wgpu::BindGroupLayoutEntry>,
     resources: Vec<BindingResource<'a>>,

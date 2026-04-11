@@ -6,4 +6,4 @@ edition = "2021"
 [dependencies]
 # crc = "3.2.1"
 crc16 = "0.4.0"
-heapless = "0.8.0"
+heapless = "0.9.2"
