@@ -3,7 +3,6 @@ use std::ops::Deref;
 use std::sync::{Arc, OnceLock, RwLock};
 
 use crate::pathfinding::OccupancyGrid;
-use crate::tasks::GLOBAL_MAP;
 use crate::utils::rwlock_write_unpoison;
 use crate::{ROBOT_STATE, tasks::ai::jobs::Job};
 use common::{FromLunabase, LUNABOT_STAGE, LunabotStage, Steering};
@@ -16,9 +15,10 @@ use std::time::Instant;
 /// this could be an atomic cell but there might be heap data in it eventually
 pub static BLACKBOARD_SHARED: OnceLock<Arc<RwLock<BlackboardShared>>> = OnceLock::new();
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct BlackboardShared {
     pub reset_obstacles: bool,
+    pub enable_apriltags: bool,
 }
 
 #[derive(Debug)]
@@ -76,8 +76,9 @@ pub struct LunabotBlackboard {
     pub last_non_zero_steering_pack: Option<Instant>,
     pub last_non_zero_lift_pack: Option<Instant>,
     pub last_non_zero_bucket_pack: Option<Instant>,
-
-    pub blackboard_shared: Arc<RwLock<BlackboardShared>>
+    
+    /// don't hold onto guards for too long
+    pub blackboard_shared: Arc<RwLock<BlackboardShared>>,
 }
 
 impl Default for LunabotBlackboard {
@@ -109,33 +110,34 @@ impl Default for LunabotBlackboard {
             last_non_zero_steering_pack: None,
             last_non_zero_lift_pack: None,
             last_non_zero_bucket_pack: None,
-            blackboard_shared: Arc::new(RwLock::new(BlackboardShared { reset_obstacles: false }))
+            blackboard_shared: Arc::new(RwLock::new(BlackboardShared {
+                reset_obstacles: false,
+                enable_apriltags: true,
+            })),
         }
     }
 }
 
 impl LunabotBlackboard {
     pub fn update_with_msg(&mut self, msg: &common::FromLunabase) {
-        if let FromLunabase::LiftActuators(val) = msg {
-            if *val != 0 {
-                self.last_non_zero_lift_pack = Some(Instant::now());
-            } else {
-                self.last_non_zero_lift_pack = None;
-            }
-
-            self.last_lift = Some(*val);
-        }
-
-        if let FromLunabase::BucketActuators(val) = msg {
-            if *val != 0 {
-                self.last_non_zero_bucket_pack = Some(Instant::now());
-            } else {
-                self.last_non_zero_bucket_pack = None;
-            }
-            self.last_bucket = Some(*val);
-        }
-
         match msg {
+            common::FromLunabase::LiftActuators(val) => {
+                if *val != 0 {
+                    self.last_non_zero_lift_pack = Some(Instant::now());
+                } else {
+                    self.last_non_zero_lift_pack = None;
+                }
+
+                self.last_lift = Some(*val);
+            }
+            common::FromLunabase::BucketActuators(val) => {
+                if *val != 0 {
+                    self.last_non_zero_bucket_pack = Some(Instant::now());
+                } else {
+                    self.last_non_zero_bucket_pack = None;
+                }
+                self.last_bucket = Some(*val);
+            }
             common::FromLunabase::Steering(steering) => {
                 let (left, right) = steering.get_left_and_right();
                 if left != 0.0 || right != 0.0 {
@@ -171,7 +173,13 @@ impl LunabotBlackboard {
                 self.latest_local_map = None;
                 rwlock_write_unpoison(self.blackboard_shared.deref()).reset_obstacles = true;
             }
-            _ => {}
+            common::FromLunabase::EnableApriltags => {
+                rwlock_write_unpoison(&self.blackboard_shared).enable_apriltags = true;
+            }
+            common::FromLunabase::DisableApriltags => {
+                rwlock_write_unpoison(&self.blackboard_shared).enable_apriltags = false;
+            }
+            FromLunabase::LiftShake | FromLunabase::StartPercuss | FromLunabase::StopPercuss => {}
         }
     }
 }

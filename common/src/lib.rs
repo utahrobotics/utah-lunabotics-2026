@@ -202,7 +202,10 @@ pub enum FromLunabase {
     Disconnect,
 
     /// resets the obstacle map
-    ResetObstacles
+    ResetObstacles,
+
+    EnableApriltags,
+    DisableApriltags,
 }
 
 impl ToString for FromLunabase {
