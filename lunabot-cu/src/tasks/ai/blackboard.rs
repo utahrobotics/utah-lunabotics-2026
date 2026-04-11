@@ -19,6 +19,11 @@ pub static BLACKBOARD_SHARED: OnceLock<Arc<RwLock<BlackboardShared>>> = OnceLock
 pub struct BlackboardShared {
     pub reset_obstacles: bool,
     pub enable_apriltags: bool,
+
+    /// by default the params come from the config passed to the realsense occupancy grid task, but we can dynamically change them 
+    /// through the AI
+    pub sigma_spatial: Option<f32>,
+    pub sigma_range: Option<f32>
 }
 
 #[derive(Debug)]
@@ -113,6 +118,8 @@ impl Default for LunabotBlackboard {
             blackboard_shared: Arc::new(RwLock::new(BlackboardShared {
                 reset_obstacles: false,
                 enable_apriltags: true,
+                sigma_range: None,
+                sigma_spatial: None
             })),
         }
     }
@@ -178,6 +185,12 @@ impl LunabotBlackboard {
             }
             common::FromLunabase::DisableApriltags => {
                 rwlock_write_unpoison(&self.blackboard_shared).enable_apriltags = false;
+            }
+            common::FromLunabase::SetSigmaSpatial(new_sigma) => {
+                rwlock_write_unpoison(&self.blackboard_shared).sigma_spatial = Some(*new_sigma);
+            }
+            common::FromLunabase::SetSigmaRange(new_sigma) => {
+                rwlock_write_unpoison(&self.blackboard_shared).sigma_range = Some(*new_sigma);
             }
             FromLunabase::LiftShake | FromLunabase::StartPercuss | FromLunabase::StopPercuss => {}
         }

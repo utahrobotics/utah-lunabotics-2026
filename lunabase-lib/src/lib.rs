@@ -286,6 +286,16 @@ impl LunabaseConnection {
     }
 
     #[func]
+    fn send_set_sigma_spatial(&self, new_sigma_spatial: f32) {
+        self.send_msg(FromLunabase::SetSigmaSpatial(new_sigma_spatial))
+    }
+
+    #[func]
+    fn send_set_sigma_range(&self, new_sigma_range: f32) {
+        self.send_msg(FromLunabase::SetSigmaRange(new_sigma_range))
+    }
+
+    #[func]
     fn send_lift_actuators(&self, speed: f64) {
         self.send_msg(FromLunabase::set_lift_actuator(speed));
     }

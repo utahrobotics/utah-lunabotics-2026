@@ -38,6 +38,7 @@ use crate::payloads::depth_frame::CuDepthFrame;
 use crate::rerun_viz::RECORDER;
 use crate::tasks::ai::blackboard::BLACKBOARD_SHARED;
 use crate::tasks::{DEPTH_FRAME_HEIGHT, DEPTH_FRAME_WIDTH};
+use crate::utils::rwlock_write_unpoison;
 pub static GLOBAL_MAP: OnceLock<Arc<RwLock<OccupancyGrid>>> = OnceLock::new();
 const PERMANENT_GRADIENT: f32 = 10.0;
 
@@ -506,6 +507,25 @@ impl CuTask for OccupancyGridTask {
             robot_radius_meters,
         })
     }
+
+    fn preprocess(&mut self, _clock: &RobotClock) -> CuResult<()> {
+        if let Some(shared_bb) = BLACKBOARD_SHARED.get() {
+            if let Ok(mut pipeline) = self.depth_projector_pipeline.try_lock() {
+                if let Some(new_sigma_spatial) =
+                    rwlock_write_unpoison(shared_bb).sigma_spatial.take()
+                {
+                    pipeline.set_sigma_spatial(new_sigma_spatial, get_device());
+                }
+                if let Some(new_sigma_range) = rwlock_write_unpoison(shared_bb).sigma_range.take() {
+                    pipeline.set_sigma_range(new_sigma_range, get_device());
+                }
+            }
+            // else: spawned thread holds the lock, we'll pick it up next cycle
+            // (the blackboard values stay in place since we didn't take() them)
+        }
+        Ok(())
+    }
+
     fn process<'i, 'o>(
         &mut self,
         _clock: &RobotClock,
@@ -514,7 +534,10 @@ impl CuTask for OccupancyGridTask {
     ) -> CuResult<()> {
         let mut output_buf = self.output_buffer.lock().unwrap();
 
-        if let Some(blackboard) = BLACKBOARD_SHARED.get() && let Ok(guard) = blackboard.try_read() && guard.reset_obstacles {
+        if let Some(blackboard) = BLACKBOARD_SHARED.get()
+            && let Ok(guard) = blackboard.try_read()
+            && guard.reset_obstacles
+        {
             drop(guard);
 
             // reset global map (non-blocking will retry next cycle if lock is held)
@@ -525,17 +548,19 @@ impl CuTask for OccupancyGridTask {
                 if let Some(arena_obstacles) = self.arena_obstacles
                     && let Some(obstacles) = load_arena_obstacles(arena_obstacles)
                 {
-                    paint_permanent_obstacles(&mut global_guard, &obstacles, self.robot_radius_meters);
+                    paint_permanent_obstacles(
+                        &mut global_guard,
+                        &obstacles,
+                        self.robot_radius_meters,
+                    );
                 }
 
-                self.depth_projector_pipeline
-                    .lock()
-                    .unwrap()
-                    .clear_map(get_device());
-                self.rolling_map_start_position = self.camera_node.get_global_isometry();
-
-                if let Ok(mut bb) = blackboard.try_write() {
-                    bb.reset_obstacles = false;
+                if let Ok(mut p) = self.depth_projector_pipeline.try_lock() {
+                    p.clear_map(get_device());
+                    self.rolling_map_start_position = self.camera_node.get_global_isometry();
+                    if let Ok(mut bb) = blackboard.try_write() {
+                        bb.reset_obstacles = false;
+                    }
                 }
             }
         }
@@ -594,11 +619,10 @@ impl CuTask for OccupancyGridTask {
                     );
                 }
 
-                self.rolling_map_start_position = camera_isometry;
-                self.depth_projector_pipeline
-                    .lock()
-                    .unwrap()
-                    .clear_map(get_device());
+                if let Ok(mut p) = self.depth_projector_pipeline.try_lock() {
+                    p.clear_map(get_device());
+                    self.rolling_map_start_position = camera_isometry;
+                }
             }
 
             output.set_payload(grid);
@@ -729,9 +753,7 @@ impl CuTask for OccupancyGridTask {
     }
 }
 
-fn load_arena_obstacles(
-    arena_obstacles: ArenaObstaclesSelection,
-) -> Option<ArenaObstacles> {
+fn load_arena_obstacles(arena_obstacles: ArenaObstaclesSelection) -> Option<ArenaObstacles> {
     match arena_obstacles {
         ArenaObstaclesSelection::Artemis => {
             let path = "arena_obstacles/artemis.ron";

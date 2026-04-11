@@ -206,6 +206,13 @@ pub enum FromLunabase {
 
     EnableApriltags,
     DisableApriltags,
+
+
+    /// Obstacle Mapper settings for blurring the height map, only used when bilateral is enabled
+    SetSigmaRange(f32),
+
+    /// Obstacle Mapper settings for blurring the height map
+    SetSigmaSpatial(f32),
 }
 
 impl ToString for FromLunabase {

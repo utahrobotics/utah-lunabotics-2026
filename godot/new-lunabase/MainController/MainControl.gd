@@ -14,6 +14,9 @@ extends Control
 @onready var speed_slider: HSlider = $VBoxContainer/MainContent/HBoxContainer/RightColumn/SpeedControl/MarginContainer/VBox/SpeedMultiplierSlider
 @onready var reset_obstacles_button: Button = $VBoxContainer/MainContent/HBoxContainer/RightColumn/SpeedControl/MarginContainer/VBox/ResetObstaclesButton
 @onready var toggle_apriltags_button: Button = $VBoxContainer/MainContent/HBoxContainer/RightColumn/SpeedControl/MarginContainer/VBox/EnableApriltagsButton
+@onready var sigma_spatial_input: SpinBox = $VBoxContainer/MainContent/HBoxContainer/RightColumn/SpeedControl/MarginContainer/VBox/SigmaSpatialInput
+@onready var sigma_range_input: SpinBox = $VBoxContainer/MainContent/HBoxContainer/RightColumn/SpeedControl/MarginContainer/VBox/SigmaRangeInput
+
 
 @onready var location_label: Label = $VBoxContainer/TopBar/MarginContainer/TopPanel/StatusGroup/location_label
 @onready var orientation_label: Label = $VBoxContainer/MainContent/HBoxContainer/CenterColumn/OrientationPanel/MarginContainer/OrientationLabel
@@ -45,8 +48,9 @@ func _ready() -> void:
 	autonomous_button.pressed.connect(_on_autonomous_pressed)
 	reset_obstacles_button.pressed.connect(_on_reset_obstacles_pressed)
 	toggle_apriltags_button.toggled.connect(_on_toggle_apriltags_pressed)
-
-
+	sigma_spatial_input.value_changed.connect(_on_set_sigma_spatial_changed)
+	sigma_range_input.value_changed.connect(_on_set_sigma_range_changed)
+	
 	speed_slider.value = 0;
 	var new_weight = GlobalLunabaseConnection.set_speed(weight)
 	
@@ -145,6 +149,13 @@ func _on_reset_obstacles_pressed() -> void:
 	
 func _on_toggle_apriltags_pressed(is_pressed: bool) -> void:
 	controller.command_recorder.execute_and_store(ToggleApriltagsCommand.new(is_pressed))
+	
+func _on_set_sigma_spatial_changed(new_spatial: float) -> void:
+	controller.command_recorder.execute_and_store(SetSigmaSpatial.new(new_spatial))
+	
+func _on_set_sigma_range_changed(new_range: float) -> void:
+	controller.command_recorder.execute_and_store(SetSigmaRange.new(new_range))
+
 	
 func _on_speed_multiplier_slider_value_changed(value: float) -> void:
 	# Update slider weight
