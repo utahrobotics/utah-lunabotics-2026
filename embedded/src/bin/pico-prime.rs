@@ -68,6 +68,14 @@ impl<'a> ActuatorDriver<'a> {
 async fn main(spawner: Spawner) -> ! {
     let p = embassy_rp::init(Default::default());
 
+    let desired_freq_hz = 20_000;
+    let clock_freq_hz = embassy_rp::clocks::clk_sys_freq();
+    let divider = 1u8;
+    let period = (clock_freq_hz / (desired_freq_hz * divider as u32)) as u16 - 1;
+    let mut c = Config::default();
+    c.top = period;
+    c.divider = divider.into();
+
     // motor_flt pins
     let driver_fault_detectors: [FaultDetector<'_>; 3] = [
         FaultDetector {
@@ -87,19 +95,19 @@ async fn main(spawner: Spawner) -> ! {
         ActuatorDriver {
             sleep: Output::new(p.PIN_11, Level::Low),
             dir: Output::new(p.PIN_7, Level::Low),
-            pwm: Pwm::new_output_a(p.PWM_SLICE4, p.PIN_8, Config::default()),
+            pwm: Pwm::new_output_a(p.PWM_SLICE4, p.PIN_8, c.clone()),
             which: Actuator::Lift,
         },
         ActuatorDriver {
             sleep: Output::new(p.PIN_17, Level::Low),
             dir: Output::new(p.PIN_13, Level::Low),
-            pwm: Pwm::new_output_a(p.PWM_SLICE7, p.PIN_14, Config::default()),
+            pwm: Pwm::new_output_a(p.PWM_SLICE7, p.PIN_14, c.clone()),
             which: Actuator::Bucket,
         },
         ActuatorDriver {
             sleep: Output::new(p.PIN_23, Level::Low),
             dir: Output::new(p.PIN_19, Level::Low),
-            pwm: Pwm::new_output_a(p.PWM_SLICE2, p.PIN_20, Config::default()),
+            pwm: Pwm::new_output_a(p.PWM_SLICE2, p.PIN_20, c.clone()),
             which: Actuator::Dumper,
         },
         // 4th motor driver slot is currently unused
