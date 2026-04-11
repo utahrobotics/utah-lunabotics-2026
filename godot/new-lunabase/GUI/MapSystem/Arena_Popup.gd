@@ -32,6 +32,7 @@ func _ready() -> void:
 func _process(_delta: float) -> void:
 	var locationValues = connection.get_location()
 	updateLunabotLocation(locationValues)
+	_update_yaw()
 
 func _on_resized() -> void:
 	_fit_map(Artemis)
@@ -81,6 +82,19 @@ func updateLunabotLocation(values: PackedFloat32Array ) -> void:
 	elif current_map == MAP.UCF:
 		update_ufc(x, y)
 
+
+func _update_yaw() -> void:
+	var ori = connection.get_orientation()
+	if ori.size() < 4:
+		return
+	var x: float = ori[0]
+	var y: float = ori[1]
+	var z: float = ori[2]
+	var w: float = ori[3]
+	var yaw := atan2(2.0 * (w * z + x * y), 1.0 - 2.0 * (y * y + z * z))
+	var map_yaw := -yaw - PI / 2.0
+	LocationLunabotArtemis.rotation = map_yaw
+	LocationLunabotUcf.rotation = map_yaw
 
 func _world_to_map_pixels(world_x: float, world_y: float, pixels_per_unit: float) -> Vector2:
 	return Vector2(world_x * pixels_per_unit, -world_y * pixels_per_unit)

@@ -288,7 +288,6 @@ impl CuBridge for Lunabase {
                     msg.set_payload(*downcasted);
                     msg.metadata.process_time.start = clock.now().into();
                 }
-                // println!("[LUNABASE BRIDGE] recved msg: {:?}", next_msg);
             }
         } else {
             msg.clear_payload();

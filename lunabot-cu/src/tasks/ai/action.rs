@@ -68,13 +68,9 @@ impl LunabotAction {
             }
             LunabotAction::SetLastSteering => {
                 if let Some(last_steer_pack_time) = blackboard.last_non_zero_steering_pack {
-                    if last_steer_pack_time.elapsed() > Duration::from_millis(200) {
-                        blackboard.outgoing_steering_msg = Some(Steering::default());
-                        println!(
-                            "dropped non zero steering packet :( {:?}",
-                            last_steer_pack_time.elapsed()
-                        );
-
+                    let elapsed = last_steer_pack_time.elapsed();
+                    if elapsed > Duration::from_millis(200) {
+                        blackboard.last_non_zero_steering_pack = None;
                         return (Success, 0.0);
                     }
                 }
@@ -87,11 +83,9 @@ impl LunabotAction {
 
             LunabotAction::SetLastBucket => {
                 if let Some(last_bucket_pack_time) = blackboard.last_non_zero_bucket_pack {
-                    if last_bucket_pack_time.elapsed() > Duration::from_millis(500) {
-                        println!(
-                            "dropped non zero bucket packer :( {:?}",
-                            last_bucket_pack_time.elapsed()
-                        );
+                    let elapsed = last_bucket_pack_time.elapsed();
+                    if elapsed > Duration::from_millis(500) {
+                        blackboard.last_non_zero_bucket_pack = None;
                         blackboard
                             .outgoing_actuator_msg_queue
                             .push_back(actuator_command_from_i8(0, Actuator::Bucket));
@@ -109,11 +103,9 @@ impl LunabotAction {
 
             LunabotAction::SetLastLift => {
                 if let Some(last_lift_pack_time) = blackboard.last_non_zero_lift_pack {
-                    if last_lift_pack_time.elapsed() > Duration::from_millis(500) {
-                        println!(
-                            "dropped non zero bucket packer :( {:?}",
-                            last_lift_pack_time.elapsed()
-                        );
+                    let elapsed = last_lift_pack_time.elapsed();
+                    if elapsed > Duration::from_millis(500) {
+                        blackboard.last_non_zero_lift_pack = None;
                         blackboard
                             .outgoing_actuator_msg_queue
                             .push_back(actuator_command_from_i8(0, Actuator::Lift));

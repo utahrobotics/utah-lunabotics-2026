@@ -40,6 +40,7 @@ scale = Vector2(0.9999998, 0.9999998)
 layout_mode = 0
 offset_right = 100.0
 offset_bottom = 100.0
+pivot_offset = Vector2(50, 50)
 texture = ExtResource("3_x0vsi")
 expand_mode = 1
 
@@ -65,5 +66,6 @@ position = Vector2(50, 50)
 layout_mode = 0
 offset_right = 100.0
 offset_bottom = 100.00003
+pivot_offset = Vector2(50, 50)
 texture = ExtResource("3_x0vsi")
 expand_mode = 1
