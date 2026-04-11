@@ -76,7 +76,7 @@ fn default_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::T265LeftGstreamer(..) => SimOverride::ExecutedBySim,
         default::SimStep::T265RightGstreamer(..) => SimOverride::ExecutedBySim,
 
-        default::SimStep::ObstacleGstreamer(..) => SimOverride::ExecuteByRuntime,
+        default::SimStep::ObstacleGstreamer(..) => SimOverride::ExecutedBySim,
 
         default::SimStep::__Phantom(_) => SimOverride::ExecutedBySim,
     }
@@ -355,7 +355,7 @@ fn sim_callback<'a>(
             }
             SimOverride::ExecutedBySim
         }
-        default::SimStep::ObstacleGstreamer(..) => SimOverride::ExecuteByRuntime,
+        default::SimStep::ObstacleGstreamer(..) => SimOverride::ExecutedBySim,
         default::SimStep::T265Subscriber(..) => SimOverride::ExecutedBySim,
         default::SimStep::DetectionHandler(_) => SimOverride::ExecutedBySim,
         default::SimStep::L2KissIcp(_) => SimOverride::ExecuteByRuntime,
