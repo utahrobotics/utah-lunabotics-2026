@@ -286,13 +286,15 @@ impl LunabaseConnection {
     }
 
     #[func]
+    /// sigma spatial is in cm
     fn send_set_sigma_spatial(&self, new_sigma_spatial: f32) {
-        self.send_msg(FromLunabase::SetSigmaSpatial(new_sigma_spatial))
+        self.send_msg(FromLunabase::SetSigmaSpatial(new_sigma_spatial / 100.0))
     }
 
     #[func]
+    /// sigma range is in cm
     fn send_set_sigma_range(&self, new_sigma_range: f32) {
-        self.send_msg(FromLunabase::SetSigmaRange(new_sigma_range))
+        self.send_msg(FromLunabase::SetSigmaRange(new_sigma_range / 100.0))
     }
 
     #[func]
