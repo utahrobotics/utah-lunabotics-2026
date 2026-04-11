@@ -18,6 +18,8 @@ use std::path::Path;
 
 use crate::ROBOT_STATE;
 use crate::rerun_viz::RECORDER;
+use crate::tasks::ai::blackboard::BLACKBOARD_SHARED;
+use crate::utils::rwlock_read_unpoison;
 
 const LATERAL_VARIANCE_MODIFIER: f64 = 0.05;
 const DEPTH_VARIENCE_MODIFIER: f64 = 0.05;
@@ -147,6 +149,9 @@ impl CuTask for AprilDetectionHandler {
         output: &mut Self::Output<'_>,
     ) -> CuResult<()> {
         output.clear_payload();
+        if let Some(bb) = BLACKBOARD_SHARED.get() && !rwlock_read_unpoison(&bb).enable_apriltags {
+            return Ok(());
+        }
         let (input1, input2, input3, input4, input5, input6) = input;
 
         self.result_buf.clear();

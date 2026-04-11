@@ -105,6 +105,7 @@ impl<const N: usize> CuTask for CuAutoGStreamer<N> {
     ) -> CuResult<()> {
         output.clear_payload();
 
+        // this check is also done in the apriltag detection handler, but by adding it here we can save some downstream processing
         if let Some(bb) = BLACKBOARD_SHARED.get() && !rwlock_read_unpoison(&bb).enable_apriltags {
             return Ok(());
         }
