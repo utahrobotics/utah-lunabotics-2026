@@ -266,7 +266,6 @@ impl CuBridge for Lunabase {
         }
 
         if !self.connection.is_alive(self.max_pong_delay) {
-            self.message_buffer.clear();
             // Set disconnect message as payload
             if std::any::TypeId::of::<Payload>() == std::any::TypeId::of::<FromLunabase>() {
                 let disconnect_msg = FromLunabase::Disconnect;
