@@ -643,4 +643,66 @@ mod tests {
         bytes[0] = 255;
         assert!(FromPico::deserialize(bytes).is_err());
     }
+
+    #[test]
+    fn secondary_request_roundtrip() {
+        let req = SecondaryRequest { mux_address: 14 };
+        let bytes = req.serialize();
+        assert_eq!(SecondaryRequest::deserialize(bytes).unwrap(), req);
+    }
+
+    #[test]
+    fn secondary_response_roundtrip() {
+        let resp = SecondaryResponse { adc_value: 1234 };
+        let bytes = resp.serialize();
+        assert_eq!(SecondaryResponse::deserialize(bytes), resp);
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(any(feature = "defmt", feature = "defmt-03"), derive(defmt::Format))]
+#[cfg_attr(
+    feature = "std",
+    derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
+)]
+pub struct SecondaryRequest {
+    pub mux_address: u8,
+}
+
+impl SecondaryRequest {
+    pub const SIZE: usize = 1;
+
+    pub fn serialize(&self) -> [u8; 1] {
+        [self.mux_address]
+    }
+
+    pub fn deserialize(bytes: [u8; 1]) -> Result<Self, &'static str> {
+        Ok(Self {
+            mux_address: bytes[0],
+        })
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(any(feature = "defmt", feature = "defmt-03"), derive(defmt::Format))]
+#[cfg_attr(
+    feature = "std",
+    derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
+)]
+pub struct SecondaryResponse {
+    pub adc_value: u16,
+}
+
+impl SecondaryResponse {
+    pub const SIZE: usize = 2;
+
+    pub fn serialize(&self) -> [u8; 2] {
+        self.adc_value.to_le_bytes()
+    }
+
+    pub fn deserialize(bytes: [u8; 2]) -> Self {
+        Self {
+            adc_value: u16::from_le_bytes(bytes),
+        }
+    }
 }

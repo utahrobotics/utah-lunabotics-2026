@@ -10,7 +10,7 @@ use embassy_rp::{
     peripherals::{UART1, UART0},
     uart::{Config as UartConfig, InterruptHandler as UartInterruptHandler, Uart},
 };
-use embassy_time::{Duration, Timer};
+use embedded_common::{SecondaryRequest, SecondaryResponse};
 use {defmt_rtt as _, panic_probe as _};
 
 bind_interrupts!(struct Irqs {
@@ -29,14 +29,10 @@ async fn main(spawner: Spawner) {
     let mut uart_config = UartConfig::default();
     uart_config.baudrate = 115200;
 
-    let mut uart = Uart::new(p.UART0, p.PIN_0, p.PIN_1, Irqs, p.DMA_CH0, p.DMA_CH1, uart_config);
+    // pin 16 TX, pin 17 RX 
+    let mut uart = Uart::new(p.UART0, p.PIN_16, p.PIN_17, Irqs, p.DMA_CH0, p.DMA_CH1, uart_config);
     let mut rx_buf = [0u8; 1];
     let mut tx_buf = [0u8; 2];
-    
-
-    
-    // Assuming UART0 on PIN_0 (tx) and PIN_1 (rx)
-
 
     // Initialize ADC
     let mut adc_config = AdcConfig::default();
@@ -45,14 +41,34 @@ async fn main(spawner: Spawner) {
     
     
     // Initialize MUX  pins
-
+    let mut mux_s0 = Output::new(p.PIN_2, Level::Low);
+    let mut mux_s1 = Output::new(p.PIN_3, Level::Low);
+    let mut mux_s2 = Output::new(p.PIN_4, Level::Low);
 
     loop {
         // Wait for a request representing the MUX address
-        match uart.read(&mut rx_buf).await 
-
+        match uart.read(&mut rx_buf).await {
+            Ok(_) => {
                 // Set MUX  pins
+                mux = rx_buf[0];
                 // Read ADC
+                    match adc.read(&mut adc_pin).await {
+                        Ok(value) => {
+                            info!("ADC value: {}", value);
+                            let resp = SecondaryResponse { adc_value: value };
+                            let tx_buf = resp.serialize();
+                            if let Err(e) = uart.write(&tx_buf).await {
+                                error!("Failed to write UART response: {:?}", e);
+                            }
+                        }
+                        Err(_e) => {
+                            error!("ADC read failed");
+                        }
+                    }
+                } else {
+                    error!("Failed to deserialize request packet");
+                }
+            }
             Err(e) => {
                 error!("UART read error: {:?}", e);
             }
