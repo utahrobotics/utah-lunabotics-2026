@@ -1,5 +1,7 @@
 #[cfg(feature = "production")]
 pub mod implementation {
+    use std::sync::{Arc, RwLock};
+
     use crossbeam::queue::ArrayQueue;
     use cu29::prelude::*;
     use cu29::{
@@ -12,10 +14,13 @@ pub mod implementation {
     use gstreamer_video::prelude::*;
 
     use crate::pathfinding::OccupancyGrid;
+    use crate::tasks::realsense_occupancy_grid::GLOBAL_MAP;
+    use crate::utils::{rwlock_read_unpoison, rwlock_write_unpoison};
 
     pub struct ObstacleStreamer {
         pipeline: Pipeline,
         grid_queue: &'static ArrayQueue<OccupancyGrid>,
+        latest_path: Arc<RwLock<Option<Vec<[f32;2]>>>>
     }
 
     impl Freezable for ObstacleStreamer {}
@@ -118,13 +123,17 @@ pub mod implementation {
             let mut img: Vec<u8> = vec![0u8; vid_w * vid_h];
             let latest_grid_queue: &'static ArrayQueue<OccupancyGrid> =
                 Box::leak(Box::new(ArrayQueue::new(20)));
+            let latest_path: Arc<RwLock<Option<Vec<[f32;2]>>>> = Arc::new(RwLock::new(Some(Vec::new())));
             let mut frame_count: u64 = 0;
 
+            let latest_path_clone = Arc::clone(&latest_path);
             appsrc.set_callbacks(
                 AppSrcCallbacks::builder()
                     .need_data(move |appsrc, _| {
-                        while let Some(grid) = latest_grid_queue.pop() {
-                            render_occupancy_grid(&mut img, vid_w, vid_h, &grid);
+
+                        while let Some(local_grid) = latest_grid_queue.pop() {
+                            let global_guard = GLOBAL_MAP.get().and_then(|m| m.try_read().ok());
+                            render_occupancy_grid(&mut img, vid_w, vid_h, &local_grid, global_guard.as_deref(), &*rwlock_read_unpoison(&latest_path_clone));
                         }
 
                         let mut buffer = gstreamer::Buffer::with_size(video_info.size())
@@ -173,6 +182,7 @@ pub mod implementation {
             Ok(Self {
                 pipeline,
                 grid_queue: latest_grid_queue,
+                latest_path
             })
         }
 
@@ -217,6 +227,9 @@ pub mod implementation {
             _clock: &cu29::prelude::RobotClock,
             input: &Self::Input<'i>,
         ) -> cu29::CuResult<()> {
+            println!("processing this bitch");
+            *rwlock_write_unpoison(&*self.latest_path) = input.1.payload().cloned();
+
             let Some(new_grid) = input.0.payload() else {
                 return Ok(());
             };
@@ -233,38 +246,60 @@ pub mod implementation {
         }
     }
 
-    /// Renders the occupancy grid into the fixed-size video frame buffer.
-    /// Maps grid cells to video pixels using nearest-neighbor scaling.
-    fn render_occupancy_grid(img: &mut [u8], vid_w: usize, vid_h: usize, grid: &OccupancyGrid) {
-        let grid_w = grid.cells_x();
-        let grid_h = grid.cells_y();
+    fn render_occupancy_grid(img: &mut [u8], vid_w: usize, vid_h: usize, local_grid: &OccupancyGrid, global_grid: Option<&OccupancyGrid>, latest_path: &Option<Vec<[f32; 2]>>) {
+        let ref_grid = global_grid.unwrap_or(local_grid);
+        let grid_w = ref_grid.cells_x();
+        let grid_h = ref_grid.cells_y();
         if grid_w == 0 || grid_h == 0 {
             return;
         }
 
-        // Clear the image before rendering
         img.fill(0);
 
-        for py in 0..vid_h {
-            for px in 0..vid_w {
-                // Map video pixel to grid cell (nearest-neighbor)
-                let gx = px * grid_w / vid_w;
-                let gy = py * grid_h / vid_h;
-                let grid_idx = gx + gy * grid_w;
-
-                if grid_idx >= grid.gradient_map.len() {
-                    continue;
+        if let Some(global) = global_grid {
+            for py in 0..vid_h {
+                for px in 0..vid_w {
+                    let gx = px * grid_w / vid_w;
+                    let gy = py * grid_h / vid_h;
+                    let grid_idx = gx + gy * grid_w;
+                    if grid_idx >= global.gradient_map.len() { continue; }
+                    let gradient = global.gradient_map[grid_idx];
+                    if gradient == f32::MIN { continue; }
+                    let normalized = gradient.clamp(0.0, 1.0);
+                    img[px + py * vid_w] = (normalized * 255.0) as u8;
                 }
+            }
+        }
 
-                let gradient = grid.gradient_map[grid_idx];
-                if gradient == f32::MIN {
-                    continue;
+        let local_w = local_grid.cells_x();
+        let local_h = local_grid.cells_y();
+        for ly in 0..local_h {
+            for lx in 0..local_w {
+                let local_idx = lx + ly * local_w;
+                if local_idx >= local_grid.gradient_map.len() { continue; }
+                let gradient = local_grid.gradient_map[local_idx];
+                if gradient == f32::MIN { continue; }
+
+                let Ok((world_x, world_y)) = local_grid.cell_to_world(lx, ly) else { continue; };
+                let Ok((gx, gy)) = ref_grid.world_to_cell(world_x, world_y) else { continue; };
+
+                let px = gx * vid_w / grid_w;
+                let py = gy * vid_h / grid_h;
+                if px < vid_w && py < vid_h {
+                    let normalized = gradient.clamp(0.0, 1.0);
+                    img[px + py * vid_w] = (normalized * 255.0) as u8;
                 }
+            }
+        }
 
-                let normalized = gradient.clamp(0.0, 1.0);
-                let pixel = (normalized * 255.0) as u8;
-                let img_idx = px + py * vid_w;
-                img[img_idx] = pixel;
+        let path_cells: Vec<(usize, usize)> = latest_path.iter().flatten().filter_map(|[x, y]| {
+            ref_grid.world_to_cell(*x, *y).ok()
+        }).collect();
+        for (cx, cy) in path_cells {
+            let px = cx * vid_w / grid_w;
+            let py = cy * vid_h / grid_h;
+            if px < vid_w && py < vid_h {
+                img[px + py * vid_w] = 255;
             }
         }
     }
