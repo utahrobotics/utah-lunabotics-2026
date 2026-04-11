@@ -28,10 +28,13 @@ fn main() -> Result<()> {
     loop {
         for event in monitor.iter() {
             if let Some(node) = event.devnode() {
+                let device = event.device();
                 let id_path = event.property_value("ID_PATH").map(|s| s.to_string_lossy());
+                let id_path = event.property_value("ID_PATH").map(|s| s.to_string_lossy());
+                let index = device.attribute_value("index");
                 match event.event_type() {
                     EventType::Add => {
-                        println!("ADD  {:<4} => {}", node.display(), id_path.unwrap_or_default());
+                        println!("ADD  {:<4} => {}:  index:{:?}", node.display(), id_path.unwrap_or_default(), index);
                     }
                     EventType::Remove => {
                         println!("REM  {:<4}", node.display());

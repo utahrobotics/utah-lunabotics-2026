@@ -98,8 +98,8 @@ pub fn spawn_receiver(address: &str, frame: SharedFrame, active: Arc<AtomicBool>
     });
 }
 
-const MAX_TEX_WIDTH: usize = 426 * 2;
-const MAX_TEX_HEIGHT: usize = 240 * 2;
+const MAX_TEX_WIDTH: usize = 426 * 3;
+const MAX_TEX_HEIGHT: usize = 240 * 3;
 
 fn frame_to_color_image(rgb_frame: &ffmpeg::frame::Video, src_w: usize, src_h: usize) -> ColorImage {
     let rgb_data = rgb_frame.data(0);

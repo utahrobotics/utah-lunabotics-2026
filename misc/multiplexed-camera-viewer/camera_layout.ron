@@ -4,19 +4,23 @@ GridLayout(
     feed_descriptors: [
         CameraFeed (
             id: "Front",
-            address: "127.0.0.1:4002",
+            address: "192.168.0.107:4002",
         ),
         CameraFeed (
             id: "ObstacleMap",
-            address: "127.0.0.1:5000",
+            address: "192.168.0.107:5000",
         ),
         CameraFeed (
             id: "T265Left",
-            address: "127.0.0.1:5001",
+            address: "192.168.0.107:5001",
         ),
         CameraFeed (
             id: "T265Right",
-            address: "127.0.0.1:5002",
+            address: "192.168.0.107:5002",
+        ),
+        CameraFeed (
+            id: "RealsenseFront",
+            address: "192.168.0.107:4003",
         )
     ]
 )
