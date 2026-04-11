@@ -126,6 +126,8 @@ pub fn new_blur_pipeline(
     input_height_map_buffer: &GpuBuffer,
     height_map_width_buffer: &GpuBuffer,
     height_map_height_buffer: &GpuBuffer,
+    sigma_spatial_buffer: &GpuBuffer,
+    sigma_range_buffer: &GpuBuffer,
 ) -> Result<(GpuBuffer, crate::shader_pipeline::ComputePipeline), WgslPclError> {
     let blur_filtered_height_map_buffer = GpuBuffer::new_storage_with_data(
         &device,
@@ -157,6 +159,26 @@ pub fn new_blur_pipeline(
                 min_binding_size: None,
             },
             height_map_height_buffer.as_entire_binding(),
+        )
+        .with_entry(
+            2,
+            ShaderStages::COMPUTE,
+            wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform,
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            sigma_spatial_buffer.as_entire_binding(),
+        )
+        .with_entry(
+            3,
+            ShaderStages::COMPUTE,
+            wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform,
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            sigma_range_buffer.as_entire_binding(),
         )
         .build(&device, "map_settings_bind_group".to_string());
     let (filter_layout, filter_bind_group) = BindGroupLayoutBuilder::new(None)
@@ -198,7 +220,6 @@ pub fn new_blur_pipeline(
         }
         BlurFilterOptions::Gaussian(opts) => {
             let constants = HashMap::from([
-                ("SIGMA", opts.sigma as f64),
                 ("CELL_SIZE", map_layout.cell_size as f64),
                 ("KERNEL_RADIUS", opts.kernel_radius as f64),
                 ("WORKGROUP_X", workgroup_size_stage2.0 as f64),
