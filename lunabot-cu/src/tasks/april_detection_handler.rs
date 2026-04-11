@@ -161,7 +161,7 @@ impl CuTask for AprilDetectionHandler {
             return Ok(());
         }
 
-        for particular_input in [input1, input2, input3, input4] {
+        for particular_input in [input1, input2, input3, input4, input5, input6] {
             let Some(dets) = particular_input.payload() else { continue };
             let camera_id = dets.camera_id.as_ref().clone();
             for observation in self.cu_detections_to_tag_observations(dets, &camera_id) {
@@ -294,7 +294,6 @@ impl AprilDetectionHandler {
             }
 
             let Some(pose) = pose.to_na() else {
-                warning!("failed to convert pose to nalgebra type");
                 continue;
             };
 
