@@ -100,3 +100,9 @@ params: {
 
 1. install ffmpeg on your machine, then run the [multiplexed camera viewer](https://github.com/utahrobotics/utah-lunabotics-2026/tree/main/misc/multiplexed-camera-viewer)
 	1. you will need to specify in the config for the camera viewer what the robots ip is, and the ports for the streams you want to connect to 
+
+# Vescs
+1. Call Sebastion
+
+# Actuators
+TODO
