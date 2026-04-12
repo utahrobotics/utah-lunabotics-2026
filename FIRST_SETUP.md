@@ -110,7 +110,9 @@ params: {
 1. Nagivate to the `embedded-legacy/v3pico` directory.
 2. Run `cargo run --release` to flash the pico.
 3. in copperconfig.ron set the config for the pico task to have `teri_mode: true`
-<br\>
+
+<br/>
+
 **For New Robot:**
 1. Navigate to embedded directory.
 2. run `cargo run --release --bin pico-prime` to flash the pico that controlls the actuators.
