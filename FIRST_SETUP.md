@@ -67,11 +67,11 @@ config: {
 
 ### RGB cameras
 
-1. plug in your rgb cameras, and make note of their positions on the robot with respect to the center like you did the other cameras.
-2. run `make discover-cameras` and start un plugging and re plugging the cameras until you figure out the ports that the cameras are on.
+1. Plug in your rgb cameras, and make note of their positions on the robot with respect to the center like you did the other cameras.
+2. Run `make discover-cameras` and start un plugging and re plugging the cameras until you figure out the ports that the cameras are on.
 	1. these will need to be the same usb ports you always plug the cameras into, same every time.
 3. Add or update an entry to the includes array in copperconfig.ron, use [Naj's focal length estimator](https://github.com/utahrobotics/focal-length-estimator) or some other tool to figure out the intrinsics.
-	1. you will need an apriltag to estimate the intrinsics using Naj's tool
+	1. You will need an apriltag to estimate the intrinsics using Naj's tool
 ```ron
 params: {
 	"id":"back", // pick some id for the camera
@@ -92,16 +92,26 @@ params: {
 # Network Stuff
 
 ### Base station comms
-1. just type in the ip of the robot in the base station and hit connect
-2. might be helpful to log into the wifi router and set a static ip for the robot
+1. Just type in the ip of the robot in the base station and hit connect
+2. Might be helpful to log into the wifi router and set a static ip for the robot
 
 ### Camera streams
 
-1. install ffmpeg on your machine, then run the [multiplexed camera viewer](https://github.com/utahrobotics/utah-lunabotics-2026/tree/main/misc/multiplexed-camera-viewer)
-	1. you will need to specify in the config for the camera viewer what the robots ip is, and the ports for the streams you want to connect to 
+1. Install ffmpeg on your machine, then run the [multiplexed camera viewer](https://github.com/utahrobotics/utah-lunabotics-2026/tree/main/misc/multiplexed-camera-viewer)
+	1. You will need to specify in the config for the camera viewer what the robots ip is, and the ports for the streams you want to connect to 
 
 # Vescs
 1. Call Sebastion
 
 # Actuators
-TODO
+1. Attach debug probe and plug the debug probe into your machine, as well as have the pico attached over usb.
+
+**For Teri:** 
+1. Nagivate to the `embedded-legacy/v3pico` directory.
+2. Run `cargo run --release` to flash the pico.
+3. in copperconfig.ron set the config for the pico task to have `teri_mode: true`
+<br\>
+**For New Robot:**
+1. Navigate to embedded directory.
+2. run `cargo run --release --bin pico-prime` to flash the pico that controlls the actuators.
+3. attach the other pico then run `cargo run --release --bin pico-secondary` to flash it.
