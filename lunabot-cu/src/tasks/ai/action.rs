@@ -74,7 +74,7 @@ impl LunabotAction {
                         return (Success, 0.0);
                     }
                 }
-                if let Some(steering) = blackboard.last_steering {
+                if let Some(steering) = blackboard.last_steering.take() {
                     blackboard.outgoing_steering_msg = Some(steering);
                 }
 
@@ -83,19 +83,21 @@ impl LunabotAction {
 
             LunabotAction::SetLastBucket => {
                 if let Some(last_bucket_pack_time) = blackboard.last_non_zero_bucket_pack {
-                    let elapsed = last_bucket_pack_time.elapsed();
-                    if elapsed > Duration::from_millis(500) {
+                    if last_bucket_pack_time.elapsed() > Duration::from_millis(200) {
+                        println!("safety: lunabase silent, forcing bucket to stop");
                         blackboard.last_non_zero_bucket_pack = None;
+                        blackboard.last_bucket = None;
                         blackboard
                             .outgoing_actuator_msg_queue
                             .push_back(actuator_command_from_i8(0, Actuator::Bucket));
+                        return (Success, 0.0);
                     }
+                }
 
-                    if let Some(value) = blackboard.last_bucket.take() {
-                        blackboard
-                            .outgoing_actuator_msg_queue
-                            .push_back(actuator_command_from_i8(value, Actuator::Bucket));
-                    }
+                if let Some(value) = blackboard.last_bucket.take() {
+                    blackboard
+                        .outgoing_actuator_msg_queue
+                        .push_back(actuator_command_from_i8(value, Actuator::Bucket));
                 }
 
                 Success
@@ -103,19 +105,21 @@ impl LunabotAction {
 
             LunabotAction::SetLastLift => {
                 if let Some(last_lift_pack_time) = blackboard.last_non_zero_lift_pack {
-                    let elapsed = last_lift_pack_time.elapsed();
-                    if elapsed > Duration::from_millis(500) {
+                    if last_lift_pack_time.elapsed() > Duration::from_millis(200) {
+                        println!("safety: lunabase silent, forcing lift to stop");
                         blackboard.last_non_zero_lift_pack = None;
+                        blackboard.last_lift = None;
                         blackboard
                             .outgoing_actuator_msg_queue
                             .push_back(actuator_command_from_i8(0, Actuator::Lift));
+                        return (Success, 0.0);
                     }
+                }
 
-                    if let Some(value) = blackboard.last_lift.take() {
-                        blackboard
-                            .outgoing_actuator_msg_queue
-                            .push_back(actuator_command_from_i8(value, Actuator::Lift));
-                    }
+                if let Some(value) = blackboard.last_lift.take() {
+                    blackboard
+                        .outgoing_actuator_msg_queue
+                        .push_back(actuator_command_from_i8(value, Actuator::Lift));
                 }
 
                 Success

@@ -134,7 +134,6 @@ impl LunabotBlackboard {
                 } else {
                     self.last_non_zero_lift_pack = None;
                 }
-
                 self.last_lift = Some(*val);
             }
             common::FromLunabase::BucketActuators(val) => {

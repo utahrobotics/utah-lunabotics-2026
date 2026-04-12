@@ -327,10 +327,9 @@ async fn read_sensors_loop(
             let len = cobs::encode(&serialized, &mut stuffed);
             for chunk in stuffed[..len+1].chunks(16) {
                 if let Err(e) = class.write_packet(chunk).await {
-                    //error!("{:?}",e);
+                    error!("{:?}",e);
                 }
             }
-            info!("{}", msg);
         } else {
             warn!("data terminal not ready");
         }
@@ -377,6 +376,7 @@ async fn motor_controller_loop(mut class: Receiver<'static, Driver<'static, USB>
                                     Actuator::Bucket => {
                                         m2.set_direction(direction);
                                         m2_target = speed;
+                                        info!("cmd: {:?}", cmd);
                                     }
                                     Actuator::Dumper => {
                                         warn!("use of dumper on a teri pico.");
