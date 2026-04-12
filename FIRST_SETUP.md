@@ -18,7 +18,7 @@
 }
 ```
 6. Update the t265_subscriber task's config in copperconfig.ron to have the correct serial numbers for left right and rear.
-	1. if you only have one plugged in or something, just make shit up for the other serial numbers cause it doesn't matter
+	1. if you only have one plugged in or something, just make stuff up for the other serial numbers cause it doesn't matter
 7. Edit the three apriltag detector tasks  for the t265's to have the right info:
 ```ron
 (
