@@ -102,6 +102,7 @@ params: {
 
 # Vescs
 1. Call Sebastion
+2. Change the motor_controller config to have the right can id's and motor masks.
 
 # Actuators
 1. Attach debug probe and plug the debug probe into your machine, as well as have the pico attached over usb.
