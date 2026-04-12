@@ -64,7 +64,6 @@ config: {
 	"camera_node": "upper_depth_camera"
 },
 ```
-6. Update this file to have the serial number of the depth camera you are using: `external-tasks/realsense/src/constants.rs`
 
 ### RGB cameras
 
