@@ -41,7 +41,7 @@
 ```
 
 **Trouble Shooting**
-- the t265 fails to boot with some fuck ass error message:
+- the t265 fails to boot with some error message:
 	- unplug and replug it, then try again.
 	- sometimes having realsense devices on a usb hub causes them to behave weird, so if you have them directly plugged in that might work better
 	- I am working on a way to power cycle them without re plugging them in case this happens during competition.
