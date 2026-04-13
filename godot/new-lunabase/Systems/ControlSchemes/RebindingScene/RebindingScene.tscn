@@ -204,7 +204,7 @@ theme = ExtResource("3_q0chg")
 theme_override_styles/normal = SubResource("StyleBoxFlat_1i5ij")
 theme_override_styles/pressed = SubResource("StyleBoxFlat_k5k4w")
 theme_override_styles/hover = SubResource("StyleBoxFlat_nt7sp")
-text = "Confirm Bindings"
+text = "Use bindings! (Be sure to save)"
 
 [node name="SaveBindingsButton" type="Button" parent="LeftColumn/InformationPanel/MarginContainer/VBox" unique_id=809130462]
 visible = false
@@ -250,7 +250,7 @@ layout_mode = 2
 theme = ExtResource("3_q0chg")
 theme_override_colors/font_color = Color(1, 0.4, 0.4, 1)
 theme_override_font_sizes/font_size = 14
-text = "WARNING: Using custom bindings will overwrite the default schemes. If you want to revert to a previous scheme or use a different custom binding, select it from the settings menu. 
+text = "WARNING: Using custom bindings will overwrite the default schemes. If you want to revert to a previous scheme or use a different custom binding, select it from the settings menu.
 
 Custom bindings are currently saved to your local app folder. The save message will let you know where that is since it changes depending on OS.
 

@@ -16,6 +16,7 @@ var current_action_to_bind: String = ""
 signal new_binding
 signal input_received
 signal new_message
+signal binding_saved
 
 func _ready() -> void:
 	setup()
@@ -55,6 +56,8 @@ func save_binding_to_file():
 	var dir_path = "user://bindings/"
 	var file_path = dir_path + scheme_name
 	
+	current_scheme.scheme_name = scheme_name
+	
 	if not DirAccess.dir_exists_absolute(dir_path):
 		DirAccess.make_dir_recursive_absolute(dir_path)
 	
@@ -65,6 +68,7 @@ func save_binding_to_file():
 		msg = "Save failed with error code: " + str(error)
 	else:
 		msg = "Resource saved successfully to: " + ProjectSettings.globalize_path(file_path)
+		binding_saved.emit()
 	print(msg)
 	var rich_text_msg = "[color=3399ff] %s [/color]" % msg
 	new_message.emit(msg)

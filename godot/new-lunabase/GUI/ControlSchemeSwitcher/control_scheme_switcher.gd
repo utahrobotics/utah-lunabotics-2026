@@ -1,11 +1,13 @@
 class_name ControlSchemeSwitcher extends Control
 
+@onready var local_scheme_option_button: OptionButton = $VBoxContainer/HBoxContainer4/LocalSchemeOptionButton
 @onready var controller_scheme_option_button: OptionButton = $VBoxContainer/HBoxContainer/ControllerSchemeOptionButton
 @onready var keyboard_scheme_option_button: OptionButton = $VBoxContainer/HBoxContainer2/KeyboardSchemeOptionButton
 @onready var touch_controls_check: CheckButton = $VBoxContainer/HBoxContainer3/TouchControlsCheckButton
 
 @export var controller_path : String = "res://Systems/ControlSchemes/schemes/ControllerSchemes"
 @export var keyboard_path : String = "res://Systems/ControlSchemes/schemes/KeyboardSchemes"
+@export var custom_path : String = "user://bindings"
 const REBINDING_SCENE = preload("res://Systems/ControlSchemes/RebindingScene/RebindingScene.tscn")
 
 signal updated_control_scheme
@@ -13,6 +15,7 @@ signal close_settings_menu
 
 var controller_schemes : Array[ControlSchemeResource]
 var keyboard_schemes : Array[ControlSchemeResource]
+var custom_schemes: Array[ControlSchemeResource]
 
 var keyboard_prev_index := -1
 var controller_prev_index := -1
@@ -20,7 +23,6 @@ var controller_prev_index := -1
 func _ready() -> void:
 	populate_schemes()
 	sync_touch_controls_from_settings()
-
 
 func sync_touch_controls_from_settings() -> void:
 	if touch_controls_check:
@@ -33,24 +35,30 @@ func _on_touch_controls_check_toggled(pressed: bool) -> void:
 func populate_schemes():
 	controller_scheme_option_button.clear()
 	keyboard_scheme_option_button.clear()
+	local_scheme_option_button.clear()
+	
+	controller_schemes.clear()
+	keyboard_schemes.clear()
+	custom_schemes.clear()
 	
 	# Load controller schemes
 	for file in ResourceLoader.list_directory(controller_path):
 		var new_resource : ControlSchemeResource = ResourceLoader.load(controller_path + "/" + file)
 		controller_schemes.append(new_resource)
 		controller_scheme_option_button.add_item(new_resource.scheme_name)
-
 	
 	for file in ResourceLoader.list_directory(keyboard_path):
 		var new_resource : ControlSchemeResource = ResourceLoader.load(keyboard_path + "/" + file)
 		keyboard_schemes.append(new_resource)
 		keyboard_scheme_option_button.add_item(new_resource.scheme_name)
+	
+	for file in ResourceLoader.list_directory(custom_path):
+		var new_resource : ControlSchemeResource = ResourceLoader.load(custom_path + "/" + file)
+		custom_schemes.append(new_resource)
+		local_scheme_option_button.add_item(new_resource.scheme_name)
+	
 	_on_keyboard_scheme_option_button_item_selected(0)
 	_on_controller_scheme_option_button_item_selected(0)
-#
-#func _process(_delta: float) -> void:
-	#if Input.is_action_just_pressed("left_wheel"):
-		#print("left wheel pressed")
 
 func erase_all_action_events():
 	var actions = InputMap.get_actions()
@@ -99,4 +107,13 @@ func _on_default_button_pressed() -> void:
 func _on_create_binding_button_pressed() -> void:
 	var bindings_scene = REBINDING_SCENE.instantiate()
 	get_tree().root.add_child(bindings_scene)
+	bindings_scene.binding_saved.connect(new_binding_saved)
 	close_settings_menu.emit()
+
+func new_binding_saved():
+	populate_schemes()
+
+func _on_local_scheme_option_button_item_selected(index: int) -> void:
+	erase_all_action_events()
+	populate_from_scheme(custom_schemes[index-1])
+	
