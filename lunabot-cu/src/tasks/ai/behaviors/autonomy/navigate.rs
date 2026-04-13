@@ -27,7 +27,6 @@ pub fn navigate_behavior(goal: NavigationGoal) -> Behavior<LunabotAction> {
             Action(LunabotAction::CalculatePath(goal)),
             // hale's path follow shouldn't need this
             // Action(LunabotAction::RotateToFacePath),,
-            // 1. navigate to dig site
             Race(vec![
                 Action(LunabotAction::FollowPath),
                 While(
