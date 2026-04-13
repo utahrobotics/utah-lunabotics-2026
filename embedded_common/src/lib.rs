@@ -57,10 +57,17 @@ pub enum Actuator {
     Bucket = 1,
     /// the dumper
     Dumper = 2,
+    /// unused
+    Motor4 = 3,
 }
 
 impl Actuator {
-    pub const ALL: [Actuator; 3] = [Actuator::Lift, Actuator::Bucket, Actuator::Dumper];
+    pub const ALL: [Actuator; 4] = [
+        Actuator::Lift,
+        Actuator::Bucket,
+        Actuator::Dumper,
+        Actuator::Motor4,
+    ];
 
     pub fn as_bit(self) -> u8 {
         1 << (self as u8)
@@ -90,10 +97,10 @@ pub enum ActuatorCommand {
     feature = "std",
     derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
 )]
-pub struct ActuatorReading {
-    pub m1_reading: u16,
-    pub m2_reading: u16,
-}
+// pub struct ActuatorReading {
+//     pub m1_reading: u16,
+//     pub m2_reading: u16,
+// }
 
 /// Channel mapping:
 ///   0  = M1_CS        (Motor 1 current sense)
@@ -146,7 +153,7 @@ pub enum FromIMU {
     derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
 )]
 pub enum FromPico {
-    Reading([FromIMU; 4], ActuatorReading),
+    Reading([FromIMU; 4], SensorReading),
     Error(PicoError),
 }
 
@@ -380,22 +387,64 @@ impl Not for Direction {
     }
 }
 
-impl ActuatorReading {
-    pub fn serialize(&self) -> [u8; 4] {
-        let mut bytes = [0, 0, 0, 0u8];
-        bytes[0..=1].copy_from_slice(&self.m1_reading.to_le_bytes());
-        bytes[2..=3].copy_from_slice(&self.m2_reading.to_le_bytes());
+// impl ActuatorReading {
+//     pub fn serialize(&self) -> [u8; 4] {
+//         let mut bytes = [0, 0, 0, 0u8];
+//         bytes[0..=1].copy_from_slice(&self.m1_reading.to_le_bytes());
+//         bytes[2..=3].copy_from_slice(&self.m2_reading.to_le_bytes());
+//         bytes
+//     }
+//     pub fn deserialize(bytes: [u8; 4]) -> Self {
+//         // this expect is safe
+//         let m1_reading =
+//             u16::from_le_bytes(bytes[0..=1].try_into().expect("wrong number of bytes"));
+//         let m2_reading =
+//             u16::from_le_bytes(bytes[2..=3].try_into().expect("wrong number of bytes"));
+//         Self {
+//             m1_reading,
+//             m2_reading,
+//         }
+//     }
+// }
+
+impl SensorReading {
+    pub const CHANNEL_COUNT: usize = 11; // 11 active mux channels
+    pub const SIZE: usize = Self::CHANNEL_COUNT * 2; // 2 bytes per channel
+    pub fn serialize(&self) -> [u8; Self::SIZE] {
+        let fields: [u16; Self::CHANNEL_COUNT] = [
+            self.m1_cs,
+            self.m2_cs,
+            self.m3_cs,
+            self.m4_cs,
+            self.m1_therm,
+            self.m2_therm,
+            self.m3_therm,
+            self.m4_therm,
+            self.drive1_he,
+            self.drive2_he,
+            self.amb_therm,
+        ];
+        let mut bytes = [0u8; Self::SIZE];
+        for (i, val) in fields.iter().enumerate() {
+            bytes[i * 2..i * 2 + 2].copy_from_slice(&val.to_le_bytes());
+        }
         bytes
     }
-    pub fn deserialize(bytes: [u8; 4]) -> Self {
-        // this expect is safe
-        let m1_reading =
-            u16::from_le_bytes(bytes[0..=1].try_into().expect("wrong number of bytes"));
-        let m2_reading =
-            u16::from_le_bytes(bytes[2..=3].try_into().expect("wrong number of bytes"));
+
+    pub fn deserialize(bytes: [u8; Self::SIZE]) -> Self {
+        let read = |i: usize| u16::from_le_bytes([bytes[i * 2], bytes[i * 2 + 1]]);
         Self {
-            m1_reading,
-            m2_reading,
+            m1_cs: read(0),
+            m2_cs: read(1),
+            m3_cs: read(2),
+            m4_cs: read(3),
+            m1_therm: read(4),
+            m2_therm: read(5),
+            m3_therm: read(6),
+            m4_therm: read(7),
+            drive1_he: read(8),
+            drive2_he: read(9),
+            amb_therm: read(10),
         }
     }
 }
@@ -458,6 +507,61 @@ impl FromPico {
                 Ok(FromPico::Error(err))
             }
             _ => Err("invalid FromPicoV3 tag"),
+        }
+    }
+}
+/// Request to secondary pico, asking for a reading from a specific mux channel
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(any(feature = "defmt", feature = "defmt-03"), derive(defmt::Format))]
+#[cfg_attr(
+    feature = "std",
+    derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
+)]
+pub struct SecondaryRequest {
+    pub mux_address: u8,
+}
+
+impl SecondaryRequest {
+    pub const SIZE: usize = 1;
+    pub const MAX_CHANNEL: u8 = 15;
+
+    pub fn serialize(&self) -> [u8; 1] {
+        [self.mux_address]
+    }
+
+    pub fn deserialize(bytes: [u8; 1]) -> Result<Self, &'static str> {
+        if bytes[0] <= Self::MAX_CHANNEL {
+            Ok(Self {
+                mux_address: bytes[0],
+            })
+        } else {
+            Err("invalid MUX address: must be 0-15")
+        }
+    }
+}
+
+/// Response from secondary pico, containing raw 12 bit ADC reading for all 11 channels
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(any(feature = "defmt", feature = "defmt-03"), derive(defmt::Format))]
+#[cfg_attr(
+    feature = "std",
+    derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
+)]
+pub struct SecondaryResponse {
+    pub adc_value: u16,
+}
+
+impl SecondaryResponse {
+    pub const SIZE: usize = 2;
+
+    pub fn serialize(&self) -> [u8; 2] {
+        self.adc_value.to_le_bytes()
+    }
+
+    pub fn deserialize(bytes: [u8; 2]) -> Self {
+        Self {
+            adc_value: u16::from_le_bytes(bytes),
         }
     }
 }
@@ -677,64 +781,54 @@ mod tests {
     }
 
     #[test]
-    fn secondary_request_roundtrip() {
-        let req = SecondaryRequest { mux_address: 14 };
-        let bytes = req.serialize();
-        assert_eq!(SecondaryRequest::deserialize(bytes).unwrap(), req);
+    fn sensor_reading_roundtrip() {
+        let v = make_sensor_reading();
+        assert_eq!(SensorReading::deserialize(v.serialize()), v);
+    }
+
+    #[test]
+    fn sensor_reading_boundary_values() {
+        for val in [0u16, u16::MAX] {
+            let v = SensorReading {
+                m1_cs: val,
+                m2_cs: val,
+                m3_cs: val,
+                m4_cs: val,
+                m1_therm: val,
+                m2_therm: val,
+                m3_therm: val,
+                m4_therm: val,
+                drive1_he: val,
+                drive2_he: val,
+                amb_therm: val,
+            };
+            assert_eq!(SensorReading::deserialize(v.serialize()), v);
+        }
+    }
+
+    #[test]
+    fn secondary_request_all_valid_channels() {
+        for ch in 0u8..=15 {
+            let req = SecondaryRequest { mux_address: ch };
+            assert_eq!(SecondaryRequest::deserialize(req.serialize()).unwrap(), req);
+        }
+    }
+
+    #[test]
+    fn secondary_request_invalid_address() {
+        for addr in 16u8..=255 {
+            assert!(
+                SecondaryRequest::deserialize([addr]).is_err(),
+                "address {addr} should be rejected"
+            );
+        }
     }
 
     #[test]
     fn secondary_response_roundtrip() {
-        let resp = SecondaryResponse { adc_value: 1234 };
-        let bytes = resp.serialize();
-        assert_eq!(SecondaryResponse::deserialize(bytes), resp);
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-#[cfg_attr(any(feature = "defmt", feature = "defmt-03"), derive(defmt::Format))]
-#[cfg_attr(
-    feature = "std",
-    derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
-)]
-pub struct SecondaryRequest {
-    pub mux_address: u8,
-}
-
-impl SecondaryRequest {
-    pub const SIZE: usize = 1;
-
-    pub fn serialize(&self) -> [u8; 1] {
-        [self.mux_address]
-    }
-
-    pub fn deserialize(bytes: [u8; 1]) -> Result<Self, &'static str> {
-        Ok(Self {
-            mux_address: bytes[0],
-        })
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-#[cfg_attr(any(feature = "defmt", feature = "defmt-03"), derive(defmt::Format))]
-#[cfg_attr(
-    feature = "std",
-    derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
-)]
-pub struct SecondaryResponse {
-    pub adc_value: u16,
-}
-
-impl SecondaryResponse {
-    pub const SIZE: usize = 2;
-
-    pub fn serialize(&self) -> [u8; 2] {
-        self.adc_value.to_le_bytes()
-    }
-
-    pub fn deserialize(bytes: [u8; 2]) -> Self {
-        Self {
-            adc_value: u16::from_le_bytes(bytes),
+        for val in [0u16, 2048, 4095, u16::MAX] {
+            let v = SecondaryResponse { adc_value: val };
+            assert_eq!(SecondaryResponse::deserialize(v.serialize()), v);
         }
     }
 }
