@@ -2,32 +2,32 @@
 
   <asset>
     <material name="DefaultMaterialArenaWindows" specular="0.5" shininess="0.5" rgba="1 1 1 1.0"/>
-    <mesh file="arena_windows.obj"/>
-    <mesh file="arena_windows_collision_0.obj"/>
-    <mesh file="arena_windows_collision_1.obj"/>
-    <mesh file="arena_windows_collision_2.obj"/>
-    <mesh file="arena_windows_collision_3.obj"/>
-    <mesh file="arena_windows_collision_4.obj"/>
-    <mesh file="arena_windows_collision_5.obj"/>
-    <mesh file="arena_windows_collision_6.obj"/>
-    <mesh file="arena_windows_collision_7.obj"/>
-    <mesh file="arena_windows_collision_8.obj"/>
-    <mesh file="arena_windows_collision_9.obj"/>
-    <mesh file="arena_windows_collision_10.obj"/>
-    <mesh file="arena_windows_collision_11.obj"/>
-    <mesh file="arena_windows_collision_12.obj"/>
-    <mesh file="arena_windows_collision_13.obj"/>
-    <mesh file="arena_windows_collision_14.obj"/>
-    <mesh file="arena_windows_collision_15.obj"/>
-    <mesh file="arena_windows_collision_16.obj"/>
-    <mesh file="arena_windows_collision_17.obj"/>
-    <mesh file="arena_windows_collision_18.obj"/>
-    <mesh file="arena_windows_collision_19.obj"/>
-    <mesh file="arena_windows_collision_20.obj"/>
-    <mesh file="arena_windows_collision_21.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_windows.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_windows_collision_0.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_windows_collision_1.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_windows_collision_2.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_windows_collision_3.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_windows_collision_4.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_windows_collision_5.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_windows_collision_6.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_windows_collision_7.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_windows_collision_8.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_windows_collision_9.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_windows_collision_10.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_windows_collision_11.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_windows_collision_12.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_windows_collision_13.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_windows_collision_14.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_windows_collision_15.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_windows_collision_16.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_windows_collision_17.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_windows_collision_18.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_windows_collision_19.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_windows_collision_20.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_windows_collision_21.obj"/>
   </asset>
   <worldbody>
-    <body name="arena_windows" pos = "4 0 1.2" euler="0 0 90" >
+    <body name="arena_windows" pos = "0 0 2.4">
       <geom material="DefaultMaterialArenaWindows" mesh="arena_windows" class="visual"/>
       <geom mesh="arena_windows_collision_0" rgba="0.22652881586116613 0.12137032299274852 0.07061312305419043 1" class="collision"/>
       <geom mesh="arena_windows_collision_1" rgba="0.265856961029695 0.05254142322988686 0.009383348704137928 1" class="collision"/>

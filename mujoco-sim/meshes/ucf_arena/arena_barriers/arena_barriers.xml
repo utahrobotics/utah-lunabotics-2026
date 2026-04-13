@@ -2,33 +2,33 @@
 
   <asset>
     <material name="DefaultMaterialArenaBarriers" specular="0.5" shininess="0.5" rgba="1 1 1 1.0"/>
-    <mesh file="arena_barriers.obj"/>
-    <mesh file="arena_barriers_collision_0.obj"/>
-    <mesh file="arena_barriers_collision_1.obj"/>
-    <mesh file="arena_barriers_collision_2.obj"/>
-    <mesh file="arena_barriers_collision_3.obj"/>
-    <mesh file="arena_barriers_collision_4.obj"/>
-    <mesh file="arena_barriers_collision_5.obj"/>
-    <mesh file="arena_barriers_collision_6.obj"/>
-    <mesh file="arena_barriers_collision_7.obj"/>
-    <mesh file="arena_barriers_collision_8.obj"/>
-    <mesh file="arena_barriers_collision_9.obj"/>
-    <mesh file="arena_barriers_collision_10.obj"/>
-    <mesh file="arena_barriers_collision_11.obj"/>
-    <mesh file="arena_barriers_collision_12.obj"/>
-    <mesh file="arena_barriers_collision_13.obj"/>
-    <mesh file="arena_barriers_collision_14.obj"/>
-    <mesh file="arena_barriers_collision_15.obj"/>
-    <mesh file="arena_barriers_collision_16.obj"/>
-    <mesh file="arena_barriers_collision_17.obj"/>
-    <mesh file="arena_barriers_collision_18.obj"/>
-    <mesh file="arena_barriers_collision_19.obj"/>
-    <mesh file="arena_barriers_collision_20.obj"/>
-    <mesh file="arena_barriers_collision_21.obj"/>
-    <mesh file="arena_barriers_collision_22.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_barriers.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_barriers_collision_0.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_barriers_collision_1.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_barriers_collision_2.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_barriers_collision_3.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_barriers_collision_4.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_barriers_collision_5.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_barriers_collision_6.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_barriers_collision_7.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_barriers_collision_8.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_barriers_collision_9.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_barriers_collision_10.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_barriers_collision_11.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_barriers_collision_12.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_barriers_collision_13.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_barriers_collision_14.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_barriers_collision_15.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_barriers_collision_16.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_barriers_collision_17.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_barriers_collision_18.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_barriers_collision_19.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_barriers_collision_20.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_barriers_collision_21.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_barriers_collision_22.obj"/>
   </asset>
   <worldbody>
-    <body name="arena_barriers" pos="2.59 0 1.2" euler="0 0 90">
+    <body name="arena_barriers" pos="0 3 2.4">
       <geom material="DefaultMaterialArenaBarriers" mesh="arena_barriers" class="visual"/>
       <geom mesh="arena_barriers_collision_0" rgba="0.4426981786422861 0.6720485860521146 0.09767575243116 1" class="collision"/>
       <geom mesh="arena_barriers_collision_1" rgba="0.10398784029416497 0.12403133703121849 0.42399608207532 1" class="collision"/>

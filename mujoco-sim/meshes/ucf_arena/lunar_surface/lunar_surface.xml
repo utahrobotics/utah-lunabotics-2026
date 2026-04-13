@@ -1,189 +1,189 @@
 <mujoco model="lunar_surface">
 
   <asset>
-    <mesh file="lunar_surface.obj"/>
-    <mesh file="lunar_surface_collision_0.obj"/>
-    <mesh file="lunar_surface_collision_1.obj"/>
-    <mesh file="lunar_surface_collision_2.obj"/>
-    <mesh file="lunar_surface_collision_3.obj"/>
-    <mesh file="lunar_surface_collision_4.obj"/>
-    <mesh file="lunar_surface_collision_5.obj"/>
-    <mesh file="lunar_surface_collision_6.obj"/>
-    <mesh file="lunar_surface_collision_7.obj"/>
-    <mesh file="lunar_surface_collision_8.obj"/>
-    <mesh file="lunar_surface_collision_9.obj"/>
-    <mesh file="lunar_surface_collision_10.obj"/>
-    <mesh file="lunar_surface_collision_11.obj"/>
-    <mesh file="lunar_surface_collision_12.obj"/>
-    <mesh file="lunar_surface_collision_13.obj"/>
-    <mesh file="lunar_surface_collision_14.obj"/>
-    <mesh file="lunar_surface_collision_15.obj"/>
-    <mesh file="lunar_surface_collision_16.obj"/>
-    <mesh file="lunar_surface_collision_17.obj"/>
-    <mesh file="lunar_surface_collision_18.obj"/>
-    <mesh file="lunar_surface_collision_19.obj"/>
-    <mesh file="lunar_surface_collision_20.obj"/>
-    <mesh file="lunar_surface_collision_21.obj"/>
-    <mesh file="lunar_surface_collision_22.obj"/>
-    <mesh file="lunar_surface_collision_23.obj"/>
-    <mesh file="lunar_surface_collision_24.obj"/>
-    <mesh file="lunar_surface_collision_25.obj"/>
-    <mesh file="lunar_surface_collision_26.obj"/>
-    <mesh file="lunar_surface_collision_27.obj"/>
-    <mesh file="lunar_surface_collision_28.obj"/>
-    <mesh file="lunar_surface_collision_29.obj"/>
-    <mesh file="lunar_surface_collision_30.obj"/>
-    <mesh file="lunar_surface_collision_31.obj"/>
-    <mesh file="lunar_surface_collision_32.obj"/>
-    <mesh file="lunar_surface_collision_33.obj"/>
-    <mesh file="lunar_surface_collision_34.obj"/>
-    <mesh file="lunar_surface_collision_35.obj"/>
-    <mesh file="lunar_surface_collision_36.obj"/>
-    <mesh file="lunar_surface_collision_37.obj"/>
-    <mesh file="lunar_surface_collision_38.obj"/>
-    <mesh file="lunar_surface_collision_39.obj"/>
-    <mesh file="lunar_surface_collision_40.obj"/>
-    <mesh file="lunar_surface_collision_41.obj"/>
-    <mesh file="lunar_surface_collision_42.obj"/>
-    <mesh file="lunar_surface_collision_43.obj"/>
-    <mesh file="lunar_surface_collision_44.obj"/>
-    <mesh file="lunar_surface_collision_45.obj"/>
-    <mesh file="lunar_surface_collision_46.obj"/>
-    <mesh file="lunar_surface_collision_47.obj"/>
-    <mesh file="lunar_surface_collision_48.obj"/>
-    <mesh file="lunar_surface_collision_49.obj"/>
-    <mesh file="lunar_surface_collision_50.obj"/>
-    <mesh file="lunar_surface_collision_51.obj"/>
-    <mesh file="lunar_surface_collision_52.obj"/>
-    <mesh file="lunar_surface_collision_53.obj"/>
-    <mesh file="lunar_surface_collision_54.obj"/>
-    <mesh file="lunar_surface_collision_55.obj"/>
-    <mesh file="lunar_surface_collision_56.obj"/>
-    <mesh file="lunar_surface_collision_57.obj"/>
-    <mesh file="lunar_surface_collision_58.obj"/>
-    <mesh file="lunar_surface_collision_59.obj"/>
-    <mesh file="lunar_surface_collision_60.obj"/>
-    <mesh file="lunar_surface_collision_61.obj"/>
-    <mesh file="lunar_surface_collision_62.obj"/>
-    <mesh file="lunar_surface_collision_63.obj"/>
-    <mesh file="lunar_surface_collision_64.obj"/>
-    <mesh file="lunar_surface_collision_65.obj"/>
-    <mesh file="lunar_surface_collision_66.obj"/>
-    <mesh file="lunar_surface_collision_67.obj"/>
-    <mesh file="lunar_surface_collision_68.obj"/>
-    <mesh file="lunar_surface_collision_69.obj"/>
-    <mesh file="lunar_surface_collision_70.obj"/>
-    <mesh file="lunar_surface_collision_71.obj"/>
-    <mesh file="lunar_surface_collision_72.obj"/>
-    <mesh file="lunar_surface_collision_73.obj"/>
-    <mesh file="lunar_surface_collision_74.obj"/>
-    <mesh file="lunar_surface_collision_75.obj"/>
-    <mesh file="lunar_surface_collision_76.obj"/>
-    <mesh file="lunar_surface_collision_77.obj"/>
-    <mesh file="lunar_surface_collision_78.obj"/>
-    <mesh file="lunar_surface_collision_79.obj"/>
-    <mesh file="lunar_surface_collision_80.obj"/>
-    <mesh file="lunar_surface_collision_81.obj"/>
-    <mesh file="lunar_surface_collision_82.obj"/>
-    <mesh file="lunar_surface_collision_83.obj"/>
-    <mesh file="lunar_surface_collision_84.obj"/>
-    <mesh file="lunar_surface_collision_85.obj"/>
-    <mesh file="lunar_surface_collision_86.obj"/>
-    <mesh file="lunar_surface_collision_87.obj"/>
-    <mesh file="lunar_surface_collision_88.obj"/>
-    <mesh file="lunar_surface_collision_89.obj"/>
-    <mesh file="lunar_surface_collision_90.obj"/>
-    <mesh file="lunar_surface_collision_91.obj"/>
-    <mesh file="lunar_surface_collision_92.obj"/>
-    <mesh file="lunar_surface_collision_93.obj"/>
-    <mesh file="lunar_surface_collision_94.obj"/>
-    <mesh file="lunar_surface_collision_95.obj"/>
-    <mesh file="lunar_surface_collision_96.obj"/>
-    <mesh file="lunar_surface_collision_97.obj"/>
-    <mesh file="lunar_surface_collision_98.obj"/>
-    <mesh file="lunar_surface_collision_99.obj"/>
-    <mesh file="lunar_surface_collision_100.obj"/>
-    <mesh file="lunar_surface_collision_101.obj"/>
-    <mesh file="lunar_surface_collision_102.obj"/>
-    <mesh file="lunar_surface_collision_103.obj"/>
-    <mesh file="lunar_surface_collision_104.obj"/>
-    <mesh file="lunar_surface_collision_105.obj"/>
-    <mesh file="lunar_surface_collision_106.obj"/>
-    <mesh file="lunar_surface_collision_107.obj"/>
-    <mesh file="lunar_surface_collision_108.obj"/>
-    <mesh file="lunar_surface_collision_109.obj"/>
-    <mesh file="lunar_surface_collision_110.obj"/>
-    <mesh file="lunar_surface_collision_111.obj"/>
-    <mesh file="lunar_surface_collision_112.obj"/>
-    <mesh file="lunar_surface_collision_113.obj"/>
-    <mesh file="lunar_surface_collision_114.obj"/>
-    <mesh file="lunar_surface_collision_115.obj"/>
-    <mesh file="lunar_surface_collision_116.obj"/>
-    <mesh file="lunar_surface_collision_117.obj"/>
-    <mesh file="lunar_surface_collision_118.obj"/>
-    <mesh file="lunar_surface_collision_119.obj"/>
-    <mesh file="lunar_surface_collision_120.obj"/>
-    <mesh file="lunar_surface_collision_121.obj"/>
-    <mesh file="lunar_surface_collision_122.obj"/>
-    <mesh file="lunar_surface_collision_123.obj"/>
-    <mesh file="lunar_surface_collision_124.obj"/>
-    <mesh file="lunar_surface_collision_125.obj"/>
-    <mesh file="lunar_surface_collision_126.obj"/>
-    <mesh file="lunar_surface_collision_127.obj"/>
-    <mesh file="lunar_surface_collision_128.obj"/>
-    <mesh file="lunar_surface_collision_129.obj"/>
-    <mesh file="lunar_surface_collision_130.obj"/>
-    <mesh file="lunar_surface_collision_131.obj"/>
-    <mesh file="lunar_surface_collision_132.obj"/>
-    <mesh file="lunar_surface_collision_133.obj"/>
-    <mesh file="lunar_surface_collision_134.obj"/>
-    <mesh file="lunar_surface_collision_135.obj"/>
-    <mesh file="lunar_surface_collision_136.obj"/>
-    <mesh file="lunar_surface_collision_137.obj"/>
-    <mesh file="lunar_surface_collision_138.obj"/>
-    <mesh file="lunar_surface_collision_139.obj"/>
-    <mesh file="lunar_surface_collision_140.obj"/>
-    <mesh file="lunar_surface_collision_141.obj"/>
-    <mesh file="lunar_surface_collision_142.obj"/>
-    <mesh file="lunar_surface_collision_143.obj"/>
-    <mesh file="lunar_surface_collision_144.obj"/>
-    <mesh file="lunar_surface_collision_145.obj"/>
-    <mesh file="lunar_surface_collision_146.obj"/>
-    <mesh file="lunar_surface_collision_147.obj"/>
-    <mesh file="lunar_surface_collision_148.obj"/>
-    <mesh file="lunar_surface_collision_149.obj"/>
-    <mesh file="lunar_surface_collision_150.obj"/>
-    <mesh file="lunar_surface_collision_151.obj"/>
-    <mesh file="lunar_surface_collision_152.obj"/>
-    <mesh file="lunar_surface_collision_153.obj"/>
-    <mesh file="lunar_surface_collision_154.obj"/>
-    <mesh file="lunar_surface_collision_155.obj"/>
-    <mesh file="lunar_surface_collision_156.obj"/>
-    <mesh file="lunar_surface_collision_157.obj"/>
-    <mesh file="lunar_surface_collision_158.obj"/>
-    <mesh file="lunar_surface_collision_159.obj"/>
-    <mesh file="lunar_surface_collision_160.obj"/>
-    <mesh file="lunar_surface_collision_161.obj"/>
-    <mesh file="lunar_surface_collision_162.obj"/>
-    <mesh file="lunar_surface_collision_163.obj"/>
-    <mesh file="lunar_surface_collision_164.obj"/>
-    <mesh file="lunar_surface_collision_165.obj"/>
-    <mesh file="lunar_surface_collision_166.obj"/>
-    <mesh file="lunar_surface_collision_167.obj"/>
-    <mesh file="lunar_surface_collision_168.obj"/>
-    <mesh file="lunar_surface_collision_169.obj"/>
-    <mesh file="lunar_surface_collision_170.obj"/>
-    <mesh file="lunar_surface_collision_171.obj"/>
-    <mesh file="lunar_surface_collision_172.obj"/>
-    <mesh file="lunar_surface_collision_173.obj"/>
-    <mesh file="lunar_surface_collision_174.obj"/>
-    <mesh file="lunar_surface_collision_175.obj"/>
-    <mesh file="lunar_surface_collision_176.obj"/>
-    <mesh file="lunar_surface_collision_177.obj"/>
-    <mesh file="lunar_surface_collision_178.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_0.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_1.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_2.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_3.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_4.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_5.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_6.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_7.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_8.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_9.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_10.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_11.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_12.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_13.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_14.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_15.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_16.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_17.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_18.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_19.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_20.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_21.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_22.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_23.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_24.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_25.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_26.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_27.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_28.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_29.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_30.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_31.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_32.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_33.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_34.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_35.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_36.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_37.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_38.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_39.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_40.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_41.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_42.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_43.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_44.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_45.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_46.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_47.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_48.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_49.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_50.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_51.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_52.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_53.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_54.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_55.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_56.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_57.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_58.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_59.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_60.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_61.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_62.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_63.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_64.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_65.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_66.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_67.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_68.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_69.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_70.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_71.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_72.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_73.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_74.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_75.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_76.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_77.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_78.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_79.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_80.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_81.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_82.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_83.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_84.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_85.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_86.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_87.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_88.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_89.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_90.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_91.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_92.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_93.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_94.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_95.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_96.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_97.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_98.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_99.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_100.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_101.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_102.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_103.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_104.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_105.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_106.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_107.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_108.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_109.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_110.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_111.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_112.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_113.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_114.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_115.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_116.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_117.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_118.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_119.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_120.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_121.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_122.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_123.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_124.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_125.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_126.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_127.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_128.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_129.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_130.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_131.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_132.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_133.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_134.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_135.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_136.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_137.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_138.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_139.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_140.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_141.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_142.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_143.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_144.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_145.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_146.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_147.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_148.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_149.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_150.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_151.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_152.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_153.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_154.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_155.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_156.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_157.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_158.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_159.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_160.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_161.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_162.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_163.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_164.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_165.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_166.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_167.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_168.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_169.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_170.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_171.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_172.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_173.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_174.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_175.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_176.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_177.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="lunar_surface_collision_178.obj"/>
   </asset>
   <worldbody>
-    <body name="lunar_surface" pos="-0.4 -2.59 0" euler="0 0 90 ">
+    <body name="lunar_surface" pos="-5.6 9.5 0">
       <geom mesh="lunar_surface" class="visual"/>
       <geom mesh="lunar_surface_collision_0" rgba="0.7402892448490246 0.5108973568050268 0.9755014953270393 1" class="collision"/>
       <geom mesh="lunar_surface_collision_1" rgba="0.9170332834800548 0.8637227759788206 0.45906501801541 1" class="collision"/>

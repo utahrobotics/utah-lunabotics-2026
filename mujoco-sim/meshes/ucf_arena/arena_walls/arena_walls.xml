@@ -2,66 +2,66 @@
 
   <asset>
     <material name="DefaultMaterialArenaWalls" specular="0.5" shininess="0.5" rgba="1 1 1 1.0"/>
-    <mesh file="arena_walls.obj"/>
-    <mesh file="arena_walls_collision_0.obj"/>
-    <mesh file="arena_walls_collision_1.obj"/>
-    <mesh file="arena_walls_collision_2.obj"/>
-    <mesh file="arena_walls_collision_3.obj"/>
-    <mesh file="arena_walls_collision_4.obj"/>
-    <mesh file="arena_walls_collision_5.obj"/>
-    <mesh file="arena_walls_collision_6.obj"/>
-    <mesh file="arena_walls_collision_7.obj"/>
-    <mesh file="arena_walls_collision_8.obj"/>
-    <mesh file="arena_walls_collision_9.obj"/>
-    <mesh file="arena_walls_collision_10.obj"/>
-    <mesh file="arena_walls_collision_11.obj"/>
-    <mesh file="arena_walls_collision_12.obj"/>
-    <mesh file="arena_walls_collision_13.obj"/>
-    <mesh file="arena_walls_collision_14.obj"/>
-    <mesh file="arena_walls_collision_15.obj"/>
-    <mesh file="arena_walls_collision_16.obj"/>
-    <mesh file="arena_walls_collision_17.obj"/>
-    <mesh file="arena_walls_collision_18.obj"/>
-    <mesh file="arena_walls_collision_19.obj"/>
-    <mesh file="arena_walls_collision_20.obj"/>
-    <mesh file="arena_walls_collision_21.obj"/>
-    <mesh file="arena_walls_collision_22.obj"/>
-    <mesh file="arena_walls_collision_23.obj"/>
-    <mesh file="arena_walls_collision_24.obj"/>
-    <mesh file="arena_walls_collision_25.obj"/>
-    <mesh file="arena_walls_collision_26.obj"/>
-    <mesh file="arena_walls_collision_27.obj"/>
-    <mesh file="arena_walls_collision_28.obj"/>
-    <mesh file="arena_walls_collision_29.obj"/>
-    <mesh file="arena_walls_collision_30.obj"/>
-    <mesh file="arena_walls_collision_31.obj"/>
-    <mesh file="arena_walls_collision_32.obj"/>
-    <mesh file="arena_walls_collision_33.obj"/>
-    <mesh file="arena_walls_collision_34.obj"/>
-    <mesh file="arena_walls_collision_35.obj"/>
-    <mesh file="arena_walls_collision_36.obj"/>
-    <mesh file="arena_walls_collision_37.obj"/>
-    <mesh file="arena_walls_collision_38.obj"/>
-    <mesh file="arena_walls_collision_39.obj"/>
-    <mesh file="arena_walls_collision_40.obj"/>
-    <mesh file="arena_walls_collision_41.obj"/>
-    <mesh file="arena_walls_collision_42.obj"/>
-    <mesh file="arena_walls_collision_43.obj"/>
-    <mesh file="arena_walls_collision_44.obj"/>
-    <mesh file="arena_walls_collision_45.obj"/>
-    <mesh file="arena_walls_collision_46.obj"/>
-    <mesh file="arena_walls_collision_47.obj"/>
-    <mesh file="arena_walls_collision_48.obj"/>
-    <mesh file="arena_walls_collision_49.obj"/>
-    <mesh file="arena_walls_collision_50.obj"/>
-    <mesh file="arena_walls_collision_51.obj"/>
-    <mesh file="arena_walls_collision_52.obj"/>
-    <mesh file="arena_walls_collision_53.obj"/>
-    <mesh file="arena_walls_collision_54.obj"/>
-    <mesh file="arena_walls_collision_55.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_0.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_1.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_2.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_3.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_4.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_5.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_6.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_7.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_8.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_9.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_10.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_11.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_12.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_13.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_14.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_15.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_16.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_17.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_18.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_19.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_20.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_21.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_22.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_23.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_24.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_25.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_26.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_27.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_28.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_29.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_30.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_31.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_32.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_33.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_34.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_35.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_36.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_37.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_38.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_39.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_40.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_41.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_42.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_43.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_44.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_45.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_46.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_47.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_48.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_49.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_50.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_51.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_52.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_53.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_54.obj"/>
+    <mesh scale="2.1 2.1 2.1" file="arena_walls_collision_55.obj"/>
   </asset>
   <worldbody>
-    <body name="arena_walls" pos = "4 0 1.2" euler="0 0 90" > 
+    <body name="arena_walls" pos = "0 0 2.4">
       <geom material="DefaultMaterialArenaWalls" mesh="arena_walls" class="visual"/>
       <geom mesh="arena_walls_collision_0" rgba="0.24005392570862905 0.27646511660967077 0.7343536367402101 1" class="collision"/>
       <geom mesh="arena_walls_collision_1" rgba="0.27301233649202183 0.9833072785689125 0.5050841994021588 1" class="collision"/>
