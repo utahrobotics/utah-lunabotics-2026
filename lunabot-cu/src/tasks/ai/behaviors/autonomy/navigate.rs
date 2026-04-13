@@ -1,5 +1,6 @@
 use bonsai_bt::Behavior::{self, Action, Race, Sequence, Wait, WaitForever, While};
 use common::Steering;
+use nalgebra::Vector2;
 use serde::Deserialize;
 
 use crate::tasks::ai::action::LunabotAction;
