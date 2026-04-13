@@ -95,6 +95,38 @@ pub struct ActuatorReading {
     pub m2_reading: u16,
 }
 
+/// Channel mapping:
+///   0  = M1_CS        (Motor 1 current sense)
+///   1  = M2_CS        (Motor 2 current sense)
+///   2  = M3_CS        (Motor 3 current sense)
+///   3  = M4_CS        (Motor 4 current sense)
+///   4  = M1_THERM     (Motor 1 thermistor)
+///   5  = M2_THERM     (Motor 2 thermistor)
+///   6  = M3_THERM     (Motor 3 thermistor)
+///   7  = M4_THERM     (Motor 4 thermistor)
+///   8  = DRIVE1_HE    (Drive 1 hall-effect sensor)
+///   9  = DRIVE2_HE    (Drive 2 hall-effect sensor)
+///   10 = AMB_THERM    (Ambient thermistor)
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(any(feature = "defmt", feature = "defmt-03"), derive(defmt::Format))]
+#[cfg_attr(
+    feature = "std",
+    derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
+)]
+pub struct SensorReading {
+    pub m1_cs: u16,
+    pub m2_cs: u16,
+    pub m3_cs: u16,
+    pub m4_cs: u16,
+    pub m1_therm: u16,
+    pub m2_therm: u16,
+    pub m3_therm: u16,
+    pub m4_therm: u16,
+    pub drive1_he: u16,
+    pub drive2_he: u16,
+    pub amb_therm: u16,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(any(feature = "defmt", feature = "defmt-03"), derive(defmt::Format))]
 #[cfg_attr(
