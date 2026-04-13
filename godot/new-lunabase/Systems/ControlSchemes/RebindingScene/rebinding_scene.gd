@@ -16,7 +16,8 @@ var current_action_to_bind: String = ""
 signal new_binding
 signal input_received
 signal new_message
-signal binding_saved
+
+signal binding_saved(saved_path: String)
 
 func _ready() -> void:
 	setup()
@@ -68,7 +69,7 @@ func save_binding_to_file():
 		msg = "Save failed with error code: " + str(error)
 	else:
 		msg = "Resource saved successfully to: " + ProjectSettings.globalize_path(file_path)
-		binding_saved.emit()
+		binding_saved.emit(file_path)
 	print(msg)
 	var rich_text_msg = "[color=3399ff] %s [/color]" % msg
 	new_message.emit(msg)

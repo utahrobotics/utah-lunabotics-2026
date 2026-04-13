@@ -20,6 +20,8 @@ var custom_schemes: Array[ControlSchemeResource]
 var keyboard_prev_index := -1
 var controller_prev_index := -1
 
+var custom_scheme_filenames: Array[String] = []
+
 func _ready() -> void:
 	populate_schemes()
 	sync_touch_controls_from_settings()
@@ -32,7 +34,10 @@ func sync_touch_controls_from_settings() -> void:
 func _on_touch_controls_check_toggled(pressed: bool) -> void:
 	SettingsMenu.set_touch_screen_controls(pressed)
 
-func populate_schemes():
+func populate_schemes(apply_default_keyboard_and_controller: bool = true) -> void:
+	keyboard_prev_index = -1
+	controller_prev_index = -1
+
 	controller_scheme_option_button.clear()
 	keyboard_scheme_option_button.clear()
 	local_scheme_option_button.clear()
@@ -40,6 +45,7 @@ func populate_schemes():
 	controller_schemes.clear()
 	keyboard_schemes.clear()
 	custom_schemes.clear()
+	custom_scheme_filenames.clear()
 	
 	# Load controller schemes
 	for file in ResourceLoader.list_directory(controller_path):
@@ -55,10 +61,14 @@ func populate_schemes():
 	for file in ResourceLoader.list_directory(custom_path):
 		var new_resource : ControlSchemeResource = ResourceLoader.load(custom_path + "/" + file)
 		custom_schemes.append(new_resource)
+		custom_scheme_filenames.append(file)
 		local_scheme_option_button.add_item(new_resource.scheme_name)
 	
-	_on_keyboard_scheme_option_button_item_selected(0)
-	_on_controller_scheme_option_button_item_selected(0)
+	if apply_default_keyboard_and_controller:
+		if keyboard_schemes.size() > 0:
+			_on_keyboard_scheme_option_button_item_selected(0)
+		if controller_schemes.size() > 0:
+			_on_controller_scheme_option_button_item_selected(0)
 
 func erase_all_action_events():
 	var actions = InputMap.get_actions()
@@ -107,13 +117,49 @@ func _on_default_button_pressed() -> void:
 func _on_create_binding_button_pressed() -> void:
 	var bindings_scene = REBINDING_SCENE.instantiate()
 	get_tree().root.add_child(bindings_scene)
-	bindings_scene.binding_saved.connect(new_binding_saved)
+	bindings_scene.binding_saved.connect(_on_binding_saved)
 	close_settings_menu.emit()
 
-func new_binding_saved():
-	populate_schemes()
+func _on_binding_saved(saved_path: String) -> void:
+	var kb_sel: int = keyboard_scheme_option_button.selected if keyboard_scheme_option_button.item_count > 0 else 0
+	var ctrl_sel: int = controller_scheme_option_button.selected if controller_scheme_option_button.item_count > 0 else 0
+
+	populate_schemes(false)
+
+	if keyboard_schemes.size() > 0:
+		var kb_i: int = clampi(kb_sel, 0, keyboard_schemes.size() - 1)
+		keyboard_scheme_option_button.select(kb_i)
+		_on_keyboard_scheme_option_button_item_selected(kb_i)
+	if controller_schemes.size() > 0:
+		var c_i: int = clampi(ctrl_sel, 0, controller_schemes.size() - 1)
+		controller_scheme_option_button.select(c_i)
+		_on_controller_scheme_option_button_item_selected(c_i)
+
+	_select_custom_scheme_by_saved_path(saved_path)
+
+
+func _select_custom_scheme_by_saved_path(saved_path: String) -> void:
+	if saved_path.is_empty():
+		return
+	var base: String = saved_path.get_file()
+	for i in custom_scheme_filenames.size():
+		if custom_scheme_filenames[i] == base:
+			local_scheme_option_button.select(i)
+			_on_local_scheme_option_button_item_selected(i)
+			return
+	if ResourceLoader.exists(saved_path):
+		var res: ControlSchemeResource = ResourceLoader.load(saved_path) as ControlSchemeResource
+		if res:
+			for i in custom_schemes.size():
+				if custom_schemes[i].scheme_name == res.scheme_name:
+					local_scheme_option_button.select(i)
+					_on_local_scheme_option_button_item_selected(i)
+					return
+	push_warning("ControlSchemeSwitcher: saved binding not found in list: %s" % base)
+
 
 func _on_local_scheme_option_button_item_selected(index: int) -> void:
+	if index < 0 or index >= custom_schemes.size():
+		return
 	erase_all_action_events()
-	populate_from_scheme(custom_schemes[index-1])
-	
+	populate_from_scheme(custom_schemes[index])
