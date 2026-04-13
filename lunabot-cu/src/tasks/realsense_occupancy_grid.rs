@@ -36,6 +36,7 @@ use crate::ROBOT_STATE;
 use crate::pathfinding::OccupancyGrid;
 use crate::payloads::depth_frame::CuDepthFrame;
 use crate::rerun_viz::RECORDER;
+use crate::tasks::ai::behaviors::autonomy::navigate::Arena;
 use crate::tasks::ai::blackboard::BLACKBOARD_SHARED;
 use crate::tasks::{DEPTH_FRAME_HEIGHT, DEPTH_FRAME_WIDTH};
 use crate::utils::rwlock_write_unpoison;
@@ -67,7 +68,7 @@ pub struct OccupancyGridTask {
     max_linear_velocity: f64,
     max_angular_velocity: f64,
     max_acceleration: f64,
-    arena_obstacles: Option<ArenaObstaclesSelection>,
+    arena_obstacles: Option<Arena>,
     robot_radius_meters: f32,
 }
 
@@ -80,13 +81,6 @@ struct ArenaObstacles {
     /// (center_x, center_y, radius)
     #[serde(default)]
     circles: Vec<(f32, f32, f32)>,
-}
-
-#[derive(Deserialize, Debug, Clone, Copy)]
-#[serde(rename_all = "lowercase")]
-enum ArenaObstaclesSelection {
-    Artemis,
-    Ucf,
 }
 
 /// Paint known arena obstacles permanently into the occupancy grid.
@@ -349,7 +343,7 @@ impl CuTask for OccupancyGridTask {
             .unwrap_or(3.0) as f32;
 
         let arena_obstacles = config.and_then(|c| {
-            c.get_value::<ArenaObstaclesSelection>("arena_obstacles")
+            c.get_value::<Arena>("arena_obstacles")
                 .expect("failed to deserialize")
         });
 
@@ -753,14 +747,14 @@ impl CuTask for OccupancyGridTask {
     }
 }
 
-fn load_arena_obstacles(arena_obstacles: ArenaObstaclesSelection) -> Option<ArenaObstacles> {
+fn load_arena_obstacles(arena_obstacles: Arena) -> Option<ArenaObstacles> {
     match arena_obstacles {
-        ArenaObstaclesSelection::Artemis => {
+        Arena::Artemis => {
             let path = "arena_obstacles/artemis.ron";
             let contents = std::fs::read_to_string(path).ok()?;
             ron::de::from_str(&contents).ok()
         }
-        ArenaObstaclesSelection::Ucf => {
+        Arena::UcfRight | Arena::UcfLeft => {
             let path = "arena_obstacles/ucf.ron";
             let contents = std::fs::read_to_string(path).ok()?;
             ron::de::from_str(&contents).ok()

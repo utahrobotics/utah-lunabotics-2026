@@ -1,27 +1,40 @@
 use bonsai_bt::Behavior::{self, Action, Race, Sequence, Wait, WaitForever, While};
 use common::Steering;
+use serde::Deserialize;
 
 use crate::tasks::ai::action::LunabotAction;
 
-pub fn navigate_behavior() -> Behavior<LunabotAction> {
+#[derive(Deserialize, Debug, Clone, Copy)]
+#[serde(rename_all = "lowercase")]
+pub enum Arena {
+    Artemis,
+    UcfRight,
+    UcfLeft,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum NavigationGoal {
+    DigSite(Arena),
+    DumpSite(Arena),
+}
+
+pub fn navigate_behavior(goal: NavigationGoal) -> Behavior<LunabotAction> {
     While(
         Box::new(Action(LunabotAction::IsAutonomy)), // this is autonomy node is technically redundant
         vec![Sequence(vec![
             // one extra yield to avoid busy looping, in case the stage was set in the same tick
             Action(LunabotAction::Yield),
-            Action(LunabotAction::CalculatePath),
+            Action(LunabotAction::CalculatePath(goal)),
             // hale's path follow shouldn't need this
             // Action(LunabotAction::RotateToFacePath),,
+            // 1. navigate to dig site
             Race(vec![
                 Action(LunabotAction::FollowPath),
                 While(
                     Box::new(WaitForever),
-                    vec![Wait(1.0), Action(LunabotAction::CalculatePath)],
+                    vec![Wait(1.0), Action(LunabotAction::CalculatePath(goal))],
                 ),
-            ]),
-            // dig/dump dirt (test for now but refactor into a continous dig, path, dump, path loop later)
-            Action(LunabotAction::Dig),
-            Action(LunabotAction::Dump),
+            ])
         ])],
     )
 }

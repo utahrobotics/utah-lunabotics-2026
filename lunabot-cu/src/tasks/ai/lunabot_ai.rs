@@ -11,6 +11,7 @@ use embedded_common::ActuatorCommand;
 
 use crate::pathfinding::OccupancyGrid;
 use crate::tasks::ai::action::LunabotAction;
+use crate::tasks::ai::behaviors::autonomy::navigate::Arena;
 use crate::tasks::ai::behaviors::teleop::teleop_behavior;
 use crate::tasks::ai::blackboard::{BLACKBOARD_SHARED, LunabotBlackboard};
 use crate::utils::nanos_to_secs;
@@ -56,12 +57,16 @@ impl CuTask for LunabotAi {
                     .expect("failed to deserialize")
             })
             .unwrap_or(0.3) as f32;
+        let arena = config.and_then(|c| {
+            c.get_value::<Arena>("arena")
+                .expect("Failed to deserialize arena")
+        }).expect("specify the arena in lunabot_ai config");
         let mut blackboard = LunabotBlackboard::default();
         BLACKBOARD_SHARED.get_or_init(|| Arc::clone(&blackboard.blackboard_shared));
         blackboard.obstacle_gradient_threshold_expander = obstacle_gradient_threshold_expander;
         blackboard.obstacle_gradient_threshold_pathfinder = obstacle_gradient_threshold_pathfinder;
         blackboard.robot_radius = robot_radius_meters;
-        let behavior = teleop_behavior();
+        let behavior = teleop_behavior(arena);
         let bt = BT::new(behavior, blackboard);
         Ok(Self {
             bt: bt,
