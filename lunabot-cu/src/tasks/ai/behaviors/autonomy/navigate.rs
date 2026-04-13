@@ -18,6 +18,12 @@ pub enum NavigationGoal {
     DumpSite(Arena),
 }
 
+impl NavigationGoal {
+    fn to_center_and_halfsizes(&self) -> (Vector2<f32>, f32, f32) {
+        todo!()
+    }
+}
+
 pub fn navigate_behavior(goal: NavigationGoal) -> Behavior<LunabotAction> {
     While(
         Box::new(Action(LunabotAction::IsAutonomy)), // this is autonomy node is technically redundant
