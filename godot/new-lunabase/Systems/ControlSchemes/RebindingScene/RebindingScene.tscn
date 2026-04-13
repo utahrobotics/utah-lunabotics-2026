@@ -256,7 +256,7 @@ Custom bindings are currently saved to your local app folder. The save message w
 
 If you want to push your binding to the repo, find the file in your local folder, place it in the corresponding folder inside res://Systems/ControlSchemes/schemes/ then you can push it to the repo to share it.
 
-BE SURE TO SAVE YOUR BINDING TO A FILE IF YOU WANT TO KEEP IT. OTHERWISE IT WILL ONLY EXIST FOR THIS SESSION"
+BE SURE TO SAVE YOUR BINDING TO A FILE IF YOU WANT TO KEEP IT. OTHERWISE IT WILL ONLY EXIST FOR THIS SESSION! alright stay safe. love you"
 autowrap_mode = 3
 
 [node name="NamingPanel" type="Panel" parent="." unique_id=333531834]
