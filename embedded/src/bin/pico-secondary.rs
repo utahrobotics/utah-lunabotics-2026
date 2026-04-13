@@ -18,6 +18,10 @@ bind_interrupts!(struct Irqs {
     UART0_IRQ => UartInterruptHandler<UART0>;
 });
 
+const UART_IDLE_TIMEOUT_MS: u64 = 1000;
+const MUX_SETTLE_US: u64 = 10;
+
+
 #[embassy_executor::main]
 async fn main(spawner: Spawner) {
     let p = embassy_rp::init(Default::default());
@@ -29,10 +33,15 @@ async fn main(spawner: Spawner) {
     let mut uart_config = UartConfig::default();
     uart_config.baudrate = 115200;
 
-    // pin 16 TX, pin 17 RX 
-    let mut uart = Uart::new(p.UART0, p.PIN_16, p.PIN_17, Irqs, p.DMA_CH0, p.DMA_CH1, uart_config);
-    let mut rx_buf = [0u8; 1];
-    let mut tx_buf = [0u8; 2];
+    let mut uart = Uart::new(
+        p.UART0,
+        p.PIN_12, // TX
+        p.PIN_13, // RX
+        Irqs,
+        p.DMA_CH0,
+        p.DMA_CH1,
+        uart_config,
+    );
 
     // Initialize ADC
     let mut adc_config = AdcConfig::default();
@@ -41,9 +50,14 @@ async fn main(spawner: Spawner) {
     
     
     // Initialize MUX  pins
-    let mut mux_s0 = Output::new(p.PIN_2, Level::Low);
-    let mut mux_s1 = Output::new(p.PIN_3, Level::Low);
-    let mut mux_s2 = Output::new(p.PIN_4, Level::Low);
+    let mut mux_s0 = Output::new(p.PIN_19, Level::Low); // physical pin 25= GPIO 19
+    let mut mux_s1 = Output::new(p.PIN_20, Level::Low); // physical pin 26= GPIO 20
+    let mut mux_s2 = Output::new(p.PIN_21, Level::Low); // physical pin 27= GPIO 21
+    let mut mux_s3 = Output::new(p.PIN_22, Level::Low); // physical pin 29 = GPIO22
+
+    let mut rx_buf = [0u8; SecondaryRequest::SIZE];
+    
+
 
     loop {
         // Wait for a request representing the MUX address
@@ -74,4 +88,11 @@ async fn main(spawner: Spawner) {
             }
         }
     }
+
+
+fn set_mux(addr: u8, s0: &mut Output, s1: &mut Output, s2: &mut Output, s3: &mut Output) {
+    s0.set_level(if addr & 0b0001 != 0 { Level::High } else { Level::Low });
+    s1.set_level(if addr & 0b0010 != 0 { Level::High } else { Level::Low });
+    s2.set_level(if addr & 0b0100 != 0 { Level::High } else { Level::Low });
+    s3.set_level(if addr & 0b1000 != 0 { Level::High } else { Level::Low });
 }
