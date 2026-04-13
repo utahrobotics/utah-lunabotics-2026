@@ -6,9 +6,12 @@ extends Control
 var is_rebinding: bool = false
 var current_action_to_bind: String = ""
 
+@onready var naming_panel: Panel = $NamingPanel
+
 @onready var skip_binding_button: Button = $LeftColumn/InformationPanel/MarginContainer/VBox/SkipBindingButton
 @onready var confirm_bindings: Button = $LeftColumn/InformationPanel/MarginContainer/VBox/ConfirmBindings
 @onready var save_bindings_button: Button = $LeftColumn/InformationPanel/MarginContainer/VBox/SaveBindingsButton
+@onready var line_edit: LineEdit = $NamingPanel/MarginContainer/VBoxContainer/LineEdit
 
 signal new_binding
 signal input_received
@@ -18,6 +21,7 @@ func _ready() -> void:
 	setup()
 
 func setup():
+	naming_panel.hide()
 	is_rebinding = false
 	current_action_to_bind = ""
 	current_scheme = ControlSchemeResource.new()
@@ -45,25 +49,30 @@ func rebind_all_controls():
 	update_ui()
 
 func save_binding_to_file():
-	var current_time_string := Time.get_datetime_string_from_system()
-	var scheme_name := current_time_string +  "_binding.tres"
-	var file_path = "user://" + scheme_name
+	var scheme_name = line_edit.text if line_edit.text != "" else "custom_binding"
+	scheme_name += ".tres"
+	
+	var dir_path = "user://bindings/"
+	var file_path = dir_path + scheme_name
+	
+	if not DirAccess.dir_exists_absolute(dir_path):
+		DirAccess.make_dir_recursive_absolute(dir_path)
 	
 	var error = ResourceSaver.save(current_scheme, file_path)
+	
 	var msg = ""
 	if error != OK:
-		msg = "Save failed with error code: " + error
+		msg = "Save failed with error code: " + str(error)
 	else:
 		msg = "Resource saved successfully to: " + ProjectSettings.globalize_path(file_path)
 	print(msg)
 	var rich_text_msg = "[color=3399ff] %s [/color]" % msg
 	new_message.emit(msg)
-
+	naming_panel.hide()
 
 func _input(event: InputEvent) -> void:
 	if not is_rebinding:
 		return
-
 	# MouseButton will not be a remappable thing due to it killing the UI, also why would you do that?
 	if event is InputEventKey or event is InputEventJoypadButton:
 		if event.is_pressed():
@@ -99,11 +108,20 @@ func _on_skip_binding_button_pressed() -> void:
 func _on_rebind_pressed() -> void:
 	setup()
 
-#TODO COMPLETE
 func _on_confirm_bindings_pressed() -> void:
 	SettingsMenu.toggle_can_accept_inputs.emit(true)
 	SettingsMenu.updated_control_scheme.emit()
 	self.queue_free()
 
 func _on_save_bindings_button_pressed() -> void:
+	open_text_edit()
+
+func open_text_edit():
+	naming_panel.show()
+
+func _on_confirm_name_pressed() -> void:
+	save_binding_to_file()
+
+
+func _on_line_edit_text_submitted(new_text: String) -> void:
 	save_binding_to_file()
