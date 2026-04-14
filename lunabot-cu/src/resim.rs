@@ -3,15 +3,13 @@ pub mod comms;
 pub mod rerun_viz;
 
 pub mod bridges;
+pub mod kalman_filtering;
 pub mod pathfinding;
+pub mod payloads;
 pub mod robot_state;
 pub mod simple_monitor;
 pub mod tasks;
 pub mod utils;
-pub mod kalman_filtering;
-pub mod payloads;
-
-
 
 use crossbeam::atomic::AtomicCell;
 use cu29::prelude::*;
@@ -56,7 +54,9 @@ fn default_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::ObstacleGstreamer(..) => SimOverride::ExecutedBySim,
         default::SimStep::T265LeftGstreamer(..) => SimOverride::ExecutedBySim,
         default::SimStep::T265RightGstreamer(..) => SimOverride::ExecutedBySim,
-
+        default::SimStep::CamD456Rgb(_) | default::SimStep::CamD456RgbNull(_) => {
+            SimOverride::ExecutedBySim
+        }
         _ => SimOverride::ExecuteByRuntime,
     }
 }
@@ -68,13 +68,16 @@ fn run_one_copperlist(
 ) {
     let msgs = &copper_list.msgs;
     let mut start = msgs
-        .get_t_265_subscriber_outputs().0
+        .get_t_265_subscriber_outputs()
+        .0
         .metadata()
         .process_time()
         .start;
     if start.is_none() {
-        eprintln!("[RESIM] Process time metadata not set. Ensure that the start task sets the process time.");
-       return;
+        eprintln!(
+            "[RESIM] Process time metadata not set. Ensure that the start task sets the process time."
+        );
+        return;
     } else {
         robot_clock.set_value(start.unwrap().as_nanos());
     }
@@ -180,9 +183,9 @@ fn run_one_copperlist(
                 SimOverride::ExecutedBySim
             }
             default::SimStep::T265Subscriber(CuTaskCallbackState::Process(_, output)) => {
-                let outputs  = msgs.get_t_265_subscriber_outputs().clone();
+                let outputs = msgs.get_t_265_subscriber_outputs().clone();
                 output.0 = outputs.0;
-                output.1 = outputs.1; 
+                output.1 = outputs.1;
                 output.0.tov = robot_clock.now().into();
                 output.1.tov = robot_clock.now().into();
 
@@ -203,6 +206,10 @@ fn run_one_copperlist(
             default::SimStep::L2KissIcp(..) => SimOverride::ExecuteByRuntime,
             default::SimStep::OccupancyGridPipeline(..) => SimOverride::ExecuteByRuntime,
             default::SimStep::Localizer(..) => SimOverride::ExecuteByRuntime,
+            default::SimStep::CamD456Rgb(_) | default::SimStep::CamD456RgbNull(_) => {
+                SimOverride::ExecutedBySim
+            }
+
             default::SimStep::__Phantom(..) => SimOverride::ExecuteByRuntime,
         }
     };
