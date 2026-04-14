@@ -30,11 +30,11 @@ fn main() -> Result<()> {
             if let Some(node) = event.devnode() {
                 let device = event.device();
                 let id_path = event.property_value("ID_PATH").map(|s| s.to_string_lossy());
-                let id_path = event.property_value("ID_PATH").map(|s| s.to_string_lossy());
+                let device = event.device();
                 let index = device.attribute_value("index");
                 match event.event_type() {
                     EventType::Add => {
-                        println!("ADD  {:<4} => {}:  index:{:?}", node.display(), id_path.unwrap_or_default(), index);
+                        println!("ADD  {:<4} => {}  index: {:?}", node.display(), id_path.unwrap_or_default(), index);
                     }
                     EventType::Remove => {
                         println!("REM  {:<4}", node.display());

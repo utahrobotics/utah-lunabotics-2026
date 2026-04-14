@@ -23,6 +23,7 @@ pub struct UdevMonitor {
 pub struct NewDevice {
     pub port: Box<String>,
     pub dev_path: Box<String>,
+    pub index: Box<String>,
 }
 
 impl Default for NewDevice {
@@ -30,6 +31,7 @@ impl Default for NewDevice {
         Self {
             port: Box::new("pci-0000:35:00.4-usb-0:1:1.3".to_string()),
             dev_path: Box::new("/dev/video4".to_string()),
+            index: Box::new(String::from("0")),
         }
     }
 }
@@ -94,16 +96,7 @@ impl CuSrcTask for UdevMonitor {
                 println!("No udev_index for camera {}", path_str);
                 continue;
             };
-            if udev_index.to_str() != Some("0") {
-                continue;
-            }
-            if let Some(name) = device.attribute_value("name") {
-                if let Some(name) = name.to_str() {
-                    if name.contains("RealSense") {
-                        continue;
-                    }
-                }
-            }
+
             let Some(port_raw) = device.property_value("ID_PATH") else {
                 println!("No port for camera {}", &path_str);
                 continue;
@@ -115,6 +108,7 @@ impl CuSrcTask for UdevMonitor {
             self.initial_enumerated.push(NewDevice {
                 port: Box::new(port.to_string()),
                 dev_path: Box::new(path_str.to_string()),
+                index: Box::new(udev_index.to_string_lossy().to_string())
             });
         }
 
@@ -155,16 +149,6 @@ impl CuSrcTask for UdevMonitor {
                             println!("No udev_index for camera {path_str}");
                             return Ok(());
                         };
-                        if udev_index.to_str() != Some("0") {
-                            return Ok(());
-                        }
-                        if let Some(name) = event.attribute_value("name") {
-                            if let Some(name) = name.to_str() {
-                                if name.contains("RealSense") {
-                                    return Ok(());
-                                }
-                            }
-                        }
                         let Some(port_raw) = event.property_value("ID_PATH") else {
                             println!("No port for camera {}", &path_str);
                             return Ok(());
@@ -176,6 +160,7 @@ impl CuSrcTask for UdevMonitor {
                         output.set_payload(NewDevice {
                             port: Box::new(port.to_string()),
                             dev_path: Box::new(path_str.to_string()),
+                            index: Box::new(udev_index.to_string_lossy().to_string())
                         });
                     }
                     _ => {}
