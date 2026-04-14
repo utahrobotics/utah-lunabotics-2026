@@ -231,7 +231,7 @@ List of common problems and how to fix them can be found [here](https://github.c
 * Detects when a realsense device is plugged in, automatically opens device and publishes point clouds.
 * Not compiled or launched in log replay mode.
 
-### unilidar_iceoryx_publisher
+### unilidar_iceoryx_publisher (deprecated)
 * Launched by lunabot-cu
 * Connects to L2 and publishes imu data and pointclouds from it.
 * Not compiled or executed in log replay mode.
@@ -243,12 +243,15 @@ Contains libraries for kinematics, network protocols, GPU utilites/Shader pipeli
 Contains task for communicating with the lunabase.
 
 ## lunabot-cu/src/tasks/sources
-
+* L2 imu rx (deprecated)
+* l2 pointcloud rx (deprecated)
+* realsense subscriber - gets frames from any d4xx series
+* t265 subscriber - gets images, 6dof, and imu messages from the plugged in t265/1 devices
+* udev monitor - feeds v4l2 usb add events to gstreamer piplines
 
 ## lunabot-cu/src/tasks/sinks
-* Sink tasks for interacting with the actuators and motors
-* localizer
-* logger placeholder task for testing obstacle map generation
+* Sink tasks for interacting with the vescs
+* Null sink for images we dont care about.
 
 ## lunabot-cu/src/tasks/ai
 * Takes in readings from the lunabase. 
@@ -261,6 +264,10 @@ Tasks that lie between the sources and sinks for:
 * Image processing for apriltag detection.
 * Automatically opening camera devices as they become available.
 * Point cloud processing (KISS-ICP)
+* localizer
+* gstreamer pipelines for rgb cameras
+* occupancy grid generation
+* interface for the rpi pico.
 
 ## lunabot-cu/src/utils
 Helper functions for:
@@ -273,11 +280,16 @@ Helper functions for:
 * Structures and helpers used for connecting to the base station.
 
 ## common/ 
-Legacy code containing structures that are used by the lunabase and the lunabot. <br>
+- contains types shared between the base station and lunabot
 
 ## embedded_common
 A no_std crate containing structures used by the embedded code as well as our tasks. 
-*there is no embedded code in this repo yet because we don't know what electrical team will throw our way quite yet*
+
+## embedded-legacy 
+- embedded code for last years robot TERI, kept for backwards compatibility
+
+## Embedded
+- embedded code for this years robot (2026)
 
 ## Others
 

@@ -63,6 +63,7 @@
             run_in_sim: false
         ),
         // subscribes to 6dof messages from the intel T265 camera
+        // subsrcibes to fisheye images as well
         (
             id: "t265_subscriber",
             type: "crate::tasks::sources::T265Subscriber",
@@ -129,6 +130,7 @@
                 enabled: false,
             )
         ),
+        // (deprecated)
         // registers point clouds into a global map, and estimates the isometry of the lidar node.
         // the isometry is relative to the robots starting position, not actual global coordinates
         (
@@ -164,7 +166,7 @@
             ),
             background: true
         ),
-        // fuses information from IMUs, Apriltags, and ICP algos providing one global robot position.
+        // fuses information from T265s, IMUs, Apriltags, and ICP algos providing one global robot position.
         // position is logged to rerun at 60 hz
         (
             id:"localizer", type:"crate::tasks::Localizer",
@@ -182,7 +184,7 @@
             )
         ),
 
-        // receives messages from the ai_source and tells the motors to move accordingly
+        // receives messages from the ai and tells the motors to move accordingly
         (
             id:"motor_ctrl", type:"crate::tasks::sinks::MotorController", config:{
                 "speed_multiplier": 1500,
@@ -221,6 +223,9 @@
                 "max_distance": 20.5
             }
         ),
+
+
+        // Special apriltag detection tasks for the T265's that handle un distortion.
         (
             id: "detector_cam_t265_left",
             type: "cu_apriltag::AprilTags",
@@ -275,6 +280,8 @@
             ),
             background: true,
         ),
+
+        // hardware encodes and streams the obstacle map.
         (
             id: "obstacle_gstreamer",
             type: "crate::tasks::ObstacleStreamer",
@@ -287,6 +294,8 @@
                 "bitrate": 2000,
             }
         ),
+
+        // streams fisheye lenses for t265
         (
             id: "t265_left_gstreamer",
             type: "crate::tasks::T265Streamer",
@@ -410,6 +419,7 @@
                 "desired_index": "0"
             }
         ),
+        // the lite version doesnt include apriltags
         (
             path:"camera_configs/camera_template_gstreamer_lite.ron",
             params:{
