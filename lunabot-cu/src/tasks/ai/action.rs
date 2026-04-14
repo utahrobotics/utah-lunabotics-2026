@@ -8,10 +8,9 @@ use nalgebra::Vector2;
 use crate::{
     ROBOT_STATE,
     tasks::ai::{
-        blackboard::LunabotBlackboard,
-        jobs::{
+        behaviors::autonomy::navigate::NavigationGoal, blackboard::LunabotBlackboard, jobs::{
             dig_job, direction_from_path, dump_job, find_path_job, follow_path_job, rotation_shim,
-        },
+        }
     },
 };
 static PATHFINDING_GOAL: [f32; 2] = [5.843524, 1.4796992];
@@ -42,7 +41,7 @@ pub enum LunabotAction {
     /// if the robot is in a cell of unknown status, we should first pathfind to the nearest free cell (if a free cell is within some range)
     IsInUnknownCell,
     /// calculates path from the robots position to x,y
-    CalculatePath,
+    CalculatePath(NavigationGoal),
     FollowPath,
     SetStage(LunabotStage),
     GetUnstuck,
@@ -154,7 +153,10 @@ impl LunabotAction {
             LunabotAction::IsInOccupiedCell => todo!(),
             LunabotAction::IsInFreeCell => todo!(),
             LunabotAction::IsInUnknownCell => todo!(),
-            LunabotAction::CalculatePath => {
+            LunabotAction::CalculatePath(navigation_goal) => {
+                // TODO: set the navigation goal intelligently, sample in the general area and find an obstacle free location
+
+
                 if let Some(ref local_map) = blackboard.latest_local_map {
                     // if the kinematic root is not initialized, we might as well just blow up because nothing will work anyways
                     let current_translation = ROBOT_STATE

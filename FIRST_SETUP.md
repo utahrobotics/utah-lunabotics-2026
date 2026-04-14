@@ -1,3 +1,5 @@
+# First Time Setup Instructions
+*This guide assumes basic linux knowledge. i.e. where to put udev rules, how to add a user to a group, how to use ssh*
 
 # Sensors
 
@@ -91,6 +93,11 @@ params: {
 
 # Network Stuff
 
+### Prerequisites
+1. Obtain ssh access by putting your public key in the right places. (probably .ssh/authorized_keys)
+2. Ensure you are on the same wifi network as the robot.
+3. ssh in, go to the root of this repo, and run `make prod`
+
 ### Base station comms
 1. Just type in the ip of the robot in the base station and hit connect
 2. Might be helpful to log into the wifi router and set a static ip for the robot
@@ -101,8 +108,15 @@ params: {
 	1. You will need to specify in the config for the camera viewer what the robots ip is, and the ports for the streams you want to connect to 
 
 # Vescs
-1. Call Sebastion
+1. Plug the vescs into the pc
 2. Change the motor_controller config to have the right can id's and motor masks.
+3. Run make prod and make sure you see a message that the motor port was opened.
+
+### Vesc troubleshooting
+1. Call sebastion.
+2. If there arent any lights on the vesc, that means it isnt getting power or it blew up.
+3. Pray.
+
 
 # Actuators
 1. Attach debug probe and plug the debug probe into your machine, as well as have the pico attached over usb.
@@ -118,3 +132,11 @@ params: {
 1. Navigate to embedded directory.
 2. run `cargo run --release --bin pico-prime` to flash the pico that controlls the actuators.
 3. attach the other pico then run `cargo run --release --bin pico-secondary` to flash it.
+
+
+
+# Permissions
+
+1. **Add your user to the following groups: dialout, render, adm**
+2. **Add the [realsense udev rules to the correct directory](https://github.com/realsenseai/librealsense/blob/master/config/99-realsense-libusb.rules)**
+3. Add the udev rules in misc/usb-reset/99-usb-reset-rules.rules
