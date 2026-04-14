@@ -34,6 +34,8 @@ pub mod implementation {
 
 #[cfg(not(feature="production"))]
 pub mod implementation {
+    use cu29::{cutask::{CuSinkTask, Freezable}, input_msg};
+    use cu29::prelude::*;
     use crate::tasks::auto_gstreamer::CuGstBuffer;
 
     pub struct NullCuImageSink {
