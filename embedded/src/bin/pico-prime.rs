@@ -204,7 +204,17 @@ async fn usb_tx_loop(
                 }
             }
 
-            // TODO: once secondary pico is implemented, read any sensor stuff off of it and send it over to the host here
+            if let Ok(_sensors) = SENSOR_READINGS.try_receive(){
+                // TODO: send sensor readings to host
+                // let serialized = FromPico::Reading([FromIMU; 4], sensors).serialize();
+                // let len = cobs::encode(&serialized, &mut stuffed);
+                // for chunk in stuffed[..len + 1].chunks(64) {
+                //     if let Err(e) = writer.write_packet(chunk).await {
+                //         error!("[COBS ERROR] {:?}", e);
+                //         break 'writer;
+                //     }
+                // }
+            }
 
             Timer::after(Duration::from_millis(POLL_INTERVAL_MS)).await;
         }
@@ -279,6 +289,49 @@ async fn usb_rx_loop(
                 }
             }
         }
+    }
+}
+
+/// Constantly polls all 11 active MUX channels and publishes reading to SENSOR_READINGS
+async fn secondary_poll_loop(uart: &'static mut Uart<'static, UART0, Async>){
+    const RESPONSE_TIMEOUT_MS:u64  = 50;
+    let mut readings = [0u16;  SensorReading:CHANNEL_COUNT];
+    loop{
+        for ch in 0u8..SensorReading::CHANNEL_COUNT as u8{
+            let req = SecondaryRequest {mux_address:ch}.serialize();
+            if uart.write(&req).await.is_err(){
+                error!("failed to write to secondary pico");
+                readings[ch as usize] = 0; // output 0 to avoid sending a completely empty reading
+                continue;
+            }
+            let response_buf = [0u8; SecondaryResponse:SIZE];
+            match with_timeout(
+                Duration:from_millis(RESPONSE_TIMEOUT_MS);
+                uart.read(&mut response_buf);
+            )
+            .await(
+                Ok(Ok(_)) => readings[ch as usize] = SecondaryResponse.deserialize(response_buf).adc_value,
+                Ok(Err(e)) => { error!("secondary UART read error ch {}: {:?}", ch, e); readings[ch as usize] = 0; }
+                Err(_)     => { error!("secondary response timeout ch {}", ch);           readings[ch as usize] = 0; }
+            )
+        }
+
+         let sensor = SensorReading {
+            m1_cs:     readings[0],
+            m2_cs:     readings[1],
+            m3_cs:     readings[2],
+            m4_cs:     readings[3],
+            m1_therm:  readings[4],
+            m2_therm:  readings[5],
+            m3_therm:  readings[6],
+            m4_therm:  readings[7],
+            drive1_he: readings[8],
+            drive2_he: readings[9],
+            amb_therm: readings[10],
+        };
+
+        SENSOR_READINGS.try_send(sensor).ok();
+        Timer::after(Duration::from_millis(POLL_INTERVAL_MS)).await;
     }
 }
 
