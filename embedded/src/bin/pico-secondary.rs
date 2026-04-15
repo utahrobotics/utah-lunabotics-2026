@@ -3,7 +3,7 @@
 
 use defmt::*;
 use embassy_executor::Spawner;
-use embassy_time;
+use embassy_time::{Duration, Timer, with_timeout};
 use embassy_rp::{
     adc::{Adc, Config as AdcConfig, InterruptHandler as AdcInterruptHandler, Channel},
     bind_interrupts,
@@ -101,7 +101,7 @@ async fn main(_spawner: Spawner) {
                     error!("UART write error: {:?}", e);
                 }
             }
-            Err(_){
+            Err(_)=>{
                 error!("adc read failed for channel {}", req.mux_address);
             }
     }
