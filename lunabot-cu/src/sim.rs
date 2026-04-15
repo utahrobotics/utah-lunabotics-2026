@@ -167,9 +167,8 @@ fn sim_callback<'a>(
                                 BUCKET_SPEED.store(*speed);
                                 BUCKET_DIRECTION.store(*direction);
                             }
-                            embedded_common::Actuator::Dumper => {
-
-                            }
+                            embedded_common::Actuator::Dumper => {}
+                            embedded_common::Actuator::Motor4 => {}
                         }
                     }
                     embedded_common::ActuatorCommand::Shake => {}

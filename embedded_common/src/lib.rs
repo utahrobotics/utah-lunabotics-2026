@@ -90,13 +90,13 @@ pub enum ActuatorCommand {
     StopAll,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-#[cfg_attr(any(feature = "defmt", feature = "defmt-03"), derive(defmt::Format))]
-/// adc readings
-#[cfg_attr(
-    feature = "std",
-    derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
-)]
+// #[derive(Clone, Copy, Debug, PartialEq)]
+// #[cfg_attr(any(feature = "defmt", feature = "defmt-03"), derive(defmt::Format))]
+// /// adc readings
+// #[cfg_attr(
+//     feature = "std",
+//     derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
+// )]
 // pub struct ActuatorReading {
 //     pub m1_reading: u16,
 //     pub m2_reading: u16,
