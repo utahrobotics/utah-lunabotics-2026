@@ -1,29 +1,25 @@
 #![no_std]
 #![no_main]
 
-use defmt::*;
-use embassy_executor::Spawner;
 use embassy_rp::{
     bind_interrupts,
     gpio::{Input, Level, Output},
-    peripherals::USB,
+    peripherals::{USB, UART0},
     pwm::{Config, Pwm, SetDutyCycle},
-    time_driver::init,
+    uart::{Async, Config as UartConfig, InterruptHandler as UartInterruptHandler, Uart},
     usb::{Driver, InterruptHandler},
 };
-use embassy_time::{Duration, Timer};
-use embassy_usb::{
-    UsbDevice,
-    class::cdc_acm::{CdcAcmClass, Receiver, Sender, State},
-};
+use embassy_time::{Duration, Timer, with_timeout};
+use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Channel};
 use embedded_common::{
     Actuator, ActuatorCommand, Direction, FromPico, MAX_MESSAGE_SIZE, PicoError,
+    SecondaryRequest, SecondaryResponse, SensorReading,
 };
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
 bind_interrupts!(struct Irqs {
     USBCTRL_IRQ => InterruptHandler<USB>;
-    UART0_IRQ => InterruptHandler<UART0>;
+    UART0_IRQ => UartInterruptHandler<UART0>;
 });
 
 static PACKET_SIZE: u16 = 64;
@@ -91,19 +87,19 @@ async fn main(spawner: Spawner) -> ! {
         ActuatorDriver { // GPIO8 = physical pin 11, GPIO0 = pin 1
             sleep: Output::new(p.PIN_8, Level::Low),
             dir: Output::new(p.PIN_0, Level::Low),
-            pwm: Pwm::new_output_a(p.PWM_SLICE4, p.PIN_8, Config::default()),
+            pwm: Pwm::new_output_a(p.PWM_SLICE4, p.PIN_1, Config::default()),
             which: Actuator::Lift,
         },
         ActuatorDriver {  // GPIO 9 and 2 = pin 12 and 4
             sleep: Output::new(p.PIN_9, Level::Low),
             dir: Output::new(p.PIN_2, Level::Low),
-            pwm: Pwm::new_output_a(p.PWM_SLICE7, p.PIN_14, Config::default()),
+            pwm: Pwm::new_output_a(p.PWM_SLICE7, p.PIN_3, Config::default()),
             which: Actuator::Bucket,
         },
         ActuatorDriver { // GPIO 10 and 4 = pin 14 and 6
             sleep: Output::new(p.PIN_10, Level::Low),
             dir: Output::new(p.PIN_4, Level::Low),
-            pwm: Pwm::new_output_a(p.PWM_SLICE2, p.PIN_20, Config::default()),
+            pwm: Pwm::new_output_a(p.PWM_SLICE2, p.PIN_5, Config::default()),
             which: Actuator::Dumper,
         },
         // 4th motor driver slot is currently unused
@@ -154,12 +150,11 @@ async fn main(spawner: Spawner) -> ! {
     info!("about to spawn usb task");
     spawner.spawn(usb_task(usb)).unwrap();
 
-    let uart= {
-        let mut cfg = UartConfig::default();
-        cfg.baudrate = 115200;
-        // GP12 and GP13 = physical 16 and 17, UART0 TX and RX
-        Uart::new(p.UART0, p.PIN_12, p.PIN_13, Irqs, p.DMA_CH0, p.DMA_CH1);
-    }
+    let uart = {
+    let mut cfg = UartConfig::default();
+    cfg.baudrate = 115200;
+    Uart::new(p.UART0, p.PIN_12, p.PIN_13, Irqs, p.DMA_CH0, p.DMA_CH1, cfg)
+};
     static SECONDARY_UART: StaticCell<Uart<'static, UART0, Async>> = StaticCell::new();
     let uart = SECONDARY_UART.init(uart);
     spawner.spawn(secondary_poll_loop(uart)).unwrap();
@@ -293,9 +288,10 @@ async fn usb_rx_loop(
 }
 
 /// Constantly polls all 11 active MUX channels and publishes reading to SENSOR_READINGS
+#[embassy_executor::task]
 async fn secondary_poll_loop(uart: &'static mut Uart<'static, UART0, Async>){
     const RESPONSE_TIMEOUT_MS:u64  = 50;
-    let mut readings = [0u16;  SensorReading:CHANNEL_COUNT];
+    let mut readings = [0u16;  SensorReading::CHANNEL_COUNT];
     loop{
         for ch in 0u8..SensorReading::CHANNEL_COUNT as u8{
             let req = SecondaryRequest {mux_address:ch}.serialize();
@@ -304,16 +300,16 @@ async fn secondary_poll_loop(uart: &'static mut Uart<'static, UART0, Async>){
                 readings[ch as usize] = 0; // output 0 to avoid sending a completely empty reading
                 continue;
             }
-            let response_buf = [0u8; SecondaryResponse:SIZE];
+            let response_buf = [0u8; SecondaryResponse::SIZE];
             match with_timeout(
-                Duration:from_millis(RESPONSE_TIMEOUT_MS);
-                uart.read(&mut response_buf);
+                Duration::from_millis(RESPONSE_TIMEOUT_MS),
+                uart.read(&mut response_buf),
             )
-            .await(
+            .await{
                 Ok(Ok(_)) => readings[ch as usize] = SecondaryResponse.deserialize(response_buf).adc_value,
                 Ok(Err(e)) => { error!("secondary UART read error ch {}: {:?}", ch, e); readings[ch as usize] = 0; }
                 Err(_)     => { error!("secondary response timeout ch {}", ch);           readings[ch as usize] = 0; }
-            )
+            }
         }
 
          let sensor = SensorReading {

@@ -907,4 +907,4 @@ mod tests {
             assert_eq!(SecondaryResponse::deserialize(v.serialize()), v);
         }
     }
-}
+
