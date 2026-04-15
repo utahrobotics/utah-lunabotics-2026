@@ -571,6 +571,33 @@ impl SecondaryResponse {
 mod tests {
     use super::*;
 
+    // Helper
+    fn make_sensor_reading() -> SensorReading {
+        SensorReading {
+            m1_cs: 100,
+            m2_cs: 200,
+            m3_cs: 300,
+            m4_cs: 400,
+            m1_therm: 500,
+            m2_therm: 600,
+            m3_therm: 700,
+            m4_therm: 800,
+            drive1_he: 900,
+            drive2_he: 1000,
+            amb_therm: 1100,
+        }
+    }
+
+    // Direction
+    #[test]
+    fn direction_not_operator() {
+        assert_eq!(!Direction::Forward, Direction::Backward);
+        assert_eq!(!Direction::Backward, Direction::Forward);
+        // double negation roundtrip
+        assert_eq!(!!Direction::Forward, Direction::Forward);
+    }
+
+    /// Angularrate/acceleration
     fn roundtrip_angular_rate(x: f32, y: f32, z: f32) {
         let original = AngularRate { x, y, z };
         let bytes = original.serialize();
@@ -599,6 +626,7 @@ mod tests {
         roundtrip_accel(f32::MAX, f32::MIN, f32::EPSILON);
     }
 
+    /// From IMU
     #[test]
     fn from_imu_reading_roundtrip() {
         let rate = AngularRate {
@@ -633,6 +661,23 @@ mod tests {
         assert_eq!(original, result);
     }
 
+    /// Actuator
+    #[test]
+    fn actuator_bit_uniqueness() {
+        let bits: Vec<u8> = Actuator::ALL.iter().map(|a| a.as_bit()).collect();
+        for i in 0..bits.len() {
+            for j in 0..bits.len() {
+                if i != j {
+                    assert_eq!(
+                        bits[i] & bits[j],
+                        0,
+                        "Actuators at index {i} and {j} share a fault bit"
+                    );
+                }
+            }
+        }
+    }
+
     #[test]
     fn actuator_reading_roundtrip() {
         let original = ActuatorReading {
@@ -646,12 +691,10 @@ mod tests {
 
     #[test]
     fn actuator_command_set_speed_roundtrip() {
-        for actuator in [Actuator::Lift, Actuator::Bucket, Actuator::Dumper] {
+        for actuator in Actuator::ALL {
             for direction in [Direction::Forward, Direction::Backward] {
-                let original = ActuatorCommand::SetSpeed(12345, actuator, direction);
-                let bytes = original.serialize();
-                let result = ActuatorCommand::deserialize(bytes).unwrap();
-                assert_eq!(original, result);
+                let v = ActuatorCommand::SetSpeed(12345, actuator, direction);
+                assert_eq!(ActuatorCommand::deserialize(v.serialize()).unwrap(), v);
             }
         }
     }
@@ -780,6 +823,7 @@ mod tests {
         assert!(FromPico::deserialize(bytes).is_err());
     }
 
+    /// Sensor readings
     #[test]
     fn sensor_reading_roundtrip() {
         let v = make_sensor_reading();
@@ -806,6 +850,38 @@ mod tests {
         }
     }
 
+    #[test]
+    fn sensor_reading_field_order() {
+        let v = make_sensor_reading(); 
+        let bytes = v.serialize();
+        assert_eq!(u16::from_le_bytes([bytes[0], bytes[1]]),  100,  "ch0 m1_cs");
+        assert_eq!(u16::from_le_bytes([bytes[2], bytes[3]]),  200,  "ch1 m2_cs");
+        assert_eq!(u16::from_le_bytes([bytes[4], bytes[5]]),  300,  "ch2 m3_cs");
+        assert_eq!(u16::from_le_bytes([bytes[6], bytes[7]]),  400,  "ch3 m4_cs");
+        assert_eq!(u16::from_le_bytes([bytes[8], bytes[9]]),  500,  "ch4 m1_therm");
+        assert_eq!(u16::from_le_bytes([bytes[10], bytes[11]]), 600, "ch5 m2_therm");
+        assert_eq!(u16::from_le_bytes([bytes[12], bytes[13]]), 700, "ch6 m3_therm");
+        assert_eq!(u16::from_le_bytes([bytes[14], bytes[15]]), 800, "ch7 m4_therm");
+        assert_eq!(u16::from_le_bytes([bytes[16], bytes[17]]), 900, "ch8 drive1_he");
+        assert_eq!(u16::from_le_bytes([bytes[18], bytes[19]]), 1000, "ch9 drive2_he");
+        assert_eq!(u16::from_le_bytes([bytes[20], bytes[21]]), 1100, "ch10 amb_therm");
+    }
+    }
+
+    #[test]
+    fn pico_error_other_is_never_faulted() {
+        for actuator in Actuator::ALL {
+            assert!(!PicoError::Other.is_faulted(actuator));
+        }
+    }
+
+    #[test]
+    fn from_pico_size_constant() {
+        assert_eq!(FromPico::SIZE, 1 + 4 * FromIMU::SIZE + SensorReading::SIZE);
+        assert_eq!(FromPico::SIZE, 123);
+    }
+
+    /// Secondary Request
     #[test]
     fn secondary_request_all_valid_channels() {
         for ch in 0u8..=15 {
