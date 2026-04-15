@@ -9,12 +9,12 @@ pub fn autonomy_main(arena: Arena) -> Behavior<LunabotAction> {
             // 1. go to dig site
             navigate_behavior(NavigationGoal::DigSite(arena)),
             // 2. dig
-            Action(LunabotAction::Dig),
+            // Action(LunabotAction::Dig),
 
             // 3. Navigate to dump site
             navigate_behavior(NavigationGoal::DumpSite(arena)),
             // 4. Dump
-            Action(LunabotAction::Dump),
+            // Action(LunabotAction::Dump),
         ],
     )
 }

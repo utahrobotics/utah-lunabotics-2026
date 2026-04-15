@@ -10,6 +10,7 @@ use cu29::{
     output_msg,
 };
 use serde::{Deserialize, Serialize};
+
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use udev::{EventType, Udev};
 

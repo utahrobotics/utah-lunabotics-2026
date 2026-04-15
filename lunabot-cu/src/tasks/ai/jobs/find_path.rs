@@ -1,4 +1,4 @@
-use crate::pathfinding::OccupancyGrid;
+use crate::{pathfinding::{OccupancyGrid, sampling::find_goal_in}, tasks::ai::behaviors::autonomy::navigate::NavigationGoal};
 use nalgebra::Vector2;
 use rerun::Vec2D;
 use tasker::tokio::sync::mpsc;
@@ -18,10 +18,10 @@ use crate::{
 pub fn find_path_job(
     latest_local_map: OccupancyGrid,
     start: Vector2<f32>,
-    end: Vector2<f32>,
     max_acceptable_gradient_expander: f32,
     max_acceptable_gradient_pathfinder: f32,
     robot_radius: f32,
+    goal: NavigationGoal
 ) -> Job<Vec<Vector2<f32>>, ()> {
     let (output_tx, output_rx) = mpsc::channel(5);
 
@@ -34,6 +34,7 @@ pub fn find_path_job(
                         .with_colors([rerun::Color::from_rgb(0, 255, 0)]),
                 );
             }
+
             let path_result = tasker::tokio::task::spawn_blocking(move || {
                 let global_map_guard = if let Some(global_map) = GLOBAL_MAP.get() {
                     global_map.read().ok()
@@ -54,7 +55,8 @@ pub fn find_path_job(
                 else {
                     return None;
                 };
-
+                let (center, hw, hh) = goal.to_center_and_halfsizes();
+                let end = find_goal_in(&expanded, center, hw, hh, max_acceptable_gradient_expander).ok()?;
                 find_path_dstar(
                     &expanded,
                     [start.x, start.y],

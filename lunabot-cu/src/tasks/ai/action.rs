@@ -4,14 +4,14 @@ use bonsai_bt::Status::{self, *};
 use common::{LUNABOT_STAGE, LunabotStage, Steering};
 use embedded_common::{Actuator, ActuatorCommand, Direction};
 use nalgebra::Vector2;
+use rerun::Boxes2D;
 
 use crate::{
-    ROBOT_STATE,
-    tasks::ai::{
+    ROBOT_STATE, rerun_viz::RECORDER, tasks::ai::{
         behaviors::autonomy::navigate::NavigationGoal, blackboard::LunabotBlackboard, jobs::{
             dig_job, direction_from_path, dump_job, find_path_job, follow_path_job, rotation_shim,
         }
-    },
+    }
 };
 static PATHFINDING_GOAL: [f32; 2] = [5.843524, 1.4796992];
 #[derive(Clone, Debug, Copy)]
@@ -156,7 +156,8 @@ impl LunabotAction {
             LunabotAction::CalculatePath(navigation_goal) => {
                 // TODO: set the navigation goal intelligently, sample in the general area and find an obstacle free location
 
-
+                let (center, hw, hh) = navigation_goal.to_center_and_halfsizes();
+                let _ = RECORDER.get().unwrap().recorder.log("ai/goal", &Boxes2D::from_centers_and_half_sizes(vec![(center.x,center.y)], vec![(hw,hh)]));
                 if let Some(ref local_map) = blackboard.latest_local_map {
                     // if the kinematic root is not initialized, we might as well just blow up because nothing will work anyways
                     let current_translation = ROBOT_STATE
@@ -171,7 +172,6 @@ impl LunabotAction {
 
                     // Get destination from blackboard, or use default PATHFINDING_GOAL
                     // PATHFINDING_GOAL is just for testing for now.
-                    let end = Vector2::new(PATHFINDING_GOAL[0], PATHFINDING_GOAL[1]);
 
                     // Check if we already have a path finder job running
                     if let Some(ref mut path_finder) = blackboard.path_finder {
@@ -212,10 +212,10 @@ impl LunabotAction {
                         let mut job = find_path_job(
                             local_map.clone(),
                             start,
-                            end,
                             blackboard.obstacle_gradient_threshold_expander,
                             blackboard.obstacle_gradient_threshold_pathfinder,
                             blackboard.robot_radius,
+                            *navigation_goal
                         );
                         let initial_status = job.get_status();
                         blackboard.path_finder = Some(job);
@@ -255,7 +255,7 @@ impl LunabotAction {
                             path,
                             None,
                             None,
-                            None,
+                            0.5,
                             None,
                             None,
                             None,
