@@ -450,21 +450,19 @@ impl SensorReading {
 }
 
 impl FromPico {
-    /// 1 tag + 4 FromImu (4×25) + 1 ActuatorReading (4)  = 105 bytes
-    pub const SIZE: usize = 105;
+    /// 1 tag + 4 FromImu (4×25) + 1 SensorReading = 123 bytes
+    pub const SIZE: usize = 1 + 4 * FromIMU::SIZE + SensorReading::SIZE;
 
     pub fn serialize(&self) -> [u8; Self::SIZE] {
         let mut bytes = [0u8; Self::SIZE];
-
         match self {
-            FromPico::Reading(readings, act) => {
+            FromPico::Reading(readings, sensors) => {
                 bytes[0] = 0;
                 for (i, r) in readings.iter().enumerate() {
                     let start = 1 + i * FromIMU::SIZE;
-                    let end = start + FromIMU::SIZE;
-                    bytes[start..end].copy_from_slice(&r.serialize());
+                    bytes[start..start + FromIMU::SIZE].copy_from_slice(&r.serialize());
                 }
-                bytes[Self::SIZE - 4..].copy_from_slice(&act.serialize());
+                bytes[Self::SIZE - SensorReading::SIZE..].copy_from_slice(&sensors.serialize());
             }
             FromPico::Error(err) => {
                 bytes[0] = 3;
@@ -483,20 +481,22 @@ impl FromPico {
     pub fn deserialize(bytes: [u8; Self::SIZE]) -> Result<Self, &'static str> {
         match bytes[0] {
             0 => {
-                let mut readings: [FromIMU; 4] = [FromIMU::Error; 4];
+                let mut readings = [FromIMU::Error; 4];
                 for i in 0..4 {
                     let start = 1 + i * FromIMU::SIZE;
-                    let end = start + FromIMU::SIZE;
-                    let imu_bytes: [u8; FromIMU::SIZE] =
-                        bytes[start..end].try_into().map_err(|_| "slice size")?;
+                    let imu_bytes: [u8; FromIMU::SIZE] = bytes[start..start + FromIMU::SIZE]
+                        .try_into()
+                        .map_err(|_| "imu slice")?;
                     readings[i] = FromIMU::deserialize(imu_bytes)?;
                 }
-                let act_bytes: [u8; 4] = bytes[Self::SIZE - 4..]
+                let sensor_bytes: [u8; SensorReading::SIZE] = bytes
+                    [Self::SIZE - SensorReading::SIZE..]
                     .try_into()
-                    .map_err(|_| "act slice")?;
-
-                let act = ActuatorReading::deserialize(act_bytes);
-                Ok(FromPico::Reading(readings, act))
+                    .map_err(|_| "sensor slice")?;
+                Ok(FromPico::Reading(
+                    readings,
+                    SensorReading::deserialize(sensor_bytes),
+                ))
             }
             3 => {
                 let err = match bytes[1] {
@@ -506,7 +506,7 @@ impl FromPico {
                 };
                 Ok(FromPico::Error(err))
             }
-            _ => Err("invalid FromPicoV3 tag"),
+            _ => Err("invalid FromPico tag"),
         }
     }
 }
