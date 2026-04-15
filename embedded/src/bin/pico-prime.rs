@@ -23,10 +23,13 @@ use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
 bind_interrupts!(struct Irqs {
     USBCTRL_IRQ => InterruptHandler<USB>;
+    UART0_IRQ => InterruptHandler<UART0>;
 });
 
 static PACKET_SIZE: u16 = 64;
 const POLL_INTERVAL_MS: u64 = 100;
+
+static SENSOR_READINGS: Channel<CriticalSectionRawMutex, SensorReading, 1> = Channel::new();
 
 struct FaultDetector<'a> {
     fault: Input<'a>,
@@ -68,46 +71,47 @@ impl<'a> ActuatorDriver<'a> {
 async fn main(spawner: Spawner) -> ! {
     let p = embassy_rp::init(Default::default());
 
-    // motor_flt pins
+    // motor_flt pins - GPIO14, 15, 16 = physical pin 19, 20, 21
     let driver_fault_detectors: [FaultDetector<'_>; 3] = [
-        FaultDetector {
-            fault: Input::new(p.PIN_10, embassy_rp::gpio::Pull::Up),
+        FaultDetector {  
+            fault: Input::new(p.PIN_14, embassy_rp::gpio::Pull::Up),
             which: Actuator::Lift,
+        },
+        FaultDetector {
+            fault: Input::new(p.PIN_15, embassy_rp::gpio::Pull::Up),
+            which: Actuator::Bucket,
         },
         FaultDetector {
             fault: Input::new(p.PIN_16, embassy_rp::gpio::Pull::Up),
-            which: Actuator::Bucket,
-        },
-        FaultDetector {
-            fault: Input::new(p.PIN_22, embassy_rp::gpio::Pull::Up),
             which: Actuator::Dumper,
         },
+        // PIN_25 is Motor4 placeholder from Vincent's spec, omitted for now
     ];
     let actuators = [
-        ActuatorDriver {
-            sleep: Output::new(p.PIN_11, Level::Low),
-            dir: Output::new(p.PIN_7, Level::Low),
+        ActuatorDriver { // GPIO8 = physical pin 11, GPIO0 = pin 1
+            sleep: Output::new(p.PIN_8, Level::Low),
+            dir: Output::new(p.PIN_0, Level::Low),
             pwm: Pwm::new_output_a(p.PWM_SLICE4, p.PIN_8, Config::default()),
             which: Actuator::Lift,
         },
-        ActuatorDriver {
-            sleep: Output::new(p.PIN_17, Level::Low),
-            dir: Output::new(p.PIN_13, Level::Low),
+        ActuatorDriver {  // GPIO 9 and 2 = pin 12 and 4
+            sleep: Output::new(p.PIN_9, Level::Low),
+            dir: Output::new(p.PIN_2, Level::Low),
             pwm: Pwm::new_output_a(p.PWM_SLICE7, p.PIN_14, Config::default()),
             which: Actuator::Bucket,
         },
-        ActuatorDriver {
-            sleep: Output::new(p.PIN_23, Level::Low),
-            dir: Output::new(p.PIN_19, Level::Low),
+        ActuatorDriver { // GPIO 10 and 4 = pin 14 and 6
+            sleep: Output::new(p.PIN_10, Level::Low),
+            dir: Output::new(p.PIN_4, Level::Low),
             pwm: Pwm::new_output_a(p.PWM_SLICE2, p.PIN_20, Config::default()),
             which: Actuator::Dumper,
         },
         // 4th motor driver slot is currently unused
-        // ActuatorDriver {
-        //     sleep: Output::new(p.PIN_29, Level::Low),
-        //     fault: Input::new(p.PIN_28, embassy_rp::gpio::Pull::Up),
-        //     dir: Output::new(p.PIN_25, Level::Low),
-        //     pwm: Pwm::new_output_a(p.PWM_SLICE5, p.PIN_26, Config::default()),
+        // ActuatorDriver { // GPIO 15 and 9 
+        //     sleep: Output::new(p.PIN_15, Level::Low),
+        //     fault: Input::new(p.PIN_25, embassy_rp::gpio::Pull::Up),
+        //     dir: Output::new(p.PIN_9, Level::Low),
+        //     pwm: Pwm::new_output_a(p.PWM_SLICE5, p.PIN_7, Config::default()),
         //     which: ...,
         // },
     ];
@@ -149,6 +153,16 @@ async fn main(spawner: Spawner) -> ! {
 
     info!("about to spawn usb task");
     spawner.spawn(usb_task(usb)).unwrap();
+
+    let uart= {
+        let mut cfg = UartConfig::default();
+        cfg.baudrate = 115200;
+        // GP12 and GP13 = physical 16 and 17, UART0 TX and RX
+        Uart::new(p.UART0, p.PIN_12, p.PIN_13, Irqs, p.DMA_CH0, p.DMA_CH1);
+    }
+    static SECONDARY_UART: StaticCell<Uart<'static, UART0, Async>> = StaticCell::new();
+    let uart = SECONDARY_UART.init(uart);
+    spawner.spawn(secondary_poll_loop(uart)).unwrap();
 
     let (class_tx, class_rx) = class.split();
 
