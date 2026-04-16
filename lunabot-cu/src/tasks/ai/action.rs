@@ -254,7 +254,7 @@ impl LunabotAction {
                             ROBOT_STATE.get().unwrap().kinematic_root,
                             path,
                             None,
-                            None,
+                            0.5,
                             0.5,
                             None,
                             None,

@@ -56,7 +56,7 @@ pub fn find_path_job(
                     return None;
                 };
                 let (center, hw, hh) = goal.to_center_and_halfsizes();
-                let end = find_goal_in(&expanded, center, hw, hh, max_acceptable_gradient_expander).ok()?;
+                let end = find_goal_in(&expanded, center, hw, hh, max_acceptable_gradient_pathfinder).ok()?;
                 find_path_dstar(
                     &expanded,
                     [start.x, start.y],
