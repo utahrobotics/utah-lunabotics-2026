@@ -7,13 +7,13 @@ mod motors;
 pub mod rerun_viz;
 
 pub mod bridges;
+pub mod kalman_filtering;
 pub mod pathfinding;
+pub mod payloads;
 pub mod robot_state;
 pub mod simple_monitor;
 pub mod tasks;
 pub mod utils;
-pub mod kalman_filtering;
-pub mod payloads;
 use crossbeam::atomic::AtomicCell;
 use cu29::prelude::*;
 use cu29_helpers::basic_copper_setup;
@@ -90,13 +90,13 @@ fn main() {
 fn launch_subprocs() {
     let mut launcher = launcher::ProcessLauncher::new();
     let suppress_output = false;
-    let mut unilidar_cmd = ProcessCommand::new("./unilidar_publisher")
-        .with_detach(true)
-        .with_working_directory("../unilidar_iceoryx_publisher/bazel-bin/");
-    if suppress_output {
-        unilidar_cmd = unilidar_cmd.with_suppress_output(true);
-    }
-    launcher.add_command("unilidar publisher", unilidar_cmd);
+    // let mut unilidar_cmd = ProcessCommand::new("./unilidar_publisher")
+    //     .with_detach(true)
+    //     .with_working_directory("../unilidar_iceoryx_publisher/bazel-bin/");
+    // if suppress_output {
+    //     unilidar_cmd = unilidar_cmd.with_suppress_output(true);
+    // }
+    // launcher.add_command("unilidar publisher", unilidar_cmd);
 
     let mut realsense_cmd = ProcessCommand::new("cargo")
         .with_args(vec!["run", "--release"])

@@ -316,21 +316,20 @@ async fn read_sensors_loop(
             }
         }
         
-        let msg = FromPicoV3::Reading(
+        let msg = FromPico::Reading(
             [imu0_readings[0], imu0_readings[1], imu1_readings[0],imu1_readings[1]],
             actuator_readings
         );
 
         if class.dtr() {
-            let serialized: [u8; FromPicoV3::SIZE] = msg.serialize();
-            let mut stuffed = [0u8; cobs::max_encoding_length(FromPicoV3::SIZE)+1];
+            let serialized: [u8; FromPico::SIZE] = msg.serialize();
+            let mut stuffed = [0u8; cobs::max_encoding_length(FromPico::SIZE)+1];
             let len = cobs::encode(&serialized, &mut stuffed);
             for chunk in stuffed[..len+1].chunks(16) {
                 if let Err(e) = class.write_packet(chunk).await {
-                    //error!("{:?}",e);
+                    error!("{:?}",e);
                 }
             }
-            info!("{}", msg);
         } else {
             warn!("data terminal not ready");
         }
@@ -377,6 +376,7 @@ async fn motor_controller_loop(mut class: Receiver<'static, Driver<'static, USB>
                                     Actuator::Bucket => {
                                         m2.set_direction(direction);
                                         m2_target = speed;
+                                        info!("cmd: {:?}", cmd);
                                     }
                                     Actuator::Dumper => {
                                         warn!("use of dumper on a teri pico.");

@@ -6,8 +6,8 @@ edition = "2024"
 [dependencies]
 clap = { version = "4.5.50", features = ["derive"] }
 petgraph = "0.8.3"
-ron = { version = "0.11" }
-serde = { version = "1.0", features = ["derive"] }
+ron.workspace = true
+serde.workspace = true
 colored = "2.1"
 layout-rs = "0.1"
-svg = "0.17"
+svg = "0.18"

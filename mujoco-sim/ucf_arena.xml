@@ -6,6 +6,9 @@
     <default class="collision">
       <geom group="2" type="mesh" />
     </default>
+    <default class="collision_soft">
+      <geom  type="mesh"  group="2" solimp="0.0 0.9 0.2 0.8 5"  solref="0.1 1"  friction="1.5 0.005 0.6"/>
+    </default>
     <default class="wheel">
         <geom group="2" type="mesh" solimp="0.8" />
     </default>
@@ -33,7 +36,11 @@
 
     <camera name="user_camera" pos="0.550397 7.43232 16.7573"
       xyaxes="-0.997 -0.078 0 0.024 -0.309 0.951" />
-
+    <body>
+      <geom size="0.4" pos="0 0 1"/>
+      <geom size="0.4" pos="8.1 0 1"/>
+      <geom size="0.4" pos="8.1 -4.57 1"/>
+    </body>
 
   </worldbody>
 

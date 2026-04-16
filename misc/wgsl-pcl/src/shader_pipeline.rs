@@ -35,7 +35,7 @@ impl ComputePipeline {
                         .map(|(_, layout, _)| layout)
                         .collect::<Vec<&BindGroupLayout>>()
                         .as_slice(),
-                    push_constant_ranges: &[],
+                    immediate_size: 0,
                 });
 
         let constants = constants.unwrap_or_default();

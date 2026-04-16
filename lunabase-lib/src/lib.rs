@@ -27,13 +27,16 @@ struct LunabaseConnection {
 
     outgoing: Option<tokio::sync::mpsc::UnboundedSender<FromLunabase>>,
     ka_state: Arc<Mutex<Option<Arc<Mutex<KeepAliveState<LunabotStage>>>>>>,
-    last_packet_time: Instant,
+    last_packet_time: Option<Instant>,
     current_stage: LunabotStage,
 
     errored_tasks: Arc<Mutex<HashMap<String, String>>>,
     current_weight: f64,
     global_position: Arc<Mutex<[f32; 3]>>,
     orientation: Arc<Mutex<[f32; 4]>>,
+
+    first_connect: bool,
+    apriltags_enabled: bool,
 }
 
 #[godot_api]
@@ -45,12 +48,14 @@ impl INode for LunabaseConnection {
             default_address: GString::from("127.0.0.1"),
             outgoing: None,
             ka_state: Arc::new(Mutex::new(None)),
-            last_packet_time: Instant::now(),
+            last_packet_time: None,
             current_stage: LunabotStage::SoftStop,
             current_weight: 1250.0,
             errored_tasks: Arc::new(Mutex::new(HashMap::new())),
             global_position: Arc::new(Mutex::new([0.0; 3])),
             orientation: Arc::new(Mutex::new([0.0; 4])),
+            first_connect: true,
+            apriltags_enabled: true,
         }
     }
 
@@ -60,21 +65,30 @@ impl INode for LunabaseConnection {
     }
 
     fn process(&mut self, _delta: f64) {
-        let guard = self.ka_state.lock().unwrap();
-        if let Some(ref state_arc) = *guard {
-            let state = state_arc.lock().unwrap();
-            if let Some(stage) = state.last_msg() {
-                drop(state);
-                drop(guard);
-                self.last_packet_time = Instant::now();
-                self.base_mut().emit_signal("packet_received", &[]);
 
-                if stage != self.current_stage {
-                    self.current_stage = stage;
-                    self.base_mut()
-                        .emit_signal("stage_changed", &[Variant::from(stage as i32)]);
+        {
+            let guard = self.ka_state.lock().unwrap();
+            if let Some(ref state_arc) = *guard {
+                let state = state_arc.lock().unwrap();
+                if let Some(stage) = state.last_msg() {
+                    drop(state);
+                    drop(guard);
+                    self.last_packet_time = Some(Instant::now());
+                    self.base_mut().emit_signal("packet_received", &[]);
+
+                    if stage != self.current_stage {
+                        self.current_stage = stage;
+                        self.base_mut()
+                            .emit_signal("stage_changed", &[Variant::from(stage as i32)]);
+                    }
                 }
             }
+        }
+
+        if self.first_connect && let Some(last_packet_time) = self.last_packet_time && last_packet_time.elapsed().as_millis() < 500 {
+            println!("sending first connect apriltag thing");
+            self.send_toggle_apriltags(self.apriltags_enabled);
+            self.first_connect = false;
         }
     }
 }
@@ -88,6 +102,7 @@ impl LunabaseConnection {
     fn stage_changed(stage: i32);
 
     fn connect_to_address(&mut self, address_str: String) {
+        self.first_connect = true;
         let addr = match address_str.parse::<Ipv4Addr>() {
             Ok(addr) => {
                 godot_warn!("Connecting to: {address_str}");
@@ -271,6 +286,18 @@ impl LunabaseConnection {
     }
 
     #[func]
+    /// sigma spatial is in cm
+    fn send_set_sigma_spatial(&self, new_sigma_spatial: f32) {
+        self.send_msg(FromLunabase::SetSigmaSpatial(new_sigma_spatial / 100.0))
+    }
+
+    #[func]
+    /// sigma range is in cm
+    fn send_set_sigma_range(&self, new_sigma_range: f32) {
+        self.send_msg(FromLunabase::SetSigmaRange(new_sigma_range / 100.0))
+    }
+
+    #[func]
     fn send_lift_actuators(&self, speed: f64) {
         self.send_msg(FromLunabase::set_lift_actuator(speed));
     }
@@ -278,6 +305,17 @@ impl LunabaseConnection {
     #[func]
     fn send_reset_obstacles(&self) {
         self.send_msg(FromLunabase::ResetObstacles);
+    }
+
+
+    #[func]
+    fn send_toggle_apriltags(&mut self, on: bool) {
+        self.apriltags_enabled = on;
+        if on {
+            self.send_msg(FromLunabase::EnableApriltags);
+        } else {
+            self.send_msg(FromLunabase::DisableApriltags);
+        }
     }
 
     #[func]

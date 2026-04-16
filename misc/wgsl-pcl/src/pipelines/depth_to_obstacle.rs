@@ -1,6 +1,7 @@
 use core::f32;
 use std::collections::HashMap;
 
+use bytemuck::bytes_of;
 use nalgebra::Vector3;
 use wgpu::{ShaderStages, include_wgsl};
 
@@ -48,6 +49,8 @@ pub struct DepthToPclAndHeightPipeline {
     _map_height_buffer: GpuBuffer,
     _map_width_buffer: GpuBuffer,
     height_map_buffer: GpuBuffer,
+    sigma_spatial_buffer: GpuBuffer,
+    sigma_range_buffer: GpuBuffer,
 
     /// Whether the clear affected cells stage is enabled
     clear_affected_cells_enabled: bool,
@@ -102,6 +105,9 @@ impl DepthToPclAndHeightPipeline {
             ],
             Some("height_map"),
         );
+
+        let sigma_spatial_buffer = GpuBuffer::new_uniform(device, size_of::<f32>() as u64, Some("sigma_spatial"));
+        let sigma_range_buffer = GpuBuffer::new_uniform(device, size_of::<f32>() as u64, Some("sigma_range"));
 
         // Create clear affected cells pipeline if enabled
         let clear_stage = if let Some(clear_options) = clear_affected_cells {
@@ -313,6 +319,8 @@ impl DepthToPclAndHeightPipeline {
             &outlier_filtered_height_map_buffer,
             &map_width_buffer,
             &map_height_buffer,
+            &sigma_spatial_buffer,
+            &sigma_range_buffer
         )?;
 
         let (gradient_map_buffer, gradient_pipeline) = new_gradient_pipeline(
@@ -373,6 +381,8 @@ impl DepthToPclAndHeightPipeline {
             _map_width_buffer: map_width_buffer,
             _map_height_buffer: map_height_buffer,
             _map_layout_buffer: map_layout_buffer,
+            sigma_range_buffer,
+            sigma_spatial_buffer
         })
     }
 
@@ -494,5 +504,13 @@ impl DepthToPclAndHeightPipeline {
         let height = (map_layout.height_meters() / map_layout.cell_size).ceil() as u32;
         let empty_map = vec![f32::MIN; (width * height) as usize];
         self.height_map_buffer.write_data(device, &empty_map, 0);
+    }
+
+    pub fn set_sigma_spatial(&mut self, new_sigma_spatial: f32, device: &GpuDevice) {
+        self.sigma_spatial_buffer.write_data(device, bytes_of(&new_sigma_spatial), 0);
+    }
+
+    pub fn set_sigma_range(&mut self, new_sigma_range: f32, device: &GpuDevice) {
+        self.sigma_range_buffer.write_data(device, bytes_of(&new_sigma_range), 0);
     }
 }

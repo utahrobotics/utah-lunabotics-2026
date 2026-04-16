@@ -11,6 +11,7 @@
                 "obstacle_gradient_threshold_expander": 0.9,
                 "obstacle_gradient_threshold_pathfinder": 0.3,
                 "robot_radius_meters": 0.8,
+                "arena": "artemis"
             },
             logging:(
                 enabled: false
@@ -50,16 +51,19 @@
             id:"realsense_subscriber",
             type: "crate::tasks::sources::RealsenseSubscriber",
             config: {
-                "serial_num": "044422250424",
-                // "serial_num": "311322302990",
+                // "serial_num": "044422250424",
+                // dust protected cam
+                // "serial_num": "341222301328",
+                "serial_num": "311322302990",
                 "camera_node": "upper_depth_camera"
             },
             logging: (
-                enabled: true
+                enabled: true,
             ),
             run_in_sim: false
         ),
         // subscribes to 6dof messages from the intel T265 camera
+        // subsrcibes to fisheye images as well
         (
             id: "t265_subscriber",
             type: "crate::tasks::sources::T265Subscriber",
@@ -67,9 +71,14 @@
                 "t265_velocity_variance": 1.0,
                 "t265_angular_velocity_variance": 1.0,
                 "pose_variance": 0.0005,
+                "left_serial": "142122111023",
+                "right_serial": "142122110508",
+                "rear_serial": "929122111514",
             },
             logging: (
-                enabled: true
+                enabled: true,
+                // disable logging for images (it takes too long)
+                disabled_slots: [1,2,3]
             ),
             run_in_sim: false
         ),
@@ -104,7 +113,7 @@
                 "clear_affected_cells": false,
                 "min_distance_to_clear": 1.5,
 
-                // enable permanent obstacles 
+                // enable permanent obstacles: artemis, ucfright, or ucfleft
                 "arena_obstacles": "artemis",
 
                 // parameters for when to reset the local map
@@ -121,6 +130,7 @@
                 enabled: false,
             )
         ),
+        // (deprecated)
         // registers point clouds into a global map, and estimates the isometry of the lidar node.
         // the isometry is relative to the robots starting position, not actual global coordinates
         (
@@ -156,7 +166,7 @@
             ),
             background: true
         ),
-        // fuses information from IMUs, Apriltags, and ICP algos providing one global robot position.
+        // fuses information from T265s, IMUs, Apriltags, and ICP algos providing one global robot position.
         // position is logged to rerun at 60 hz
         (
             id:"localizer", type:"crate::tasks::Localizer",
@@ -168,12 +178,13 @@
                 "process_noise_acceleration": 0.5,
 
                 "initial_covariance": 100.0,
-
             },
-
+            logging: (
+                enabled: false
+            )
         ),
 
-        // receives messages from the ai_source and tells the motors to move accordingly
+        // receives messages from the ai and tells the motors to move accordingly
         (
             id:"motor_ctrl", type:"crate::tasks::sinks::MotorController", config:{
                 "speed_multiplier": 1500,
@@ -200,7 +211,7 @@
         // controls actuators and sends imu data to the localizer
         (
             id:"v3_pico", type: "crate::tasks::V3PicoTask", config:{
-                "teri_mode": false,
+                "teri_mode": true,
             }
         ),
         // handles apriltag detections from all the cameras, combining them and then sending them over to the localizer
@@ -212,8 +223,47 @@
                 "max_distance": 20.5
             }
         ),
+
+
+        // Special apriltag detection tasks for the T265's that handle un distortion.
         (
-            id: "detector_cam_t265",
+            id: "detector_cam_t265_left",
+            type: "cu_apriltag::AprilTags",
+            config: {
+                "family": "tag36h11",
+                "tag_size": 0.145,
+                "fx": 1,
+                "fy": 1,
+                "cx": 960.84,
+                "cy": 600.819,
+                "camera_id": "142122111023",
+                "distortion_path": "camera_configs/t265_distortion.ron",
+            },
+            logging: (
+                enabled: true
+            ),
+            background: true,
+        ),
+        (
+            id: "detector_cam_t265_right",
+            type: "cu_apriltag::AprilTags",
+            config: {
+                "family": "tag36h11",
+                "tag_size": 0.145,
+                "fx": 1,
+                "fy": 1,
+                "cx": 960.84,
+                "cy": 600.819,
+                "camera_id": "142122110508",
+                "distortion_path": "camera_configs/t265_distortion.ron",
+            },
+            logging: (
+                enabled: true
+            ),
+            background: true,
+        ),
+        (
+            id: "detector_cam_t265_rear",
             type: "cu_apriltag::AprilTags",
             config: {
                 "family": "tag36h11",
@@ -229,6 +279,46 @@
                 enabled: true
             ),
             background: true,
+        ),
+
+        // hardware encodes and streams the obstacle map.
+        (
+            id: "obstacle_gstreamer",
+            type: "crate::tasks::ObstacleStreamer",
+            config: {
+                "width": 520,
+                "height": 600,
+                "fps": 30,
+                "host": "0.0.0.0",
+                "port": 5000,
+                "bitrate": 2000,
+            }
+        ),
+
+        // streams fisheye lenses for t265
+        (
+            id: "t265_left_gstreamer",
+            type: "crate::tasks::T265Streamer",
+            config: {
+                "width": 848,
+                "height": 800,
+                "fps": 30,
+                "host": "0.0.0.0",
+                "port": 5001,
+                "bitrate": 2000,
+            }
+        ),
+        (
+            id: "t265_right_gstreamer",
+            type: "crate::tasks::T265Streamer",
+            config: {
+                "width": 848,
+                "height": 800,
+                "fps": 30,
+                "host": "0.0.0.0",
+                "port": 5002,
+                "bitrate": 2000,
+            }
         )
     ],
     cnx:[
@@ -243,11 +333,21 @@
         (src:"new_ai",                        dst:"motor_ctrl",              msg:"common::Steering"),
         (src:"new_ai",                        dst:"v3_pico",                 msg:"embedded_common::ActuatorCommand"),
         (src:"v3_pico",                       dst:"localizer",               msg:"embedded_common::FromPico"),
-        (src:"detection_handler",             dst: "localizer",              msg:"Vec<crate::tasks::AprilTagMeasurement>"),
-        (src:"t265_subscriber",               dst:"localizer",               msg:"crate::tasks::sources::T265Msg"),
-        (src:"t265_subscriber",               dst:"detector_cam_t265",       msg:"cu_sensor_payloads::CuImage<Vec<u8>>"),
-        (src:"detector_cam_t265",             dst: "detection_handler",      msg:"cu_apriltag::AprilTagDetections"),
+        (src:"detection_handler",             dst:"localizer",               msg:"Vec<crate::tasks::AprilTagMeasurement>"),
+        (src:"t265_subscriber",               dst:"localizer",               msg:"crate::tasks::sources::T265Msg", src_port: Some(0)),
+        (src:"t265_subscriber",               dst:"detector_cam_t265_left",  msg:"cu_sensor_payloads::CuImage<Vec<u8>>", src_port: Some(1)),
+        (src:"t265_subscriber",               dst:"detector_cam_t265_right", msg:"cu_sensor_payloads::CuImage<Vec<u8>>", src_port: Some(2)),
+        (src:"t265_subscriber",               dst:"detector_cam_t265_rear",  msg:"cu_sensor_payloads::CuImage<Vec<u8>>", src_port: Some(3)),
 
+        (src:"detector_cam_t265_left",        dst:"detection_handler",       msg:"cu_apriltag::AprilTagDetections"),
+        (src:"detector_cam_t265_right",       dst:"detection_handler",       msg:"cu_apriltag::AprilTagDetections"),
+        (src:"detector_cam_t265_rear",        dst:"detection_handler",       msg:"cu_apriltag::AprilTagDetections"),
+
+        (src:"t265_subscriber", dst:"t265_left_gstreamer", msg:"cu_sensor_payloads::CuImage<Vec<u8>>", src_port: Some(1)),
+        (src:"t265_subscriber", dst:"t265_right_gstreamer", msg:"cu_sensor_payloads::CuImage<Vec<u8>>", src_port: Some(2)),
+
+        (src:"occupancy_grid_pipeline",       dst: "obstacle_gstreamer",     msg:"crate::pathfinding::OccupancyGrid"),
+        (src:"new_ai",                        dst: "obstacle_gstreamer",     msg:"Vec<[f32; 2]>"),
     ],
 
     // comms to lunabase software
@@ -270,7 +370,7 @@
     includes:[
         // starts a gstreamer pipeline that waits for a message from udev_monitor and then starts the pipeline accordingly
         // sends frames through a dynamic threshold and then to the apriltag detector, then to the detection handler.
-        // frames are streamed over udp to the host and port specified in the config
+        // frames are streamed over tcp to the host and port specified in the config
         (
             path:"camera_configs/camera_template_gstreamer.ron",
             params:{
@@ -282,8 +382,9 @@
                 "cy":600.819,
                 "width":1920,
                 "height":1200,
-                "udp_host":"192.168.0.108",
-                "udp_port":5004,
+                "tcp_host":"0.0.0.0",
+                "tcp_port":4000,
+                "desired_index": "0"
             },
         ),
         (
@@ -297,8 +398,9 @@
                 "cy":604.28,
                 "width":640,
                 "height":480,
-                "udp_host":"127.0.0.1",
-                "udp_port":4001,
+                "tcp_host":"0.0.0.0",
+                "tcp_port":4001,
+                "desired_index": "0"
             },
         ),
         (
@@ -312,8 +414,22 @@
                 "cy":340.819,
                 "width":1280,
                 "height":720,
-                "udp_host":"127.0.0.1",
-                "udp_port":4000,
+                "tcp_host":"0.0.0.0",
+                "tcp_port":4002,
+                "desired_index": "0"
+            }
+        ),
+        // the lite version doesnt include apriltags
+        (
+            path:"camera_configs/camera_template_gstreamer_lite.ron",
+            params:{
+                "id":"d456_rgb",
+                "port":"pci-0000:e6:00.4-usb-0:1:1.3",
+                "width":640,
+                "height":480,
+                "tcp_host":"0.0.0.0",
+                "tcp_port":4003,
+                "desired_index": "0"
             }
         ),
     ],
@@ -321,9 +437,9 @@
     // monitor:(type:"cu_consolemon::CuConsoleMon"),
     monitor: (type:"simple_monitor::SimpleMonitor"),
     logging:(
-    // if true, each output payload of each will be logged unless a task opts out
-        enable_task_logging: true,
-        section_size_mib:100,
+        // if true, each output payload of each will be logged unless a task opts out
+        enable_task_logging: false,
+        section_size_mib: 100,
         copperlist_count: 20,
     ),
 )

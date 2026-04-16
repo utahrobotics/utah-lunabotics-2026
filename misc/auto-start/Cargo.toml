@@ -6,4 +6,4 @@ edition = "2024"
 [dependencies]
 tiny_http = "0.12.0"
 sha1 = "0.10"
-base64 = "0.21"
+base64 = "0.22.1"

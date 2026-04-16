@@ -22,6 +22,7 @@ production = [
     "cu-apriltag/hardware",
     "udev",
     "gstreamer",
+    "gstreamer-video",
     "gstreamer-app",
     "cu-gstreamer",
     "circular-buffer",
@@ -90,7 +91,7 @@ serde-big-array.workspace = true
 
 # misc
 simple-motion = { path = "../misc/simple-motion" }
-bitcode = "0.6.6"
+bitcode.workspace = true
 tasker = { path = "../misc/tasker" }
 iceoryx-types = { path = "../misc/iceoryx-types" }
 launcher = { path = "../misc/launcher", optional = true }
@@ -113,6 +114,7 @@ bonsai-bt = { git = "https://github.com/utahrobotics/bonsai.git" }
 # production hardware feature only
 udev = { version = "0.9", features = ["mio10"], optional = true }
 gstreamer = { version = "0.24.0", optional = true }
+gstreamer-video = { version = "0.24.0", optional = true }
 circular-buffer = { version = "1.1.0", optional = true }
 gstreamer-app = { version = "0.24.0", optional = true }
 cu-gstreamer = { workspace = true, optional = true }
@@ -126,7 +128,7 @@ mujoco-rs = { version = "2.2.2", features = [
     "renderer",
     "renderer-winit-fallback"
 ], optional = true, default-features = false }
-rand = "0.9.2"
+rand = "0.9.0"
 ctrlc = "3.5.2"
 
 [build-dependencies]

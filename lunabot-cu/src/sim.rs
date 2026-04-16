@@ -70,7 +70,14 @@ fn default_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::LunabaseBridgeRxFromLunabaseRx { .. } => SimOverride::ExecuteByRuntime,
         default::SimStep::LunabaseBridgeTxToLunabase { .. } => SimOverride::ExecuteByRuntime,
         default::SimStep::LunabaseBridgeBridge { .. } => SimOverride::ExecuteByRuntime,
-        default::SimStep::DetectorCamT265(..) => SimOverride::ExecutedBySim,
+        default::SimStep::DetectorCamT265Right(..) => SimOverride::ExecutedBySim,
+        default::SimStep::DetectorCamT265Left(..) => SimOverride::ExecutedBySim,
+        default::SimStep::DetectorCamT265Rear(..) => SimOverride::ExecutedBySim,
+        default::SimStep::T265LeftGstreamer(..) => SimOverride::ExecutedBySim,
+        default::SimStep::T265RightGstreamer(..) => SimOverride::ExecutedBySim,
+        default::SimStep::CamD456Rgb(_) | default::SimStep::CamD456RgbNull(_) => SimOverride::ExecutedBySim,
+        default::SimStep::ObstacleGstreamer(..) => SimOverride::ExecutedBySim,
+
         default::SimStep::__Phantom(_) => SimOverride::ExecutedBySim,
     }
 }
@@ -145,6 +152,8 @@ fn sim_callback<'a>(
         default::SimStep::GstConvertSide(_) => SimOverride::ExecutedBySim,
         default::SimStep::GstConvertLaptopFront(_) => SimOverride::ExecutedBySim,
         default::SimStep::L2Pointcloud(_) => SimOverride::ExecutedBySim,
+        default::SimStep::T265LeftGstreamer(..) => SimOverride::ExecutedBySim,
+        default::SimStep::T265RightGstreamer(..) => SimOverride::ExecutedBySim,
         default::SimStep::L2Imu(_) => SimOverride::ExecutedBySim,
         default::SimStep::V3Pico(CuTaskCallbackState::Process(input, _)) => {
             static LIFT_DIRECTION: AtomicCell<Direction> = AtomicCell::new(Direction::Forward);
@@ -167,9 +176,7 @@ fn sim_callback<'a>(
                                 BUCKET_SPEED.store(*speed);
                                 BUCKET_DIRECTION.store(*direction);
                             }
-                            embedded_common::Actuator::Dumper => {
-
-                            }
+                            embedded_common::Actuator::Dumper => {}
                         }
                     }
                     embedded_common::ActuatorCommand::Shake => {}
@@ -235,7 +242,9 @@ fn sim_callback<'a>(
         default::SimStep::MotorCtrl(..) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamBack(_) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamSide(_) => SimOverride::ExecutedBySim,
-        default::SimStep::DetectorCamT265(..) => SimOverride::ExecutedBySim,
+        default::SimStep::DetectorCamT265Right(..) => SimOverride::ExecutedBySim,
+        default::SimStep::DetectorCamT265Left(..) => SimOverride::ExecutedBySim,
+        default::SimStep::DetectorCamT265Rear(..) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamLaptopFront(_) => SimOverride::ExecutedBySim,
         default::SimStep::RealsenseSubscriber(CuTaskCallbackState::Process(_, output)) => {
             use crate::payloads::depth_frame::{CuDepthFrame, CuDepthFrameFormat};
@@ -346,6 +355,7 @@ fn sim_callback<'a>(
             }
             SimOverride::ExecutedBySim
         }
+        default::SimStep::ObstacleGstreamer(..) => SimOverride::ExecutedBySim,
         default::SimStep::T265Subscriber(..) => SimOverride::ExecutedBySim,
         default::SimStep::DetectionHandler(_) => SimOverride::ExecutedBySim,
         default::SimStep::L2KissIcp(_) => SimOverride::ExecuteByRuntime,
@@ -355,6 +365,7 @@ fn sim_callback<'a>(
         default::SimStep::LunabaseBridgeRxFromLunabaseRx { .. } => SimOverride::ExecuteByRuntime,
         default::SimStep::LunabaseBridgeTxToLunabase { .. } => SimOverride::ExecuteByRuntime,
         default::SimStep::LunabaseBridgeBridge { .. } => SimOverride::ExecuteByRuntime,
+        default::SimStep::CamD456Rgb(_) | default::SimStep::CamD456RgbNull(_) => SimOverride::ExecutedBySim,
 
         default::SimStep::__Phantom(_) => SimOverride::ExecutedBySim,
     }

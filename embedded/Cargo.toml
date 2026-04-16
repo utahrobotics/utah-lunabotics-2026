@@ -38,7 +38,7 @@ log = "0.4.28"
 pio-proc = "0.3.0"
 pio = "0.3.0"
 rand = { version = "0.9.2", default-features = false }
-cobs = { version = "0.4.0", default-features = false }
+cobs = { version = "0.5.0", default-features = false }
 embedded_common ={ path = "../embedded_common", features = ["defmt"]}
 
 [profile.release]

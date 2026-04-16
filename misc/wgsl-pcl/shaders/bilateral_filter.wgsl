@@ -4,14 +4,15 @@
 @group(1) @binding(1) var<storage, read_write> filtered_height_map: array<f32>;
 @group(0) @binding(0) var<uniform> map_width: u32;
 @group(0) @binding(1) var<uniform> map_height: u32;
+@group(0) @binding(2) var<uniform> sigma_spatial: f32;
+@group(0) @binding(3) var<uniform> sigma_range: f32;
+
 
 override WORKGROUP_X: u32 = 8;
 override WORKGROUP_Y: u32 = 8;
 // kernel radius includes the center pixel in the kernel
 override KERNEL_RADIUS: u32 = 4;
 
-override SIGMA_SPATIAL: f32 = 0.1;
-override SIGMA_RANGE: f32 = 0.2;
 override CELL_SIZE: f32 = 0.1;
 
 
@@ -67,9 +68,9 @@ fn depth(
                 
                 let range_dist = abs(neighbor_value - center_value);
                 
-                let spatial_weight = exp(-(spatial_dist * spatial_dist) / (2.0 * f32(SIGMA_SPATIAL) * f32(SIGMA_SPATIAL)));
+                let spatial_weight = exp(-(spatial_dist * spatial_dist) / (2.0 * f32(sigma_spatial) * f32(sigma_spatial)));
                 
-                let range_weight = exp(-(range_dist * range_dist) / (2.0 * SIGMA_RANGE * SIGMA_RANGE));
+                let range_weight = exp(-(range_dist * range_dist) / (2.0 * sigma_range * sigma_range));
                 
                 let weight = spatial_weight * range_weight;
                 
