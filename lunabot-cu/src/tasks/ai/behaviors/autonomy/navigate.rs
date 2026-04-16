@@ -33,7 +33,7 @@ impl NavigationGoal {
                 (Vector2::new(3.75,-2.37), 0.30, 1.0)
             },
             NavigationGoal::DumpSite(Arena::Artemis) => {
-                (Vector2::new(5.38,1.0), 1.0, 0.5)
+                (Vector2::new(5.38,1.0), 1.0, 0.25)
             },
             NavigationGoal::DumpSite(Arena::UcfLeft) => {
                 (Vector2::new(6.8, 1.5), 1.0, 0.25)
