@@ -3,7 +3,7 @@
 *HINT: if you disable task logging the sim will run smoother*
 
 ## Setup
-1. Follow the installation instructions [here](https://mujoco-rs.readthedocs.io/en/v2.0.x/installation.html#static-linking) to build mujoco for static linking. (you may have to leave off the release flag on the make step)
+1. Follow the installation instructions [here](https://mujoco-rs.readthedocs.io/en/v2.0.x/installation.html#static-linking) to build mujoco for static linking. (you may have to leave off the release flag on the make step), also it is possible you will need to use [this](https://github.com/matthewashton-k/mujoco-rs) fork of mujoco-rs.
 
 2. Ensure that the correct environment variables are set to point to the mujoco library, e.g. ```export MUJOCO_STATIC_LINK_DIR=/home/matthew_a/mujoco-rs/mujoco/build/lib```
 
