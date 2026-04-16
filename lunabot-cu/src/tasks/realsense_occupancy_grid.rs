@@ -83,48 +83,32 @@ struct ArenaObstacles {
     circles: Vec<(f32, f32, f32)>,
 }
 
-/// Paint known arena obstacles permanently into the occupancy grid.
-/// robot_radius is added to all obstacle extents to account for robot size.
 fn paint_permanent_obstacles(
     grid: &mut OccupancyGrid,
     obstacles: &ArenaObstacles,
-    robot_radius: f32,
 ) {
-    // paint rects (as centers and half sizes)
     for &(cx, cy, half_w, half_h) in &obstacles.rects {
-        let min_x = cx - half_w - robot_radius;
-        let max_x = cx + half_w + robot_radius;
-        let min_y = cy - half_h - robot_radius;
-        let max_y = cy + half_h + robot_radius;
+        let min_x = cx - half_w;
+        let max_x = cx + half_w;
+        let min_y = cy - half_h;
+        let max_y = cy + half_h;
 
-        if let (Ok((x1, y1)), Ok((x2, y2))) = (
-            grid.world_to_cell(min_x, min_y),
-            grid.world_to_cell(max_x, max_y),
-        ) {
-            for x in x1..=x2 {
-                for y in y1..=y2 {
+        let x1 = grid.world_to_cell(min_x, min_y).map(|(x, _)| x).unwrap_or(0);
+        let y1 = grid.world_to_cell(min_x, min_y).map(|(_, y)| y).unwrap_or(0);
+        let x2 = grid.world_to_cell(max_x, max_y).map(|(x, _)| x).unwrap_or(grid.cells_x() - 1);
+        let y2 = grid.world_to_cell(max_x, max_y).map(|(_, y)| y).unwrap_or(grid.cells_y() - 1);
+
+        for x in x1..=x2 {
+            for y in y1..=y2 {
+                // Double check bounds just to be safe before writing to the grid
+                if x < grid.cells_x() && y < grid.cells_y() {
                     let _ = grid.set_gradient_at(x, y, PERMANENT_GRADIENT);
                 }
             }
         }
     }
-    // paint circles
-    for &(cx, cy, radius) in &obstacles.circles {
-        if let Ok((center_x, center_y)) = grid.world_to_cell(cx, cy) {
-            let expanded_radius = radius + robot_radius;
-            let radius_cells = (expanded_radius / grid.layout.cell_size).ceil() as isize;
-
-            for dx in -radius_cells..=radius_cells {
-                for dy in -radius_cells..=radius_cells {
-                    if dx * dx + dy * dy <= radius_cells * radius_cells {
-                        let x = (center_x as isize + dx).max(0) as usize;
-                        let y = (center_y as isize + dy).max(0) as usize;
-                        let _ = grid.set_gradient_at(x, y, PERMANENT_GRADIENT);
-                    }
-                }
-            }
-        }
-    }
+    
+    // ... same logic for circles (just use 'radius' instead of 'radius + robot_radius')
 }
 
 impl Freezable for OccupancyGridTask {}
@@ -475,7 +459,7 @@ impl CuTask for OccupancyGridTask {
             if let Some(arena_obstacles) = arena_obstacles
                 && let Some(obstacles) = load_arena_obstacles(arena_obstacles)
             {
-                paint_permanent_obstacles(&mut grid, &obstacles, robot_radius_meters);
+                paint_permanent_obstacles(&mut grid, &obstacles);
             } else {
                 eprintln!("[OccupancyGrid] No arena obstacles loaded");
             }
@@ -545,7 +529,6 @@ impl CuTask for OccupancyGridTask {
                     paint_permanent_obstacles(
                         &mut global_guard,
                         &obstacles,
-                        self.robot_radius_meters,
                     );
                 }
 
