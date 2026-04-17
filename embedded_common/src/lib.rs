@@ -1,5 +1,8 @@
 #![no_std]
 
+#[cfg(feature = "std")]
+extern crate std;
+
 // When using defmt-03 feature, re-export defmt 0.3 under the name `defmt`
 // so that derive(defmt::Format) works uniformly
 #[cfg(feature = "defmt-03")]
@@ -90,13 +93,6 @@ pub enum ActuatorCommand {
     StopAll,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-#[cfg_attr(any(feature = "defmt", feature = "defmt-03"), derive(defmt::Format))]
-/// adc readings
-#[cfg_attr(
-    feature = "std",
-    derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
-)]
 // pub struct ActuatorReading {
 //     pub m1_reading: u16,
 //     pub m2_reading: u16,
@@ -448,23 +444,21 @@ impl SensorReading {
         }
     }
 }
-
 impl FromPico {
-    /// 1 tag + 4 FromImu (4×25) + 1 ActuatorReading (4)  = 105 bytes
-    pub const SIZE: usize = 105;
+    /// 1 tag + 4 × FromIMU (4×25=100) + SensorReading (22) = 123 bytes
+    pub const SIZE: usize = 1 + 4 * FromIMU::SIZE + SensorReading::SIZE;
 
     pub fn serialize(&self) -> [u8; Self::SIZE] {
         let mut bytes = [0u8; Self::SIZE];
-
         match self {
-            FromPico::Reading(readings, act) => {
+            FromPico::Reading(readings, sensor) => {
                 bytes[0] = 0;
                 for (i, r) in readings.iter().enumerate() {
                     let start = 1 + i * FromIMU::SIZE;
-                    let end = start + FromIMU::SIZE;
-                    bytes[start..end].copy_from_slice(&r.serialize());
+                    bytes[start..start + FromIMU::SIZE].copy_from_slice(&r.serialize());
                 }
-                bytes[Self::SIZE - 4..].copy_from_slice(&act.serialize());
+                bytes[Self::SIZE - SensorReading::SIZE..]
+                    .copy_from_slice(&sensor.serialize());
             }
             FromPico::Error(err) => {
                 bytes[0] = 3;
@@ -486,17 +480,16 @@ impl FromPico {
                 let mut readings: [FromIMU; 4] = [FromIMU::Error; 4];
                 for i in 0..4 {
                     let start = 1 + i * FromIMU::SIZE;
-                    let end = start + FromIMU::SIZE;
-                    let imu_bytes: [u8; FromIMU::SIZE] =
-                        bytes[start..end].try_into().map_err(|_| "slice size")?;
+                    let imu_bytes: [u8; FromIMU::SIZE] = bytes[start..start + FromIMU::SIZE]
+                        .try_into()
+                        .map_err(|_| "slice size")?;
                     readings[i] = FromIMU::deserialize(imu_bytes)?;
                 }
-                let act_bytes: [u8; 4] = bytes[Self::SIZE - 4..]
-                    .try_into()
-                    .map_err(|_| "act slice")?;
-
-                let act = ActuatorReading::deserialize(act_bytes);
-                Ok(FromPico::Reading(readings, act))
+                let sensor_bytes: [u8; SensorReading::SIZE] =
+                    bytes[Self::SIZE - SensorReading::SIZE..]
+                        .try_into()
+                        .map_err(|_| "sensor slice")?;
+                Ok(FromPico::Reading(readings, SensorReading::deserialize(sensor_bytes)))
             }
             3 => {
                 let err = match bytes[1] {
@@ -506,10 +499,11 @@ impl FromPico {
                 };
                 Ok(FromPico::Error(err))
             }
-            _ => Err("invalid FromPicoV3 tag"),
+            _ => Err("invalid FromPico tag"),
         }
     }
 }
+
 /// Request to secondary pico, asking for a reading from a specific mux channel
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[cfg_attr(any(feature = "defmt", feature = "defmt-03"), derive(defmt::Format))]
@@ -565,11 +559,35 @@ impl SecondaryResponse {
         }
     }
 }
-
 #[cfg(test)]
 #[cfg(feature = "std")]
 mod tests {
+    use std::vec::Vec;
+
     use super::*;
+
+    fn make_sensor_reading() -> SensorReading {
+        SensorReading {
+            m1_cs: 100,
+            m2_cs: 200,
+            m3_cs: 300,
+            m4_cs: 400,
+            m1_therm: 500,
+            m2_therm: 600,
+            m3_therm: 700,
+            m4_therm: 800,
+            drive1_he: 900,
+            drive2_he: 1000,
+            amb_therm: 1100,
+        }
+    }
+
+    #[test]
+    fn direction_not_operator() {
+        assert_eq!(!Direction::Forward, Direction::Backward);
+        assert_eq!(!Direction::Backward, Direction::Forward);
+        assert_eq!(!!Direction::Forward, Direction::Forward);
+    }
 
     fn roundtrip_angular_rate(x: f32, y: f32, z: f32) {
         let original = AngularRate { x, y, z };
@@ -601,16 +619,8 @@ mod tests {
 
     #[test]
     fn from_imu_reading_roundtrip() {
-        let rate = AngularRate {
-            x: 0.1,
-            y: 0.2,
-            z: 0.3,
-        };
-        let accel = AccelerationNorm {
-            x: 0.0,
-            y: -9.81,
-            z: 0.0,
-        };
+        let rate = AngularRate { x: 0.1, y: 0.2, z: 0.3 };
+        let accel = AccelerationNorm { x: 0.0, y: -9.81, z: 0.0 };
         let original = FromIMU::Reading(rate, accel);
         let bytes = original.serialize();
         let result = FromIMU::deserialize(bytes).unwrap();
@@ -634,24 +644,34 @@ mod tests {
     }
 
     #[test]
-    fn actuator_reading_roundtrip() {
-        let original = ActuatorReading {
-            m1_reading: 1234,
-            m2_reading: 5678,
-        };
-        let bytes = original.serialize();
-        let result = ActuatorReading::deserialize(bytes);
-        assert_eq!(original, result);
+    fn from_imu_invalid_tag() {
+        let mut bytes = [0u8; FromIMU::SIZE];
+        bytes[0] = 255;
+        assert!(FromIMU::deserialize(bytes).is_err());
+    }
+
+    #[test]
+    fn actuator_bit_uniqueness() {
+        let bits: Vec<u8> = Actuator::ALL.iter().map(|a| a.as_bit()).collect();
+        for i in 0..bits.len() {
+            for j in 0..bits.len() {
+                if i != j {
+                    assert_eq!(
+                        bits[i] & bits[j],
+                        0,
+                        "Actuators at index {i} and {j} share a fault bit"
+                    );
+                }
+            }
+        }
     }
 
     #[test]
     fn actuator_command_set_speed_roundtrip() {
         for actuator in [Actuator::Lift, Actuator::Bucket, Actuator::Dumper] {
             for direction in [Direction::Forward, Direction::Backward] {
-                let original = ActuatorCommand::SetSpeed(12345, actuator, direction);
-                let bytes = original.serialize();
-                let result = ActuatorCommand::deserialize(bytes).unwrap();
-                assert_eq!(original, result);
+                let v = ActuatorCommand::SetSpeed(12345, actuator, direction);
+                assert_eq!(ActuatorCommand::deserialize(v.serialize()).unwrap(), v);
             }
         }
     }
@@ -667,16 +687,10 @@ mod tests {
     #[test]
     fn actuator_command_percuss_roundtrip() {
         let start = ActuatorCommand::StartPercuss;
-        assert_eq!(
-            start,
-            ActuatorCommand::deserialize(start.serialize()).unwrap()
-        );
+        assert_eq!(start, ActuatorCommand::deserialize(start.serialize()).unwrap());
 
         let stop = ActuatorCommand::StopPercuss;
-        assert_eq!(
-            stop,
-            ActuatorCommand::deserialize(stop.serialize()).unwrap()
-        );
+        assert_eq!(stop, ActuatorCommand::deserialize(stop.serialize()).unwrap());
     }
 
     #[test]
@@ -685,71 +699,6 @@ mod tests {
         let bytes = cmd.serialize();
         let result = ActuatorCommand::deserialize(bytes).unwrap();
         assert_eq!(cmd, result);
-    }
-
-    #[test]
-    fn from_pico_v3_reading_roundtrip() {
-        let rate = AngularRate {
-            x: 1.0,
-            y: 2.0,
-            z: 3.0,
-        };
-        let accel = AccelerationNorm {
-            x: 0.0,
-            y: -9.81,
-            z: 0.0,
-        };
-        let readings = [
-            FromIMU::Reading(rate, accel),
-            FromIMU::NoDataReady,
-            FromIMU::Error,
-            FromIMU::Reading(
-                AngularRate {
-                    x: -1.0,
-                    y: 0.0,
-                    z: 0.5,
-                },
-                AccelerationNorm {
-                    x: 1.0,
-                    y: 1.0,
-                    z: 1.0,
-                },
-            ),
-        ];
-        let act = ActuatorReading {
-            m1_reading: 100,
-            m2_reading: 200,
-        };
-        let original = FromPico::Reading(readings, act);
-        let bytes = original.serialize();
-        let result = FromPico::deserialize(bytes).unwrap();
-        assert_eq!(original, result);
-    }
-
-    #[test]
-    fn from_pico_v3_error_roundtrip() {
-        let original = FromPico::Error(PicoError::Other);
-        let bytes = original.serialize();
-        let result = FromPico::deserialize(bytes).unwrap();
-        assert_eq!(original, result);
-
-        // single faults
-        for actuator in Actuator::ALL {
-            let original = FromPico::Error(PicoError::MotorDriverFault(actuator.as_bit()));
-            let bytes = original.serialize();
-            let result = FromPico::deserialize(bytes).unwrap();
-            assert_eq!(original, result);
-        }
-
-        // multiple faults
-        let multi = PicoError::from_faults([Actuator::Lift, Actuator::Dumper].into_iter());
-        assert!(multi.is_faulted(Actuator::Lift));
-        assert!(!multi.is_faulted(Actuator::Bucket));
-        assert!(multi.is_faulted(Actuator::Dumper));
-        let original = FromPico::Error(multi);
-        let bytes = original.serialize();
-        let result = FromPico::deserialize(bytes).unwrap();
-        assert_eq!(original, result);
     }
 
     #[test]
@@ -767,10 +716,44 @@ mod tests {
     }
 
     #[test]
-    fn from_imu_invalid_tag() {
-        let mut bytes = [0u8; FromIMU::SIZE];
-        bytes[0] = 255;
-        assert!(FromIMU::deserialize(bytes).is_err());
+    fn from_pico_v3_reading_roundtrip() {
+        let rate = AngularRate { x: 1.0, y: 2.0, z: 3.0 };
+        let accel = AccelerationNorm { x: 0.0, y: -9.81, z: 0.0 };
+        let readings = [
+            FromIMU::Reading(rate, accel),
+            FromIMU::NoDataReady,
+            FromIMU::Error,
+            FromIMU::Reading(
+                AngularRate { x: -1.0, y: 0.0, z: 0.5 },
+                AccelerationNorm { x: 1.0, y: 1.0, z: 1.0 },
+            ),
+        ];
+        let original = FromPico::Reading(readings, make_sensor_reading());
+        let bytes = original.serialize();
+        assert_eq!(FromPico::deserialize(bytes).unwrap(), original);
+    }
+
+    #[test]
+    fn from_pico_v3_error_roundtrip() {
+        let original = FromPico::Error(PicoError::Other);
+        let bytes = original.serialize();
+        let result = FromPico::deserialize(bytes).unwrap();
+        assert_eq!(original, result);
+
+        for actuator in Actuator::ALL {
+            let original = FromPico::Error(PicoError::MotorDriverFault(actuator.as_bit()));
+            let bytes = original.serialize();
+            let result = FromPico::deserialize(bytes).unwrap();
+            assert_eq!(original, result);
+        }
+
+        let multi = PicoError::from_faults([Actuator::Lift, Actuator::Dumper].into_iter());
+        assert!(multi.is_faulted(Actuator::Lift));
+        assert!(!multi.is_faulted(Actuator::Bucket));
+        assert!(multi.is_faulted(Actuator::Dumper));
+        let original = FromPico::Error(multi);
+        let bytes = original.serialize();
+        assert_eq!(FromPico::deserialize(bytes).unwrap(), original);
     }
 
     #[test]
@@ -778,6 +761,19 @@ mod tests {
         let mut bytes = [0u8; FromPico::SIZE];
         bytes[0] = 255;
         assert!(FromPico::deserialize(bytes).is_err());
+    }
+
+    #[test]
+    fn from_pico_size_constant() {
+        assert_eq!(FromPico::SIZE, 1 + 4 * FromIMU::SIZE + SensorReading::SIZE);
+        assert_eq!(FromPico::SIZE, 123);
+    }
+
+    #[test]
+    fn pico_error_other_is_never_faulted() {
+        for actuator in Actuator::ALL {
+            assert!(!PicoError::Other.is_faulted(actuator));
+        }
     }
 
     #[test]
@@ -804,6 +800,23 @@ mod tests {
             };
             assert_eq!(SensorReading::deserialize(v.serialize()), v);
         }
+    }
+
+    #[test]
+    fn sensor_reading_field_order() {
+        let v = make_sensor_reading();
+        let bytes = v.serialize();
+        assert_eq!(u16::from_le_bytes([bytes[0],  bytes[1]]),  100,  "ch0  m1_cs");
+        assert_eq!(u16::from_le_bytes([bytes[2],  bytes[3]]),  200,  "ch1  m2_cs");
+        assert_eq!(u16::from_le_bytes([bytes[4],  bytes[5]]),  300,  "ch2  m3_cs");
+        assert_eq!(u16::from_le_bytes([bytes[6],  bytes[7]]),  400,  "ch3  m4_cs");
+        assert_eq!(u16::from_le_bytes([bytes[8],  bytes[9]]),  500,  "ch4  m1_therm");
+        assert_eq!(u16::from_le_bytes([bytes[10], bytes[11]]), 600,  "ch5  m2_therm");
+        assert_eq!(u16::from_le_bytes([bytes[12], bytes[13]]), 700,  "ch6  m3_therm");
+        assert_eq!(u16::from_le_bytes([bytes[14], bytes[15]]), 800,  "ch7  m4_therm");
+        assert_eq!(u16::from_le_bytes([bytes[16], bytes[17]]), 900,  "ch8  drive1_he");
+        assert_eq!(u16::from_le_bytes([bytes[18], bytes[19]]), 1000, "ch9  drive2_he");
+        assert_eq!(u16::from_le_bytes([bytes[20], bytes[21]]), 1100, "ch10 amb_therm");
     }
 
     #[test]
