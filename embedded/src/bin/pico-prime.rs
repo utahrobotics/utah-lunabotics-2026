@@ -18,8 +18,8 @@ use embassy_usb::{
     class::cdc_acm::{CdcAcmClass, Receiver, Sender, State},
 };
 use embedded_common::{
-    Actuator, ActuatorCommand, Direction, FromPico, MAX_MESSAGE_SIZE, PicoError, SecondaryRequest,
-    SecondaryResponse, SensorReading,
+    Actuator, ActuatorCommand, Direction, FromIMU, FromPico, MAX_MESSAGE_SIZE, PicoError,
+    SecondaryRequest, SecondaryResponse, SensorReading,
 };
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
@@ -32,6 +32,7 @@ static PACKET_SIZE: u16 = 64;
 const POLL_INTERVAL_MS: u64 = 5;
 
 static SENSOR_READINGS: Channel<CriticalSectionRawMutex, SensorReading, 1> = Channel::new();
+static SECONDARY_PICO_ERRORS: Channel<CriticalSectionRawMutex, PicoError, 1> = Channel::new();
 
 struct FaultDetector<'a> {
     fault: Input<'a>,
@@ -199,25 +200,37 @@ async fn usb_tx_loop(
                     .filter(|fd| fd.is_faulted())
                     .map(|fd| fd.which),
             );
-            let serialized = FromPico::Error(err).serialize();
-            let len = cobs::encode(&serialized, &mut stuffed);
-            for chunk in stuffed[..len + 1].chunks(64) {
-                if let Err(e) = writer.write_packet(chunk).await {
-                    error!("[COBS ERROR] {:?}", e);
-                    break 'writer;
+            if let Some(fault_error) = err {
+                let serialized = FromPico::Error(fault_error).serialize();
+                let len = cobs::encode(&serialized, &mut stuffed);
+                for chunk in stuffed[..len + 1].chunks(64) {
+                    if let Err(e) = writer.write_packet(chunk).await {
+                        error!("[COBS ERROR] {:?}", e);
+                        break 'writer;
+                    }
                 }
             }
 
-            if let Ok(_sensors) = SENSOR_READINGS.try_receive() {
-                // TODO: send sensor readings to host
-                // let serialized = FromPico::Reading([FromIMU; 4], sensors).serialize();
-                // let len = cobs::encode(&serialized, &mut stuffed);
-                // for chunk in stuffed[..len + 1].chunks(64) {
-                //     if let Err(e) = writer.write_packet(chunk).await {
-                //         error!("[COBS ERROR] {:?}", e);
-                //         break 'writer;
-                //     }
-                // }
+            if let Ok(secondary_pico_err) = SECONDARY_PICO_ERRORS.try_receive() {
+                let serialized = FromPico::Error(secondary_pico_err).serialize();
+                let len = cobs::encode(&serialized, &mut stuffed);
+                for chunk in stuffed[..len + 1].chunks(64) {
+                    if let Err(e) = writer.write_packet(chunk).await {
+                        error!("[COBS ERROR] {:?}", e);
+                        break 'writer;
+                    }
+                }
+            }
+
+            if let Ok(sensors) = SENSOR_READINGS.try_receive() {
+                let serialized = FromPico::Reading([FromIMU::NoDataReady; 4], sensors).serialize();
+                let len = cobs::encode(&serialized, &mut stuffed);
+                for chunk in stuffed[..len + 1].chunks(64) {
+                    if let Err(e) = writer.write_packet(chunk).await {
+                        error!("[COBS ERROR] {:?}", e);
+                        break 'writer;
+                    }
+                }
             }
 
             Timer::after(Duration::from_millis(POLL_INTERVAL_MS)).await;
@@ -301,7 +314,7 @@ async fn usb_rx_loop(
 async fn secondary_poll_loop(uart: &'static mut Uart<'static, Async>) {
     const RESPONSE_TIMEOUT_MS: u64 = 50;
     let mut readings = [0u16; SensorReading::CHANNEL_COUNT];
-    loop {
+    'poll_loop: loop {
         for ch in 0u8..SensorReading::CHANNEL_COUNT as u8 {
             let req = SecondaryRequest { mux_address: ch }.serialize();
             if uart.write(&req).await.is_err() {
@@ -321,11 +334,13 @@ async fn secondary_poll_loop(uart: &'static mut Uart<'static, Async>) {
                 }
                 Ok(Err(e)) => {
                     error!("secondary UART read error ch {}: {:?}", ch, e);
-                    readings[ch as usize] = 0;
+                    let _ = SECONDARY_PICO_ERRORS.try_send(PicoError::SecondaryPicoUartError);
+                    continue 'poll_loop;
                 }
                 Err(_) => {
                     error!("secondary response timeout ch {}", ch);
-                    readings[ch as usize] = 0;
+                    let _ = SECONDARY_PICO_ERRORS.try_send(PicoError::SecondaryPicoUartTimeout);
+                    continue 'poll_loop;
                 }
             }
         }

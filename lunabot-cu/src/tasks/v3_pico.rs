@@ -263,6 +263,9 @@ mod prod_impl {
             if let Some(reading) = self.from_pico.pop() {
                 output.set_payload(reading);
                 self.last_reading = Instant::now();
+                if let FromPico::Error(e) = reading {
+                    return Err(CuError::from(format!("Pico Error: {e:?}")))
+                }
             } else {
                 output.clear_payload();
             }
