@@ -296,7 +296,7 @@ async fn usb_rx_loop(
     }
 }
 
-/// Constantly polls all 11 active MUX channels and publishes reading to SENSOR_READINGS
+// Asks secondary pico for sensor readings from channels, publishes to SENSOR_READINGS
 #[embassy_executor::task]
 async fn secondary_poll_loop(uart: &'static mut Uart<'static, Async>) {
     const RESPONSE_TIMEOUT_MS: u64 = 50;
