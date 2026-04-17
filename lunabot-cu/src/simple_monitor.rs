@@ -1,12 +1,12 @@
 use cu29::prelude::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, Instant};
 
 /// Used in the lunabase source task to send over any errored tasks, the id is the first string in the tuple
 pub static ERRORED_TASKS: OnceLock<
-    Arc<Mutex<HashMap<usize, (String, CuTaskState, String, Instant)>>>,
+    Arc<Mutex<HashMap<usize, (String, CuTaskState, HashMap<String, Instant>)>>>,
 > = OnceLock::new();
 
 // I got tired of dealing with TUI shenannigans so I made something much simpler.
@@ -46,15 +46,26 @@ impl CuMonitor for SimpleMonitor {
                 if should_print {
                     let mut errors = ERRORED_TASKS.get().unwrap().lock().unwrap();
                     let cutoff_time = now - Duration::from_millis(500);
-                    errors.retain(|_, (_, _, _, timestamp)| *timestamp > cutoff_time);
+                    // errors.retain(|_, (_, _, _, timestamp)| *timestamp > cutoff_time);
+                    // errors.retain(|_, (_, _, error_map)| *timestamp > cutoff_time);
+                    errors.iter_mut().for_each(|(_, (_, _, error_map))| {
+                        error_map.retain(|_, ts| {
+                            *ts > cutoff_time
+                        });
+                    });
+
+                    errors.retain(|_, (_, _, error_map)| {
+                        !error_map.is_empty()
+                    });
+
 
                     if !errors.is_empty() {
                         println!("\n=== ERRORED TASKS ===");
-                        for (&task_id, (_, state, error, _)) in errors.iter() {
+                        for (&task_id, (_, state, error)) in errors.iter() {
                             let task_name =
                                 tasks.get(task_id).map(|&name| name).unwrap_or("Unknown");
                             println!(
-                                "Task {}: {} (State: {:?}) - {}",
+                                "Task {}: {} (State: {:?}) - {:?}",
                                 task_id, task_name, state, error
                             );
                         }
@@ -91,20 +102,20 @@ impl CuMonitor for SimpleMonitor {
     fn process_error(&self, taskid: usize, step: CuTaskState, error: &CuError) -> Decision {
         let mut errors = ERRORED_TASKS.get().unwrap().lock().unwrap();
         let now = Instant::now();
-        if let Some((_, _, _, timestamp)) = errors.get(&taskid) {
-            if now.duration_since(*timestamp) < Duration::from_millis(500) {
-                return Decision::Ignore;
-            }
-        }
-        errors.insert(
-            taskid,
+        errors.entry(taskid).and_modify(|entry| {
+            entry.0 = self.tasks[taskid].to_string();
+            entry.1 = step.clone();
+            let _ = entry.2.insert(error.to_string(), now);
+        }).or_insert_with(|| {
+            let mut hashset = HashMap::new();
+            hashset.insert(error.to_string(), now);
             (
                 self.tasks[taskid].to_string(),
                 step,
-                error.to_string(),
-                now,
-            ),
-        );
+                hashset,
+            )
+        });
+
         Decision::Ignore
     }
 
