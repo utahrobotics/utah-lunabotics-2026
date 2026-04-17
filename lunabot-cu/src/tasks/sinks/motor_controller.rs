@@ -36,6 +36,14 @@ impl CuSinkTask for MotorController {
                 .get::<f64>("speed_multiplier")
                 .expect("failed to deserialize")
                 .unwrap_or(2000.) as f32;
+            let invert_left = config
+                .get::<bool>("invert_left")
+                .expect("failed to deserialize invert_left")
+                .unwrap_or(false);
+            let invert_right = config
+                .get::<bool>("invert_right")
+                .expect("failed to deserialize invert_right")
+                .unwrap_or(false);
             let vesc_pairs = config
                 .get_value::<Vec<VescPair>>("vesc_pairs")
                 .expect("failed to deserialize vesc pairs")
@@ -59,7 +67,7 @@ impl CuSinkTask for MotorController {
                     ));
                 }
             }
-            motor_ref = enumerate_motors(vesc_ids, speed_multiplier);
+            motor_ref = enumerate_motors(vesc_ids, speed_multiplier, invert_left, invert_right);
         } else {
             return Err(CuError::new_with_cause(
                 "no vesc pairs or speed multiplier set in config",

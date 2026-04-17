@@ -18,6 +18,8 @@ use std::path::Path;
 
 use crate::ROBOT_STATE;
 use crate::rerun_viz::RECORDER;
+use crate::tasks::ai::blackboard::BLACKBOARD_SHARED;
+use crate::utils::rwlock_read_unpoison;
 
 const LATERAL_VARIANCE_MODIFIER: f64 = 0.05;
 const DEPTH_VARIENCE_MODIFIER: f64 = 0.05;
@@ -126,6 +128,8 @@ impl CuTask for AprilDetectionHandler {
         &'m input_msg!(AprilTagDetections),
         &'m input_msg!(AprilTagDetections),
         &'m input_msg!(AprilTagDetections),
+        &'m input_msg!(AprilTagDetections),
+        &'m input_msg!(AprilTagDetections),
     );
     // camera_id, estimated isometry of camera
     type Output<'m> = output_msg!(Vec<AprilTagMeasurement>);
@@ -145,16 +149,19 @@ impl CuTask for AprilDetectionHandler {
         output: &mut Self::Output<'_>,
     ) -> CuResult<()> {
         output.clear_payload();
-        let (input1, input2, input3, input4) = input;
+        if let Some(bb) = BLACKBOARD_SHARED.get() && !rwlock_read_unpoison(&bb).enable_apriltags {
+            return Ok(());
+        }
+        let (input1, input2, input3, input4, input5, input6) = input;
 
         self.result_buf.clear();
 
         // Early exit if nothing to process
-        if [input1, input2, input3, input4].iter().all(|i| i.payload().is_none()) {
+        if [input1, input2, input3, input4, input5, input6].iter().all(|i| i.payload().is_none()) {
             return Ok(());
         }
 
-        for particular_input in [input1, input2, input3, input4] {
+        for particular_input in [input1, input2, input3, input4, input5, input6] {
             let Some(dets) = particular_input.payload() else { continue };
             let camera_id = dets.camera_id.as_ref().clone();
             for observation in self.cu_detections_to_tag_observations(dets, &camera_id) {
@@ -287,7 +294,6 @@ impl AprilDetectionHandler {
             }
 
             let Some(pose) = pose.to_na() else {
-                warning!("failed to convert pose to nalgebra type");
                 continue;
             };
 

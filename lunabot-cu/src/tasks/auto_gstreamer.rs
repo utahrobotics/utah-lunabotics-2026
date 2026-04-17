@@ -20,6 +20,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::tasks::NewDevice;
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+use crate::tasks::ai::blackboard::BLACKBOARD_SHARED;
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+use crate::utils::rwlock_read_unpoison;
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 pub use cu_gstreamer::CuGstBuffer;
 
 pub type CuDefaultAutoGStreamer = CuAutoGStreamer<16>;
@@ -27,6 +31,7 @@ pub type CuDefaultAutoGStreamer = CuAutoGStreamer<16>;
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 pub struct CuAutoGStreamer<const N: usize> {
     desired_port: String,
+    desired_index: String,
     camera_id: String,
     pipeline_template: String,
     caps_str: String,
@@ -68,6 +73,9 @@ impl<const N: usize> CuTask for CuAutoGStreamer<N> {
             caps_str: cfg
                 .get::<String>("caps")?
                 .ok_or("'caps' missing from config")?,
+            desired_index: cfg
+                .get::<String>("desired_index")?
+                .ok_or("'desired_index' missing from config")?,
             pipeline: None,
             appsink: None,
             circular_buffer: Arc::new(Mutex::new(CircularBuffer::new())),
@@ -99,8 +107,15 @@ impl<const N: usize> CuTask for CuAutoGStreamer<N> {
         input: &Self::Input<'_>,
         output: &mut Self::Output<'_>,
     ) -> CuResult<()> {
+        output.clear_payload();
+
+        // this check is also done in the apriltag detection handler, but by adding it here we can save some downstream processing
+        if let Some(bb) = BLACKBOARD_SHARED.get() && !rwlock_read_unpoison(&bb).enable_apriltags {
+            return Ok(());
+        }
+
         if let Some(dev) = input.payload() {
-            if *dev.port == self.desired_port {
+            if *dev.port == self.desired_port && *dev.index == self.desired_index {
                 println!(
                     "GStreamer [{}]: Device detected at {}",
                     self.camera_id, &dev.dev_path
@@ -108,8 +123,6 @@ impl<const N: usize> CuTask for CuAutoGStreamer<N> {
                 self.pending_dev_path = Some(dev.dev_path.to_string());
             }
         }
-
-        output.clear_payload();
 
         if let Some(buffer) = self.circular_buffer.lock().unwrap().pop_front() {
             output.tov = clock.now().into();

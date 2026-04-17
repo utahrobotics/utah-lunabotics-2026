@@ -7,10 +7,11 @@
 
 [node name="ArenaMap" type="Control" unique_id=1557496579]
 layout_mode = 3
-anchor_right = 0.23300001
-anchor_bottom = 0.397
-offset_right = 0.3999939
-offset_bottom = 0.099975586
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_right = 0.0
+offset_bottom = 0.0
+clip_contents = true
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 1
@@ -20,7 +21,6 @@ script = ExtResource("1_87x0i")
 layout_mode = 1
 offset_right = 688.0
 offset_bottom = 500.0
-scale = Vector2(0.4, 0.4)
 texture = ExtResource("4_h6673")
 expand_mode = 1
 
@@ -40,6 +40,7 @@ scale = Vector2(0.9999998, 0.9999998)
 layout_mode = 0
 offset_right = 100.0
 offset_bottom = 100.0
+pivot_offset = Vector2(50, 50)
 texture = ExtResource("3_x0vsi")
 expand_mode = 1
 
@@ -47,7 +48,6 @@ expand_mode = 1
 layout_mode = 1
 offset_right = 814.0
 offset_bottom = 914.0
-scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_1610t")
 expand_mode = 1
 
@@ -66,5 +66,6 @@ position = Vector2(50, 50)
 layout_mode = 0
 offset_right = 100.0
 offset_bottom = 100.00003
+pivot_offset = Vector2(50, 50)
 texture = ExtResource("3_x0vsi")
 expand_mode = 1

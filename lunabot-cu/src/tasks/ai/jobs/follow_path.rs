@@ -195,7 +195,7 @@ pub fn follow_path_job(
                     //   Radius is proportional to the ratio of velocity to angular velocity:
                     //   https://www.desmos.com/calculator/f7grn652s4
                     // TODO Fix problems with dot being behind bot
-                    let velocity = follow_speed_factor * target_distance; // will be fixed by normalization
+                    let velocity = follow_speed_factor * target_distance.sqrt(); // will be fixed by normalization
                     let turning =
                         velocity * WHEEL_BASE_SIZE * turning_ratio_adjustment * 0.5 / radius;
 

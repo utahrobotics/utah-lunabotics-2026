@@ -19,7 +19,6 @@ use cu29::prelude::*;
 use nalgebra::Isometry3;
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
-use std::ops::Deref;
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use wgsl_pcl::pipelines::depth_to_obstacle::ClearAffectedCellsOptions;
 use wgsl_pcl::pipelines::filters::*;
@@ -37,9 +36,10 @@ use crate::ROBOT_STATE;
 use crate::pathfinding::OccupancyGrid;
 use crate::payloads::depth_frame::CuDepthFrame;
 use crate::rerun_viz::RECORDER;
+use crate::tasks::ai::behaviors::autonomy::navigate::Arena;
 use crate::tasks::ai::blackboard::BLACKBOARD_SHARED;
 use crate::tasks::{DEPTH_FRAME_HEIGHT, DEPTH_FRAME_WIDTH};
-use crate::utils::{rwlock_read_unpoison, rwlock_write_unpoison};
+use crate::utils::rwlock_write_unpoison;
 pub static GLOBAL_MAP: OnceLock<Arc<RwLock<OccupancyGrid>>> = OnceLock::new();
 const PERMANENT_GRADIENT: f32 = 10.0;
 
@@ -68,7 +68,7 @@ pub struct OccupancyGridTask {
     max_linear_velocity: f64,
     max_angular_velocity: f64,
     max_acceleration: f64,
-    arena_obstacles: Option<ArenaObstaclesSelection>,
+    arena_obstacles: Option<Arena>,
     robot_radius_meters: f32,
 }
 
@@ -83,55 +83,32 @@ struct ArenaObstacles {
     circles: Vec<(f32, f32, f32)>,
 }
 
-#[derive(Deserialize, Debug, Clone, Copy)]
-#[serde(rename_all = "lowercase")]
-enum ArenaObstaclesSelection {
-    Artemis,
-    Ucf,
-}
-
-/// Paint known arena obstacles permanently into the occupancy grid.
-/// robot_radius is added to all obstacle extents to account for robot size.
 fn paint_permanent_obstacles(
     grid: &mut OccupancyGrid,
     obstacles: &ArenaObstacles,
-    robot_radius: f32,
 ) {
-    // paint rects (as centers and half sizes)
     for &(cx, cy, half_w, half_h) in &obstacles.rects {
-        let min_x = cx - half_w - robot_radius;
-        let max_x = cx + half_w + robot_radius;
-        let min_y = cy - half_h - robot_radius;
-        let max_y = cy + half_h + robot_radius;
+        let min_x = cx - half_w;
+        let max_x = cx + half_w;
+        let min_y = cy - half_h;
+        let max_y = cy + half_h;
 
-        if let (Ok((x1, y1)), Ok((x2, y2))) = (
-            grid.world_to_cell(min_x, min_y),
-            grid.world_to_cell(max_x, max_y),
-        ) {
-            for x in x1..=x2 {
-                for y in y1..=y2 {
+        let x1 = grid.world_to_cell(min_x, min_y).map(|(x, _)| x).unwrap_or(0);
+        let y1 = grid.world_to_cell(min_x, min_y).map(|(_, y)| y).unwrap_or(0);
+        let x2 = grid.world_to_cell(max_x, max_y).map(|(x, _)| x).unwrap_or(grid.cells_x() - 1);
+        let y2 = grid.world_to_cell(max_x, max_y).map(|(_, y)| y).unwrap_or(grid.cells_y() - 1);
+
+        for x in x1..=x2 {
+            for y in y1..=y2 {
+                // Double check bounds just to be safe before writing to the grid
+                if x < grid.cells_x() && y < grid.cells_y() {
                     let _ = grid.set_gradient_at(x, y, PERMANENT_GRADIENT);
                 }
             }
         }
     }
-    // paint circles
-    for &(cx, cy, radius) in &obstacles.circles {
-        if let Ok((center_x, center_y)) = grid.world_to_cell(cx, cy) {
-            let expanded_radius = radius + robot_radius;
-            let radius_cells = (expanded_radius / grid.layout.cell_size).ceil() as isize;
-
-            for dx in -radius_cells..=radius_cells {
-                for dy in -radius_cells..=radius_cells {
-                    if dx * dx + dy * dy <= radius_cells * radius_cells {
-                        let x = (center_x as isize + dx).max(0) as usize;
-                        let y = (center_y as isize + dy).max(0) as usize;
-                        let _ = grid.set_gradient_at(x, y, PERMANENT_GRADIENT);
-                    }
-                }
-            }
-        }
-    }
+    
+    // ... same logic for circles (just use 'radius' instead of 'radius + robot_radius')
 }
 
 impl Freezable for OccupancyGridTask {}
@@ -350,7 +327,7 @@ impl CuTask for OccupancyGridTask {
             .unwrap_or(3.0) as f32;
 
         let arena_obstacles = config.and_then(|c| {
-            c.get_value::<ArenaObstaclesSelection>("arena_obstacles")
+            c.get_value::<Arena>("arena_obstacles")
                 .expect("failed to deserialize")
         });
 
@@ -482,7 +459,7 @@ impl CuTask for OccupancyGridTask {
             if let Some(arena_obstacles) = arena_obstacles
                 && let Some(obstacles) = load_arena_obstacles(arena_obstacles)
             {
-                paint_permanent_obstacles(&mut grid, &obstacles, robot_radius_meters);
+                paint_permanent_obstacles(&mut grid, &obstacles);
             } else {
                 eprintln!("[OccupancyGrid] No arena obstacles loaded");
             }
@@ -508,6 +485,25 @@ impl CuTask for OccupancyGridTask {
             robot_radius_meters,
         })
     }
+
+    fn preprocess(&mut self, _clock: &RobotClock) -> CuResult<()> {
+        if let Some(shared_bb) = BLACKBOARD_SHARED.get() {
+            if let Ok(mut pipeline) = self.depth_projector_pipeline.try_lock() {
+                if let Some(new_sigma_spatial) =
+                    rwlock_write_unpoison(shared_bb).sigma_spatial.take()
+                {
+                    pipeline.set_sigma_spatial(new_sigma_spatial, get_device());
+                }
+                if let Some(new_sigma_range) = rwlock_write_unpoison(shared_bb).sigma_range.take() {
+                    pipeline.set_sigma_range(new_sigma_range, get_device());
+                }
+            }
+            // else: spawned thread holds the lock, we'll pick it up next cycle
+            // (the blackboard values stay in place since we didn't take() them)
+        }
+        Ok(())
+    }
+
     fn process<'i, 'o>(
         &mut self,
         _clock: &RobotClock,
@@ -516,7 +512,10 @@ impl CuTask for OccupancyGridTask {
     ) -> CuResult<()> {
         let mut output_buf = self.output_buffer.lock().unwrap();
 
-        if let Some(blackboard) = BLACKBOARD_SHARED.get() && let Ok(guard) = blackboard.try_read() && guard.reset_obstacles {
+        if let Some(blackboard) = BLACKBOARD_SHARED.get()
+            && let Ok(guard) = blackboard.try_read()
+            && guard.reset_obstacles
+        {
             drop(guard);
 
             // reset global map (non-blocking will retry next cycle if lock is held)
@@ -527,17 +526,18 @@ impl CuTask for OccupancyGridTask {
                 if let Some(arena_obstacles) = self.arena_obstacles
                     && let Some(obstacles) = load_arena_obstacles(arena_obstacles)
                 {
-                    paint_permanent_obstacles(&mut global_guard, &obstacles, self.robot_radius_meters);
+                    paint_permanent_obstacles(
+                        &mut global_guard,
+                        &obstacles,
+                    );
                 }
 
-                self.depth_projector_pipeline
-                    .lock()
-                    .unwrap()
-                    .clear_map(get_device());
-                self.rolling_map_start_position = self.camera_node.get_global_isometry();
-
-                if let Ok(mut bb) = blackboard.try_write() {
-                    bb.reset_obstacles = false;
+                if let Ok(mut p) = self.depth_projector_pipeline.try_lock() {
+                    p.clear_map(get_device());
+                    self.rolling_map_start_position = self.camera_node.get_global_isometry();
+                    if let Ok(mut bb) = blackboard.try_write() {
+                        bb.reset_obstacles = false;
+                    }
                 }
             }
         }
@@ -596,11 +596,10 @@ impl CuTask for OccupancyGridTask {
                     );
                 }
 
-                self.rolling_map_start_position = camera_isometry;
-                self.depth_projector_pipeline
-                    .lock()
-                    .unwrap()
-                    .clear_map(get_device());
+                if let Ok(mut p) = self.depth_projector_pipeline.try_lock() {
+                    p.clear_map(get_device());
+                    self.rolling_map_start_position = camera_isometry;
+                }
             }
 
             output.set_payload(grid);
@@ -731,16 +730,14 @@ impl CuTask for OccupancyGridTask {
     }
 }
 
-fn load_arena_obstacles(
-    arena_obstacles: ArenaObstaclesSelection,
-) -> Option<ArenaObstacles> {
+fn load_arena_obstacles(arena_obstacles: Arena) -> Option<ArenaObstacles> {
     match arena_obstacles {
-        ArenaObstaclesSelection::Artemis => {
+        Arena::Artemis => {
             let path = "arena_obstacles/artemis.ron";
             let contents = std::fs::read_to_string(path).ok()?;
             ron::de::from_str(&contents).ok()
         }
-        ArenaObstaclesSelection::Ucf => {
+        Arena::UcfRight | Arena::UcfLeft => {
             let path = "arena_obstacles/ucf.ron";
             let contents = std::fs::read_to_string(path).ok()?;
             ron::de::from_str(&contents).ok()

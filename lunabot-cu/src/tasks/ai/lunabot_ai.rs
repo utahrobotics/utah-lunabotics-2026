@@ -11,6 +11,7 @@ use embedded_common::ActuatorCommand;
 
 use crate::pathfinding::OccupancyGrid;
 use crate::tasks::ai::action::LunabotAction;
+use crate::tasks::ai::behaviors::autonomy::navigate::Arena;
 use crate::tasks::ai::behaviors::teleop::teleop_behavior;
 use crate::tasks::ai::blackboard::{BLACKBOARD_SHARED, LunabotBlackboard};
 use crate::utils::nanos_to_secs;
@@ -26,8 +27,8 @@ impl CuTask for LunabotAi {
     // the occupancy grid recved here is the local occupancy grid
     type Input<'m> = input_msg!('m, FromLunabase, OccupancyGrid);
 
-    // (Steering, ActuatorCommand)
-    type Output<'m> = (CuMsg<Steering>, CuMsg<ActuatorCommand>);
+    // (Steering, ActuatorCommand, calculated path)
+    type Output<'m> = (CuMsg<Steering>, CuMsg<ActuatorCommand>, CuMsg<Vec<[f32; 2]>>);
     type Resources<'r> = ();
 
     fn new(
@@ -56,12 +57,16 @@ impl CuTask for LunabotAi {
                     .expect("failed to deserialize")
             })
             .unwrap_or(0.3) as f32;
+        let arena = config.and_then(|c| {
+            c.get_value::<Arena>("arena")
+                .expect("Failed to deserialize arena")
+        }).expect("specify the arena in lunabot_ai config");
         let mut blackboard = LunabotBlackboard::default();
         BLACKBOARD_SHARED.get_or_init(|| Arc::clone(&blackboard.blackboard_shared));
         blackboard.obstacle_gradient_threshold_expander = obstacle_gradient_threshold_expander;
         blackboard.obstacle_gradient_threshold_pathfinder = obstacle_gradient_threshold_pathfinder;
         blackboard.robot_radius = robot_radius_meters;
-        let behavior = teleop_behavior();
+        let behavior = teleop_behavior(arena);
         let bt = BT::new(behavior, blackboard);
         Ok(Self {
             bt: bt,
@@ -105,6 +110,11 @@ impl CuTask for LunabotAi {
         }
         if let Some(steering_cmd) = self.bt.blackboard_mut().outgoing_steering_msg.take() {
             output.0.set_payload(steering_cmd);
+        }
+        if let Some(ref latest_calculated_path) = self.bt.blackboard().calculated_path {
+            output.2.set_payload(latest_calculated_path.iter().map(|node| {
+                [node.x, node.y]
+            }).collect());
         }
         Ok(())
     }

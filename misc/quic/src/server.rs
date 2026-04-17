@@ -54,6 +54,15 @@ pub struct ServerConnection<KA> {
 }
 
 impl<KA> ServerConnection<KA> {
+    /// Access the inner [`quinn::Connection`].
+    ///
+    /// Useful for cloning the refcounted connection handle so other tasks
+    /// can wait on `connection.closed()` or proactively `close()` it without
+    /// holding the [`ServerConnection`] itself.
+    pub fn quinn(&self) -> &quinn::Connection {
+        &self.connection
+    }
+
     /// Accept a bidirectional stream of the given type.
     ///
     /// Reads the stream type ID byte and matches it against `S::ID`.

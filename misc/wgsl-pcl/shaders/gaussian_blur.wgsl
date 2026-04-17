@@ -2,6 +2,7 @@
 // if the value in the height map is f32 min, then we will know that the cell is considered to be unknown.
 @group(0) @binding(0) var<uniform> map_width: u32;
 @group(0) @binding(1) var<uniform> map_height: u32;
+@group(0) @binding(2) var<uniform> sigma: f32;
 @group(1) @binding(0) var<storage, read_write> height_map: array<f32>;
 @group(1) @binding(1) var<storage, read_write> filtered_height_map: array<f32>;
 
@@ -9,8 +10,6 @@ override WORKGROUP_X: u32 = 8;
 override WORKGROUP_Y: u32 = 8;
 // kernel radius includes the center pixel in the kernel
 override KERNEL_RADIUS: u32 = 4;
-// sigma controls the spread of the Gaussian
-override SIGMA: f32 = 3.0;
 override CELL_SIZE: f32 = 0.1;
 
 @compute
@@ -64,7 +63,7 @@ fn depth(
                 let spatial_dist = sqrt(dx * dx + dy * dy);
                 
                 // Simple Gaussian weight based only on spatial distance
-                let weight = exp(-(spatial_dist * spatial_dist) / (2.0 * SIGMA * SIGMA));
+                let weight = exp(-(spatial_dist * spatial_dist) / (2.0 * sigma * sigma));
                 
                 weighted_sum += neighbor_value * weight;
                 weight_sum += weight;

@@ -92,9 +92,11 @@ impl VescIDs {
 }
 
 pub struct MotorRef {
-    speeds: AtomicCell<Option<(f32, f32)>>,
+    speeds: AtomicCell<Option<(f32, f32, Instant)>>,
     latest_telemetry: std::sync::Mutex<HashMap<u8, GetValuesResponse>>,
     speed_multiplier: Arc<AtomicCell<f32>>,
+    invert_left: bool,
+    invert_right: bool,
 }
 
 impl MotorRef {
@@ -104,8 +106,15 @@ impl MotorRef {
 
     /// Final RPM = (left_or_right) * weight
     /// weight is the same thing as speed multiplier
-    pub fn set_speed(&self, left: f32, right: f32) {
-        self.speeds.store(Some((left, right)));
+    /// Commands expire after 200ms — caller must write at least 5Hz to keep motors running.
+    pub fn set_speed(&self, mut left: f32, mut right: f32) {
+        if self.invert_left {
+            left *= -1.0;
+        }
+        if self.invert_right {
+            right *= -1.0;
+        }
+        self.speeds.store(Some((left, right, Instant::now())));
     }
 
     /// Returns and clears any collected telemetry.
@@ -121,12 +130,16 @@ impl MotorRef {
     }
 }
 
-pub fn enumerate_motors(vesc_ids: VescIDs, speed_multiplier: f32) -> &'static MotorRef {
+const SPEED_COMMAND_EXPIRY: Duration = Duration::from_millis(200);
+
+pub fn enumerate_motors(vesc_ids: VescIDs, speed_multiplier: f32, invert_left: bool, invert_right: bool) -> &'static MotorRef {
     let speed_multiplier = Arc::new(AtomicCell::new(speed_multiplier));
     let motor_ref: &_ = Box::leak(Box::new(MotorRef {
         speeds: AtomicCell::new(None),
         latest_telemetry: std::sync::Mutex::new(HashMap::new()),
         speed_multiplier: Arc::clone(&speed_multiplier),
+        invert_left, 
+        invert_right
     }));
 
     let (tx, rx) = std::sync::mpmc::sync_channel::<String>(1);
@@ -405,11 +418,15 @@ impl MotorTask {
 
         loop {
             let values = loop {
-                let values = self.motor_ref.speeds.take();
-                if let Some(values) = values {
-                    break values;
+                match self.motor_ref.speeds.load() {
+                    Some((left, right, timestamp)) => {
+                        if timestamp.elapsed() > SPEED_COMMAND_EXPIRY {
+                            break (0.0, 0.0);
+                        }
+                        break (left, right);
+                    }
+                    None => backoff.snooze(),
                 }
-                backoff.snooze();
             };
             backoff.reset();
 

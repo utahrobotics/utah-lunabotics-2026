@@ -25,15 +25,21 @@ struct LunabaseConnection {
     #[export]
     default_address: GString,
 
-    outgoing: Option<tokio::sync::mpsc::UnboundedSender<FromLunabase>>,
+    outgoing: Arc<Mutex<Option<tokio::sync::mpsc::UnboundedSender<FromLunabase>>>>,
     ka_state: Arc<Mutex<Option<Arc<Mutex<KeepAliveState<LunabotStage>>>>>>,
-    last_packet_time: Instant,
+    /// Abort handle for the currently-active background QUIC task. Aborted on
+    /// reconnect.
+    bg_task: Option<tokio::task::AbortHandle>,
+    last_packet_time: Option<Instant>,
     current_stage: LunabotStage,
 
     errored_tasks: Arc<Mutex<HashMap<String, String>>>,
     current_weight: f64,
     global_position: Arc<Mutex<[f32; 3]>>,
     orientation: Arc<Mutex<[f32; 4]>>,
+
+    first_connect: bool,
+    apriltags_enabled: bool,
 }
 
 #[godot_api]
@@ -43,14 +49,17 @@ impl INode for LunabaseConnection {
         LunabaseConnection {
             base,
             default_address: GString::from("127.0.0.1"),
-            outgoing: None,
+            outgoing: Arc::new(Mutex::new(None)),
             ka_state: Arc::new(Mutex::new(None)),
-            last_packet_time: Instant::now(),
+            bg_task: None,
+            last_packet_time: None,
             current_stage: LunabotStage::SoftStop,
             current_weight: 1250.0,
             errored_tasks: Arc::new(Mutex::new(HashMap::new())),
             global_position: Arc::new(Mutex::new([0.0; 3])),
             orientation: Arc::new(Mutex::new([0.0; 4])),
+            first_connect: true,
+            apriltags_enabled: true,
         }
     }
 
@@ -60,21 +69,50 @@ impl INode for LunabaseConnection {
     }
 
     fn process(&mut self, _delta: f64) {
-        let guard = self.ka_state.lock().unwrap();
-        if let Some(ref state_arc) = *guard {
-            let state = state_arc.lock().unwrap();
-            if let Some(stage) = state.last_msg() {
-                drop(state);
-                drop(guard);
-                self.last_packet_time = Instant::now();
-                self.base_mut().emit_signal("packet_received", &[]);
+        let mut send_packet_rx_signal = false;
+        let mut new_state = None;
 
-                if stage != self.current_stage {
-                    self.current_stage = stage;
-                    self.base_mut()
-                        .emit_signal("stage_changed", &[Variant::from(stage as i32)]);
+        {
+            let guard = self.ka_state.lock().unwrap();
+            if let Some(ref state_arc) = *guard {
+                let state = state_arc.lock().unwrap();
+                if let Some(stage) = state.last_msg() {
+                    if let Some(elapsed) = state.time_since_last() {
+                        if elapsed.as_millis() < 500 {
+                            self.last_packet_time = Some(Instant::now());
+                            send_packet_rx_signal = true;
+                            if stage != self.current_stage {
+                                self.current_stage = stage;
+                                new_state = Some(stage);
+                            }
+                        }
+                    }
+                }
+            } else if self.last_packet_time.is_some() { // change ui so it isnt stale on a disconnect.
+                self.last_packet_time = None;
+                if self.current_stage != LunabotStage::SoftStop {
+                    self.current_stage = LunabotStage::SoftStop;
+                    new_state = Some(LunabotStage::SoftStop);
                 }
             }
+        }
+
+        if send_packet_rx_signal {
+            self.base_mut().emit_signal("packet_received", &[]);
+        }
+
+        if let Some(stage) = new_state {
+            self.base_mut()
+                .emit_signal("stage_changed", &[Variant::from(stage as i32)]);
+        }
+
+        if self.first_connect
+            && let Some(last_packet_time) = self.last_packet_time
+            && last_packet_time.elapsed().as_millis() < 500
+        {
+            println!("sending first connect apriltag thing");
+            self.send_toggle_apriltags(self.apriltags_enabled);
+            self.first_connect = false;
         }
     }
 }
@@ -88,6 +126,7 @@ impl LunabaseConnection {
     fn stage_changed(stage: i32);
 
     fn connect_to_address(&mut self, address_str: String) {
+        self.first_connect = true;
         let addr = match address_str.parse::<Ipv4Addr>() {
             Ok(addr) => {
                 godot_warn!("Connecting to: {address_str}");
@@ -99,16 +138,24 @@ impl LunabaseConnection {
             }
         };
 
+        // ensure to abort previous tasks so that there isnt anything lurking in the background
+        if let Some(prev) = self.bg_task.take() {
+            prev.abort();
+        }
+
         let server_addr = SocketAddr::V4(SocketAddrV4::new(addr, common::ports::TELEOP));
 
         let (tx_outgoing, rx_outgoing) = tokio::sync::mpsc::unbounded_channel::<FromLunabase>();
 
         let ka_state = self.ka_state.clone();
+        let outgoing_shared = self.outgoing.clone();
         let errored_tasks = self.errored_tasks.clone();
         let global_position = self.global_position.clone();
         let orientation = self.orientation.clone();
 
-        get_tokio_handle().spawn(async move {
+        let our_tx = tx_outgoing.clone();
+
+        let task = get_tokio_handle().spawn(async move {
             let bind: SocketAddr = "0.0.0.0:0".parse().unwrap();
             let client = match QuicClient::connect_insecure(
                 bind,
@@ -159,13 +206,13 @@ impl LunabaseConnection {
                 }
             };
 
-            // Share the keep-alive state so process() can read it
-            *ka_state.lock().unwrap() = Some(client.keep_alive.shared_state());
+            let our_ka_state = client.keep_alive.shared_state();
+            *ka_state.lock().unwrap() = Some(Arc::clone(&our_ka_state));
 
             // Recv pose data (RobotIsometry, ArmAngles)
             let global_position_c = global_position.clone();
             let orientation_c = orientation.clone();
-            tokio::spawn(async move {
+            let pose_handle = tokio::spawn(async move {
                 loop {
                     match pose_stream.recv().await {
                         Ok(msg) => match msg {
@@ -189,7 +236,7 @@ impl LunabaseConnection {
             });
 
             // Recv error messages (ErroredTasks)
-            tokio::spawn(async move {
+            let error_handle = tokio::spawn(async move {
                 loop {
                     match error_stream.recv().await {
                         Ok(FromLunabot::ErroredTasks(map)) => {
@@ -208,7 +255,7 @@ impl LunabaseConnection {
 
             // Send commands on command stream
             let mut rx = rx_outgoing;
-            tokio::spawn(async move {
+            let cmd_handle = tokio::spawn(async move {
                 while let Some(msg) = rx.recv().await {
                     if let Err(e) = command_stream.send(&msg).await {
                         eprintln!("[LunabaseConnection] Send error: {e}");
@@ -217,11 +264,58 @@ impl LunabaseConnection {
                 }
             });
 
-            // Keep client alive (owns the QUIC connection + KeepAlive background task)
-            std::future::pending::<()>().await;
+            // Capture abort handles before select! so that whichever branch
+            // wins, we can still kill the other inner stream tasks (dropping a
+            // JoinHandle does not abort its task).
+            let pose_abort = pose_handle.abort_handle();
+            let error_abort = error_handle.abort_handle();
+            let cmd_abort = cmd_handle.abort_handle();
+
+            // Watchdog thing: tear down the entire connection the moment vital
+            // task or the QUIC connection itself dies. Otherwise keep-alive
+            // datagrams could keep flowing while the streams are dead, leaving
+            // both ends thinking they're still connected which used to happen every so often
+            let conn_closed = client.quinn().closed();
+            tokio::select! {
+                _ = pose_handle => {
+                    eprintln!("[LunabaseConnection] Pose task ended");
+                }
+                _ = error_handle => {
+                    eprintln!("[LunabaseConnection] Error task ended");
+                }
+                _ = cmd_handle => {
+                    eprintln!("[LunabaseConnection] Command task ended");
+                }
+                _ = conn_closed => {
+                    eprintln!("[LunabaseConnection] QUIC connection closed");
+                }
+            }
+            // closed now, release resources
+            pose_abort.abort();
+            error_abort.abort();
+            cmd_abort.abort();
+
+            eprintln!("[LunabaseConnection] Tearing down connection");
+            client.close();
+
+            // A reconnect could have raced and
+            // installed a newer ka_state / outgoing that we cant be clobbering
+            {
+                let mut g = ka_state.lock().unwrap();
+                if g.as_ref().is_some_and(|a| Arc::ptr_eq(a, &our_ka_state)) {
+                    *g = None;
+                }
+            }
+            {
+                let mut g = outgoing_shared.lock().unwrap();
+                if g.as_ref().is_some_and(|s| s.same_channel(&our_tx)) {
+                    *g = None;
+                }
+            }
         });
 
-        self.outgoing = Some(tx_outgoing);
+        *self.outgoing.lock().unwrap() = Some(tx_outgoing);
+        self.bg_task = Some(task.abort_handle());
         godot_print!("Connection initiated to {address_str}");
     }
 
@@ -251,10 +345,14 @@ impl LunabaseConnection {
         self.current_stage as i32
     }
 
-    fn send_msg(&self, msg: FromLunabase) {
-        if let Some(ref tx) = self.outgoing {
+    fn send_msg(&mut self, msg: FromLunabase) {
+        let mut guard = self.outgoing.lock().unwrap();
+        if let Some(tx) = guard.as_ref() {
             if let Err(e) = tx.send(msg) {
-                godot_warn!("Failed to send message: {e}");
+                godot_warn!(
+                    "Failed to send message: {e}. Channel closed, clearing connection state."
+                );
+                *guard = None;
             }
         } else {
             godot_warn!("Cannot send: not connected");
@@ -262,7 +360,7 @@ impl LunabaseConnection {
     }
 
     #[func]
-    fn execute_steering(&self, left: f64, right: f64) {
+    fn execute_steering(&mut self, left: f64, right: f64) {
         self.send_msg(FromLunabase::Steering(Steering::new(
             left,
             right,
@@ -271,33 +369,55 @@ impl LunabaseConnection {
     }
 
     #[func]
-    fn send_lift_actuators(&self, speed: f64) {
+    /// sigma spatial is in cm
+    fn send_set_sigma_spatial(&mut self, new_sigma_spatial: f32) {
+        self.send_msg(FromLunabase::SetSigmaSpatial(new_sigma_spatial / 100.0))
+    }
+
+    #[func]
+    /// sigma range is in cm
+    fn send_set_sigma_range(&mut self, new_sigma_range: f32) {
+        self.send_msg(FromLunabase::SetSigmaRange(new_sigma_range / 100.0))
+    }
+
+    #[func]
+    fn send_lift_actuators(&mut self, speed: f64) {
         self.send_msg(FromLunabase::set_lift_actuator(speed));
     }
 
     #[func]
-    fn send_reset_obstacles(&self) {
+    fn send_reset_obstacles(&mut self) {
         self.send_msg(FromLunabase::ResetObstacles);
     }
 
     #[func]
-    fn send_bucket_actuators(&self, speed: f64) {
+    fn send_toggle_apriltags(&mut self, on: bool) {
+        self.apriltags_enabled = on;
+        if on {
+            self.send_msg(FromLunabase::EnableApriltags);
+        } else {
+            self.send_msg(FromLunabase::DisableApriltags);
+        }
+    }
+
+    #[func]
+    fn send_bucket_actuators(&mut self, speed: f64) {
         self.send_msg(FromLunabase::set_bucket_actuator(speed));
     }
 
     #[func]
-    fn send_soft_stop(&self) {
+    fn send_soft_stop(&mut self) {
         self.send_msg(FromLunabase::SoftStop);
     }
 
     /// continue mission means manual
     #[func]
-    fn send_continue_mission(&self) {
+    fn send_continue_mission(&mut self) {
         self.send_msg(FromLunabase::Manual);
     }
 
     #[func]
-    fn send_start_autonomy(&self) {
+    fn send_start_autonomy(&mut self) {
         self.send_msg(FromLunabase::Navigate((0.0, 0.0)));
     }
 

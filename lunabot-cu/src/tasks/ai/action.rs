@@ -4,15 +4,14 @@ use bonsai_bt::Status::{self, *};
 use common::{LUNABOT_STAGE, LunabotStage, Steering};
 use embedded_common::{Actuator, ActuatorCommand, Direction};
 use nalgebra::Vector2;
+use rerun::Boxes2D;
 
 use crate::{
-    ROBOT_STATE,
-    tasks::ai::{
-        blackboard::LunabotBlackboard,
-        jobs::{
+    ROBOT_STATE, rerun_viz::RECORDER, tasks::ai::{
+        behaviors::autonomy::navigate::NavigationGoal, blackboard::LunabotBlackboard, jobs::{
             dig_job, direction_from_path, dump_job, find_path_job, follow_path_job, rotation_shim,
-        },
-    },
+        }
+    }
 };
 static PATHFINDING_GOAL: [f32; 2] = [5.843524, 1.4796992];
 #[derive(Clone, Debug, Copy)]
@@ -42,7 +41,7 @@ pub enum LunabotAction {
     /// if the robot is in a cell of unknown status, we should first pathfind to the nearest free cell (if a free cell is within some range)
     IsInUnknownCell,
     /// calculates path from the robots position to x,y
-    CalculatePath,
+    CalculatePath(NavigationGoal),
     FollowPath,
     SetStage(LunabotStage),
     GetUnstuck,
@@ -68,17 +67,13 @@ impl LunabotAction {
             }
             LunabotAction::SetLastSteering => {
                 if let Some(last_steer_pack_time) = blackboard.last_non_zero_steering_pack {
-                    if last_steer_pack_time.elapsed() > Duration::from_millis(500) {
-                        blackboard.outgoing_steering_msg = Some(Steering::default());
-                        println!(
-                            "dropped non zero steering packet :( {:?}",
-                            last_steer_pack_time.elapsed()
-                        );
-
+                    let elapsed = last_steer_pack_time.elapsed();
+                    if elapsed > Duration::from_millis(200) {
+                        blackboard.last_non_zero_steering_pack = None;
                         return (Success, 0.0);
                     }
                 }
-                if let Some(steering) = blackboard.last_steering {
+                if let Some(steering) = blackboard.last_steering.take() {
                     blackboard.outgoing_steering_msg = Some(steering);
                 }
 
@@ -87,21 +82,21 @@ impl LunabotAction {
 
             LunabotAction::SetLastBucket => {
                 if let Some(last_bucket_pack_time) = blackboard.last_non_zero_bucket_pack {
-                    if last_bucket_pack_time.elapsed() > Duration::from_millis(500) {
-                        println!(
-                            "dropped non zero bucket packer :( {:?}",
-                            last_bucket_pack_time.elapsed()
-                        );
+                    if last_bucket_pack_time.elapsed() > Duration::from_millis(200) {
+                        println!("safety: lunabase silent, forcing bucket to stop");
+                        blackboard.last_non_zero_bucket_pack = None;
+                        blackboard.last_bucket = None;
                         blackboard
                             .outgoing_actuator_msg_queue
                             .push_back(actuator_command_from_i8(0, Actuator::Bucket));
+                        return (Success, 0.0);
                     }
+                }
 
-                    if let Some(value) = blackboard.last_bucket.take() {
-                        blackboard
-                            .outgoing_actuator_msg_queue
-                            .push_back(actuator_command_from_i8(value, Actuator::Bucket));
-                    }
+                if let Some(value) = blackboard.last_bucket.take() {
+                    blackboard
+                        .outgoing_actuator_msg_queue
+                        .push_back(actuator_command_from_i8(value, Actuator::Bucket));
                 }
 
                 Success
@@ -109,21 +104,21 @@ impl LunabotAction {
 
             LunabotAction::SetLastLift => {
                 if let Some(last_lift_pack_time) = blackboard.last_non_zero_lift_pack {
-                    if last_lift_pack_time.elapsed() > Duration::from_millis(500) {
-                        println!(
-                            "dropped non zero bucket packer :( {:?}",
-                            last_lift_pack_time.elapsed()
-                        );
+                    if last_lift_pack_time.elapsed() > Duration::from_millis(200) {
+                        println!("safety: lunabase silent, forcing lift to stop");
+                        blackboard.last_non_zero_lift_pack = None;
+                        blackboard.last_lift = None;
                         blackboard
                             .outgoing_actuator_msg_queue
                             .push_back(actuator_command_from_i8(0, Actuator::Lift));
+                        return (Success, 0.0);
                     }
+                }
 
-                    if let Some(value) = blackboard.last_lift.take() {
-                        blackboard
-                            .outgoing_actuator_msg_queue
-                            .push_back(actuator_command_from_i8(value, Actuator::Lift));
-                    }
+                if let Some(value) = blackboard.last_lift.take() {
+                    blackboard
+                        .outgoing_actuator_msg_queue
+                        .push_back(actuator_command_from_i8(value, Actuator::Lift));
                 }
 
                 Success
@@ -158,7 +153,11 @@ impl LunabotAction {
             LunabotAction::IsInOccupiedCell => todo!(),
             LunabotAction::IsInFreeCell => todo!(),
             LunabotAction::IsInUnknownCell => todo!(),
-            LunabotAction::CalculatePath => {
+            LunabotAction::CalculatePath(navigation_goal) => {
+                // TODO: set the navigation goal intelligently, sample in the general area and find an obstacle free location
+
+                let (center, hw, hh) = navigation_goal.to_center_and_halfsizes();
+                let _ = RECORDER.get().unwrap().recorder.log("ai/goal", &Boxes2D::from_centers_and_half_sizes(vec![(center.x,center.y)], vec![(hw,hh)]));
                 if let Some(ref local_map) = blackboard.latest_local_map {
                     // if the kinematic root is not initialized, we might as well just blow up because nothing will work anyways
                     let current_translation = ROBOT_STATE
@@ -173,7 +172,6 @@ impl LunabotAction {
 
                     // Get destination from blackboard, or use default PATHFINDING_GOAL
                     // PATHFINDING_GOAL is just for testing for now.
-                    let end = Vector2::new(PATHFINDING_GOAL[0], PATHFINDING_GOAL[1]);
 
                     // Check if we already have a path finder job running
                     if let Some(ref mut path_finder) = blackboard.path_finder {
@@ -214,10 +212,10 @@ impl LunabotAction {
                         let mut job = find_path_job(
                             local_map.clone(),
                             start,
-                            end,
                             blackboard.obstacle_gradient_threshold_expander,
                             blackboard.obstacle_gradient_threshold_pathfinder,
                             blackboard.robot_radius,
+                            *navigation_goal
                         );
                         let initial_status = job.get_status();
                         blackboard.path_finder = Some(job);
@@ -256,8 +254,8 @@ impl LunabotAction {
                             ROBOT_STATE.get().unwrap().kinematic_root,
                             path,
                             None,
-                            None,
-                            None,
+                            0.5,
+                            0.5,
                             None,
                             None,
                             None,

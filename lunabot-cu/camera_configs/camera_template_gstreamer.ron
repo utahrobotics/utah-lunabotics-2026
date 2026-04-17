@@ -6,9 +6,10 @@
             config: {
                 "camera_id": "cam_{{id}}",
                 "device_port": "{{port}}",
-                "pipeline": "v4l2src device=<devpath> ! image/jpeg,width={{width}},height={{height}},framerate=30/1 ! jpegdec ! videoconvert ! tee name=t ! queue ! videoconvert ! video/x-raw,format=GRAY8 ! appsink name=copper_cam_{{id}} t. ! queue ! videoconvert ! video/x-raw,format=NV12 ! vaapih264enc bitrate=2000 ! rtph264pay ! udpsink host={{udp_host}} port={{udp_port}} sync=false",
+                "pipeline": "v4l2src device=<devpath> ! image/jpeg,width={{width}},height={{height}},framerate=30/1 ! jpegdec ! tee name=t ! queue ! videoconvert ! video/x-raw,format=GRAY8 ! appsink name=copper_cam_{{id}} t. ! queue ! videoconvert ! video/x-raw,format=NV12 ! vaapih264enc bitrate=2000 ! mpegtsmux ! tcpserversink host={{tcp_host}} port={{tcp_port}} sync=false",
                 "caps": "video/x-raw, format=GRAY8, width={{width}}, height={{height}}",
                 "timeout_ms": 500,
+                "desired_index": "{{desired_index}}",
             },
             logging: (
                 enabled: false

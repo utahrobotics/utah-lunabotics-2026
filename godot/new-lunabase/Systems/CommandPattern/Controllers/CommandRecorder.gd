@@ -21,7 +21,7 @@ var replay_start_time := 0
 var is_replaying := false
 @export var throttle_inputs := true
 # Default throttle time set to 100ms
-@export var throttle_time_ms = 100
+@export var throttle_time_ms = 50
 @export var zero_keepalive_time_ms = 1500
 
 var throttle_elapsed_ms := 0.0
