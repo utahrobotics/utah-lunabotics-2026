@@ -223,10 +223,6 @@ async fn read_sensors_loop(
 
         let m1_reading = if t1_count != 0 {(total/t1_count as u16)} else {0}; 
         let m2_reading = if t2_count != 0 {(total2/t2_count as u16)} else {0};
-        let actuator_readings = ActuatorReading {
-            m1_reading,
-            m2_reading,
-        };
 
         // ----- IMU -----
         let mut imu0_readings = [FromIMU::Error; 2];
@@ -318,7 +314,7 @@ async fn read_sensors_loop(
         
         let msg = FromPico::Reading(
             [imu0_readings[0], imu0_readings[1], imu1_readings[0],imu1_readings[1]],
-            actuator_readings
+            SensorReading::empty()
         );
 
         if class.dtr() {
@@ -380,6 +376,9 @@ async fn motor_controller_loop(mut class: Receiver<'static, Driver<'static, USB>
                                     }
                                     Actuator::Dumper => {
                                         warn!("use of dumper on a teri pico.");
+                                    }
+                                    Actuator::Motor4 => {
+                                        
                                     }
                                 }
                             }

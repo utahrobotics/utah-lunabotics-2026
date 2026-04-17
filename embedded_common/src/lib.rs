@@ -453,6 +453,22 @@ impl SensorReading {
             amb_therm: read(10),
         }
     }
+
+    pub fn empty() -> Self {
+        Self {
+            m1_cs: 0,
+            m2_cs: 0,
+            m3_cs: 0,
+            m4_cs: 0,
+            m1_therm: 0,
+            m2_therm: 0,
+            m3_therm: 0,
+            m4_therm: 0,
+            drive1_he: 0,
+            drive2_he: 0,
+            amb_therm: 0,
+        }
+    }
 }
 impl FromPico {
     /// 1 tag + 4 FromImu (4×25) + 1 SensorReading = 123 bytes
