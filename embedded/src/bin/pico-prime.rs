@@ -164,7 +164,7 @@ async fn main(spawner: Spawner) -> ! {
         cfg.baudrate = 115200;
         Uart::new(p.UART0, p.PIN_12, p.PIN_13, Irqs, p.DMA_CH0, p.DMA_CH1, cfg)
     };
-    static SECONDARY_UART: StaticCell<Uart<'static, embassy_rp::uart::Async>> = StaticCell::new();
+    static SECONDARY_UART: StaticCell<Uart<'static, Async>> = StaticCell::new();
     let uart = SECONDARY_UART.init(uart);
     spawner.spawn(secondary_poll_loop(uart)).unwrap();
 
@@ -298,7 +298,7 @@ async fn usb_rx_loop(
 
 /// Constantly polls all 11 active MUX channels and publishes reading to SENSOR_READINGS
 #[embassy_executor::task]
-async fn secondary_poll_loop(uart: &'static mut Uart<'static, embassy_rp::uart::Async>) {
+async fn secondary_poll_loop(uart: &'static mut Uart<'static, Async>) {
     const RESPONSE_TIMEOUT_MS: u64 = 50;
     let mut readings = [0u16; SensorReading::CHANNEL_COUNT];
     loop {
@@ -343,9 +343,7 @@ async fn secondary_poll_loop(uart: &'static mut Uart<'static, embassy_rp::uart::
             drive2_he: readings[9],
             amb_therm: readings[10],
         };
-
-        info!("sensor readings: {:?}", sensor);
-
+        info!("sensor reading: {:?}", sensor);
         SENSOR_READINGS.try_send(sensor).ok();
         Timer::after(Duration::from_millis(POLL_INTERVAL_MS)).await;
     }

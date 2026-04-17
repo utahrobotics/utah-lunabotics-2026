@@ -98,7 +98,6 @@ async fn main(_spawner: Spawner) {
             Ok(value) => {
                 info!("ADC ch{} = {}", req.mux_address, value);
                 let tx_buf = SecondaryResponse { adc_value: value }.serialize();
-
                 if let Err(e) = uart.write(&tx_buf).await {
                     error!("UART write error: {:?}", e);
                 }

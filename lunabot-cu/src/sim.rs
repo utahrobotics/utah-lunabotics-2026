@@ -12,9 +12,9 @@ pub mod tasks;
 pub mod utils;
 
 use crossbeam::atomic::AtomicCell;
-use cu_spatial_payloads::EncodableIsometry;
 use cu29::prelude::*;
 use cu29_helpers::basic_copper_setup;
+use cu_spatial_payloads::EncodableIsometry;
 use embedded_common::Direction;
 use mujoco_rs::cpp_viewer::MjViewerCpp;
 use mujoco_rs::prelude::*;
@@ -24,14 +24,14 @@ use nalgebra::{SMatrix, SVector};
 use robot_state::RobotState;
 use simple_motion::{ChainBuilder, NodeSerde};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::sync::OnceLock;
-use std::sync::atomic::{AtomicBool, Ordering};
 use wgsl_pcl::wgsl_setup::{init_gpu_blocking, is_gpu_initialized};
 extern crate cu_bincode as bincode;
 
 use crate::rerun_viz::{RECORDER, ROBOT_STRUCTURE};
-use crate::tasks::{DEPTH_FRAME_HEIGHT, DEPTH_FRAME_WIDTH, T265IMUMsg, T265Msg};
+use crate::tasks::{T265IMUMsg, T265Msg, DEPTH_FRAME_HEIGHT, DEPTH_FRAME_WIDTH};
 
 const PREALLOCATED_STORAGE_SIZE: Option<usize> = Some(1024 * 1024 * 100);
 
@@ -75,7 +75,9 @@ fn default_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::DetectorCamT265Rear(..) => SimOverride::ExecutedBySim,
         default::SimStep::T265LeftGstreamer(..) => SimOverride::ExecutedBySim,
         default::SimStep::T265RightGstreamer(..) => SimOverride::ExecutedBySim,
-        default::SimStep::CamD456Rgb(_) | default::SimStep::CamD456RgbNull(_) => SimOverride::ExecutedBySim,
+        default::SimStep::CamD456Rgb(_) | default::SimStep::CamD456RgbNull(_) => {
+            SimOverride::ExecutedBySim
+        }
         default::SimStep::ObstacleGstreamer(..) => SimOverride::ExecutedBySim,
 
         default::SimStep::__Phantom(_) => SimOverride::ExecutedBySim,
@@ -177,6 +179,7 @@ fn sim_callback<'a>(
                                 BUCKET_DIRECTION.store(*direction);
                             }
                             embedded_common::Actuator::Dumper => {}
+                            embedded_common::Actuator::Motor4 => {}
                         }
                     }
                     embedded_common::ActuatorCommand::Shake => {}
@@ -365,7 +368,9 @@ fn sim_callback<'a>(
         default::SimStep::LunabaseBridgeRxFromLunabaseRx { .. } => SimOverride::ExecuteByRuntime,
         default::SimStep::LunabaseBridgeTxToLunabase { .. } => SimOverride::ExecuteByRuntime,
         default::SimStep::LunabaseBridgeBridge { .. } => SimOverride::ExecuteByRuntime,
-        default::SimStep::CamD456Rgb(_) | default::SimStep::CamD456RgbNull(_) => SimOverride::ExecutedBySim,
+        default::SimStep::CamD456Rgb(_) | default::SimStep::CamD456RgbNull(_) => {
+            SimOverride::ExecutedBySim
+        }
 
         default::SimStep::__Phantom(_) => SimOverride::ExecutedBySim,
     }
