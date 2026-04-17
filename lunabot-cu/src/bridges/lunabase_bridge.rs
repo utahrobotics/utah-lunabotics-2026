@@ -137,8 +137,11 @@ impl CuBridge for Lunabase {
             if let Ok(errored_tasks) = errored_tasks.lock() {
                 let transformed_tasks: std::collections::HashMap<String, String> = errored_tasks
                     .iter()
-                    .map(|(_, (task_id, state, name, _instant))| {
-                        (task_id.to_string(), format!("{:?}: {}", state, name))
+                    .map(|(_, (task_id, state, errors))| {
+                        (task_id.to_string(), format!("{:?}: {}", state, errors.iter().fold(String::new(), |mut acc, entry| {
+                            acc += entry.0.as_ref();
+                            acc
+                        })))
                     })
                     .collect();
                 let _ = self
@@ -242,8 +245,15 @@ impl CuBridge for Lunabase {
             if let Ok(errored_tasks) = errored_tasks.lock() {
                 let transformed_tasks: std::collections::HashMap<String, String> = errored_tasks
                     .iter()
-                    .map(|(_, (task_id, state, name, _instant))| {
-                        (task_id.to_string(), format!("{:?}: {}", state, name))
+                    .map(|(_, (task_id, state, errors))| {
+                        (task_id.to_string(), format!("{:?}: {}", state, errors.iter().fold(
+                            String::new(),
+                            |mut acc, err| {
+                                acc += err.0.as_ref();
+                                acc += " ";
+                                acc
+                            }
+                        )))
                     })
                     .collect();
                 let _ = self
