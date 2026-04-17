@@ -97,6 +97,9 @@ fn decode_datagram_packet<KA: Encode + Decode<()>>(
     Ok(bincode::decode_from_slice(data, bincode::config::standard())?.0)
 }
 
+/// a few dropped datagrams are not necessarily fatal
+const MAX_CONSECUTIVE_PONG_MISSES: u32 = 5;
+
 /// Start the **server-side** keep-alive loop (sends pings, expects pongs).
 pub fn start_server_keep_alive<KA>(
     connection: Connection,
@@ -118,6 +121,8 @@ where
         // First tick completes immediately; skip it so we don't ping at t=0.
         ticker.tick().await;
 
+        let mut consecutive_misses: u32 = 0;
+
         loop {
             ticker.tick().await;
 
@@ -134,24 +139,43 @@ where
             // Wait up to 3x interval for a pong
             let timeout = interval * 3;
             match tokio::time::timeout(timeout, connection.read_datagram()).await {
-                Ok(Ok(data)) => match decode_datagram_packet::<KA>(&data) {
-                    Ok(KeepAlivePacket::Pong(msg)) => {
-                        let mut s = state_c.lock().unwrap();
-                        s.last_received_msg = Some(msg);
-                        s.last_received_at = Some(Instant::now());
+                Ok(Ok(data)) => {
+                    consecutive_misses = 0;
+                    match decode_datagram_packet::<KA>(&data) {
+                        Ok(KeepAlivePacket::Pong(msg)) => {
+                            let mut s = state_c.lock().unwrap();
+                            s.last_received_msg = Some(msg);
+                            s.last_received_at = Some(Instant::now());
+                        }
+                        Ok(KeepAlivePacket::Ping(_)) => {
+                            eprintln!("[SERVER keep-alive] unexpected ping, ignoring");
+                        }
+                        Err(e) => {
+                            eprintln!("[SERVER keep-alive] decode error: {e}");
+                        }
                     }
-                    Ok(KeepAlivePacket::Ping(_)) => {
-                        eprintln!("[SERVER keep-alive] unexpected ping, ignoring");
-                    }
-                    Err(e) => {
-                        eprintln!("[SERVER keep-alive] decode error: {e}");
-                    }
-                },
+                }
                 Ok(Err(e)) => {
-                    eprintln!("[SERVER keep-alive] datagram read error: {e}");
+
+                    eprintln!(
+                        "[SERVER keep-alive] datagram read error: {e}, closing connection"
+                    );
+                    connection.close(1u32.into(), b"keep-alive read error");
+                    break;
                 }
                 Err(_) => {
-                    eprintln!("[SERVER keep-alive] pong timeout");
+                    consecutive_misses += 1;
+                    eprintln!(
+                        "[SERVER keep-alive] pong timeout ({}/{})",
+                        consecutive_misses, MAX_CONSECUTIVE_PONG_MISSES
+                    );
+                    if consecutive_misses >= MAX_CONSECUTIVE_PONG_MISSES {
+                        eprintln!(
+                            "[SERVER keep-alive] {MAX_CONSECUTIVE_PONG_MISSES} consecutive pong misses, closing connection"
+                        );
+                        connection.close(1u32.into(), b"pong timeout");
+                        break;
+                    }
                 }
             }
         }

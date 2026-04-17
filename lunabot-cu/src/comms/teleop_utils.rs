@@ -129,86 +129,95 @@ async fn accept_loop(
     let rx_pose = Arc::new(tokio::sync::Mutex::new(rx_outgoing_pose));
     let rx_error = Arc::new(tokio::sync::Mutex::new(rx_outgoing_error));
 
-    let mut recv_abort: Option<tokio::task::AbortHandle> = None;
-    let mut send_pose_abort: Option<tokio::task::AbortHandle> = None;
-    let mut send_error_abort: Option<tokio::task::AbortHandle> = None;
-
     loop {
-        match server
+        let connection = match server
             .accept(keep_alive_interval, LunabotStage::SoftStop)
             .await
         {
-            Ok(connection) => {
-                // Accept all 3 streams sequentially.
-                // The quic crate buffers non-matching stream IDs, so
-                // the client can open them in any order without deadlock.
-                let command_stream = match connection
-                    .accept_bi::<FromLunabot, FromLunabase, { COMMAND_STREAM_ID }>()
-                    .await
-                {
-                    Ok(s) => s,
-                    Err(e) => {
-                        eprintln!("[LunabaseConnection] Failed to accept command stream: {e}");
-                        continue;
-                    }
-                };
-
-                let pose_stream = match connection
-                    .accept_bi::<FromLunabot, FromLunabase, { POSE_STREAM_ID }>()
-                    .await
-                {
-                    Ok(s) => s,
-                    Err(e) => {
-                        eprintln!("[LunabaseConnection] Failed to accept pose stream: {e}");
-                        continue;
-                    }
-                };
-
-                let error_stream = match connection
-                    .accept_bi::<FromLunabot, FromLunabase, { ERROR_STREAM_ID }>()
-                    .await
-                {
-                    Ok(s) => s,
-                    Err(e) => {
-                        eprintln!("[LunabaseConnection] Failed to accept error stream: {e}");
-                        continue;
-                    }
-                };
-
-                // Abort old tasks
-                if let Some(h) = recv_abort.take() {
-                    h.abort();
-                }
-                if let Some(h) = send_pose_abort.take() {
-                    h.abort();
-                }
-                if let Some(h) = send_error_abort.take() {
-                    h.abort();
-                }
-
-                // drops when reconnects occur
-                *shared_conn.lock().unwrap() = Some(connection);
-
-                if let Some(ts) = LAST_SEEN_TIMESTAMP_COMMAND.get() {
-                    ts.store(Instant::now());
-                }
-
-                let h = tokio::spawn(recv_loop(command_stream, tx_incoming.clone()));
-                recv_abort = Some(h.abort_handle());
-
-                let rx_pose_clone = Arc::clone(&rx_pose);
-                let h = tokio::spawn(send_loop(pose_stream, rx_pose_clone));
-                send_pose_abort = Some(h.abort_handle());
-
-                let rx_error_clone = Arc::clone(&rx_error);
-                let h = tokio::spawn(send_loop(error_stream, rx_error_clone));
-                send_error_abort = Some(h.abort_handle());
-            }
+            Ok(c) => c,
             Err(e) => {
                 eprintln!("[LunabaseConnection] Accept error: {e}");
                 tokio::time::sleep(Duration::from_millis(100)).await;
+                continue;
+            }
+        };
+
+        // Accept all 3 streams sequentially.
+        // The quic crate buffers non-matching stream IDs, so
+        // the client can open them in any order without deadlock.
+        let command_stream = match connection
+            .accept_bi::<FromLunabot, FromLunabase, { COMMAND_STREAM_ID }>()
+            .await
+        {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("[LunabaseConnection] Failed to accept command stream: {e}");
+                continue;
+            }
+        };
+
+        let pose_stream = match connection
+            .accept_bi::<FromLunabot, FromLunabase, { POSE_STREAM_ID }>()
+            .await
+        {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("[LunabaseConnection] Failed to accept pose stream: {e}");
+                continue;
+            }
+        };
+
+        let error_stream = match connection
+            .accept_bi::<FromLunabot, FromLunabase, { ERROR_STREAM_ID }>()
+            .await
+        {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("[LunabaseConnection] Failed to accept error stream: {e}");
+                continue;
+            }
+        };
+
+        let conn_for_watch = connection.quinn().clone();
+        *shared_conn.lock().unwrap() = Some(connection);
+
+        if let Some(ts) = LAST_SEEN_TIMESTAMP_COMMAND.get() {
+            ts.store(Instant::now());
+        }
+
+        let recv_handle = tokio::spawn(recv_loop(command_stream, tx_incoming.clone()));
+        let send_pose_handle =
+            tokio::spawn(send_loop(pose_stream, Arc::clone(&rx_pose)));
+        let send_error_handle =
+            tokio::spawn(send_loop(error_stream, Arc::clone(&rx_error)));
+        let recv_abort = recv_handle.abort_handle();
+        let send_pose_abort = send_pose_handle.abort_handle();
+        let send_error_abort = send_error_handle.abort_handle();
+
+        // watchdog
+        let conn_closed = conn_for_watch.closed();
+        tokio::select! {
+            _ = recv_handle => {
+                eprintln!("[LunabaseConnection] command recv task died");
+            }
+            _ = send_pose_handle => {
+                eprintln!("[LunabaseConnection] pose send task died");
+            }
+            _ = send_error_handle => {
+                eprintln!("[LunabaseConnection] error send task died");
+            }
+            _ = conn_closed => {
+                eprintln!("[LunabaseConnection] QUIC connection closed");
             }
         }
+
+        recv_abort.abort();
+        send_pose_abort.abort();
+        send_error_abort.abort();
+
+        conn_for_watch.close(2u32.into(), b"stream died");
+        *shared_conn.lock().unwrap() = None;
+        eprintln!("[LunabaseConnection] Connection torn down, ready to accept again");
     }
 }
 

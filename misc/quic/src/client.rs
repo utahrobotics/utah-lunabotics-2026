@@ -21,6 +21,14 @@ pub struct QuicClient<KA> {
 }
 
 impl<KA> QuicClient<KA> {
+    /// Access the inner [`quinn::Connection`].
+    ///
+    /// Useful for cloning the refcounted connection handle so other tasks
+    /// can wait on `connection.closed()` without holding the [`QuicClient`].
+    pub fn quinn(&self) -> &quinn::Connection {
+        &self.connection
+    }
+
     /// Connect to a QUIC server, verifying the server certificate.
     pub async fn connect(
         bind_addr: SocketAddr,
