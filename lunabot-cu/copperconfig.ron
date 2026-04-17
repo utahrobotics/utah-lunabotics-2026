@@ -190,6 +190,13 @@
                 "speed_multiplier": 1500,
                 "vesc_pairs": [
                     {
+                        "id1": 10,
+                        "id2": 8,
+                        "mask1": "Right",
+                        "mask2": "Left",
+                        "command_both": true
+                    },
+                    {
                         "id1": 75,
                         "id2": 110,
                         "mask1": "Right",
