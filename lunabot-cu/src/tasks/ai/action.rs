@@ -157,7 +157,9 @@ impl LunabotAction {
                 // TODO: set the navigation goal intelligently, sample in the general area and find an obstacle free location
 
                 let (center, hw, hh) = navigation_goal.to_center_and_halfsizes();
-                let _ = RECORDER.get().unwrap().recorder.log("ai/goal", &Boxes2D::from_centers_and_half_sizes(vec![(center.x,center.y)], vec![(hw,hh)]));
+                if let Some(rec) = RECORDER.get() {
+                    let _ = rec.recorder.log("ai/goal", &Boxes2D::from_centers_and_half_sizes(vec![(center.x,center.y)], vec![(hw,hh)]));
+                }
                 if let Some(ref local_map) = blackboard.latest_local_map {
                     // if the kinematic root is not initialized, we might as well just blow up because nothing will work anyways
                     let current_translation = ROBOT_STATE
