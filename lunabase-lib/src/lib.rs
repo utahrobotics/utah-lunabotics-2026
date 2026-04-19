@@ -422,7 +422,7 @@ impl LunabaseConnection {
     }
 
     #[func]
-    fn get_errored_tasks(&self) -> Dictionary {
+    fn get_errored_tasks(&self) -> Dictionary<GString, GString> {
         let mut dict = Dictionary::new();
         if let Ok(guard) = self.errored_tasks.lock() {
             for (task_name, error_msg) in guard.iter() {

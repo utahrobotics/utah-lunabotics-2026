@@ -1,2 +1,4 @@
 [target.x86_64-unknown-linux-gnu]
 rustflags = ["-C", "link-arg=-Wl,-z,stack-size=33554432"]
+[target.aarch64-linux-android]
+rustflags = ["-Clink-arg=-Wl,-z,max-page-size=16384"]

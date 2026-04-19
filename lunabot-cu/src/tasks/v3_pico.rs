@@ -66,6 +66,10 @@ mod prod_impl {
             };
 
             let (path_tx, path_rx) = crossbeam_channel::bounded(1);
+
+            // this thread monitors for device add events, and then checks the serial number and if it matches what we expect for the pico, it sends the 
+            // path to path_rx, where that path tries to be opened in pre_process. 
+            // this is so we can hot plug the pico and it auto reconnects.
             std::thread::spawn(move || {
                 let mut monitor = match MonitorBuilder::new() {
                     Ok(x) => x,

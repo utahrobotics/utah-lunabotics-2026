@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-godot = "0.4.0"
+godot = { git = "https://github.com/godot-rust/gdext", branch = "master", features = ["lazy-function-tables", "api-4-6"] }
 common = { path = "../common" }
 quic = { path = "../misc/quic" }
 tasker = { path = "../misc/tasker" }
