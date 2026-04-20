@@ -206,7 +206,7 @@
                         "mask2": "Right",
                         "command_both": true,
                     },
-                    {   // I think this is the one with a problem on ttyACM*?
+                    {   // I think this is the one with a permission denied problem on ttyACM*?
                         "id1": 63,
                         "id2": 74,
                         "mask1": "Left",
