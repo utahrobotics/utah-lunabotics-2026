@@ -293,6 +293,37 @@ impl CameraMultiplexerApp {
             feed.texture = None;
         }
     }
+
+    fn enable_all(&mut self) {
+        for i in 0..self.feeds.len() {
+            if !self.feeds[i].enabled {
+                self.feeds[i].enabled = true;
+                self.feeds[i].active = Arc::new(AtomicBool::new(true));
+                self.feeds[i].frame = Arc::new(Mutex::new(None));
+                self.feeds[i].texture = None;
+                spawn_receiver(
+                    &self.config.feed_descriptors[i].address,
+                    Arc::clone(&self.feeds[i].frame),
+                    Arc::clone(&self.feeds[i].active),
+                    self.ctx.clone(),
+                );
+            }
+        }
+    }
+
+    fn disable_all(&mut self) {
+        for feed in &mut self.feeds {
+            if feed.enabled {
+                feed.enabled = false;
+                feed.active.store(false, Ordering::Relaxed);
+                feed.texture = None;
+            }
+        }
+    }
+
+    fn all_enabled(&self) -> bool {
+        self.feeds.iter().all(|f| f.enabled)
+    }
 }
 
 const HOTKEYS: [Key; 9] = [
@@ -318,8 +349,6 @@ impl eframe::App for CameraMultiplexerApp {
         let now = Instant::now();
         let ctx = ui.ctx().clone();
 
-        // FPS counter
-        self.frame_count += 1;
         let elapsed_sec = now.duration_since(self.fps_reset_time).as_secs_f32();
         if elapsed_sec >= 1.0 {
             self.fps = self.frame_count as f32 / elapsed_sec;
@@ -348,6 +377,7 @@ impl eframe::App for CameraMultiplexerApp {
             }
             if let Ok(mut lock) = feed.frame.try_lock() {
                 if let Some(image) = lock.take() {
+                    self.frame_count += 1; 
                     match &mut feed.texture {
                         Some(tex) => tex.set(image, TextureOptions::NEAREST),
                         None => {
@@ -362,8 +392,31 @@ impl eframe::App for CameraMultiplexerApp {
             }
         }
 
-        egui::Panel::top("fps_bar").show_inside(ui, |ui| {
-            ui.label(format!("FPS: {:.1}", self.fps));
+        egui::TopBottomPanel::top("fps_bar").show_inside(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(format!("FPS: {:.1}", self.fps));
+
+                ui.separator();
+
+                let all_on = self.all_enabled();
+                let btn_label = if all_on { "Disable All" } else { "Enable All" };
+                let btn_color = if all_on {
+                    Color32::from_rgb(180, 60, 60)
+                } else {
+                    Color32::from_rgb(60, 160, 80)
+                };
+
+                if ui
+                    .add(egui::Button::new(btn_label).fill(btn_color))
+                    .clicked()
+                {
+                    if all_on {
+                        self.disable_all();
+                    } else {
+                        self.enable_all();
+                    }
+                }
+            });
         });
 
         egui::CentralPanel::default().show_inside(ui, |ui| {

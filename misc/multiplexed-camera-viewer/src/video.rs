@@ -1,7 +1,6 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::Instant;
 
 use egui::{ColorImage, Vec2};
 use ffmpeg_next as ffmpeg;
@@ -18,6 +17,11 @@ pub fn spawn_receiver(address: &str, frame: SharedFrame, active: Arc<AtomicBool>
         let url = format!("tcp://{address}");
         let mut opts = ffmpeg::Dictionary::new();
         opts.set("timeout", "1000000");
+        opts.set("fflags", "nobuffer+discardcorrupt");
+        opts.set("flags", "low_delay");
+        opts.set("max_delay", "0");
+        opts.set("probesize", "32");
+        opts.set("analyzeduration", "0");
 
         let mut input_ctx = loop {
             if !active.load(Ordering::Relaxed) {
@@ -50,8 +54,7 @@ pub fn spawn_receiver(address: &str, frame: SharedFrame, active: Arc<AtomicBool>
 
         let mut decoded_frame = ffmpeg::frame::Video::empty();
         let mut scaler: Option<ffmpeg::software::scaling::Context> = None;
-        let mut _last_frame_time = Instant::now();
-        let mut _frames_decoded = 0u64;
+        let mut newest_pts: i64 = i64::MIN;
 
         for (stream, packet) in input_ctx.packets() {
             if !active.load(Ordering::Relaxed) {
@@ -66,7 +69,14 @@ pub fn spawn_receiver(address: &str, frame: SharedFrame, active: Arc<AtomicBool>
                 continue;
             }
 
+            let mut last_frame: Option<ColorImage> = None;
             while decoder.receive_frame(&mut decoded_frame).is_ok() {
+                let pts = decoded_frame.pts().unwrap_or(i64::MAX);
+                if pts < newest_pts {
+                    continue;
+                }
+                newest_pts = pts;
+
                 let src_w = decoded_frame.width();
                 let src_h = decoded_frame.height();
 
@@ -86,12 +96,13 @@ pub fn spawn_receiver(address: &str, frame: SharedFrame, active: Arc<AtomicBool>
                 let mut rgb_frame = ffmpeg::frame::Video::empty();
                 scaler.run(&decoded_frame, &mut rgb_frame).expect("Failed to scale");
 
-                let image = frame_to_color_image(&rgb_frame, src_w as usize, src_h as usize);
+                last_frame = Some(frame_to_color_image(&rgb_frame, src_w as usize, src_h as usize));
+            }
+
+            if let Some(image) = last_frame {
                 if let Ok(mut lock) = frame.lock() {
                     *lock = Some(image);
                 }
-                _frames_decoded += 1;
-                _last_frame_time = Instant::now();
                 ctx.request_repaint();
             }
         }
