@@ -189,6 +189,7 @@
             id:"motor_ctrl", type:"crate::tasks::sinks::MotorController", config:{
                 "speed_multiplier": 1500,
                 "vesc_pairs": [
+                    // the new vesc matthew G has been configuring
                     {
                         "id1": 10,
                         "id2": 8,
@@ -196,6 +197,8 @@
                         "mask2": "Left",
                         "command_both": true
                     },
+
+                    // the vescs we used on teri, dubious if they both work
                     {
                         "id1": 75,
                         "id2": 110,
@@ -203,7 +206,7 @@
                         "mask2": "Right",
                         "command_both": true,
                     },
-                    {
+                    {   // I think this is the one with a problem on ttyACM*?
                         "id1": 63,
                         "id2": 74,
                         "mask1": "Left",
