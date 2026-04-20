@@ -98,7 +98,7 @@ fn decode_datagram_packet<KA: Encode + Decode<()>>(
 }
 
 /// a few dropped datagrams are not necessarily fatal
-const MAX_CONSECUTIVE_PONG_MISSES: u32 = 5;
+const MAX_CONSECUTIVE_PONG_MISSES: u32 = 100;
 
 /// Start the **server-side** keep-alive loop (sends pings, expects pongs).
 pub fn start_server_keep_alive<KA>(
