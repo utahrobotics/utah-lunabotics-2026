@@ -10,7 +10,6 @@ CARGO_CMD_DEBUG = $(shell if [ "$(PERF)" = "true" ]; then echo "cargo samply"; e
 
 # Build the unilidar_publisher with Bazel and run the main cargo project
 prod:
-	cd $(UNILIDAR_DIR) && RULES_RUST_TOOLCHAIN_VERSION=$(RUST_TOOLCHAIN_VERSION) bazel build //:unilidar_publisher $(BAZEL_BUILD_FLAGS)
 	cd lunabot-cu && $(CARGO_CMD) --features production
 
 # Build the unilidar_publisher with Bazel and run the main cargo project in debug mode

@@ -77,6 +77,7 @@ struct FeedState {
     active: Arc<AtomicBool>,
     frame: SharedFrame,
     texture: Option<TextureHandle>,
+    last_frame_time: Option<Instant>
 }
 
 #[derive(Deserialize, Serialize)]
@@ -111,6 +112,10 @@ impl<'a> egui_tiles::Behavior<CameraPane> for CameraBehavior<'a> {
 
         let mut drag_started = false;
 
+        let stale = feed.last_frame_time.map_or(false, |t| {
+            t.elapsed() > std::time::Duration::from_millis(500)
+        });
+
         ui.vertical(|ui| {
             ui.horizontal(|ui| {
                 let (drag_rect, drag_response) = ui.allocate_exact_size(
@@ -133,6 +138,10 @@ impl<'a> egui_tiles::Behavior<CameraPane> for CameraBehavior<'a> {
 
                 if ui.button(&label).clicked() {
                     self.clicked.push(i);
+                }
+
+                if stale && feed.enabled {
+                    ui.colored_label(Color32::RED, "No signal");
                 }
             });
 
@@ -238,6 +247,7 @@ impl CameraMultiplexerApp {
                     active,
                     frame,
                     texture: None,
+                    last_frame_time: None,
                 }
             })
             .collect();
@@ -378,6 +388,7 @@ impl eframe::App for CameraMultiplexerApp {
             if let Ok(mut lock) = feed.frame.try_lock() {
                 if let Some(image) = lock.take() {
                     self.frame_count += 1; 
+                    feed.last_frame_time = Some(Instant::now());
                     match &mut feed.texture {
                         Some(tex) => tex.set(image, TextureOptions::NEAREST),
                         None => {
