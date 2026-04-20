@@ -379,6 +379,18 @@ impl ActuatorCommand {
         speed = speed.clamp(0.0, 1.0);
         ActuatorCommand::SetSpeed((speed * u16::MAX as f64) as u16, actuator, direction)
     }
+
+    /// little helper method to make the actuators move slower at outreach events
+    pub fn apply_speed_factor(&mut self, factor: f32) {
+        match self {
+            ActuatorCommand::SetSpeed(speed, actuator, direction) => {
+                *speed = (factor * (*speed as f32)) as u16;
+            },
+            _ => {
+
+            }
+        }
+    }
 }
 
 impl Not for Direction {
