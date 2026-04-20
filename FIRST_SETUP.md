@@ -128,7 +128,7 @@ params: {
 
 ### Camera streams
 
-1. Install ffmpeg on your machine, then run the [multiplexed camera viewer](https://github.com/utahrobotics/utah-lunabotics-2026/tree/main/misc/multiplexed-camera-viewer)
+1. follow the installation instructions for the [multiplexed camera viewer](https://github.com/utahrobotics/utah-lunabotics-2026/tree/main/misc/multiplexed-camera-viewer) crate in misc.
 	1. You will need to specify in the config for the camera viewer what the robots ip is, and the ports for the streams you want to connect to 
 
 # Vescs
@@ -156,6 +156,8 @@ params: {
 1. Navigate to embedded directory.
 2. run `cargo run --release --bin pico-prime` to flash the pico that controlls the actuators.
 3. attach the other pico then run `cargo run --release --bin pico-secondary` to flash it.
+4. Only the prime pico needs to be attached to the computer over micro usb, the secondary pico should not be attached.
+5. Make sure all 3 red LED's on the board the prime pico is attached to are lit. If not all of them are lit that means something isn't getting powered (maybe the secondary pico?).
 
 
 
