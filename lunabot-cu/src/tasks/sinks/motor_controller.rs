@@ -109,7 +109,7 @@ impl CuSinkTask for MotorController {
                     .recorder
                     .log("vesc_telemetry", &TextLog::new(format!("{telemetry:?}")));
             } else {
-                println!("{telemetry:?}");
+                // println!("{telemetry:?}");
             }
         }
 
