@@ -72,7 +72,11 @@ impl<KA: Clone> KeepAlive<KA> {
 
     /// How long since we last heard from the remote.
     pub fn time_since_last(&self) -> Option<Duration> {
-        self.state.lock().unwrap().last_received_at.map(|t| t.elapsed())
+        self.state
+            .lock()
+            .unwrap()
+            .last_received_at
+            .map(|t| t.elapsed())
     }
 
     /// Get a shared reference to the inner state, allowing reads without owning
@@ -98,7 +102,7 @@ fn decode_datagram_packet<KA: Encode + Decode<()>>(
 }
 
 /// a few dropped datagrams are not necessarily fatal
-const MAX_CONSECUTIVE_PONG_MISSES: u32 = 100;
+const MAX_CONSECUTIVE_PONG_MISSES: u32 = 50;
 
 /// Start the **server-side** keep-alive loop (sends pings, expects pongs).
 pub fn start_server_keep_alive<KA>(
@@ -156,10 +160,7 @@ where
                     }
                 }
                 Ok(Err(e)) => {
-
-                    eprintln!(
-                        "[SERVER keep-alive] datagram read error: {e}, closing connection"
-                    );
+                    eprintln!("[SERVER keep-alive] datagram read error: {e}, closing connection");
                     connection.close(1u32.into(), b"keep-alive read error");
                     break;
                 }
@@ -188,10 +189,7 @@ where
 }
 
 /// Start the **client-side** keep-alive loop (listens for pings, replies with pongs).
-pub fn start_client_keep_alive<KA>(
-    connection: Connection,
-    initial_msg: KA,
-) -> KeepAlive<KA>
+pub fn start_client_keep_alive<KA>(connection: Connection, initial_msg: KA) -> KeepAlive<KA>
 where
     KA: Encode + Decode<()> + Clone + Send + Sync + 'static,
 {
@@ -218,10 +216,9 @@ where
                             s.last_received_at = Some(Instant::now());
                             pong_msg = s.outgoing_msg.clone();
                         }
-                        if let Err(e) = send_datagram_packet(
-                            &connection,
-                            KeepAlivePacket::Pong(pong_msg),
-                        ) {
+                        if let Err(e) =
+                            send_datagram_packet(&connection, KeepAlivePacket::Pong(pong_msg))
+                        {
                             eprintln!("[CLIENT keep-alive] failed to send pong: {e}");
                         }
                     }

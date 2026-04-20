@@ -7,11 +7,15 @@ use nalgebra::Vector2;
 use rerun::Boxes2D;
 
 use crate::{
-    ROBOT_STATE, rerun_viz::RECORDER, tasks::ai::{
-        behaviors::autonomy::navigate::NavigationGoal, blackboard::LunabotBlackboard, jobs::{
+    ROBOT_STATE,
+    rerun_viz::RECORDER,
+    tasks::ai::{
+        behaviors::autonomy::navigate::NavigationGoal,
+        blackboard::LunabotBlackboard,
+        jobs::{
             dig_job, direction_from_path, dump_job, find_path_job, follow_path_job, rotation_shim,
-        }
-    }
+        },
+    },
 };
 static PATHFINDING_GOAL: [f32; 2] = [5.843524, 1.4796992];
 #[derive(Clone, Debug, Copy)]
@@ -217,7 +221,7 @@ impl LunabotAction {
                             blackboard.obstacle_gradient_threshold_expander,
                             blackboard.obstacle_gradient_threshold_pathfinder,
                             blackboard.robot_radius,
-                            *navigation_goal
+                            *navigation_goal,
                         );
                         let initial_status = job.get_status();
                         blackboard.path_finder = Some(job);

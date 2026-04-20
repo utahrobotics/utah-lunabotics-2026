@@ -28,7 +28,11 @@ impl CuTask for LunabotAi {
     type Input<'m> = input_msg!('m, FromLunabase, OccupancyGrid);
 
     // (Steering, ActuatorCommand, calculated path)
-    type Output<'m> = (CuMsg<Steering>, CuMsg<ActuatorCommand>, CuMsg<Vec<[f32; 2]>>);
+    type Output<'m> = (
+        CuMsg<Steering>,
+        CuMsg<ActuatorCommand>,
+        CuMsg<Vec<[f32; 2]>>,
+    );
     type Resources<'r> = ();
 
     fn new(
@@ -57,10 +61,12 @@ impl CuTask for LunabotAi {
                     .expect("failed to deserialize")
             })
             .unwrap_or(0.3) as f32;
-        let arena = config.and_then(|c| {
-            c.get_value::<Arena>("arena")
-                .expect("Failed to deserialize arena")
-        }).expect("specify the arena in lunabot_ai config");
+        let arena = config
+            .and_then(|c| {
+                c.get_value::<Arena>("arena")
+                    .expect("Failed to deserialize arena")
+            })
+            .expect("specify the arena in lunabot_ai config");
         let mut blackboard = LunabotBlackboard::default();
         BLACKBOARD_SHARED.get_or_init(|| Arc::clone(&blackboard.blackboard_shared));
         blackboard.obstacle_gradient_threshold_expander = obstacle_gradient_threshold_expander;
@@ -112,9 +118,12 @@ impl CuTask for LunabotAi {
             output.0.set_payload(steering_cmd);
         }
         if let Some(ref latest_calculated_path) = self.bt.blackboard().calculated_path {
-            output.2.set_payload(latest_calculated_path.iter().map(|node| {
-                [node.x, node.y]
-            }).collect());
+            output.2.set_payload(
+                latest_calculated_path
+                    .iter()
+                    .map(|node| [node.x, node.y])
+                    .collect(),
+            );
         }
         Ok(())
     }
