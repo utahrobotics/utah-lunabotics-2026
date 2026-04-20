@@ -77,10 +77,7 @@ pub struct OccupancyGridTask {
 struct ArenaObstacles {
     /// (center_x, center_y, half_width, half_height)
     #[serde(default)]
-    rects: Vec<(f32, f32, f32, f32)>,
-    /// (center_x, center_y, radius)
-    #[serde(default)]
-    circles: Vec<(f32, f32, f32)>,
+    rects: Vec<(f32, f32, f32, f32)>
 }
 
 fn paint_permanent_obstacles(
@@ -107,8 +104,6 @@ fn paint_permanent_obstacles(
             }
         }
     }
-    
-    // ... same logic for circles (just use 'radius' instead of 'radius + robot_radius')
 }
 
 impl Freezable for OccupancyGridTask {}

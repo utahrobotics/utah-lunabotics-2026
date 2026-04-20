@@ -12,6 +12,4 @@
         // center divider wall (10cm thick at y=0) (ish)
         (4.05, 0.0, 4.05, 0.05),
     ],
-
-    circles: [],
 )
