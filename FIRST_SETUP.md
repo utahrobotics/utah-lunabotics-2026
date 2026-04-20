@@ -42,11 +42,14 @@
 (
 ```
 
-**Trouble Shooting**
+<br/>
+
+**Trouble Shooting:** <br/>
 - the t265 fails to boot with some error message:
 	- unplug and replug it, then try again.
 	- sometimes having realsense devices on a usb hub causes them to behave weird, so if you have them directly plugged in that might work better
 	- I am working on a way to power cycle them without re plugging them in case this happens during competition.
+
 ### Depth Camera (d465)
 1. make sure you are using the fancy dust protection rated d456 not the d455
 2. connect it to the PC with a cable and port that supports usb 3.0 or higher
@@ -59,13 +62,23 @@
 	"euler": [0.0, 28.0, 0.0]
 },
 ```
-5. update the realsense_subscriber task's copperconfig.ron to have the serial number of the upper depth camera, and the right node name in the config (maybe I should have just kept the pattern of using the serial number as the node name but ehhhh I cant be bothered to change it cause its a minor thing)
+5. Update the realsense_subscriber task's copperconfig.ron to have the serial number of the upper depth camera, and the right node name in the config (maybe I should have just kept the pattern of using the serial number as the node name but ehhhh I cant be bothered to change it cause its a minor thing)
 ```ron
 config: {
 	"serial_num": "341222301328",
 	"camera_node": "upper_depth_camera"
 },
 ```
+
+6. If you wish to stream the rgb frames from the depth camera, run `make discover-cameras`, then unplug and replug the realsense and take note of the ports that pop up. There should be two different ports that pop up, each with a few indexes. The RGB should be index 0 on the port that mentions "3.1". (I believe this is because the realsense offers usb 2 and usb 3 and the rgb is on 3). 
+Update the `d456_rgb` task's config to have that port. 
+
+<br/>
+
+**Realsense Troubleshooting** <br/>
+
+1. "**d456_rgb reported no frames after 500 ms**" message or if the rgb feed doesn't seem to work: try running `ffplay /dev/videoX` where /dev/videoX is the port you think corresponds with the rgb. If that is the rgb feed, you will see it playing, then if that works and there are no errors with the d456_rgb task make sure your camera feed ip and port are set correctly in the copperconfig, and in the multiplexed camera viewer config.
+2. **No depth frames in 500 ms**: If there are no depth frames recieved, first run `make kill` to kill all lunabot related processes, then cd into external_tasks/realsense and directly run `cargo run --release` from there, then plug in the realsense. If you see a few messages about the realsense popping up and publishing, it should be working. Double check that the serial number in the realsense_subscriber tasks config is correct. 
 
 ### RGB cameras
 
@@ -90,6 +103,17 @@ params: {
 },
 ```
 4. make sure there is a node in the robot layout with the same id you specified in the copperconfig
+
+<br/>
+
+**Trouble Shooting RGB Cameras:**
+<br/>
+
+1. cam_x no frames in 500 ms:
+
+- Check the port is right, use the `make discover-cameras` and `ffplay /dev/videox` commands to help
+- Run `v4l2-ctl --list-formats-ext` to list the available capture profiles and then ensure that your width and height specified in the config are compatable with at least 30 fps for the MJPG type.
+
 
 # Network Stuff
 
