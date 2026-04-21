@@ -66,7 +66,7 @@ pub fn navigate_behavior(goal: NavigationGoal) -> Behavior<LunabotAction> {
                 Action(LunabotAction::SetStage(common::LunabotStage::SoftStop)),
             ])),
         ),
-        // hale's path follow shouldn't need this
+        // hale's path follow shouldn't need the rotation shim
         // Action(LunabotAction::RotateToFacePath),,
         Action(LunabotAction::SetBTStatusMsg(format!(
             "Moving to {}",
@@ -97,7 +97,8 @@ pub fn navigate_behavior(goal: NavigationGoal) -> Behavior<LunabotAction> {
 
 /// calculates a path to goal, if it fails once, the local obstacles are reset.
 /// if the path calc fails once again after local obstacles are reset, then
-/// global obstacles are reset also
+/// global obstacles are reset also.
+/// TODO: experiment with relaxing rules about maximum traversible gradient on failure also.
 fn calculate_path_behavior(goal: NavigationGoal) -> Behavior<LunabotAction> {
     Select(vec![
         Action(LunabotAction::CalculatePath(goal)),
@@ -123,11 +124,6 @@ fn wait_for_new_frame() -> Behavior<LunabotAction> {
         ])),
         vec![Action(LunabotAction::Yield)],
     )
-}
-
-#[allow(unused)]
-fn set_stage(stage: common::LunabotStage) -> Behavior<LunabotAction> {
-    Sequence(vec![Action(LunabotAction::SetStage(stage))])
 }
 
 #[allow(unused, dead_code)]
