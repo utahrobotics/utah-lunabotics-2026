@@ -4,11 +4,11 @@
 /// Steps:
 ///
 /// 1. Uses known camera extrinsics and intrinsics to convert a depth image to a point cloud.
-/// 2. Creates a height map by othographically projecting point cloud onto a grid of height map cells, where the value of each cell will be equal to the maximum z value ofthe points projected onto the cell.
-/// 2. Removes statistical outliers from the newly created height map.
-/// 3. Uses either gaussian or bilateral filtering to reduce noise in the map.
-/// 4. Computes the avg gradient between k neighbors in the height map, disregarding cells with too many unknown neighbors.
-/// 5. Marks gradients over a certain value as obstacles.
+/// 2. Creates a height map by othographically projecting point cloud onto a grid of height map cells, where the value of each cell will be equal to the maximum z value of the points projected onto the cell.
+/// 3. Removes statistical outliers from the newly created height map.
+/// 4. Uses either gaussian or bilateral filtering to reduce noise in the map.
+/// 5. Computes the avg gradient between k neighbors in the height map, disregarding cells with too many unknown neighbors.
+/// 6. Marks gradients over a certain value as obstacles.
 ///
 /// Notes:
 ///
@@ -19,7 +19,10 @@ use cu29::prelude::*;
 use nalgebra::Isometry3;
 use rayon::{ThreadPool, ThreadPoolBuilder};
 
-use std::sync::{Arc, Mutex, OnceLock, RwLock};
+use std::sync::{
+    Arc, Mutex, OnceLock, RwLock,
+    atomic::{AtomicU64, Ordering},
+};
 use wgsl_pcl::pipelines::depth_to_obstacle::ClearAffectedCellsOptions;
 use wgsl_pcl::pipelines::filters::*;
 
@@ -40,17 +43,20 @@ use crate::tasks::ai::behaviors::autonomy::navigate::Arena;
 use crate::tasks::ai::blackboard::BLACKBOARD_SHARED;
 use crate::tasks::{DEPTH_FRAME_HEIGHT, DEPTH_FRAME_WIDTH};
 use crate::utils::rwlock_write_unpoison;
+
 pub static GLOBAL_MAP: OnceLock<Arc<RwLock<OccupancyGrid>>> = OnceLock::new();
 const PERMANENT_GRADIENT: f32 = 10.0;
 
 #[allow(unused)]
-#[allow(unused)]
 struct ProcessRequest {
     layout: MapLayout,
-    buffer_handle: CuHandle<Vec<u16>>, // Arc clone, no data copy
+    buffer_handle: CuHandle<Vec<u16>>,
     depth_scale: f32,
     transform: AlignedMatrix4<f32>,
     origin: (f32, f32),
+    /// Generation captured at spawn time. Checked inside the output_buffer
+    /// lock before writing results
+    generation: u64,
 }
 
 pub struct OccupancyGridTask {
@@ -59,7 +65,6 @@ pub struct OccupancyGridTask {
     global_layout: MapLayout,
     local_layout: MapLayout,
     output_buffer: Arc<Mutex<Option<OccupancyGrid>>>,
-    /// technically an atomic would be enough but I dont trust my knowledge of atomic ordering enough to dare use them
     processing: Arc<Mutex<bool>>,
     thread_pool: Arc<ThreadPool>,
     rolling_map_start_position: Isometry3<f64>,
@@ -70,6 +75,15 @@ pub struct OccupancyGridTask {
     max_acceleration: f64,
     arena_obstacles: Option<Arena>,
     robot_radius_meters: f32,
+    /// Monotonically increasing. Incremented every time clear_map() is called.
+    /// The background thread checks this inside the output_buffer lock before
+    /// committing a result; a mismatch means the map was reset mid-flight.
+    map_generation: Arc<AtomicU64>,
+    /// Set when the rolling-map reset succeeds in calling append_to() but
+    /// fails to acquire the pipeline lock for clear_map() (because the
+    /// background thread is still holding it for post-process logging).
+    /// Retried at the top of the next process() call.
+    pending_local_clear: bool,
 }
 
 /// Arena obstacle configuration
@@ -77,27 +91,35 @@ pub struct OccupancyGridTask {
 struct ArenaObstacles {
     /// (center_x, center_y, half_width, half_height)
     #[serde(default)]
-    rects: Vec<(f32, f32, f32, f32)>
+    rects: Vec<(f32, f32, f32, f32)>,
 }
 
-fn paint_permanent_obstacles(
-    grid: &mut OccupancyGrid,
-    obstacles: &ArenaObstacles,
-) {
+fn paint_permanent_obstacles(grid: &mut OccupancyGrid, obstacles: &ArenaObstacles) {
     for &(cx, cy, half_w, half_h) in &obstacles.rects {
         let min_x = cx - half_w;
         let max_x = cx + half_w;
         let min_y = cy - half_h;
         let max_y = cy + half_h;
 
-        let x1 = grid.world_to_cell(min_x, min_y).map(|(x, _)| x).unwrap_or(0);
-        let y1 = grid.world_to_cell(min_x, min_y).map(|(_, y)| y).unwrap_or(0);
-        let x2 = grid.world_to_cell(max_x, max_y).map(|(x, _)| x).unwrap_or(grid.cells_x() - 1);
-        let y2 = grid.world_to_cell(max_x, max_y).map(|(_, y)| y).unwrap_or(grid.cells_y() - 1);
+        let x1 = grid
+            .world_to_cell(min_x, min_y)
+            .map(|(x, _)| x)
+            .unwrap_or(0);
+        let y1 = grid
+            .world_to_cell(min_x, min_y)
+            .map(|(_, y)| y)
+            .unwrap_or(0);
+        let x2 = grid
+            .world_to_cell(max_x, max_y)
+            .map(|(x, _)| x)
+            .unwrap_or(grid.cells_x() - 1);
+        let y2 = grid
+            .world_to_cell(max_x, max_y)
+            .map(|(_, y)| y)
+            .unwrap_or(grid.cells_y() - 1);
 
         for x in x1..=x2 {
             for y in y1..=y2 {
-                // Double check bounds just to be safe before writing to the grid
                 if x < grid.cells_x() && y < grid.cells_y() {
                     let _ = grid.set_gradient_at(x, y, PERMANENT_GRADIENT);
                 }
@@ -132,42 +154,7 @@ impl CuTask for OccupancyGridTask {
                     &rerun::Boxes3D::from_centers_and_half_sizes(vec![center], vec![half_size]),
                 )
                 .unwrap();
-
-            // Log permanent obstacles to Rerun
-            /*if let Some(global_map) = GLOBAL_MAP.get() {
-                if let Ok(grid) = global_map.read() {
-                    let mut points = vec![];
-                    let mut colors = vec![];
-                    for cell_y in 0..grid.cells_y() {
-                        for cell_x in 0..grid.cells_x() {
-                            let idx = cell_x + cell_y * grid.cells_x();
-                            if idx < grid.gradient_map.len() {
-                                let gradient = grid.gradient_map[idx];
-                                if gradient > PERMANENT_GRADIENT / 2.0 {
-                                    // Only show permanent obstacles - obstacles should have gradient of 10.
-                                    if let Ok((world_x, world_y)) =
-                                        grid.cell_to_world(cell_x, cell_y)
-                                    {
-                                        points.push([world_x, world_y]);
-                                        colors.push([255, 0, 255]); // Bright magenta
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    if !points.is_empty() {
-                        logger
-                            .recorder
-                            .log_static(
-                                "realsense/permanent_obstacles",
-                                &Points2D::new(points).with_colors(colors),
-                            )
-                            .unwrap();
-                    }
-                }
-            }*/
         }
-
         Ok(())
     }
 
@@ -183,6 +170,7 @@ impl CuTask for OccupancyGridTask {
                 CuError::new_with_cause("failed to init gpu", std::io::Error::other(e))
             })?;
         }
+
         let camera_name = config
             .and_then(|c| {
                 c.get::<String>("camera_node")
@@ -284,39 +272,33 @@ impl CuTask for OccupancyGridTask {
                     .expect("failed to deserialize")
             })
             .unwrap_or(2.0) as f32;
-
         let outlier_filter_max_unknown_neighbors_ratio = config
             .and_then(|c| {
                 c.get::<f64>("outlier_filter_max_unknown_neighbors_ratio ")
                     .expect("failed to deserialize")
             })
             .unwrap_or(0.5) as f32;
-
         let gradient_filter_kernel_radius = config
             .and_then(|c| {
                 c.get::<u64>("gradient_filter_kernel_radius")
                     .expect("failed to deserialize")
             })
             .unwrap_or(2) as u32;
-
         let gaussian_blur_kernel_radius = config
             .and_then(|c| {
                 c.get::<u64>("gaussian_blur_kernel_radius")
                     .expect("failed to deserialize")
             })
             .unwrap_or(5) as u32;
-
         let gaussian_sigma_spatial = config
             .and_then(|c| {
                 c.get::<f64>("gaussian_sigma_spatial")
                     .expect("failed to deserialize")
             })
             .unwrap_or(6.0) as f32;
-
         let min_depth = config
             .and_then(|c| c.get::<f64>("min_depth").expect("failed to deserialize"))
             .unwrap_or(0.3) as f32;
-
         let max_depth = config
             .and_then(|c| c.get::<f64>("max_depth").expect("failed to deserialize"))
             .unwrap_or(3.0) as f32;
@@ -326,7 +308,6 @@ impl CuTask for OccupancyGridTask {
                 .expect("failed to deserialize")
         });
 
-        // use bilateral by default, fall back on gaussian
         let use_bilateral = config
             .and_then(|c| {
                 c.get::<bool>("use_bilateral_filter")
@@ -397,6 +378,7 @@ impl CuTask for OccupancyGridTask {
             -distance_buffer,
             cell_size,
         );
+
         let blur_filter_options = if use_bilateral {
             BlurFilterOptions::Bilateral(BilateralOptions {
                 kernel_radius: bilateral_filter_kernel_radius,
@@ -443,14 +425,13 @@ impl CuTask for OccupancyGridTask {
                 .build()
                 .map_err(|e| CuError::new_with_cause("failed to create thread pool", e))?,
         );
+
         GLOBAL_MAP.get_or_init(|| {
             let mut grid = OccupancyGrid {
                 layout: global_layout.clone(),
                 gradient_map: vec![f32::MIN; global_layout.cells_x() * global_layout.cells_y()],
                 origin: (0.0, 0.0),
             };
-
-            // Load and paint arena obstacles
             if let Some(arena_obstacles) = arena_obstacles
                 && let Some(obstacles) = load_arena_obstacles(arena_obstacles)
             {
@@ -458,7 +439,6 @@ impl CuTask for OccupancyGridTask {
             } else {
                 eprintln!("[OccupancyGrid] No arena obstacles loaded");
             }
-
             Arc::new(RwLock::new(grid))
         });
 
@@ -478,6 +458,8 @@ impl CuTask for OccupancyGridTask {
             max_acceleration,
             arena_obstacles,
             robot_radius_meters,
+            map_generation: Arc::new(AtomicU64::new(0)),
+            pending_local_clear: false,
         })
     }
 
@@ -493,8 +475,6 @@ impl CuTask for OccupancyGridTask {
                     pipeline.set_sigma_range(new_sigma_range, get_device());
                 }
             }
-            // else: spawned thread holds the lock, we'll pick it up next cycle
-            // (the blackboard values stay in place since we didn't take() them)
         }
         Ok(())
     }
@@ -505,34 +485,62 @@ impl CuTask for OccupancyGridTask {
         input: &Self::Input<'i>,
         output: &mut Self::Output<'o>,
     ) -> CuResult<()> {
-        let mut output_buf = self.output_buffer.lock().unwrap();
+        // try lock to prevent jitter
+        let Ok(mut output_buf) = self.output_buffer.try_lock() else {
+            return Ok(());
+        };
+
+        // If the rolling-map reset previously succeeded at append_to() but
+        // failed to acquire the pipeline lock (background thread held it),
+        // we retry here before doing anything else. rolling_map_start_position
+        if self.pending_local_clear {
+            if let Ok(mut p) = self.depth_projector_pipeline.try_lock() {
+                p.clear_map(get_device());
+                self.map_generation.fetch_add(1, Ordering::SeqCst);
+                *output_buf = None;
+                self.rolling_map_start_position = self.camera_node.get_global_isometry();
+                self.pending_local_clear = false;
+            }
+        }
 
         if let Some(blackboard) = BLACKBOARD_SHARED.get()
             && let Ok(guard) = blackboard.try_read()
-            && guard.reset_obstacles
+            && (guard.reset_map || guard.reset_local_map)
         {
+            let reset_all = guard.reset_map;
             drop(guard);
 
-            // reset global map (non-blocking will retry next cycle if lock is held)
-            if let Some(global) = GLOBAL_MAP.get()
-                && let Ok(mut global_guard) = global.try_write()
-            {
-                global_guard.gradient_map.fill(f32::MIN);
-                if let Some(arena_obstacles) = self.arena_obstacles
-                    && let Some(obstacles) = load_arena_obstacles(arena_obstacles)
+            if reset_all {
+                if let Some(global) = GLOBAL_MAP.get()
+                    && let Ok(mut global_guard) = global.try_write()
                 {
-                    paint_permanent_obstacles(
-                        &mut global_guard,
-                        &obstacles,
-                    );
-                }
+                    global_guard.gradient_map.fill(f32::MIN);
+                    if let Some(arena_obstacles) = self.arena_obstacles
+                        && let Some(obstacles) = load_arena_obstacles(arena_obstacles)
+                    {
+                        paint_permanent_obstacles(&mut global_guard, &obstacles);
+                    }
 
-                if let Ok(mut p) = self.depth_projector_pipeline.try_lock() {
+                    if let Ok(mut p) = self.depth_projector_pipeline.try_lock()
+                        && let Ok(mut bb) = blackboard.try_write()
+                    {
+                        p.clear_map(get_device());
+                        self.rolling_map_start_position = self.camera_node.get_global_isometry();
+                        self.map_generation.fetch_add(1, Ordering::SeqCst);
+                        *output_buf = None;
+                        bb.reset_map = false;
+                        bb.reset_local_map = false;
+                    }
+                }
+            } else {
+                if let Ok(mut p) = self.depth_projector_pipeline.try_lock()
+                    && let Ok(mut bb) = blackboard.try_write()
+                {
                     p.clear_map(get_device());
                     self.rolling_map_start_position = self.camera_node.get_global_isometry();
-                    if let Ok(mut bb) = blackboard.try_write() {
-                        bb.reset_obstacles = false;
-                    }
+                    self.map_generation.fetch_add(1, Ordering::SeqCst);
+                    *output_buf = None;
+                    bb.reset_local_map = false;
                 }
             }
         }
@@ -593,7 +601,14 @@ impl CuTask for OccupancyGridTask {
 
                 if let Ok(mut p) = self.depth_projector_pipeline.try_lock() {
                     p.clear_map(get_device());
+                    self.map_generation.fetch_add(1, Ordering::SeqCst);
                     self.rolling_map_start_position = camera_isometry;
+                    self.pending_local_clear = false;
+                } else {
+                    eprintln!(
+                        "[OccupancyGrid] Pipeline lock contention, deferring clear_map() to next cycle"
+                    );
+                    self.pending_local_clear = true;
                 }
             }
 
@@ -638,23 +653,24 @@ impl CuTask for OccupancyGridTask {
 
         let request = ProcessRequest {
             layout: self.local_layout,
-            buffer_handle: input_msg.buffer_handle.clone(), // cheap Arc clone huzzah
+            buffer_handle: input_msg.buffer_handle.clone(),
             depth_scale: input_msg.format.depth_scale,
             transform: iso.to_homogeneous().cast::<f32>().into(),
             origin: (
                 self.rolling_map_start_position.translation.vector.x as f32,
                 self.rolling_map_start_position.translation.vector.y as f32,
             ),
+
+            generation: self.map_generation.load(Ordering::SeqCst),
         };
 
         let pipeline = Arc::clone(&self.depth_projector_pipeline);
         let output_buffer = Arc::clone(&self.output_buffer);
         let processing_flag = Arc::clone(&self.processing);
+        let map_generation = Arc::clone(&self.map_generation);
         let layout = self.local_layout;
 
         self.thread_pool.spawn_fifo(move || {
-            // Everything that touches the depth buffer happens inside with_inner —
-            // no copy, no unsafe transmute of a cloned vec.
             let result = request.buffer_handle.with_inner(|depths| {
                 let process_result = {
                     let mut pipeline_guard = pipeline.lock().unwrap();
@@ -666,7 +682,9 @@ impl CuTask for OccupancyGridTask {
                     )
                 };
 
-                if let (Ok((_, obstacle_map)), Some(logger)) = (&process_result, RECORDER.get()) {
+                if let (Ok((_points, obstacle_map)), Some(logger)) =
+                    (&process_result, RECORDER.get())
+                {
                     let depth_bytes: &[u8] = unsafe {
                         std::slice::from_raw_parts(
                             depths.as_ptr() as *const u8,
@@ -709,11 +727,18 @@ impl CuTask for OccupancyGridTask {
 
             match result {
                 Ok((_, obstacle_map)) => {
-                    *output_buffer.lock().unwrap() = Some(OccupancyGrid {
-                        layout,
-                        gradient_map: obstacle_map,
-                        origin: request.origin,
-                    });
+                    let mut buf = output_buffer.lock().unwrap();
+                    if map_generation.load(Ordering::SeqCst) == request.generation {
+                        *buf = Some(OccupancyGrid {
+                            layout,
+                            gradient_map: obstacle_map,
+                            origin: request.origin,
+                        });
+                    } else {
+                        eprintln!(
+                            "[OccupancyGrid] Discarding stale result    (map was reset during GPU processing)"
+                        );
+                    }
                 }
                 Err(e) => eprintln!("GPU processing error: {:?}", e),
             }
@@ -757,16 +782,12 @@ fn log_map(
     for cell_y in 0..cells_y {
         for cell_x in 0..cells_x {
             let idx = cell_x + cell_y * cells_x;
-
             if idx < local_obstacle_map.len() {
                 let gradient = local_obstacle_map[idx];
-
                 if gradient != f32::MIN {
                     let x = layout.min_x + (cell_x as f32 + 0.5) * layout.cell_size + origin.0;
                     let y = layout.min_y + (cell_y as f32 + 0.5) * layout.cell_size + origin.1;
-
                     local_obstacle_points.push([x, y]);
-
                     let normalized = ((gradient + 1.0) / 4.0).clamp(0.0, 1.0);
                     local_obstacle_colors.push([
                         (normalized * 255.0) as u8,
@@ -777,13 +798,11 @@ fn log_map(
             }
         }
     }
-
     let _ = logger.recorder.log(
         "obstacle_mapper/local_obstacle_map",
         &Points2D::new(local_obstacle_points).with_colors(local_obstacle_colors),
     );
 
-    // Log raw height map
     let mut raw_height_points = Vec::new();
     let mut raw_height_colors = Vec::new();
     for cell_y in 0..cells_y {
@@ -807,7 +826,6 @@ fn log_map(
         }
     }
 
-    // Log gradient map
     let mut gradient_points = Vec::new();
     let mut gradient_colors = Vec::new();
     for cell_y in 0..cells_y {
@@ -820,7 +838,6 @@ fn log_map(
                 }
                 let x = layout.min_x + (cell_x as f32 + 0.5) * layout.cell_size + origin.0;
                 let y = layout.min_y + (cell_y as f32 + 0.5) * layout.cell_size + origin.1;
-                // Use gradient value as z for visualization
                 gradient_points.push([x, y, gradient * 2.0]);
                 let normalized = (gradient * 2.0).clamp(0.0, 1.0);
                 gradient_colors.push([
@@ -832,7 +849,6 @@ fn log_map(
         }
     }
 
-    // Log blur filtered height map
     let mut blur_height_points = Vec::new();
     let mut blur_height_colors = Vec::new();
     for cell_y in 0..cells_y {

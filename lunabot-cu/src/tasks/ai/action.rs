@@ -15,11 +15,22 @@ use crate::{
         jobs::{
             dig_job, direction_from_path, dump_job, find_path_job, follow_path_job, rotation_shim,
         },
-    },
+    }, utils::{rwlock_read_unpoison, rwlock_write_unpoison},
 };
 static PATHFINDING_GOAL: [f32; 2] = [5.843524, 1.4796992];
 #[derive(Clone, Debug, Copy)]
 pub enum LunabotAction {
+    ResetAllObstacles,
+    ResetLocalObstacles,
+
+    /// returns Running if reset_map or reset_local_map are set to true in the shared blackboard,
+    /// otherwise returns Success
+    ObstacleResetRequested,
+
+    /// returns Running if the latest local map is None, this is a way to basically wait until an occupancy grid map is published
+    /// returns success if latest local map is Some
+    LatestLocalMapReady,
+
     Yield,
     SetSteering(Steering),
     /// sets steering to last known value rx'd from lunabase
@@ -83,7 +94,6 @@ impl LunabotAction {
 
                 Success
             }
-
             LunabotAction::SetLastBucket => {
                 if let Some(last_bucket_pack_time) = blackboard.last_non_zero_bucket_pack {
                     if last_bucket_pack_time.elapsed() > Duration::from_millis(200) {
@@ -105,7 +115,6 @@ impl LunabotAction {
 
                 Success
             }
-
             LunabotAction::SetLastLift => {
                 if let Some(last_lift_pack_time) = blackboard.last_non_zero_lift_pack {
                     if last_lift_pack_time.elapsed() > Duration::from_millis(200) {
@@ -158,11 +167,15 @@ impl LunabotAction {
             LunabotAction::IsInFreeCell => todo!(),
             LunabotAction::IsInUnknownCell => todo!(),
             LunabotAction::CalculatePath(navigation_goal) => {
-                // TODO: set the navigation goal intelligently, sample in the general area and find an obstacle free location
-
                 let (center, hw, hh) = navigation_goal.to_center_and_halfsizes();
                 if let Some(rec) = RECORDER.get() {
-                    let _ = rec.recorder.log("ai/goal", &Boxes2D::from_centers_and_half_sizes(vec![(center.x,center.y)], vec![(hw,hh)]));
+                    let _ = rec.recorder.log(
+                        "ai/goal",
+                        &Boxes2D::from_centers_and_half_sizes(
+                            vec![(center.x, center.y)],
+                            vec![(hw, hh)],
+                        ),
+                    );
                 }
                 if let Some(ref local_map) = blackboard.latest_local_map {
                     // if the kinematic root is not initialized, we might as well just blow up because nothing will work anyways
@@ -411,6 +424,31 @@ impl LunabotAction {
                     }
                 }
             }
+            LunabotAction::ResetAllObstacles => {
+                blackboard.latest_local_map = None;
+                rwlock_write_unpoison(&*blackboard.blackboard_shared).reset_map = true;
+                Success
+            },
+            LunabotAction::ResetLocalObstacles => {
+                blackboard.latest_local_map = None;
+                rwlock_write_unpoison(&*blackboard.blackboard_shared).reset_local_map = true;
+                Success
+            },
+            LunabotAction::ObstacleResetRequested => {
+                let guard = rwlock_read_unpoison(&*blackboard.blackboard_shared);
+                if guard.reset_local_map || guard.reset_map {
+                    Running
+                } else {
+                    Success
+                }
+            },
+            LunabotAction::LatestLocalMapReady => {
+                if blackboard.latest_local_map.is_some() {
+                    Success
+                } else {
+                    Running
+                }
+            },
         };
         (status, 0.0)
     }

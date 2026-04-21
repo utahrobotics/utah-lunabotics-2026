@@ -201,7 +201,7 @@ pub enum FromLunabase {
     /// when the last seen packet from the lunabase exceeds the timeout
     Disconnect,
 
-    /// resets the obstacle map
+    /// resets the local and global obstacle map
     ResetObstacles,
 
     EnableApriltags,

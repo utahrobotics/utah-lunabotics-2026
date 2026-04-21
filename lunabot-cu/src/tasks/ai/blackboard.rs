@@ -17,7 +17,10 @@ pub static BLACKBOARD_SHARED: OnceLock<Arc<RwLock<BlackboardShared>>> = OnceLock
 
 #[derive(Debug, Clone, Copy)]
 pub struct BlackboardShared {
-    pub reset_obstacles: bool,
+    /// reset just the local map, read by occupancy grid task
+    pub reset_local_map: bool,
+    /// reset both local and global, read by both tasks
+    pub reset_map: bool,
     pub enable_apriltags: bool,
 
     /// by default the params come from the config passed to the realsense occupancy grid task, but we can dynamically change them 
@@ -82,7 +85,7 @@ pub struct LunabotBlackboard {
     pub last_non_zero_lift_pack: Option<Instant>,
     pub last_non_zero_bucket_pack: Option<Instant>,
 
-    /// don't hold onto guards for too long
+    /// don't hold onto guards for too long (longer than 200 microseconds is bad)
     pub blackboard_shared: Arc<RwLock<BlackboardShared>>,
 }
 
@@ -116,7 +119,8 @@ impl Default for LunabotBlackboard {
             last_non_zero_lift_pack: None,
             last_non_zero_bucket_pack: None,
             blackboard_shared: Arc::new(RwLock::new(BlackboardShared {
-                reset_obstacles: false,
+                reset_local_map: false,
+                reset_map: false,
                 enable_apriltags: true,
                 sigma_range: None,
                 sigma_spatial: None
@@ -177,7 +181,7 @@ impl LunabotBlackboard {
             }
             common::FromLunabase::ResetObstacles => {
                 self.latest_local_map = None;
-                rwlock_write_unpoison(self.blackboard_shared.deref()).reset_obstacles = true;
+                rwlock_write_unpoison(self.blackboard_shared.deref()).reset_map = true;
             }
             common::FromLunabase::EnableApriltags => {
                 rwlock_write_unpoison(&self.blackboard_shared).enable_apriltags = true;
