@@ -23,10 +23,8 @@ pub mod implementation {
             )
         }
     
-        fn process<'i>(&mut self, _clock: &cu29::prelude::RobotClock, input: &Self::Input<'i>) -> cu29::CuResult<()> {
-            Ok(
-                ()
-            )
+        fn process<'i>(&mut self, _clock: &cu29::prelude::RobotClock, _input: &Self::Input<'i>) -> cu29::CuResult<()> {
+            Ok(())
         }
     }
 }

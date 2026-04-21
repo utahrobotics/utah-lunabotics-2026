@@ -10,5 +10,8 @@
         (6.98, 2.5, 0.1, 2.7),  
         // center pillar
         (3.44, 2.5, 0.20, 0.20),
+
+        // might as well just block off the part thats going to be rocks
+        // (3.44, 1.25, 0.20, 1.25)
     ],
 )
