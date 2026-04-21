@@ -22,6 +22,9 @@ static _PATHFINDING_GOAL: [f32; 2] = [5.843524, 1.4796992];
 
 #[derive(Clone, Debug)]
 pub enum LunabotAction {
+
+    /// Sets a status message that is sent over to the lunabase.
+    /// Dont be repeatedly calling this a million times per second because it will use bandwidth.
     SetBTStatusMsg(String),
 
     ResetAllObstacles,
