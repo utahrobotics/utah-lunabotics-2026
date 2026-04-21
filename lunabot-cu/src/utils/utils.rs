@@ -1,15 +1,19 @@
 #![allow(unused)]
 
-use std::{ops::{Add, Mul, Sub}, sync::{RwLock, RwLockReadGuard, RwLockWriteGuard}};
+use std::{
+    ops::{Add, Mul, Sub},
+    sync::{RwLock, RwLockReadGuard, RwLockWriteGuard},
+};
 
 use crossbeam::atomic::AtomicCell;
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use mio::{Events, Interest, Poll, Token};
 use nalgebra::{
-    Isometry3, Quaternion, RealField, SimdRealField, UnitQuaternion, UnitVector3, Vector2, Vector3
+    Isometry3, Quaternion, RealField, SimdRealField, UnitQuaternion, UnitVector3, Vector2, Vector3,
 };
 
 use common::Steering;
+use rerun::Transform3D;
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use udev::Event;
 use wgsl_pcl::pipelines::filters::GaussianOptions;
@@ -46,7 +50,7 @@ pub fn rwlock_read_unpoison<T>(lock: &RwLock<T>) -> RwLockReadGuard<'_, T> {
         Err(poison) => {
             lock.clear_poison();
             poison.into_inner()
-        },
+        }
     }
 }
 
@@ -56,7 +60,7 @@ pub fn rwlock_write_unpoison<T>(lock: &RwLock<T>) -> RwLockWriteGuard<'_, T> {
         Err(poison) => {
             lock.clear_poison();
             poison.into_inner()
-        },
+        }
     }
 }
 
@@ -137,8 +141,15 @@ where
     )
 }
 
+pub fn na_isometry_to_rerun(iso: &Isometry3<f64>) -> Transform3D {
+    rerun::Transform3D::from_translation_rotation(
+        iso.translation.vector.cast::<f32>().data.0[0],
+        rerun::Quaternion::from_xyzw(iso.rotation.as_vector().cast::<f32>().data.0[0]),
+    )
+}
+
 /// Transform velocity from sensor frame to base frame
-/// 
+///
 /// # Arguments
 /// * `sensor_linear_vel` - Linear velocity in sensor frame
 /// * `sensor_angular_vel` - Angular velocity in sensor frame  
@@ -153,15 +164,15 @@ pub fn transform_sensor_velocity_to_base(
 ) -> (Vector3<f64>, Vector3<f64>) {
     let sensor_to_base = base_to_sensor.inverse();
     let sensor_offset = base_to_sensor.translation.vector;
-    
+
     // Transform angular velocity to base frame first
     let base_angular_vel = sensor_to_base.rotation * sensor_angular_vel;
-    
+
     // v_sensor = v_base + ω_base × r
     // So: v_base = R * v_sensor - ω_base × r  (both ω and r now in base frame)
-    let base_linear_vel = sensor_to_base.rotation * sensor_linear_vel 
-        - base_angular_vel.cross(&sensor_offset);
-    
+    let base_linear_vel =
+        sensor_to_base.rotation * sensor_linear_vel - base_angular_vel.cross(&sensor_offset);
+
     (base_linear_vel, base_angular_vel)
 }
 

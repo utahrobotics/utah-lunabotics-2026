@@ -53,7 +53,8 @@ pub struct WarmupState {
     done: bool,
     current_pose_count: usize,
     warmup_pose_count: usize,
-    twist_correction: Option<UnitQuaternion<f64>>,
+    // the t265's pose readings have an arbitrary origin.
+    world_to_odom_offset: Option<Isometry3<f64>>, 
 }
 
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
@@ -63,7 +64,7 @@ impl Default for WarmupState {
             done: false,
             current_pose_count: 0,
             warmup_pose_count: 100,
-            twist_correction: Default::default(),
+            world_to_odom_offset: None,
         }
     }
 }
@@ -363,25 +364,22 @@ impl CuSrcTask for T265Subscriber {
                 ));
             };
 
-            let twist_correction = warmup_state.twist_correction.unwrap_or_else(|| {
-                use nalgebra::UnitVector3;
+            let isometry_from_base = kinematic_node.get_isometry_from_base();
+            let current_raw_pose: Isometry3<f64> = pose.cast();
 
-                use crate::utils::swing_twist_decomposition;
-
-                let robot_base = pose.cast() * kinematic_node.get_isometry_from_base().inverse();
-                let up: Vector3<f64> = Vector3::z();
-                let (_, twist) = swing_twist_decomposition(
-                    &robot_base.rotation,
-                    &UnitVector3::new_normalize(up),
-                );
-                warmup_state.twist_correction = Some(twist.inverse());
-                twist.inverse()
+            // Calculate or retrieve the static offset to align this sensor's odometry 
+            // origin to the robot's world origin established directly after warmup.
+            let world_to_odom = warmup_state.world_to_odom_offset.unwrap_or_else(|| {
+                let offset = isometry_from_base * current_raw_pose.inverse();
+                warmup_state.world_to_odom_offset = Some(offset);
+                offset
             });
 
-            let base_twist_corrected_pose =
-                twist_correction * pose.cast() * kinematic_node.get_isometry_from_base().inverse();
+            // World -> Odom -> Sensor -> Base
+            let base_pose_in_world = world_to_odom * current_raw_pose * isometry_from_base.inverse();
+
             let msg = T265Msg {
-                pose: EncodableIsometry::from_na(&base_twist_corrected_pose),
+                pose: EncodableIsometry::from_na(&base_pose_in_world),
                 pose_variance: self.pose_variance,
                 velocity_variance: self.velocity_variance,
                 angular_velocity_variance: self.angular_velocity_variance,
