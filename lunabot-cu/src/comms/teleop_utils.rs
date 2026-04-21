@@ -4,8 +4,7 @@ use std::{
 };
 
 use common::{
-    COMMAND_STREAM_ID, ERROR_STREAM_ID, POSE_STREAM_ID, FromLunabase, FromLunabot, LunabotStage,
-    ports::TELEOP,
+    BT_STATUS_STREAM_ID, COMMAND_STREAM_ID, ERROR_STREAM_ID, FromLunabase, FromLunabot, LunabotStage, POSE_STREAM_ID, ports::TELEOP
 };
 use crossbeam::atomic::AtomicCell;
 use quic::{
@@ -22,14 +21,16 @@ static LAST_SEEN_TIMESTAMP_COMMAND: OnceLock<AtomicCell<Instant>> = OnceLock::ne
 /// Spawns background tokio tasks that accept connections, receive messages,
 /// and send messages. New connections automatically replace old ones.
 ///
-/// Uses three multiplexed QUIC streams:
+/// Uses 4 multiplexed QUIC streams:
 /// - Command stream (ID 0): receives `FromLunabase` commands
 /// - Pose stream (ID 1): sends high-frequency pose data (`FromLunabot`)
 /// - Error stream (ID 2): sends low-frequency error messages (`FromLunabot::ErroredTasks`)
+/// - BT Status stream (ID 3): sends low-frequency status updates from the behavior tree (`FromLunabot::BTStatus`).
 pub struct LunabaseConnection {
     incoming: crossbeam_channel::Receiver<FromLunabase>,
     outgoing_pose_stream: tokio::sync::mpsc::UnboundedSender<FromLunabot>,
     outgoing_error_stream: tokio::sync::mpsc::UnboundedSender<FromLunabot>,
+    outgoing_bt_status_stream: tokio::sync::mpsc::UnboundedSender<FromLunabot>,
     shared_conn: Arc<Mutex<Option<ServerConnection<LunabotStage>>>>,
 }
 
@@ -49,6 +50,9 @@ impl LunabaseConnection {
         let (tx_outgoing_error_stream, rx_outgoing_error_stream) =
             tokio::sync::mpsc::unbounded_channel::<FromLunabot>();
 
+        let (tx_outgoing_bt_status_stream, rx_outgoing_bt_status_stream) =
+            tokio::sync::mpsc::unbounded_channel::<FromLunabot>();
+
         let shared_conn: Arc<Mutex<Option<ServerConnection<LunabotStage>>>> =
             Arc::new(Mutex::new(None));
         let shared_conn_clone = Arc::clone(&shared_conn);
@@ -60,12 +64,14 @@ impl LunabaseConnection {
             tx_incoming_command_stream,
             rx_outgoing_pose_stream,
             rx_outgoing_error_stream,
+            rx_outgoing_bt_status_stream,
         ));
 
         Ok(Self {
             incoming: rx_incoming_command_stream,
             outgoing_pose_stream: tx_outgoing_pose_stream,
             outgoing_error_stream: tx_outgoing_error_stream,
+            outgoing_bt_status_stream: tx_outgoing_bt_status_stream,
             shared_conn,
         })
     }
@@ -83,7 +89,12 @@ impl LunabaseConnection {
     ) -> Result<(), tokio::sync::mpsc::error::SendError<FromLunabot>> {
         match &msg {
             FromLunabot::ErroredTasks(_) => self.outgoing_error_stream.send(msg),
-            _ => self.outgoing_pose_stream.send(msg),
+            FromLunabot::RobotIsometry { ..} => self.outgoing_pose_stream.send(msg),
+            FromLunabot::BTStatus(_) => self.outgoing_bt_status_stream.send(msg),
+            FromLunabot::ArmAngles { ..} => {
+                // TODO: maybe just send these over the pose stream, rn they arent actually used
+                Ok(())
+            },
         }
     }
 
@@ -122,12 +133,14 @@ async fn accept_loop(
     tx_incoming: crossbeam_channel::Sender<FromLunabase>,
     rx_outgoing_pose: tokio::sync::mpsc::UnboundedReceiver<FromLunabot>,
     rx_outgoing_error: tokio::sync::mpsc::UnboundedReceiver<FromLunabot>,
+    rx_outgoing_bt_status: tokio::sync::mpsc::UnboundedReceiver<FromLunabot>,
 ) {
     // Wrap receivers in Arc<Mutex> so they survive across reconnections.
     // When a send task is aborted on reconnect, the mutex is released and the
     // new task can acquire it. Queued messages are preserved.
     let rx_pose = Arc::new(tokio::sync::Mutex::new(rx_outgoing_pose));
     let rx_error = Arc::new(tokio::sync::Mutex::new(rx_outgoing_error));
+    let rx_bt_status = Arc::new(tokio::sync::Mutex::new(rx_outgoing_bt_status));
 
     loop {
         let connection = match server
@@ -142,7 +155,7 @@ async fn accept_loop(
             }
         };
 
-        // Accept all 3 streams sequentially.
+        // Accept all 4 streams sequentially.
         // The quic crate buffers non-matching stream IDs, so
         // the client can open them in any order without deadlock.
         let command_stream = match connection
@@ -178,6 +191,17 @@ async fn accept_loop(
             }
         };
 
+        let bt_status_stream = match connection
+            .accept_bi::<FromLunabot, FromLunabase, { BT_STATUS_STREAM_ID }>()
+            .await
+        {
+            Ok(s) => s,
+            Err(e) => {
+                eprintln!("[LunabaseConnection] Failed to accept BT status stream: {e}");
+                continue;
+            }
+        };
+
         let conn_for_watch = connection.quinn().clone();
         *shared_conn.lock().unwrap() = Some(connection);
 
@@ -190,9 +214,11 @@ async fn accept_loop(
             tokio::spawn(send_loop(pose_stream, Arc::clone(&rx_pose)));
         let send_error_handle =
             tokio::spawn(send_loop(error_stream, Arc::clone(&rx_error)));
+        let send_bt_status_handle = tokio::spawn(send_loop(bt_status_stream, Arc::clone(&rx_bt_status)));
         let recv_abort = recv_handle.abort_handle();
         let send_pose_abort = send_pose_handle.abort_handle();
         let send_error_abort = send_error_handle.abort_handle();
+        let send_bt_status_abort = send_bt_status_handle.abort_handle();
 
         // watchdog
         let conn_closed = conn_for_watch.closed();
@@ -209,11 +235,15 @@ async fn accept_loop(
             _ = conn_closed => {
                 eprintln!("[LunabaseConnection] QUIC connection closed");
             }
+            _ = send_bt_status_handle => {
+                eprintln!("[LunabaseConnection] BT status send task died");
+            }
         }
 
         recv_abort.abort();
         send_pose_abort.abort();
         send_error_abort.abort();
+        send_bt_status_abort.abort();
 
         conn_for_watch.close(2u32.into(), b"stream died");
         *shared_conn.lock().unwrap() = None;

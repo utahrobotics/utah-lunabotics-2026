@@ -17,9 +17,8 @@ extends Control
 @onready var sigma_spatial_input: SpinBox = $VBoxContainer/MainContent/HBoxContainer/RightColumn/SpeedControl/MarginContainer/VBox/SigmaSpatialInput
 @onready var sigma_range_input: SpinBox = $VBoxContainer/MainContent/HBoxContainer/RightColumn/SpeedControl/MarginContainer/VBox/SigmaRangeInput
 
-
 @onready var location_label: Label = $VBoxContainer/TopBar/MarginContainer/TopPanel/StatusGroup/location_label
-@onready var orientation_label: Label = $VBoxContainer/MainContent/HBoxContainer/CenterColumn/OrientationPanel/MarginContainer/OrientationLabel
+@onready var bt_status_label: Label = $VBoxContainer/MainContent/HBoxContainer/CenterColumn/StatusPanel/MarginContainer/BTStatusLabel
 @onready var PitchAndRollGUI: Control = $VBoxContainer/MainContent/HBoxContainer/CenterColumn/UIAttitude
 var command_recorder: CommandRecorder
 
@@ -96,11 +95,6 @@ func _process(delta: float) -> void:
 	#location  
 	var location = connection.get_location()
 	location_label.text = "location: [%.2f, %.2f, %.2f]" % [location[0], location[1], location[2]]
-	
-	#orientation label 
-	var orientation = connection.get_orientation()
-	orientation_label.text = "orientation: [%.2f, %.2f, %.2f, %.2f]" % [orientation[0], orientation[1], orientation[2], orientation[3]
-]
  
 	# Update errored tasks
 	var errored_tasks: Dictionary = GlobalLunabaseConnection.get_errored_tasks()
@@ -112,6 +106,15 @@ func _process(delta: float) -> void:
 			var error_msg: String = errored_tasks[task_name]
 			error_text += task_name + ":\n  " + error_msg + "\n\n"
 		errored_tasks_label.text = error_text.strip_edges()
+		
+	var bt_status: String = GlobalLunabaseConnection.get_bt_status()
+	
+	if bt_status.is_empty():
+		bt_status_label.text = "BT STATUS: UNKNOWN"
+	else:
+		bt_status_label.text = "BT STATUS: " + bt_status
+
+
 		
 	
 func _on_stage_changed(stage: int) -> void:

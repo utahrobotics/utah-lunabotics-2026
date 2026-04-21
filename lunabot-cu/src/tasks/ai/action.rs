@@ -17,9 +17,13 @@ use crate::{
         },
     }, utils::{rwlock_read_unpoison, rwlock_write_unpoison},
 };
-static PATHFINDING_GOAL: [f32; 2] = [5.843524, 1.4796992];
-#[derive(Clone, Debug, Copy)]
+
+static _PATHFINDING_GOAL: [f32; 2] = [5.843524, 1.4796992];
+
+#[derive(Clone, Debug)]
 pub enum LunabotAction {
+    SetBTStatusMsg(String),
+
     ResetAllObstacles,
     ResetLocalObstacles,
 
@@ -33,10 +37,13 @@ pub enum LunabotAction {
 
     Yield,
     SetSteering(Steering),
+
     /// sets steering to last known value rx'd from lunabase
     SetLastSteering,
+
     /// sets lift to last known value rx'd from lunabase
     SetLastLift,
+
     /// sets bucket to last known value rx'd from lunabase
     SetLastBucket,
 
@@ -51,10 +58,13 @@ pub enum LunabotAction {
     /// if the robot is in an occupied cell, we should first pathfind to the nearest free cell (if a free cell is within some range)
     IsInOccupiedCell,
     IsInFreeCell,
+
     /// Success if the robot has reached destination, Running if the robot is currently navigating, Failiure if the robot got stuck
     CheckNavigation,
+
     /// if the robot is in a cell of unknown status, we should first pathfind to the nearest free cell (if a free cell is within some range)
     IsInUnknownCell,
+
     /// calculates path from the robots position to x,y
     CalculatePath(NavigationGoal),
     FollowPath,
@@ -448,6 +458,10 @@ impl LunabotAction {
                 } else {
                     Running
                 }
+            },
+            LunabotAction::SetBTStatusMsg(msg) => {
+                blackboard.outgoing_bt_status_msg = Some(msg.to_owned());
+                Success
             },
         };
         (status, 0.0)

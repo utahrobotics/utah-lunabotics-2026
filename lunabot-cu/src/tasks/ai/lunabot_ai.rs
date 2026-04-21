@@ -10,6 +10,7 @@ use cu29::{
 use embedded_common::ActuatorCommand;
 
 use crate::pathfinding::OccupancyGrid;
+use crate::rerun_viz::RECORDER;
 use crate::tasks::ai::action::LunabotAction;
 use crate::tasks::ai::behaviors::autonomy::navigate::Arena;
 use crate::tasks::ai::behaviors::teleop::teleop_behavior;
@@ -28,10 +29,11 @@ impl CuTask for LunabotAi {
     type Input<'m> = input_msg!('m, FromLunabase, OccupancyGrid);
 
     // (Steering, ActuatorCommand, calculated path)
-    type Output<'m> = (
-        CuMsg<Steering>,
-        CuMsg<ActuatorCommand>,
-        CuMsg<Vec<[f32; 2]>>,
+    type Output<'m> = output_msg!(
+        Steering,
+        ActuatorCommand,
+        Vec<[f32; 2]>,
+        String // outgoing status msg
     );
     type Resources<'r> = ();
 
@@ -124,6 +126,11 @@ impl CuTask for LunabotAi {
                     .map(|node| [node.x, node.y])
                     .collect(),
             );
+        }
+        if let Some(outgoing_status) = self.bt.blackboard_mut().outgoing_bt_status_msg.take() {
+            output.3.set_payload(
+                outgoing_status
+            )
         }
         Ok(())
     }

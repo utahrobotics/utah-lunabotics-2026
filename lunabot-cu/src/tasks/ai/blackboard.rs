@@ -57,6 +57,9 @@ pub struct LunabotBlackboard {
     /// but for autonomy we can't know that
     pub outgoing_steering_msg: Option<Steering>,
 
+    /// Status msg describing what branch of the bt we are in.
+    pub outgoing_bt_status_msg: Option<String>,
+
     pub current_mission: LunabotStage,
 
     pub yielded: bool,
@@ -118,6 +121,7 @@ impl Default for LunabotBlackboard {
             last_non_zero_steering_pack: None,
             last_non_zero_lift_pack: None,
             last_non_zero_bucket_pack: None,
+            outgoing_bt_status_msg: None,
             blackboard_shared: Arc::new(RwLock::new(BlackboardShared {
                 reset_local_map: false,
                 reset_map: false,

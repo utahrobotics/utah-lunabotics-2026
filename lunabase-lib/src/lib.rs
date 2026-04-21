@@ -1,11 +1,11 @@
 use std::collections::HashMap;
 use std::net::{Ipv4Addr, SocketAddr, SocketAddrV4};
+use std::ops::Deref;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use common::{
-    COMMAND_STREAM_ID, ERROR_STREAM_ID, FromLunabase, FromLunabot, LunabotStage, POSE_STREAM_ID,
-    Steering,
+    BT_STATUS_STREAM_ID, COMMAND_STREAM_ID, ERROR_STREAM_ID, FromLunabase, FromLunabot, LunabotStage, POSE_STREAM_ID, Steering
 };
 use godot::prelude::*;
 use quic::KeepAliveState;
@@ -34,6 +34,7 @@ struct LunabaseConnection {
     current_stage: LunabotStage,
 
     errored_tasks: Arc<Mutex<HashMap<String, String>>>,
+    bt_status_msg: Arc<Mutex<String>>,
     current_weight: f64,
     global_position: Arc<Mutex<[f32; 3]>>,
     orientation: Arc<Mutex<[f32; 4]>>,
@@ -59,6 +60,7 @@ impl INode for LunabaseConnection {
             global_position: Arc::new(Mutex::new([0.0; 3])),
             orientation: Arc::new(Mutex::new([0.0; 4])),
             first_connect: true,
+            bt_status_msg: Arc::new(Mutex::new(String::new())),
             apriltags_enabled: true,
         }
     }
@@ -150,6 +152,7 @@ impl LunabaseConnection {
         let ka_state = self.ka_state.clone();
         let outgoing_shared = self.outgoing.clone();
         let errored_tasks = self.errored_tasks.clone();
+        let bt_status_msg = self.bt_status_msg.clone();
         let global_position = self.global_position.clone();
         let orientation = self.orientation.clone();
 
@@ -172,7 +175,7 @@ impl LunabaseConnection {
                 }
             };
 
-            // Open 3 multiplexed streams
+            // Open 4 multiplexed streams
             let command_stream = match client
                 .open_bi::<FromLunabase, FromLunabot, { COMMAND_STREAM_ID }>()
                 .await
@@ -202,6 +205,17 @@ impl LunabaseConnection {
                 Ok(s) => s,
                 Err(e) => {
                     eprintln!("[LunabaseConnection] open error stream failed: {e}");
+                    return;
+                }
+            };
+
+            let bt_status_stream = match client
+                .open_bi::<FromLunabase, FromLunabot, { BT_STATUS_STREAM_ID }>()
+                .await
+            {
+                Ok(s) => s,
+                Err(e) => {
+                    eprintln!("[LunabaseConnection] open BT status stream failed: {e}");
                     return;
                 }
             };
@@ -253,6 +267,24 @@ impl LunabaseConnection {
                 }
             });
 
+            // Recv Behavior tree status
+            let bt_status_handle = tokio::spawn(async move {
+                loop {
+                    match bt_status_stream.recv().await {
+                        Ok(FromLunabot::BTStatus(status_msg)) => {
+                            if let Ok(mut guard) = bt_status_msg.lock() {
+                                *guard = status_msg;
+                            }
+                        }
+                        Ok(_) => {}
+                        Err(e) => {
+                            eprintln!("[LunabaseConnection] Error recv error: {e}");
+                            break;
+                        }
+                    }
+                }
+            });
+
             // Send commands on command stream
             let mut rx = rx_outgoing;
             let cmd_handle = tokio::spawn(async move {
@@ -270,6 +302,7 @@ impl LunabaseConnection {
             let pose_abort = pose_handle.abort_handle();
             let error_abort = error_handle.abort_handle();
             let cmd_abort = cmd_handle.abort_handle();
+            let bt_status_abort = bt_status_handle.abort_handle();
 
             // Watchdog thing: tear down the entire connection the moment vital
             // task or the QUIC connection itself dies. Otherwise keep-alive
@@ -286,6 +319,9 @@ impl LunabaseConnection {
                 _ = cmd_handle => {
                     eprintln!("[LunabaseConnection] Command task ended");
                 }
+                _ = bt_status_handle => {
+                    eprintln!("[LunabaseConnection] BT Status task ended");
+                }
                 _ = conn_closed => {
                     eprintln!("[LunabaseConnection] QUIC connection closed");
                 }
@@ -294,6 +330,7 @@ impl LunabaseConnection {
             pose_abort.abort();
             error_abort.abort();
             cmd_abort.abort();
+            bt_status_abort.abort();
 
             eprintln!("[LunabaseConnection] Tearing down connection");
             client.close();
@@ -430,6 +467,15 @@ impl LunabaseConnection {
             }
         }
         dict
+    }
+
+    #[func]
+    fn get_bt_status(&self) -> String {
+        if let Ok(status) = self.bt_status_msg.lock() {
+            return status.deref().clone();
+        } else {
+            "".to_string()
+        }
     }
 
     #[func]

@@ -14,3 +14,5 @@ pub static LUNABOT_STAGE: Lazy<Arc<AtomicCell<LunabotStage>>> =
 pub const COMMAND_STREAM_ID: u8 = 0;
 pub const POSE_STREAM_ID: u8 = 1;
 pub const ERROR_STREAM_ID: u8 = 2;
+pub const BT_STATUS_STREAM_ID: u8 = 3;
+

@@ -51,8 +51,8 @@
             id:"realsense_subscriber",
             type: "crate::tasks::sources::RealsenseSubscriber",
             config: {
-                // "serial_num": "044422250424",
-                "serial_num": "341222301443",
+                "serial_num": "044422250424",
+                // "serial_num": "341222301443",
                 // dust protected cam
                 // "serial_num": "341222301328",
                 // "serial_num": "311322302990",
@@ -337,12 +337,13 @@
         (src:"l2_pointcloud",                 dst:"l2_kiss_icp",             msg:"iceoryx_types::IceoryxPointCloud"),
         (src:"l2_kiss_icp",                   dst:"localizer",               msg:"crate::tasks::IcpMeasurement"),
         (src:"lunabase_bridge/from_lunabase_rx", dst:"new_ai",                  msg:"common::FromLunabase"),
-        (src:"localizer",                    dst:"lunabase_bridge/to_lunabase", msg:"common::FromLunabot"),
+        (src:"localizer",                    dst:"lunabase_bridge/to_lunabase_pose", msg:"common::FromLunabot"),
         // copper doesn't support multiple outputs on a single task so for now we just put them in a tuple and ignore one side
         (src:"realsense_subscriber",          dst:"occupancy_grid_pipeline", msg:"crate::payloads::depth_frame::CuDepthFrame<Vec<u16>>"),
         (src:"occupancy_grid_pipeline",       dst:"new_ai",                  msg:"crate::pathfinding::OccupancyGrid"),
-        (src:"new_ai",                        dst:"motor_ctrl",              msg:"common::Steering"),
-        (src:"new_ai",                        dst:"v3_pico",                 msg:"embedded_common::ActuatorCommand"),
+        (src:"new_ai",                        dst:"motor_ctrl",              msg:"common::Steering", src_port: Some(0)),
+        (src:"new_ai",                        dst:"v3_pico",                 msg:"embedded_common::ActuatorCommand", src_port: Some(1)),
+        (src:"new_ai",                        dst:"lunabase_bridge/to_lunabase_bt_status", msg: "String", src_port: Some(3)),
         (src:"v3_pico",                       dst:"localizer",               msg:"embedded_common::FromPico"),
         (src:"detection_handler",             dst:"localizer",               msg:"Vec<crate::tasks::AprilTagMeasurement>"),
         (src:"t265_subscriber",               dst:"localizer",               msg:"crate::tasks::sources::T265Msg", src_port: Some(0)),
@@ -358,7 +359,7 @@
         (src:"t265_subscriber", dst:"t265_right_gstreamer", msg:"cu_sensor_payloads::CuImage<Vec<u8>>", src_port: Some(2)),
 
         (src:"occupancy_grid_pipeline",       dst: "obstacle_gstreamer",     msg:"crate::pathfinding::OccupancyGrid"),
-        (src:"new_ai",                        dst: "obstacle_gstreamer",     msg:"Vec<[f32; 2]>"),
+        (src:"new_ai",                        dst: "obstacle_gstreamer",     msg:"Vec<[f32; 2]>", src_port: Some(2)),
     ],
 
     // comms to lunabase software
@@ -373,7 +374,8 @@
             run_in_sim: true,
             channels: [
                 Rx ( id: "from_lunabase_rx" ),
-                Tx ( id: "to_lunabase" ),
+                Tx ( id: "to_lunabase_pose" ),
+                Tx ( id: "to_lunabase_bt_status" ),
             ],
         ),
     ],

@@ -29,7 +29,8 @@ tx_channels! {
 
     pub struct ToLunabaseChannel : ToLunabaseRxId {
         // id, type, route
-        to_lunabase => FromLunabot = "lunabase_bridge/to_lunabase"
+        to_lunabase_pose => FromLunabot = "lunabase_bridge/to_lunabase_pose",
+        to_lunabase_bt_status => String = "lunabase_bridge/to_lunabase_bt_status"
     }
 }
 
@@ -101,7 +102,7 @@ impl CuBridge for Lunabase {
     fn send<'a, Payload>(
         &mut self,
         _clock: &cu29::prelude::RobotClock,
-        _channel: &'static cu29::prelude::BridgeChannel<
+        channel: &'static cu29::prelude::BridgeChannel<
             <Self::Tx as cu29::prelude::BridgeChannelSet>::Id,
             Payload,
         >,
@@ -154,48 +155,13 @@ impl CuBridge for Lunabase {
         if let Some(payload) = msg.payload() {
             if let Some(lunabot_msg) = (payload as &dyn std::any::Any).downcast_ref::<FromLunabot>()
             {
-                // you will probably want to rate limit how often the iso gets sent over for bandwidth reasons
-
-                use core::f32;
                 if let Err(e) = self.connection.try_send(lunabot_msg.clone()) {
                     eprintln!("Failed to send message to Lunabase: {}", e);
                 }
-                // send FromLunabot packets here :)
-                let isometries = ROBOT_STATE
-                    .get()
-                    .unwrap()
-                    .kinematic_root
-                    .get_global_isometry();
-                let position = isometries.translation.vector.cast::<f32>().data.0[0];
-
-                let orientation = isometries.rotation.as_vector().cast::<f32>().data.0[0];
-
-                if let Err(e) = self.connection.try_send(FromLunabot::RobotIsometry {
-                    origin: (position),
-                    quat: (orientation),
-                }) {
-                    eprintln!("cannot send isometries to lunabase: {}", e);
+            } else if let Some(status_msg) = (payload as &dyn std::any::Any).downcast_ref::<String>() {
+                if let Err(e) = self.connection.try_send(FromLunabot::BTStatus(status_msg.to_owned())) {
+                    eprintln!("Failed to send message to Lunabase: {}", e);
                 }
-                // let velo = ROBOT_STATE.get().unwrap().get_velocity();
-
-                // let accel = ROBOT_STATE.get().unwrap().get_acceleration();
-
-                // let velof32 = [
-                //     velo[0] as f32,
-                //     velo[1] as f32,
-                //     velo[2] as f32
-                // ];
-                // let accelf32 = [
-                //     accel[0] as f32,
-                //     accel[1] as f32,
-                //     accel[2] as f32,
-                // ];
-                // if let Err(e) = self.connection.try_send(FromLunabot::RobotMotion {
-                //     velocity: (velof32),
-                //     acceleration: (accelf32)
-                //  }){
-                //     eprintln!("cannot send motion to lunabase{}" , e);
-                //  }
             }
         }
 

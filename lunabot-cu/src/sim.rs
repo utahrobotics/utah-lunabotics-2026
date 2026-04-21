@@ -68,7 +68,8 @@ fn default_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::NewAi(_) => SimOverride::ExecuteByRuntime,
         default::SimStep::Localizer(_) => SimOverride::ExecuteByRuntime,
         default::SimStep::LunabaseBridgeRxFromLunabaseRx { .. } => SimOverride::ExecuteByRuntime,
-        default::SimStep::LunabaseBridgeTxToLunabase { .. } => SimOverride::ExecuteByRuntime,
+        default::SimStep::LunabaseBridgeTxToLunabasePose { .. } => SimOverride::ExecuteByRuntime,
+        default::SimStep::LunabaseBridgeTxToLunabaseBtStatus { .. } => SimOverride::ExecuteByRuntime,
         default::SimStep::LunabaseBridgeBridge { .. } => SimOverride::ExecuteByRuntime,
         default::SimStep::DetectorCamT265Right(..) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamT265Left(..) => SimOverride::ExecutedBySim,
@@ -229,6 +230,7 @@ fn sim_callback<'a>(
         default::SimStep::MotorCtrl(CuTaskCallbackState::Process(input, _)) => {
             if let Some(steering) = input.payload() {
                 let (left, right) = steering.get_left_and_right();
+                println!("[MOTOR_CTRL] l: {left} r: {right}");
                 let speed_mult = steering.get_weight();
                 // FIXME: probably shouldn't just put a magic number
                 let left = (left * speed_mult) * 0.022;
@@ -366,7 +368,8 @@ fn sim_callback<'a>(
         default::SimStep::NewAi(_) => SimOverride::ExecuteByRuntime,
         default::SimStep::Localizer(..) => SimOverride::ExecuteByRuntime,
         default::SimStep::LunabaseBridgeRxFromLunabaseRx { .. } => SimOverride::ExecuteByRuntime,
-        default::SimStep::LunabaseBridgeTxToLunabase { .. } => SimOverride::ExecuteByRuntime,
+        default::SimStep::LunabaseBridgeTxToLunabasePose { .. } => SimOverride::ExecuteByRuntime,
+        default::SimStep::LunabaseBridgeTxToLunabaseBtStatus { .. } => SimOverride::ExecuteByRuntime,
         default::SimStep::LunabaseBridgeBridge { .. } => SimOverride::ExecuteByRuntime,
         default::SimStep::CamD456Rgb(_) | default::SimStep::CamD456RgbNull(_) => {
             SimOverride::ExecutedBySim

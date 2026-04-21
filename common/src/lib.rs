@@ -298,6 +298,9 @@ pub enum FromLunabot {
     // },
     /// Error messages from monitored tasks
     ErroredTasks(HashMap<String, String>),
+
+    /// Status message from the behavior tree, usually something to report what branch of the bt we are in
+    BTStatus(String),
 }
 
 
