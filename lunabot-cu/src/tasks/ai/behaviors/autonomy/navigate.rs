@@ -56,7 +56,7 @@ pub fn navigate_behavior(goal: NavigationGoal) -> Behavior<LunabotAction> {
             Action(LunabotAction::FollowPath),
             While(
                 Box::new(WaitForever),
-                vec![Wait(5.0), calculate_path_behavior(goal)],
+                vec![Wait(1.0), calculate_path_behavior(goal)],
             ),
         ])
     ])
@@ -64,45 +64,34 @@ pub fn navigate_behavior(goal: NavigationGoal) -> Behavior<LunabotAction> {
 
 /// calculates a path to goal, if it fails once, the local obstacles are reset.
 /// if the path calc fails once again after local obstacles are reset, then 
+/// global obstacles are reset also
 fn calculate_path_behavior(goal: NavigationGoal) -> Behavior<LunabotAction> {
     Select(vec![
         Action(LunabotAction::CalculatePath(goal)),
         Invert(Box::new(Action(LunabotAction::ResetLocalObstacles))),
         Invert(Box::new(Action(LunabotAction::Yield))),
         // this behavior just waits until a requested obstcle reset is actually fulfilled
-        // obstacle reset requested and yeild will always return Success which is why we 
+        // "obstacle reset requested" and "yield" will always return Success which is why we 
         // need the invert to force the outer select to continue on
-        Invert(
-            Box::new(
-                While(
-                    Box::new(Sequence(vec![
-                        Action(LunabotAction::ObstacleResetRequested),
-                        Action(LunabotAction::LatestLocalMapReady),
-                    ])),
-                    vec![
-                        Action(LunabotAction::Yield)
-                    ]
-                )
-            )
-        ),
+        Invert(Box::new(wait_for_new_frame())),
         Action(LunabotAction::CalculatePath(goal)),
         Invert(Box::new(Action(LunabotAction::ResetAllObstacles))),
         Invert(Box::new(Action(LunabotAction::Yield))),
-        Invert(
-            Box::new(
-                While(
-                    Box::new(Sequence(vec![
-                        Action(LunabotAction::ObstacleResetRequested),
-                        Action(LunabotAction::LatestLocalMapReady),
-                    ])),
-                    vec![
-                        Action(LunabotAction::Yield)
-                    ]
-                )
-            )
-        ),
+        Invert(Box::new(wait_for_new_frame())),
         Action(LunabotAction::CalculatePath(goal)),
     ])
+}
+
+fn wait_for_new_frame() -> Behavior<LunabotAction> {
+    While(
+        Box::new(Sequence(vec![
+            Action(LunabotAction::ObstacleResetRequested),
+            Action(LunabotAction::LatestLocalMapReady),
+        ])),
+        vec![
+            Action(LunabotAction::Yield)
+        ]
+    )
 }
 
 #[allow(unused)]
