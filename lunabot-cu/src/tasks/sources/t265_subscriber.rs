@@ -20,7 +20,7 @@ use std::ops::DerefMut;
 use t265_rs::{Pose, T265Manager, VideoFrame};
 
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
-use crate::{ROBOT_STATE, kalman_filtering::quaternion_error};
+use crate::ROBOT_STATE;
 
 #[cfg(all(any(feature = "resim", feature = "sim")))]
 pub struct T265Subscriber {}
@@ -45,8 +45,6 @@ pub struct T265Subscriber {
     pub left_serial: String,
     pub right_serial: String,
     pub rear_serial: String,
-
-    synchronizer: Synchronizer,
 }
 
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
@@ -78,6 +76,8 @@ pub struct T265Msg {
     pub pose_variance: f64,
     pub velocity_variance: f64,
     pub angular_velocity_variance: f64,
+    /// always set to the serial number
+    pub node_name: String,
     pub imu_msg: T265IMUMsg,
 }
 
@@ -107,6 +107,7 @@ impl Default for T265Msg {
             velocity_variance: 1.0,
             pose_variance: 0.5,
             angular_velocity_variance: 1.0,
+            node_name: "t265".to_string(),
             imu_msg: Default::default(),
         }
     }
@@ -211,7 +212,6 @@ impl CuSrcTask for T265Subscriber {
             left_serial,
             right_serial,
             rear_serial,
-            synchronizer: Synchronizer::new()
         })
     }
 
@@ -383,6 +383,7 @@ impl CuSrcTask for T265Subscriber {
                 pose_variance: self.pose_variance,
                 velocity_variance: self.velocity_variance,
                 angular_velocity_variance: self.angular_velocity_variance,
+                node_name: device_id,
                 imu_msg: T265IMUMsg {
                     accel: acceleration,
                     angular_accel: angular_acceleration,
@@ -390,10 +391,7 @@ impl CuSrcTask for T265Subscriber {
                     angular_velocity,
                 },
             };
-            self.synchronizer.push_pose(device_id, msg);
-            if let Some(latest) = self.synchronizer.get_fused(7) {
-                new_msg.0.set_payload(latest);
-            }
+            new_msg.0.set_payload(msg);
             self.last_seen = clock.now().as_millis();
         }
 
@@ -413,91 +411,6 @@ impl CuSrcTask for T265Subscriber {
         Ok(())
     }
 }
-
-#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
-pub struct Synchronizer {
-    pub buffer: HashMap<String, (T265Msg, Instant)>,
-}
-
-#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
-impl Synchronizer {
-    pub fn new() -> Self {
-        Self {
-            buffer: HashMap::new(),
-        }
-    }
-
-    pub fn push_pose(&mut self, key: String, pose: T265Msg) {
-        self.buffer.insert(key, (pose, Instant::now()));
-    }
-
-    pub fn get_fused(&mut self, max_age_ms: u64) -> Option<T265Msg> {
-        self.buffer
-            .retain(|_, (_, t)| Instant::now().as_nanos() - t.as_nanos() < (max_age_ms * 1000000));
-
-        let fresh: Vec<&T265Msg> = self.buffer.values().map(|(msg, _)| msg).collect();
-
-        if fresh.is_empty() {
-            return None;
-        }
-        if fresh.len() == 1 {
-            return Some(fresh[0].clone());
-        }
-
-        let weights: Vec<f64> = fresh.iter().map(|m| 1.0 / m.pose_variance).collect();
-        let weight_sum: f64 = weights.iter().sum();
-
-        let reference_quat = fresh
-            .iter()
-            .zip(&weights)
-            .max_by(|(_, wa), (_, wb)| wa.partial_cmp(wb).unwrap())
-            .and_then(|(msg, _)| msg.pose.to_na())
-            .map(|iso| iso.rotation)?;
-
-        let mut fused_translation = Vector3::zeros();
-        let mut fused_rotation_error = Vector3::zeros();
-        let mut fused_imu = T265IMUMsg::default();
-
-        for (msg, w) in fresh.iter().zip(&weights) {
-            let normalized_w = w / weight_sum;
-            let Some(iso) = msg.pose.to_na() else { continue };
-
-            fused_translation += iso.translation.vector * normalized_w;
-
-            let err = quaternion_error(&reference_quat, &iso.rotation);
-            fused_rotation_error += err * normalized_w;
-
-            let imu = &msg.imu_msg;
-            for i in 0..3 {
-                fused_imu.accel[i] += (imu.accel[i] as f64 * normalized_w) as f32;
-                fused_imu.velocity[i] += (imu.velocity[i] as f64 * normalized_w) as f32;
-                fused_imu.angular_velocity[i] +=
-                    (imu.angular_velocity[i] as f64 * normalized_w) as f32;
-                fused_imu.angular_accel[i] +=
-                    (imu.angular_accel[i] as f64 * normalized_w) as f32;
-            }
-        }
-
-        let fused_rotation =
-            UnitQuaternion::from_scaled_axis(fused_rotation_error) * reference_quat;
-        let fused_pose = Isometry3::from_parts(fused_translation.into(), fused_rotation);
-
-        let fused_variance = 1.0 / weight_sum;
-
-        Some(T265Msg {
-            pose: EncodableIsometry::from_na(&fused_pose),
-            pose_variance: fused_variance,
-            velocity_variance: 1.0 / fresh.iter().zip(&weights)
-                .map(|(m, w)| w / m.velocity_variance)
-                .sum::<f64>(),
-            angular_velocity_variance: 1.0 / fresh.iter().zip(&weights)
-                .map(|(m, w)| w / m.angular_velocity_variance)
-                .sum::<f64>(),
-            imu_msg: fused_imu,
-        })
-    }
-}
-
 
 #[cfg(any(feature = "resim", feature = "sim"))]
 impl CuSrcTask for T265Subscriber {

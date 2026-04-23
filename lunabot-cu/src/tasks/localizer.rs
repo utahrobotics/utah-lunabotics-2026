@@ -404,6 +404,8 @@ impl CuTask for Localizer {
         // Process T265 -> local filter (direct pose measurement, transformed to base frame)
         if let Some(t265_msg) = input.4.payload() {
             if let Some(robot_base_seen_by_t265) = t265_msg.pose.to_na() {
+                let node_name = &t265_msg.node_name;
+
                 let pose_vec = create_pose_measurement_vec(
                     self.local_filter.reference_quaternion(),
                     &robot_base_seen_by_t265,
@@ -422,7 +424,8 @@ impl CuTask for Localizer {
 
                 if let Err(e) = self.local_filter.update(&self.pose_measurement_local) {
                     eprintln!(
-                        "Local filter update with T265 failed: {:?}", e
+                        "Local filter update with T265 ({}) failed: {:?}",
+                        node_name, e
                     );
                 }
             }
