@@ -186,8 +186,12 @@ fn run_one_copperlist(
                 let outputs = msgs.get_t_265_subscriber_outputs().clone();
                 output.0 = outputs.0;
                 output.1 = outputs.1;
+                output.2 = outputs.2;
+                output.3 = outputs.3;
                 output.0.tov = robot_clock.now().into();
                 output.1.tov = robot_clock.now().into();
+                output.2.tov = robot_clock.now().into();
+                output.3.tov = robot_clock.now().into();
 
                 SimOverride::ExecutedBySim
             }
@@ -200,7 +204,9 @@ fn run_one_copperlist(
                 SimOverride::ExecutedBySim
             }
             default::SimStep::LunabaseBridgeBridge(..) => SimOverride::ExecutedBySim,
-            default::SimStep::LunabaseBridgeTxToLunabase { .. } => SimOverride::ExecutedBySim,
+            default::SimStep::LunabaseBridgeTxToLunabasePose { .. } => SimOverride::ExecutedBySim,
+            default::SimStep::LunabaseBridgeTxToLunabaseBtStatus { .. } => SimOverride::ExecutedBySim,
+
             default::SimStep::NewAi(..) => SimOverride::ExecuteByRuntime,
             default::SimStep::DetectionHandler(..) => SimOverride::ExecuteByRuntime,
             default::SimStep::L2KissIcp(..) => SimOverride::ExecuteByRuntime,
