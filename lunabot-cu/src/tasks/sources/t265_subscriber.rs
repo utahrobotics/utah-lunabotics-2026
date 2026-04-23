@@ -353,6 +353,9 @@ impl CuSrcTask for T265Subscriber {
                 q_robot,
             );
 
+            // transforming accel vectors to  z up y left x forward
+            //see misc/t265_translations/t265_transformations.py
+
             use nalgebra::Matrix3;
             let x_angle = std::f64::consts::PI;
             let z_angle = std::f64::consts::FRAC_PI_2;
@@ -378,23 +381,44 @@ impl CuSrcTask for T265Subscriber {
                 0.0,
                 0.0,
                 0.0,
-                0.0,
+                1.0,
             );
 
             let accel_rotation_matrix = accel_rotation_matrix_z * accel_rotation_matrix_x;
 
             let accel_vector: Vector3<f64> = Vector3::from_row_slice(&acceleration);
-            
-            let _check: Vector3<f64> = acceleration;
+            let angular_accel_vector: Vector3<f64> = Vector3::from_row_slice(&angular_acceleration);
+            let velo_vector: Vector3<f64> = Vector3::from_row_slice(&velocity);
+            let angular_velo_vector: Vector3<f64> = Vector3::from_row_slice(&angular_velocity);
 
-            let transformed_accel =  accel_rotation_matrix * accel_vector;
+            let transformed_accel = accel_rotation_matrix * accel_vector;
+            let transformed_ang_accel = accel_rotation_matrix * angular_accel_vector;
+            let transformed_velo = accel_rotation_matrix * velo_vector;
+            let transformed_ang_velo = accel_rotation_matrix * angular_velo_vector;
+
             let accel: [f32; 3] = [
-             transformed_accel.x as f32,
-             transformed_accel.y as f32,
-             transformed_accel.z as f32,
+                transformed_accel.x as f32,
+                transformed_accel.y as f32,
+                transformed_accel.z as f32,
             ];
 
+            let angular_acceleration: [f32; 3] = [
+                transformed_ang_accel.x as f32,
+                transformed_ang_accel.y as f32,
+                transformed_ang_accel.z as f32,
+            ];
 
+            let velocity: [f32; 3] = [
+                transformed_velo.x as f32,
+                transformed_velo.y as f32,
+                transformed_velo.z as f32,
+            ];
+
+            let angular_velocity: [f32; 3] = [
+                transformed_ang_velo.x as f32,
+                transformed_ang_velo.y as f32,
+                transformed_ang_velo.z as f32,
+            ];
 
             let Some(kinematic_node) = ROBOT_STATE
                 .get()
