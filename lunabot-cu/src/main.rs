@@ -56,8 +56,8 @@ fn main() {
     //     "127.0.0.1".to_string(),
     // ))
     // .expect("Failed to initialize rerun viz.");
-    rerun_viz::init_rerun(rerun_viz::RerunViz::Viz(rerun_viz::Level::All))
-        .expect("Failed to initialize rerun viz.");
+    // rerun_viz::init_rerun(rerun_viz::RerunViz::Viz(rerun_viz::Level::All))
+    //     .expect("Failed to initialize rerun viz.");
     // rerun_viz::init_rerun(rerun_viz::RerunViz::Viz(rerun_viz::Level::All))
     //     .expect("Failed to initialize rerun viz.");
 
