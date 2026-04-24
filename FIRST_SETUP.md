@@ -102,7 +102,7 @@ params: {
 	"tcp_port":4000,
 },
 ```
-4. make sure there is a node in the robot layout with the same id you specified in the copperconfig
+4. make sure there is a node in the robot layout with the format cam_<id> using the id you specified in the copperconfig
 
 <br/>
 
