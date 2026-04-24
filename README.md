@@ -1,5 +1,7 @@
 # Lunabot
 
+## First Setup guide is in FIRST_SETUP.md
+
 ## Architecture Overview
 <img width="7916" height="1812" alt="image" src="https://github.com/user-attachments/assets/2a677af1-867d-446d-bd8f-a53078787d23" />
 

@@ -226,7 +226,7 @@
         // controls actuators and sends imu data to the localizer
         (
             id:"v3_pico", type: "crate::tasks::V3PicoTask", config:{
-                "teri_mode": true,
+                "teri_mode": false,
             }
         ),
         // handles apriltag detections from all the cameras, combining them and then sending them over to the localizer
@@ -331,7 +331,7 @@
                 "height": 800,
                 "fps": 30,
                 "host": "0.0.0.0",
-                "port": 5002,
+                "tcp_port": 5002,
                 "bitrate": 2000,
             }
         )

@@ -62,7 +62,7 @@
 	"euler": [0.0, 28.0, 0.0]
 },
 ```
-5. Update the realsense_subscriber task's copperconfig.ron to have the serial number of the upper depth camera, and the right node name in the config (maybe I should have just kept the pattern of using the serial number as the node name but ehhhh I cant be bothered to change it cause its a minor thing)
+5. Update the realsense_subscriber task's copperconfig.ron to have the serial number of the upper depth camera, and the corresponding node name defined in `robot_layout/lunabot.ron.`
 ```ron
 config: {
 	"serial_num": "341222301328",
@@ -70,7 +70,7 @@ config: {
 },
 ```
 
-6. If you wish to stream the rgb frames from the depth camera, run `make discover-cameras`, then unplug and replug the realsense and take note of the ports that pop up. There should be two different ports that pop up, each with a few indexes. The RGB should be index 0 on the port that mentions "3.1". (I believe this is because the realsense offers usb 2 and usb 3 and the rgb is on 3). 
+6. If you wish to stream the rgb frames from the depth camera, run `make discover-cameras`, then unplug and replug the realsense and take note of the ports that pop up. There should be two different ports that pop up, each with a few indexes. The RGB should be index 0 on the port that mentions "1.3". (I believe this is because the realsense offers usb 2 and usb 3 and the rgb is on 3). 
 Update the `d456_rgb` task's config to have that port. 
 
 <br/>
@@ -85,7 +85,7 @@ Update the `d456_rgb` task's config to have that port.
 1. Plug in your rgb cameras, and make note of their positions on the robot with respect to the center like you did the other cameras.
 2. Run `make discover-cameras` and start un plugging and re plugging the cameras until you figure out the ports that the cameras are on.
 	1. these will need to be the same usb ports you always plug the cameras into, same every time.
-3. Add or update an entry to the includes array in copperconfig.ron, use [Naj's focal length estimator](https://github.com/utahrobotics/focal-length-estimator) or some other tool to figure out the intrinsics.
+3. Update one of the entries to the includes array (for one of the camera_template_gstreamer ones) in copperconfig.ron, use [Naj's focal length estimator](https://github.com/utahrobotics/focal-length-estimator) or some other tool to figure out the intrinsics.
 	1. You will need an apriltag to estimate the intrinsics using Naj's tool
 ```ron
 params: {
@@ -102,7 +102,7 @@ params: {
 	"tcp_port":4000,
 },
 ```
-4. make sure there is a node in the robot layout with the same id you specified in the copperconfig
+4. make sure there is a node in the robot layout with the format cam_<id> using the id you specified in the copperconfig
 
 <br/>
 
@@ -130,16 +130,29 @@ params: {
 
 1. follow the installation instructions for the [multiplexed camera viewer](https://github.com/utahrobotics/utah-lunabotics-2026/tree/main/misc/multiplexed-camera-viewer) crate in misc.
 	1. You will need to specify in the config for the camera viewer what the robots ip is, and the ports for the streams you want to connect to 
+2. Ctrl-f for `tcp_port` in copperconfig.ron to whatever you want for each camera.
+- Note that for all the camera streaming, the camera stream is a server hosted on the robots pc, and the camera multiplexed viewer is the client.
+
+#### Camera stream trouble shooting
+1. Check the task error messages (in lunabase, or from the periodic task error prints) for any messages about the camera feeds.
+2. Consult "trouble shooting RGB cameras" section of this guide.
+3. if there are no error messages in the lunabase mentioning the cameras, then double check that your ports are configured correctly in the multiplexed camera viewer config, and the copperconfig.ron.
+4. If the feeds are frozen, try clicking the red "Disable" button in the top left of the multiplexed viewer, then re enabling the streams and seeing if they reconnect.
+
+
+### Network Trouble shooting
+*Cant find ip of the robot*: <br/>
+1. Ensure you are on the same wifi network as the robot, make sure the robot pc is powered on and has had a minute or two to boot then run `nmap -p 22 192.168.0.0/24` to discover devices with an open ssh port on the network.
 
 # Vescs
 1. Plug the vescs into the pc
 2. Change the motor_ctrl config to have the right can id's and motor masks.
-3. Run make prod and make sure you see a message that the motor port was opened.
+3. Run make prod, disengage e-stop and make sure you see a message that the motor port was opened.
 
 ### Vesc troubleshooting
 1. Call sebastion.
 2. If there arent any lights on the vesc, that means it isnt getting power or it blew up.
-3. Pray.
+3. Check make prod stdout for any messages saying "Opened motor port", or for any permission denied messages on ttyacmX
 
 
 # Actuators
@@ -158,6 +171,8 @@ params: {
 3. attach the other pico then run `cargo run --release --bin pico-secondary` to flash it.
 4. Only the prime pico needs to be attached to the computer over micro usb, the secondary pico should not be attached.
 5. Make sure all 3 red LED's on the board the prime pico is attached to are lit. If not all of them are lit that means something isn't getting powered (maybe the secondary pico?).
+6. in copperconfig.ron set the config for the pico task to have `teri_mode: false`
+
 
 
 
