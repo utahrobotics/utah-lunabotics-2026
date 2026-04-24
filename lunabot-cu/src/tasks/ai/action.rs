@@ -55,6 +55,7 @@ pub enum LunabotAction {
 
     SetLift(i8),
     SetBucket(i8),
+    SetDumper(i8),
     // actions for checking the lunabot stage (dig, dump, manual, soft stop, navigate)
     IsSoftStop,
     IsAutonomy,
@@ -186,6 +187,13 @@ impl LunabotAction {
                 blackboard
                     .outgoing_actuator_msg_queue
                     .push_back(actuator_command_from_i8(*value, Actuator::Lift));
+                Success
+            }
+            LunabotAction::SetDumper(value) => {
+                blackboard.last_dumper = None;
+                blackboard
+                    .outgoing_actuator_msg_queue
+                    .push_back(actuator_command_from_i8(*value, Actuator::Dumper));
                 Success
             }
             LunabotAction::IsSoftStop => match blackboard.current_mission {

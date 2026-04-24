@@ -9,6 +9,7 @@ pub fn manual_ctrl_behavior() -> Behavior<LunabotAction> {
             Action(LunabotAction::SetLastSteering),
             Action(LunabotAction::SetLastLift),
             Action(LunabotAction::SetLastBucket),
+            Action(LunabotAction::SetLastDumper),
             Action(LunabotAction::Yield),
         ],
     )
