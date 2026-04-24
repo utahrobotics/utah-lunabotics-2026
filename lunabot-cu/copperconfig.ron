@@ -331,7 +331,7 @@
                 "height": 800,
                 "fps": 30,
                 "host": "0.0.0.0",
-                "port": 5002,
+                "tcp_port": 5002,
                 "bitrate": 2000,
             }
         )

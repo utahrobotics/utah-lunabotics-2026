@@ -130,16 +130,29 @@ params: {
 
 1. follow the installation instructions for the [multiplexed camera viewer](https://github.com/utahrobotics/utah-lunabotics-2026/tree/main/misc/multiplexed-camera-viewer) crate in misc.
 	1. You will need to specify in the config for the camera viewer what the robots ip is, and the ports for the streams you want to connect to 
+2. Ctrl-f for `tcp_port` in copperconfig.ron to whatever you want for each camera.
+- Note that for all the camera streaming, the camera stream is a server hosted on the robots pc, and the camera multiplexed viewer is the client.
+
+#### Camera stream trouble shooting
+1. Check the task error messages (in lunabase, or from the periodic task error prints) for any messages about the camera feeds.
+2. Consult "trouble shooting RGB cameras" section of this guide.
+3. if there are no error messages in the lunabase mentioning the cameras, then double check that your ports are configured correctly in the multiplexed camera viewer config, and the copperconfig.ron.
+4. If the feeds are frozen, try clicking the red "Disable" button in the top left of the multiplexed viewer, then re enabling the streams and seeing if they reconnect.
+
+
+### Network Trouble shooting
+*Cant find ip of the robot*: <br/>
+1. Ensure you are on the same wifi network as the robot, make sure the robot pc is powered on and has had a minute or two to boot then run `nmap -p 22 192.168.0.0/24` to discover devices with an open ssh port on the network.
 
 # Vescs
 1. Plug the vescs into the pc
 2. Change the motor_ctrl config to have the right can id's and motor masks.
-3. Run make prod and make sure you see a message that the motor port was opened.
+3. Run make prod, disengage e-stop and make sure you see a message that the motor port was opened.
 
 ### Vesc troubleshooting
 1. Call sebastion.
 2. If there arent any lights on the vesc, that means it isnt getting power or it blew up.
-3. Pray.
+3. Check make prod stdout for any messages saying "Opened motor port", or for any permission denied messages on ttyacmX
 
 
 # Actuators
@@ -158,6 +171,8 @@ params: {
 3. attach the other pico then run `cargo run --release --bin pico-secondary` to flash it.
 4. Only the prime pico needs to be attached to the computer over micro usb, the secondary pico should not be attached.
 5. Make sure all 3 red LED's on the board the prime pico is attached to are lit. If not all of them are lit that means something isn't getting powered (maybe the secondary pico?).
+6. in copperconfig.ron set the config for the pico task to have `teri_mode: false`
+
 
 
 

@@ -56,8 +56,8 @@ pub mod implementation {
                 .and_then(|c| c.get("host").expect("failed to deserialize host"))
                 .expect("Provide host for T265Streamer");
             let port: i32 = config
-                .and_then(|c| c.get("port").expect("failed to deserialize port"))
-                .expect("Provide port for T265Streamer");
+                .and_then(|c| c.get("tcp_port").expect("failed to deserialize port"))
+                .expect("Provide tcp_port for T265Streamer");
 
             let video_info = gstreamer_video::VideoInfo::builder(
                 gstreamer_video::VideoFormat::Gray8,
