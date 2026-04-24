@@ -48,6 +48,21 @@ text = "Keyboard Scheme: "
 [node name="KeyboardSchemeOptionButton" type="OptionButton" parent="VBoxContainer/HBoxContainer2" unique_id=98250649]
 layout_mode = 2
 
+[node name="HBoxContainer4" type="HBoxContainer" parent="VBoxContainer" unique_id=1720532089]
+layout_mode = 2
+alignment = 1
+
+[node name="Label" type="Label" parent="VBoxContainer/HBoxContainer4" unique_id=2005506046]
+layout_mode = 2
+text = "Local Schemes: "
+
+[node name="LocalSchemeOptionButton" type="OptionButton" parent="VBoxContainer/HBoxContainer4" unique_id=591643682]
+layout_mode = 2
+selected = 0
+item_count = 1
+popup/item_0/text = "None Selected"
+popup/item_0/id = 0
+
 [node name="HBoxContainer3" type="HBoxContainer" parent="VBoxContainer" unique_id=2100440001]
 layout_mode = 2
 alignment = 1
@@ -89,5 +104,6 @@ grow_vertical = 0
 theme = ExtResource("2_5lhh3")
 text = "Create custom binding"
 
-[connection signal="pressed" from="CreateBindingButton" to="." method="_on_create_binding_button_pressed"]
+[connection signal="item_selected" from="VBoxContainer/HBoxContainer4/LocalSchemeOptionButton" to="." method="_on_local_scheme_option_button_item_selected"]
 [connection signal="toggled" from="VBoxContainer/HBoxContainer3/TouchControlsCheckButton" to="." method="_on_touch_controls_check_toggled"]
+[connection signal="pressed" from="CreateBindingButton" to="." method="_on_create_binding_button_pressed"]
