@@ -85,7 +85,7 @@ Update the `d456_rgb` task's config to have that port.
 1. Plug in your rgb cameras, and make note of their positions on the robot with respect to the center like you did the other cameras.
 2. Run `make discover-cameras` and start un plugging and re plugging the cameras until you figure out the ports that the cameras are on.
 	1. these will need to be the same usb ports you always plug the cameras into, same every time.
-3. Add or update an entry to the includes array in copperconfig.ron, use [Naj's focal length estimator](https://github.com/utahrobotics/focal-length-estimator) or some other tool to figure out the intrinsics.
+3. Update one of the entries to the includes array for (one of the camera_template_gstreamer ones) in copperconfig.ron, use [Naj's focal length estimator](https://github.com/utahrobotics/focal-length-estimator) or some other tool to figure out the intrinsics.
 	1. You will need an apriltag to estimate the intrinsics using Naj's tool
 ```ron
 params: {
