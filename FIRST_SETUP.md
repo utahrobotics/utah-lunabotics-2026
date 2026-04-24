@@ -62,7 +62,7 @@
 	"euler": [0.0, 28.0, 0.0]
 },
 ```
-5. Update the realsense_subscriber task's copperconfig.ron to have the serial number of the upper depth camera, and the right node name in the config (maybe I should have just kept the pattern of using the serial number as the node name but ehhhh I cant be bothered to change it cause its a minor thing)
+5. Update the realsense_subscriber task's copperconfig.ron to have the serial number of the upper depth camera, and the corresponding node name defined in `robot_layout/lunabot.ron.`
 ```ron
 config: {
 	"serial_num": "341222301328",
