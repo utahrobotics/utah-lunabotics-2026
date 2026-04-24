@@ -70,7 +70,7 @@ config: {
 },
 ```
 
-6. If you wish to stream the rgb frames from the depth camera, run `make discover-cameras`, then unplug and replug the realsense and take note of the ports that pop up. There should be two different ports that pop up, each with a few indexes. The RGB should be index 0 on the port that mentions "3.1". (I believe this is because the realsense offers usb 2 and usb 3 and the rgb is on 3). 
+6. If you wish to stream the rgb frames from the depth camera, run `make discover-cameras`, then unplug and replug the realsense and take note of the ports that pop up. There should be two different ports that pop up, each with a few indexes. The RGB should be index 0 on the port that mentions "1.3". (I believe this is because the realsense offers usb 2 and usb 3 and the rgb is on 3). 
 Update the `d456_rgb` task's config to have that port. 
 
 <br/>
