@@ -146,8 +146,10 @@ layout_mode = 2
 theme_override_constants/separation = 15
 
 [node name="LeftColumn" type="VBoxContainer" parent="VBoxContainer/MainContent/HBoxContainer" unique_id=856686899]
-custom_minimum_size = Vector2(350, 0)
+custom_minimum_size = Vector2(260, 0)
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 2.0
 theme_override_constants/separation = 15
 
 [node name="ControlsPanel" type="PanelContainer" parent="VBoxContainer/MainContent/HBoxContainer/LeftColumn" unique_id=339335488]
@@ -232,6 +234,7 @@ autowrap_mode = 3
 [node name="CenterColumn" type="VBoxContainer" parent="VBoxContainer/MainContent/HBoxContainer" unique_id=690483984]
 layout_mode = 2
 size_flags_horizontal = 3
+size_flags_stretch_ratio = 5.0
 theme_override_constants/separation = 15
 
 [node name="Map Panel" type="Panel" parent="VBoxContainer/MainContent/HBoxContainer/CenterColumn" unique_id=1896710441]
@@ -247,6 +250,7 @@ anchors_preset = 15
 [node name="UIAttitude" parent="VBoxContainer/MainContent/HBoxContainer/CenterColumn" unique_id=1693065779 instance=ExtResource("4_3r4oj")]
 custom_minimum_size = Vector2(0, 130)
 layout_mode = 2
+size_flags_horizontal = 3
 
 [node name="StatusPanel" type="PanelContainer" parent="VBoxContainer/MainContent/HBoxContainer/CenterColumn" unique_id=1629187079]
 layout_mode = 2
@@ -266,8 +270,10 @@ text = "BT STATUS: UNKNOWN"
 horizontal_alignment = 1
 
 [node name="RightColumn" type="VBoxContainer" parent="VBoxContainer/MainContent/HBoxContainer" unique_id=1091366724]
-custom_minimum_size = Vector2(180, 0)
+custom_minimum_size = Vector2(160, 0)
 layout_mode = 2
+size_flags_horizontal = 3
+size_flags_stretch_ratio = 1.0
 theme_override_constants/separation = 15
 
 [node name="LogoContainer" type="CenterContainer" parent="VBoxContainer/MainContent/HBoxContainer/RightColumn" unique_id=922206054]

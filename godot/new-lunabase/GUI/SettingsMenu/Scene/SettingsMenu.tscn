@@ -41,13 +41,15 @@ theme_override_styles/panel = SubResource("StyleBoxFlat_hgbih")
 [node name="ScrollContainer" type="ScrollContainer" parent="Control/Panel" unique_id=1535194856]
 visible = false
 layout_mode = 1
-anchors_preset = 15
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = 395.0
-offset_top = 225.0
-offset_right = -395.0
-offset_bottom = -225.0
+anchors_preset = 0
+anchor_left = 0.08
+anchor_top = 0.1
+anchor_right = 0.92
+anchor_bottom = 0.9
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 0.0
+offset_bottom = 0.0
 grow_horizontal = 2
 grow_vertical = 2
 
@@ -76,20 +78,35 @@ grow_horizontal = 2
 grow_vertical = 2
 
 [node name="Behind Icon" type="Panel" parent="Control" unique_id=185379264]
-layout_mode = 0
-offset_left = 1154.0
-offset_top = 44.0
-offset_right = 1194.0
-offset_bottom = 84.0
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 0.0
+offset_left = -52.0
+offset_top = 36.0
+offset_right = -8.0
+offset_bottom = 80.0
+grow_horizontal = 0
+grow_vertical = 0
 theme_override_styles/panel = SubResource("StyleBoxFlat_85h60")
 
 [node name="SettingsButton" type="Button" parent="Control/Behind Icon" unique_id=386834087]
 z_index = 10
 z_as_relative = false
 layout_mode = 1
-offset_left = 1.0
-offset_right = 40.0
-offset_bottom = 42.038963
+anchors_preset = 15
+anchor_left = 0.0
+anchor_top = 0.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 2.0
+offset_top = 2.0
+offset_right = -2.0
+offset_bottom = -2.0
+grow_horizontal = 2
+grow_vertical = 2
 toggle_mode = true
 icon = ExtResource("3_85h60")
 flat = true
