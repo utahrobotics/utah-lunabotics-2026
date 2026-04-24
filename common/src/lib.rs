@@ -184,6 +184,7 @@ pub enum FromLunabase {
     /// Move lift actuators, positive up, negative down  
     LiftActuators(i8),
     BucketActuators(i8),
+    DumperActuators(i8),
 
     LiftShake,
     /// Start autonomous mode, starting navigating to the requested x and y values.
@@ -246,6 +247,16 @@ impl FromLunabase {
             (speed * i8::MAX as f64) as i8
         };
         FromLunabase::BucketActuators(speed)
+    }
+
+    pub fn set_dumper_actuator(mut speed: f64) -> Self {
+        speed = speed.clamp(-1.0, 1.0);
+        let speed = if speed < 0.0 {
+            (-speed * i8::MIN as f64) as i8
+        } else {
+            (speed * i8::MAX as f64) as i8
+        };
+        FromLunabase::DumperActuators(speed)
     }
 
     pub fn get_lift_actuator_command(self) -> Option<ActuatorCommand> {

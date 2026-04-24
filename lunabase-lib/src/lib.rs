@@ -443,6 +443,11 @@ impl LunabaseConnection {
     }
 
     #[func]
+    fn send_dumper_actuators(&mut self, speed: f64) {
+        self.send_msg(FromLunabase::set_dumper_actuator(speed));
+    }
+
+    #[func]
     fn send_soft_stop(&mut self) {
         self.send_msg(FromLunabase::SoftStop);
     }
