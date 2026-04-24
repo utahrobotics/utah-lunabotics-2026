@@ -133,7 +133,7 @@ params: {
 
 # Vescs
 1. Plug the vescs into the pc
-2. Change the motor_controller config to have the right can id's and motor masks.
+2. Change the motor_ctrl config to have the right can id's and motor masks.
 3. Run make prod and make sure you see a message that the motor port was opened.
 
 ### Vesc troubleshooting

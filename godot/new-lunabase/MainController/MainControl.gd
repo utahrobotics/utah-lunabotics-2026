@@ -102,9 +102,14 @@ func _process(delta: float) -> void:
 		errored_tasks_label.text = "No errors"
 	else:
 		var error_text := ""
-		for task_name in errored_tasks.keys():
+
+		var sorted_tasks := errored_tasks.keys()
+		sorted_tasks.sort()
+
+		for task_name in sorted_tasks:
 			var error_msg: String = errored_tasks[task_name]
 			error_text += task_name + ":\n  " + error_msg + "\n\n"
+
 		errored_tasks_label.text = error_text.strip_edges()
 		
 	var bt_status: String = GlobalLunabaseConnection.get_bt_status()

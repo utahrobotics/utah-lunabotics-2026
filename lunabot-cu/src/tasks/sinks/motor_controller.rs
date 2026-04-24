@@ -67,7 +67,7 @@ impl CuSinkTask for MotorController {
                     ));
                 }
             }
-            motor_ref = enumerate_motors(vesc_ids, speed_multiplier, invert_left, invert_right);
+            motor_ref = enumerate_motors(vesc_ids, speed_multiplier, invert_left, invert_right).expect("failed to call enumerate_motors");
         } else {
             return Err(CuError::new_with_cause(
                 "no vesc pairs or speed multiplier set in config",
@@ -99,6 +99,7 @@ impl CuSinkTask for MotorController {
             let (left, right) = steering.get_left_and_right();
             self.motor_ref.set_speed(left as f32, right as f32);
         }
+    
 
         if let Some(telemetry) = self.motor_ref.get_latest_telemetry() {
             use crate::rerun_viz::RECORDER;
@@ -111,6 +112,10 @@ impl CuSinkTask for MotorController {
             } else {
                 // println!("{telemetry:?}");
             }
+        }
+
+        if let Some(errors) = self.motor_ref.get_latest_errors() {
+            return Err(CuError::from(errors.join(" | ")));
         }
 
         Ok(())

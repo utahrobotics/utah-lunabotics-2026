@@ -188,6 +188,9 @@
         // receives messages from the ai and tells the motors to move accordingly
         (
             id:"motor_ctrl", type:"crate::tasks::sinks::MotorController", config:{
+                // little invert flags so you can quickly invert the direction without vesc tool.
+                "invert_left": false,
+                "invert_right": false,
                 "speed_multiplier": 1500,
                 "vesc_pairs": [
                     // the new vesc matthew G has been configuring
@@ -199,15 +202,16 @@
                         "command_both": true
                     },
 
-                    // the vescs we used on teri, dubious if they both work
+                    // WORKING VESC: 
                     {
                         "id1": 75,
                         "id2": 110,
                         "mask1": "Right",
-                        "mask2": "Right",
+                        "mask2": "Left",
                         "command_both": true,
                     },
-                    {   // I think this is the one with a permission denied problem on ttyACM*?
+
+                    {   // do not use this one, I think this is the one with a permission denied problem on ttyACM*?
                         "id1": 63,
                         "id2": 74,
                         "mask1": "Left",
