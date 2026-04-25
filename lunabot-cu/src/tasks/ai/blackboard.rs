@@ -43,6 +43,9 @@ pub struct LunabotBlackboard {
     /// stores the last bucket actuator message received from lunabase
     pub last_bucket: Option<i8>,
 
+    /// stores the last bucket actuator message received from lunabase
+    pub last_dumper: Option<i8>,
+
     /// stores the last steering message recieved from the lunabase
     pub last_steering: Option<Steering>,
 
@@ -87,6 +90,8 @@ pub struct LunabotBlackboard {
     pub last_non_zero_steering_pack: Option<Instant>,
     pub last_non_zero_lift_pack: Option<Instant>,
     pub last_non_zero_bucket_pack: Option<Instant>,
+    pub last_non_zero_dumper_pack: Option<Instant>,
+
 
     /// don't hold onto guards for too long (longer than 200 microseconds is bad)
     pub blackboard_shared: Arc<RwLock<BlackboardShared>>,
@@ -122,6 +127,8 @@ impl Default for LunabotBlackboard {
             last_non_zero_lift_pack: None,
             last_non_zero_bucket_pack: None,
             outgoing_bt_status_msg: None,
+            last_non_zero_dumper_pack: None,
+            last_dumper: None,
             blackboard_shared: Arc::new(RwLock::new(BlackboardShared {
                 reset_local_map: false,
                 reset_map: false,
@@ -143,6 +150,14 @@ impl LunabotBlackboard {
                     self.last_non_zero_lift_pack = None;
                 }
                 self.last_lift = Some(*val);
+            }
+            common::FromLunabase::DumperActuators(val) => {
+                if *val != 0 {
+                    self.last_non_zero_dumper_pack = Some(Instant::now());
+                } else {
+                    self.last_non_zero_dumper_pack = None;
+                }
+                self.last_dumper = Some(*val);   
             }
             common::FromLunabase::BucketActuators(val) => {
                 if *val != 0 {

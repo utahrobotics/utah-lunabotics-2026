@@ -50,8 +50,12 @@ pub enum LunabotAction {
     /// sets bucket to last known value rx'd from lunabase
     SetLastBucket,
 
+    /// sets dumper to last known value rx'd from lunabase
+    SetLastDumper,
+
     SetLift(i8),
     SetBucket(i8),
+    SetDumper(i8),
     // actions for checking the lunabot stage (dig, dump, manual, soft stop, navigate)
     IsSoftStop,
     IsAutonomy,
@@ -128,6 +132,28 @@ impl LunabotAction {
 
                 Success
             }
+            LunabotAction::SetLastDumper => {
+                if let Some(last_dumper_pack_time) = blackboard.last_non_zero_dumper_pack {
+                    if last_dumper_pack_time.elapsed() > Duration::from_millis(200) {
+                        println!("safety: lunabase silent, forcing lift to stop");
+                        blackboard.last_non_zero_dumper_pack = None;
+                        blackboard.last_dumper = None;
+                        blackboard
+                            .outgoing_actuator_msg_queue
+                            .push_back(actuator_command_from_i8(0, Actuator::Dumper));
+                        return (Success, 0.0);
+                    }
+                }
+
+                if let Some(value) = blackboard.last_dumper.take() {
+                    blackboard
+                        .outgoing_actuator_msg_queue
+                        .push_back(actuator_command_from_i8(value, Actuator::Dumper));
+                }
+
+                Success
+            }
+
             LunabotAction::SetLastLift => {
                 if let Some(last_lift_pack_time) = blackboard.last_non_zero_lift_pack {
                     if last_lift_pack_time.elapsed() > Duration::from_millis(200) {
@@ -161,6 +187,13 @@ impl LunabotAction {
                 blackboard
                     .outgoing_actuator_msg_queue
                     .push_back(actuator_command_from_i8(*value, Actuator::Lift));
+                Success
+            }
+            LunabotAction::SetDumper(value) => {
+                blackboard.last_dumper = None;
+                blackboard
+                    .outgoing_actuator_msg_queue
+                    .push_back(actuator_command_from_i8(*value, Actuator::Dumper));
                 Success
             }
             LunabotAction::IsSoftStop => match blackboard.current_mission {
