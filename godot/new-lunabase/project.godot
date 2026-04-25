@@ -85,6 +85,14 @@ bucket_down={
 "deadzone": 0.2,
 "events": []
 }
+dumper_up={
+"deadzone": 0.2,
+"events": []
+}
+dumper_down={
+"deadzone": 0.2,
+"events": []
+}
 autonomy={
 "deadzone": 0.2,
 "events": []

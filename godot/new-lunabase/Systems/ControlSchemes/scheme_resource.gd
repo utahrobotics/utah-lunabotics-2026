@@ -14,6 +14,8 @@ class_name ControlSchemeResource extends Resource
 @export var lift_down  : Array[InputEvent]
 @export var bucket_up  : Array[InputEvent]
 @export var bucket_down  : Array[InputEvent]
+@export var dumper_up  : Array[InputEvent]
+@export var dumper_down  : Array[InputEvent]
 @export var autonomy  : Array[InputEvent]
 @export var increment_speed  : Array[InputEvent]
 @export var decrement_speed  : Array[InputEvent]
@@ -36,6 +38,8 @@ func get_all_actions() -> Dictionary:
 	all_actions["lift_down"] = lift_down
 	all_actions["bucket_up"] = bucket_up
 	all_actions["bucket_down"] = bucket_down
+	all_actions["dumper_up"] = dumper_up
+	all_actions["dumper_down"] = dumper_down
 	all_actions["autonomy"] = autonomy
 	all_actions["increment_speed"] = increment_speed
 	all_actions["decrement_speed"] = decrement_speed

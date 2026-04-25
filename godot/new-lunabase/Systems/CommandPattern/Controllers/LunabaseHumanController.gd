@@ -123,6 +123,17 @@ func _process(_delta: float) -> void:
 	var bucket_cmd := BucketActuatorsCommand.new()
 	bucket_cmd.bucket = int(bucket_input * 127.0)
 	command_recorder.execute_and_store(bucket_cmd)
+
+	# === DUMPER ACTUATORS ===
+	var dumper_input: float = 0.0
+	if Input.is_action_pressed("dumper_up"):
+		dumper_input = 1.0
+	elif Input.is_action_pressed("dumper_down"):
+		dumper_input = -1.0
+
+	var dumper_cmd := DumperActuatorCommand.new()
+	dumper_cmd.dumper = int(dumper_input * 127.0)
+	command_recorder.execute_and_store(dumper_cmd)
 	
 	if Input.is_action_just_pressed("continue_mission"):
 		command_recorder.execute_and_store(ContinueMissionCommand.new())

@@ -125,7 +125,7 @@ func handle_throttle(_delta):
 		return
 	
 	# Deterministic stream order.
-	for stream_key in ["steering", "lift", "bucket"]:
+	for stream_key in ["steering", "lift", "bucket", "dumper"]:
 		if not pending_commands.has(stream_key):
 			continue
 		var command: Command = pending_commands[stream_key]
@@ -140,7 +140,7 @@ func handle_throttle(_delta):
 
 func _send_zero_keepalives_if_needed() -> void:
 	var now_ms: int = Time.get_ticks_msec()
-	for stream_key in ["steering", "lift", "bucket"]:
+	for stream_key in ["steering", "lift", "bucket", "dumper"]:
 		if not last_sent_commands.has(stream_key):
 			continue
 		var last_cmd: Command = last_sent_commands[stream_key]
@@ -175,6 +175,8 @@ func _get_throttle_stream_key(cmd: Command) -> String:
 		return "lift"
 	if cmd is BucketActuatorsCommand:
 		return "bucket"
+	if cmd is DumperActuatorCommand:
+		return "dumper"
 	return ""
 
 
@@ -204,6 +206,8 @@ func _commands_equivalent(a: Command, b: Command) -> bool:
 		return (a as LiftActuatorsCommand).lift == (b as LiftActuatorsCommand).lift
 	if a is BucketActuatorsCommand and b is BucketActuatorsCommand:
 		return (a as BucketActuatorsCommand).bucket == (b as BucketActuatorsCommand).bucket
+	if a is DumperActuatorCommand and b is DumperActuatorCommand:
+		return (a as DumperActuatorCommand).dumper == (b as DumperActuatorCommand).dumper
 	return false
 
 
@@ -214,6 +218,8 @@ func _is_zero_command(cmd: Command) -> bool:
 		return (cmd as LiftActuatorsCommand).lift == 0
 	if cmd is BucketActuatorsCommand:
 		return (cmd as BucketActuatorsCommand).bucket == 0
+	if cmd is DumperActuatorCommand:
+		return (cmd as DumperActuatorCommand).dumper == 0
 	return false
 
 
@@ -231,6 +237,10 @@ func _build_zero_command_for_stream(stream_key: String) -> Command:
 			var bucket := BucketActuatorsCommand.new()
 			bucket.bucket = 0
 			return bucket
+		"dumper":
+			var dumper := DumperActuatorCommand.new()
+			dumper.dumper = 0
+			return dumper
 		_:
 			return null
 
