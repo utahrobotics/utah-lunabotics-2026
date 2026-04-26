@@ -10,9 +10,9 @@
 4. Plug power bank into pc, press on button, ensure that lights turn on.
 5. Plug one side of the vesc into the PC (it'll be a micro usb).
 6. Plug the prime pico into the PC (the pico mounted to the board with 3 red LED's on the front).
-7. SSH into the robot using the username, password, and IP in admin chat pinned message. `ssh <user>@<ip>`
-8. run `cd utah-lunabotics-2026`
-9. run `make prod`
+7. SSH into the robot using the username, password, and IP in admin chat pinned message. Type `ssh <user>@<ip>` in a shell started on your laptop.
+8. Once sshed in, run `cd utah-lunabotics-2026` on the shell you are sshed into.
+9. run `make prod` on the shell you are sshed into.
 10. On your laptop, start the lunabase, type in the ip of the lunabot in the upper left hand corner, press connect, press manual mode, then control the robot.
 11. If something doesn't work, scroll through the error messages in the lower left box, make sure lights on the vesc and prime pico board are all lit, and consult the sections of this guide below for more details.
 
