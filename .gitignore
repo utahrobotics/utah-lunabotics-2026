@@ -7,3 +7,4 @@ build/CMakeFiles/cmake.check_cache
 build/*
 .DS_Store
 godot/new-lunabase/liblunabase_lib.so
+godot/build/*

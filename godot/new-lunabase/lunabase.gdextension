@@ -4,6 +4,8 @@ compatibility_minimum = 4.1
 reloadable = true
 
 [libraries]
+android.debug.arm64 =      "res://../../target/aarch64-linux-android/debug/liblunabase_lib.so"
+android.release.arm64 =    "res://../../target/aarch64-linux-android/release/liblunabase_lib.so"
 linux.debug.x86_64 =     "res://../../target/debug/liblunabase_lib.so"
 linux.release.x86_64 =   "res://../../target/release/liblunabase_lib.so"
 windows.debug.x86_64 =   "res://../../target/debug/lunabase_lib.dll"
