@@ -18,6 +18,12 @@ signal input_received
 signal new_message
 
 signal binding_saved(saved_path: String)
+const JOYPAD_AXIS_BIND_THRESHOLD := 0.5
+const JOYPAD_AXIS_RELEASE_THRESHOLD := 0.2
+
+var waiting_for_axis_release := false
+var pending_axis_device := -1
+var pending_axis := -1
 
 func _ready() -> void:
 	setup()
@@ -26,6 +32,9 @@ func setup():
 	naming_panel.hide()
 	is_rebinding = false
 	current_action_to_bind = ""
+	waiting_for_axis_release = false
+	pending_axis_device = -1
+	pending_axis = -1
 	current_scheme = ControlSchemeResource.new()
 	rebind_all_controls()
 	update_ui()
@@ -40,7 +49,7 @@ func rebind_all_controls():
 	var actions = current_scheme.get_all_actions()
 	
 	for action_name in actions.keys():
-		label.text = "Press key for: " + action_name
+		label.text = "Press input for: " + action_name
 		current_action_to_bind = action_name
 		is_rebinding = true
 		
@@ -78,13 +87,59 @@ func save_binding_to_file():
 func _input(event: InputEvent) -> void:
 	if not is_rebinding:
 		return
-	# MouseButton will not be a remappable thing due to it killing the UI, also why would you do that?
-	if event is InputEventKey or event is InputEventJoypadButton:
-		if event.is_pressed():
-			apply_binding(current_action_to_bind, event)
+	if waiting_for_axis_release:
+		_handle_axis_release(event)
+		return
+	# MouseButton is intentionally excluded so UI remains usable.
+	if not _is_bindable_event(event):
+		return
+	var bind_event := _build_bind_event(event)
+	if bind_event == null:
+		return
+	apply_binding(current_action_to_bind, bind_event)
+	if bind_event is InputEventJoypadMotion:
+		waiting_for_axis_release = true
+		pending_axis_device = bind_event.device
+		pending_axis = bind_event.axis
+		label.text = "Release stick to continue..."
+	else:
+		input_received.emit()
+	get_viewport().set_input_as_handled()
 
-			input_received.emit() 
-			get_viewport().set_input_as_handled()
+
+func _is_bindable_event(event: InputEvent) -> bool:
+	if event is InputEventKey:
+		return event.is_pressed() and not event.echo
+	if event is InputEventJoypadButton:
+		return event.is_pressed()
+	if event is InputEventJoypadMotion:
+		return abs(event.axis_value) >= JOYPAD_AXIS_BIND_THRESHOLD
+	return false
+
+
+func _build_bind_event(event: InputEvent) -> InputEvent:
+	if event is InputEventJoypadMotion:
+		var motion := InputEventJoypadMotion.new()
+		motion.device = event.device
+		motion.axis = event.axis
+		# Save a deterministic direction for the action (-1 or 1)
+		motion.axis_value = 1.0 if event.axis_value >= 0.0 else -1.0
+		return motion
+	return event
+
+
+func _handle_axis_release(event: InputEvent) -> void:
+	if not (event is InputEventJoypadMotion):
+		return
+	if event.device != pending_axis_device or event.axis != pending_axis:
+		return
+	if abs(event.axis_value) > JOYPAD_AXIS_RELEASE_THRESHOLD:
+		return
+	waiting_for_axis_release = false
+	pending_axis_device = -1
+	pending_axis = -1
+	input_received.emit()
+	get_viewport().set_input_as_handled()
 
 func apply_binding(action_name: String, event: InputEvent):
 	if not InputMap.has_action(action_name):
