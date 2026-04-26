@@ -12,10 +12,12 @@ pub fn rotation_shim(
     tolerance: f64,
     kp: impl Into<Option<f64>>,
     ki: impl Into<Option<f64>>,
+    kd: impl Into<Option<f64>>,
 ) -> Job<Steering, ()> {
     let (output_tx, output_rx) = mpsc::channel(5);
     let kp = kp.into().unwrap_or(1.0);
     let ki = ki.into().unwrap_or(0.5);
+    let kd = kd.into().unwrap_or(0.3);
 
     let body = async move {
         let target_rot = Rotation2::new(target_yaw.to_radians() as f64);
@@ -23,6 +25,7 @@ pub fn rotation_shim(
         let max_integral = 1.0;
 
         let mut integral = 0.0;
+        let mut previous_error = 0.0;
         let mut last_time = Instant::now();
 
         loop {
@@ -51,8 +54,10 @@ pub fn rotation_shim(
 
             // accumulate integral with anti-windup
             integral = (integral + error * dt).clamp(-max_integral, max_integral);
+            let derivative = (error-previous_error)/dt;
+            previous_error = error;
 
-            let output = kp * error + ki * integral;
+            let output = kp * error + ki * integral + kd*derivative;
 
             output_tx
                 .send(Steering::new_ik(0.0, output, Steering::DEFAULT_WEIGHT))

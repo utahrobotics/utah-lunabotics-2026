@@ -454,7 +454,7 @@ impl LunabotAction {
                     //     eprintln!("Calculated path has < 2 nodes");
                     //     return (Failure, 0.0);
                     // };
-                    let mut rotation_shim = rotation_shim(*target_yaw, 0.1, None, None);
+                    let mut rotation_shim = rotation_shim(*target_yaw, 0.1, None, None, None);
                     let job_initial_status = rotation_shim.get_status();
                     blackboard.rotation_shim = Some(rotation_shim);
                     println!(
