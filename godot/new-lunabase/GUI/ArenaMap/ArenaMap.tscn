@@ -6,12 +6,11 @@
 [ext_resource type="Texture2D" uid="uid://b8fyvsigu0r8h" path="res://Assets/Maps/Screenshot From 2026-01-14 21-57-20.png" id="4_h6673"]
 
 [node name="ArenaMap" type="Control" unique_id=1557496579]
+clip_contents = true
 layout_mode = 3
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_right = 0.0
-offset_bottom = 0.0
-clip_contents = true
 grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 1
@@ -50,13 +49,14 @@ offset_right = 814.0
 offset_bottom = 914.0
 texture = ExtResource("2_1610t")
 expand_mode = 1
+flip_h = true
 
 [node name="Origin" type="Control" parent="Ucf" unique_id=1856979022]
 anchors_preset = 0
-offset_left = 40.0
-offset_top = 413.33334
-offset_right = 80.0
-offset_bottom = 453.33334
+offset_left = -44.0
+offset_top = 411.0
+offset_right = -4.0
+offset_bottom = 451.0
 pivot_offset = Vector2(50, 50)
 
 [node name="TrailMarkerUcf" type="Line2D" parent="Ucf/Origin" unique_id=1985587690]

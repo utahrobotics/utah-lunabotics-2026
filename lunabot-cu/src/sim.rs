@@ -230,7 +230,6 @@ fn sim_callback<'a>(
         default::SimStep::MotorCtrl(CuTaskCallbackState::Process(input, _)) => {
             if let Some(steering) = input.payload() {
                 let (left, right) = steering.get_left_and_right();
-                println!("[MOTOR_CTRL] l: {left} r: {right}");
                 let speed_mult = steering.get_weight();
                 // FIXME: probably shouldn't just put a magic number
                 let left = (left * speed_mult) * 0.022;
