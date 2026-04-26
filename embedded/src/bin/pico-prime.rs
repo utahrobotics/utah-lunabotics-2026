@@ -78,11 +78,11 @@ async fn main(spawner: Spawner) -> ! {
     let driver_fault_detectors: [FaultDetector<'_>; 3] = [
         FaultDetector {
             fault: Input::new(p.PIN_14, embassy_rp::gpio::Pull::Up),
-            which: Actuator::Lift,
+            which: Actuator::Bucket,
         },
         FaultDetector {
             fault: Input::new(p.PIN_15, embassy_rp::gpio::Pull::Up),
-            which: Actuator::Bucket,
+            which: Actuator::Lift,
         },
         FaultDetector {
             fault: Input::new(p.PIN_16, embassy_rp::gpio::Pull::Up),
@@ -96,14 +96,14 @@ async fn main(spawner: Spawner) -> ! {
             sleep: Output::new(p.PIN_8, Level::Low),
             dir: Output::new(p.PIN_0, Level::Low),
             pwm: Pwm::new_output_b(p.PWM_SLICE0, p.PIN_1, Config::default()),
-            which: Actuator::Lift,
+            which: Actuator::Bucket,
         },
         ActuatorDriver {
             // GPIO 9 and 2 = pin 12 and 4
             sleep: Output::new(p.PIN_9, Level::Low),
             dir: Output::new(p.PIN_2, Level::Low),
             pwm: Pwm::new_output_b(p.PWM_SLICE1, p.PIN_3, Config::default()),
-            which: Actuator::Bucket,
+            which: Actuator::Lift,
         },
         ActuatorDriver {
             // GPIO 10 and 4 = pin 14 and 6

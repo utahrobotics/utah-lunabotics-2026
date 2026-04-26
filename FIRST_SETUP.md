@@ -1,6 +1,23 @@
 # First Time Setup Instructions
 *This guide assumes basic linux knowledge. i.e. where to put udev rules, how to add a user to a group, how to use ssh*
 
+## TLDR:
+**If you only care about manual mode and dont care about sensors:**
+<br>
+1. Download lunabase for your platform from the latest release [here](https://github.com/utahrobotics/utah-lunabotics-2026/releases)
+2. Plug in white router to wall power, and connect your laptop to USR-Wifi-5G. The user and pass are in a pinned msg in admin chat.
+3. Plug ALFA external antenna into pc.
+4. Plug power bank into pc, press on button, ensure that lights turn on.
+5. Plug one side of the vesc into the PC (it'll be a micro usb).
+6. Plug the prime pico into the PC (the pico mounted to the board with 3 red LED's on the front).
+7. SSH into the robot using the username, password, and IP in admin chat pinned message. Type `ssh <user>@<ip>` in a shell started on your laptop.
+8. Once sshed in, run `cd utah-lunabotics-2026` on the shell you are sshed into.
+9. run `make prod` on the shell you are sshed into.
+10. On your laptop, start the lunabase, type in the ip of the lunabot in the upper left hand corner, press connect, press manual mode, then control the robot.
+11. If something doesn't work, scroll through the error messages in the lower left box, make sure lights on the vesc and prime pico board are all lit, and consult the sections of this guide below for more details.
+
+
+
 # Sensors
 
 ### T265/1
@@ -173,8 +190,10 @@ params: {
 5. Make sure all 3 red LED's on the board the prime pico is attached to are lit. If not all of them are lit that means something isn't getting powered (maybe the secondary pico?).
 6. in copperconfig.ron set the config for the pico task to have `teri_mode: false`
 
+<br/>
 
-
+**For Both:** <br/>
+- Set the speed ratio in the config, keep in mind with a max ratio of 1.0, the actuators are heinously fast.
 
 # Permissions
 

@@ -227,6 +227,8 @@
         (
             id:"v3_pico", type: "crate::tasks::V3PicoTask", config:{
                 "teri_mode": false,
+                // Float between 0 and 1. Max power would be 1.0 which is honestly too fast even for prod, 0.2 is decently slow and good for outreach events 
+                "speed_ratio": 0.4,
             }
         ),
         // handles apriltag detections from all the cameras, combining them and then sending them over to the localizer

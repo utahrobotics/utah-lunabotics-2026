@@ -37,9 +37,21 @@ impl NavigationGoal {
             NavigationGoal::DigSite(Arena::Artemis) => (Vector2::new(2.5, 3.75), 0.25, 1.0),
             NavigationGoal::DigSite(Arena::UcfLeft) => (Vector2::new(3.75, 2.37), 0.30, 1.0),
             NavigationGoal::DigSite(Arena::UcfRight) => (Vector2::new(3.75, -2.37), 0.30, 1.0),
-            NavigationGoal::DumpSite(Arena::Artemis) => (Vector2::new(5.38, 1.0), 1.0, 0.25),
-            NavigationGoal::DumpSite(Arena::UcfLeft) => (Vector2::new(6.8, 1.5), 1.0, 0.25),
-            NavigationGoal::DumpSite(Arena::UcfRight) => (Vector2::new(6.8, -1.5), 1.0, 0.25),
+            NavigationGoal::DumpSite(Arena::Artemis) => (Vector2::new(5.38, 1.15), 1.0, 0.15),
+            NavigationGoal::DumpSite(Arena::UcfLeft) => (Vector2::new(6.8, 2.92), 1.0, 0.15),
+            NavigationGoal::DumpSite(Arena::UcfRight) => (Vector2::new(6.8, -2.92), 1.0, 0.15),
+        }
+    }
+
+    /// returns in degrees
+    pub fn path_end_target_yaw(&self) -> Option<f32> {
+        match self {
+            NavigationGoal::DigSite(_) => None,
+            NavigationGoal::DumpSite(arena) => match arena {
+                Arena::Artemis => Some(-90.0),
+                Arena::UcfRight => Some(-90.0),
+                Arena::UcfLeft => Some(90.0),
+            },
         }
     }
 }
@@ -92,6 +104,25 @@ pub fn navigate_behavior(goal: NavigationGoal) -> Behavior<LunabotAction> {
                 ],
             ),
         ]),
+        {
+            if let Some(target_yaw) = goal.path_end_target_yaw() {
+                Sequence(vec![
+                    Action(LunabotAction::SetBTStatusMsg(
+                        "Fine Positioning...".to_string(),
+                    )),
+                    Action(LunabotAction::RotateTo(target_yaw)),
+                ])
+            } else {
+                Action(LunabotAction::None)
+            }
+        }
+    ])
+}
+
+pub fn back_up_for(seconds: f64) -> Behavior<LunabotAction> {
+    While(Box::new(Wait(seconds)), vec![
+        Action(LunabotAction::SetSteering(Steering::new(-0.5, -0.5, 2000.0))),
+        Action(LunabotAction::Yield)
     ])
 }
 
