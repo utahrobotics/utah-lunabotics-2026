@@ -119,6 +119,13 @@ pub fn navigate_behavior(goal: NavigationGoal) -> Behavior<LunabotAction> {
     ])
 }
 
+pub fn back_up_for(seconds: f64) -> Behavior<LunabotAction> {
+    While(Box::new(Wait(seconds)), vec![
+        Action(LunabotAction::SetSteering(Steering::new(-0.5, -0.5, 2000.0))),
+        Action(LunabotAction::Yield)
+    ])
+}
+
 /// calculates a path to goal, if it fails once, the local obstacles are reset.
 /// if the path calc fails once again after local obstacles are reset, then
 /// global obstacles are reset also.
