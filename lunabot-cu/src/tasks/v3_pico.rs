@@ -43,6 +43,7 @@ mod prod_impl {
         /// prevents us from powercycling a bajillion times in a row
         last_powercycle: Instant,
         teri_mode: bool,
+        speed_ratio: f64,
     }
 
     impl Freezable for V3PicoTask {}
@@ -64,6 +65,12 @@ mod prod_impl {
             } else {
                 false
             };
+
+            let speed_ratio = if let Some(config) = config {
+                config.get::<f64>("speed_ratio")?.unwrap_or(1.0)
+            } else {
+                1.0
+            }.clamp(0.0, 1.0);
 
             let (path_tx, path_rx) = crossbeam_channel::bounded(1);
 
@@ -181,6 +188,7 @@ mod prod_impl {
                 last_reading: Instant::now(),
                 last_powercycle: Instant::now(),
                 teri_mode,
+                speed_ratio
             })
         }
 
@@ -256,9 +264,10 @@ mod prod_impl {
             input: &Self::Input<'i>,
             output: &mut Self::Output<'o>,
         ) -> CuResult<()> {
-            if let Some(actuator_cmd) = input.payload()
+            if let Some(mut actuator_cmd) = input.payload().cloned()
                 && let Some(ref cmd_tx) = self.cmd_tx
             {
+                actuator_cmd.apply_speed_factor(self.speed_ratio as f32);
                 let serialized = ActuatorCommand::serialize(&actuator_cmd);
                 if let Err(_) = cmd_tx.try_send(serialized) {
                     eprintln!("[PICO] Command channel full or closed, dropping command");

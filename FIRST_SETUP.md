@@ -173,8 +173,10 @@ params: {
 5. Make sure all 3 red LED's on the board the prime pico is attached to are lit. If not all of them are lit that means something isn't getting powered (maybe the secondary pico?).
 6. in copperconfig.ron set the config for the pico task to have `teri_mode: false`
 
+<br/>
 
-
+**For Both:** <br/>
+- Set the speed ratio in the config, keep in mind with a max ratio of 1.0, the actuators are heinously fast.
 
 # Permissions
 
