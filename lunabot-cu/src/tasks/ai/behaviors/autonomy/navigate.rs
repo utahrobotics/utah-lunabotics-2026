@@ -42,6 +42,18 @@ impl NavigationGoal {
             NavigationGoal::DumpSite(Arena::UcfRight) => (Vector2::new(6.8, -2.92), 1.0, 0.15),
         }
     }
+
+    /// returns in degrees
+    pub fn path_end_target_yaw(&self) -> Option<f32> {
+        match self {
+            NavigationGoal::DigSite(_) => None,
+            NavigationGoal::DumpSite(arena) => match arena {
+                Arena::Artemis => Some(-90.0),
+                Arena::UcfRight => Some(-90.0),
+                Arena::UcfLeft => Some(90.0),
+            },
+        }
+    }
 }
 
 pub fn navigate_behavior(goal: NavigationGoal) -> Behavior<LunabotAction> {
@@ -92,6 +104,18 @@ pub fn navigate_behavior(goal: NavigationGoal) -> Behavior<LunabotAction> {
                 ],
             ),
         ]),
+        {
+            if let Some(target_yaw) = goal.path_end_target_yaw() {
+                Sequence(vec![
+                    Action(LunabotAction::SetBTStatusMsg(
+                        "Fine Positioning...".to_string(),
+                    )),
+                    Action(LunabotAction::RotateTo(target_yaw)),
+                ])
+            } else {
+                Action(LunabotAction::None)
+            }
+        }
     ])
 }
 

@@ -6,6 +6,7 @@ use std::time::{Duration, Instant};
 use tasker::tokio::{self, sync::mpsc};
 
 /// rotates to target yaw within tolerance radians
+/// pass in target yaw as degrees
 pub fn rotation_shim(
     target_yaw: f32,
     tolerance: f64,
@@ -14,10 +15,10 @@ pub fn rotation_shim(
 ) -> Job<Steering, ()> {
     let (output_tx, output_rx) = mpsc::channel(5);
     let kp = kp.into().unwrap_or(1.0);
-    let ki = ki.into().unwrap_or(0.6);
+    let ki = ki.into().unwrap_or(0.5);
 
     let body = async move {
-        let target_rot = Rotation2::new(target_yaw as f64);
+        let target_rot = Rotation2::new(target_yaw.to_radians() as f64);
 
         let max_integral = 1.0;
 

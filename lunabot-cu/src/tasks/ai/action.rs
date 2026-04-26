@@ -81,9 +81,8 @@ pub enum LunabotAction {
     // dig up some moon dirt
     Dig,
     Dump,
-
-    /// rotate to face a certain direction
-    RotateToFacePath,
+    /// Rotates to reach a target yaw. (in degrees)
+    RotateTo(f32),
 
     /// Cancels long running jobs like pathfinding and path following
     CancelJobs,
@@ -432,7 +431,7 @@ impl LunabotAction {
                 }
                 Success
             }
-            LunabotAction::RotateToFacePath => {
+            LunabotAction::RotateTo(target_yaw) => {
                 if ROBOT_STATE.get().is_none() {
                     eprintln!(
                         "Cannot start rotation shim job because ROBOT_STATE is not initialized"
@@ -450,24 +449,19 @@ impl LunabotAction {
                     }
                     status
                 } else {
-                    // Use the calculated path from CalculatePath action
-                    if let Some(ref path) = blackboard.calculated_path {
-                        let Some(target_yaw) = direction_from_path(path) else {
-                            eprintln!("Calculated path has < 2 nodes");
-                            return (Failure, 0.0);
-                        };
-                        let mut rotation_shim = rotation_shim(target_yaw, 0.1, None, None);
-                        let job_initial_status = rotation_shim.get_status();
-                        blackboard.rotation_shim = Some(rotation_shim);
-                        println!(
-                            "Face path job started with initial status: {:?}",
-                            job_initial_status
-                        );
+                    // uncomment to get yaw to face general direction the path wants you to go
+                    // let Some(target_yaw) = direction_from_path(path) else {
+                    //     eprintln!("Calculated path has < 2 nodes");
+                    //     return (Failure, 0.0);
+                    // };
+                    let mut rotation_shim = rotation_shim(*target_yaw, 0.1, None, None);
+                    let job_initial_status = rotation_shim.get_status();
+                    blackboard.rotation_shim = Some(rotation_shim);
+                    println!(
+                        "Face path job started with initial status: {:?}",
                         job_initial_status
-                    } else {
-                        eprintln!("Cannot face path: no calculated path available");
-                        Failure
-                    }
+                    );
+                    job_initial_status
                 }
             }
             LunabotAction::ResetAllObstacles => {
