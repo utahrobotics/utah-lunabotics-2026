@@ -98,11 +98,11 @@ autonomy={
 "deadzone": 0.2,
 "events": []
 }
-left_wheel={
+left_wheel_fwd={
 "deadzone": 0.2,
 "events": []
 }
-right_wheel={
+right_wheel_fwd={
 "deadzone": 0.2,
 "events": []
 }
@@ -111,6 +111,14 @@ increment_speed={
 "events": [null]
 }
 decrement_speed={
+"deadzone": 0.2,
+"events": []
+}
+left_wheel_back={
+"deadzone": 0.2,
+"events": []
+}
+right_wheel_back={
 "deadzone": 0.2,
 "events": []
 }

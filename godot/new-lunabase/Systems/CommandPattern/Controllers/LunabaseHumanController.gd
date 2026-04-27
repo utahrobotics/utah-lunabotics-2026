@@ -58,16 +58,16 @@ func _process(_delta: float) -> void:
 	# deadzone of 0.2
 	if abs(turn_input) < deadzone:
 		turn_input = 0.0
-		
 	
 	# forward backward speed
 	var forward_backward: float = forward_input - backward_input
 	
 	# diff steering calculation
 	
-	# The inputs of moving the left or right wheels individually
-	var left_wheel : float = Input.get_action_strength("left_wheel")
-	var right_wheel : float = Input.get_action_strength("right_wheel")
+	# Each wheel axis is split into two directional actions so get_action_strength
+	# (which clamps to 0..1) can represent the full -1..1 range, same as move_forward/backward.
+	var left_wheel: float = Input.get_action_strength("left_wheel_fwd") - Input.get_action_strength("left_wheel_back")
+	var right_wheel: float = Input.get_action_strength("right_wheel_fwd") - Input.get_action_strength("right_wheel_back")
 	
 	# Gets left and right wheel speed if using the forward/backward input
 	var calculated_left_speed: float = forward_backward + turn_input
@@ -79,6 +79,7 @@ func _process(_delta: float) -> void:
 	
 	left_speed = clamp(left_speed, -1, 1)
 	right_speed = clamp(right_speed, -1, 1)
+
 	# Queue every frame while held; CommandRecorder throttles and repeats non-zero at throttle_time_ms.
 	var steer_cmd := SteeringCommand.new()
 	steer_cmd.direction = Vector2(left_speed, right_speed)
