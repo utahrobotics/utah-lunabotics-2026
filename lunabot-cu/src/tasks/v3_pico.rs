@@ -1,6 +1,8 @@
 #[cfg(feature = "production")]
 mod prod_impl {
+    use std::ops::Deref as _;
     use std::sync::Arc;
+    use std::sync::Mutex;
     use std::sync::OnceLock;
     use std::time::Duration;
 
@@ -44,6 +46,7 @@ mod prod_impl {
         last_powercycle: Instant,
         teri_mode: bool,
         speed_ratio: f64,
+        wrong_pico_msg: Arc<Mutex<Option<String>>>,
     }
 
     impl Freezable for V3PicoTask {}
@@ -73,7 +76,8 @@ mod prod_impl {
             }.clamp(0.0, 1.0);
 
             let (path_tx, path_rx) = crossbeam_channel::bounded(1);
-
+            let wrong_pico_msg = Arc::new(Mutex::new(None));
+            let msg_clone = Arc::clone(&wrong_pico_msg);
             // this thread monitors for device add events, and then checks the serial number and if it matches what we expect for the pico, it sends the 
             // path to path_rx, where that path tries to be opened in pre_process. 
             // this is so we can hot plug the pico and it auto reconnects.
@@ -152,6 +156,7 @@ mod prod_impl {
                         match serial {
                             embedded_common::PRIME_PICO_SERIAL => {
                                 if teri_mode {
+                                    msg_clone.lock().unwrap().replace(String::from("Teri mode expected, but non teri pico was detected"));
                                     eprintln!("[PICO] Teri mode expected, but non teri pico was detected");
                                     return;
                                 }
@@ -170,6 +175,7 @@ mod prod_impl {
                                     }
                                     println!("[Info] Opened pico");
                                 } else {
+                                    msg_clone.lock().unwrap().replace(String::from("TERI mode pico detected when teri mode isnt activated"));
                                     eprintln!("[PICO] TERI mode pico detected when teri mode isnt activated");
                                 }
                             }
@@ -181,6 +187,7 @@ mod prod_impl {
             });
             let from_pico = Arc::new(&*Box::leak(Box::new(ArrayQueue::new(50))));
             Ok(Self {
+                wrong_pico_msg,
                 path_rx,
                 is_broken: None,
                 from_pico,
@@ -281,6 +288,9 @@ mod prod_impl {
                 }
             } else {
                 output.clear_payload();
+            }
+            if let Some(msg) = self.wrong_pico_msg.lock().unwrap().deref() {
+                return Err(CuError::from(msg.to_owned()));
             }
 
             if self.last_reading.elapsed().as_millis() > 1000 {
