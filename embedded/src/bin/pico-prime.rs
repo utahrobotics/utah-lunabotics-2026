@@ -112,14 +112,14 @@ async fn main(spawner: Spawner) -> ! {
             pwm: Pwm::new_output_b(p.PWM_SLICE2, p.PIN_5, Config::default()),
             which: Actuator::Dumper,
         },
-        // 4th motor driver slot is currently unused
-        // ActuatorDriver { // GPIO 15 and 9
-        //     sleep: Output::new(p.PIN_15, Level::Low),
-        //     fault: Input::new(p.PIN_25, embassy_rp::gpio::Pull::Up),
-        //     dir: Output::new(p.PIN_9, Level::Low),
-        //     pwm: Pwm::new_output_a(p.PWM_SLICE5, p.PIN_7, Config::default()),
-        //     which: ...,
-        // },
+        // used by the fan
+        ActuatorDriver {
+            // GPIO 15 and 9
+            sleep: Output::new(p.PIN_11, Level::Low),
+            dir: Output::new(p.PIN_6, Level::Low),
+            pwm: Pwm::new_output_b(p.PWM_SLICE3, p.PIN_7, Config::default()),
+            which: Actuator::Motor4,
+        },
     ];
 
     let driver = Driver::new(p.USB, Irqs);
@@ -171,7 +171,7 @@ async fn main(spawner: Spawner) -> ! {
 
     let (class_tx, class_rx) = class.split();
 
-    static ACTUATORS: StaticCell<[ActuatorDriver<'static>; 3]> = StaticCell::new();
+    static ACTUATORS: StaticCell<[ActuatorDriver<'static>; 4]> = StaticCell::new();
     static FAULT_DETECTORS: StaticCell<[FaultDetector<'static>; 3]> = StaticCell::new();
     let actuators = ACTUATORS.init(actuators);
     let fault_detectors = FAULT_DETECTORS.init(driver_fault_detectors);
@@ -242,8 +242,10 @@ async fn usb_tx_loop(
 #[embassy_executor::task]
 async fn usb_rx_loop(
     mut reader: Receiver<'static, Driver<'static, USB>>,
-    actuators: &'static mut [ActuatorDriver<'static>; 3],
+    actuators: &'static mut [ActuatorDriver<'static>; 4],
 ) {
+    // just set the fan to high for the whole time
+    actuators[3].drive(65530, Direction::Forward);
     let mut decoded_buf = [0u8; MAX_MESSAGE_SIZE];
     let mut encoded_buf = [0u8; PACKET_SIZE as usize];
     let mut decoder = cobs::CobsDecoder::new(&mut decoded_buf);

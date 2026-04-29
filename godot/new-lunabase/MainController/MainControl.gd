@@ -50,7 +50,9 @@ func _ready() -> void:
 	sigma_spatial_input.value_changed.connect(_on_set_sigma_spatial_changed)
 	sigma_range_input.value_changed.connect(_on_set_sigma_range_changed)
 	
-	speed_slider.value = 0;
+	
+	speed_slider.value = 600;
+	weight = 600;
 	var new_weight = GlobalLunabaseConnection.set_speed(weight)
 	
 	speed_label.text = "SpeedMultiplier set to " + str(new_weight)
