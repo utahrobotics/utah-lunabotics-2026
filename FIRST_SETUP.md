@@ -13,7 +13,7 @@
 7. SSH into the robot using the username, password, and IP in admin chat pinned message. Type `ssh <user>@<ip>` in a shell started on your laptop.
 8. Once sshed in, run `cd utah-lunabotics-2026` on the shell you are sshed into.
 9. run `make prod` on the shell you are sshed into.
-10. On your laptop, start the lunabase, type in the ip of the lunabot in the upper left hand corner, press connect, press manual mode, then control the robot.
+10. On your laptop, start the lunabase, type in the ip of the lunabot in the upper left hand corner, press connect, press manual mode, check if the speed multiplier is non zero, then control the robot.
 11. If something doesn't work, scroll through the error messages in the lower left box, make sure lights on the vesc and prime pico board are all lit, and consult the sections of this guide below for more details.
 
 
