@@ -41,6 +41,7 @@ layout_mode = 2
 layout_mode = 2
 text = "Active input source: "
 horizontal_alignment = 1
+autowrap_mode = 3
 
 [node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer" unique_id=1167786125]
 layout_mode = 2
