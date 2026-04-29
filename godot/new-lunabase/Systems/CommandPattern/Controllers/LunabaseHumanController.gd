@@ -89,8 +89,14 @@ func _process(_delta: float) -> void:
 	# === LIFT ACTUATORS (Keyboard Q/E + D-pad) ===
 	# Sim env doesnt have actuators yet, this will need testing in real life
 	var lift_input: float = 0.0
-	
-	if Input.is_action_pressed("lift_up"):
+
+	var lift_analog_mag: float = maxf(
+		Input.get_action_strength("lift_analog_up"),
+		Input.get_action_strength("lift_analog_down")
+	)
+	if lift_analog_mag > deadzone:
+		lift_input = -lift_analog_mag if Input.is_action_pressed("lift_reverse") else lift_analog_mag
+	elif Input.is_action_pressed("lift_up"):
 		lift_input = 1.0
 	elif Input.is_action_pressed("lift_down"):
 		lift_input = -1.0
@@ -115,8 +121,14 @@ func _process(_delta: float) -> void:
 	# === BUCKET ACTUATORS (Keyboard Z/C + Y/A buttons) ===
 	# This might be a bit clunky tbh, someone who is a gamer might have better ideas
 	var bucket_input: float = 0.0
-	
-	if Input.is_action_pressed("bucket_up"):
+
+	var bucket_analog_mag: float = maxf(
+		Input.get_action_strength("bucket_analog_up"),
+		Input.get_action_strength("bucket_analog_down")
+	)
+	if bucket_analog_mag > deadzone:
+		bucket_input = -bucket_analog_mag if Input.is_action_pressed("bucket_reverse") else bucket_analog_mag
+	elif Input.is_action_pressed("bucket_up"):
 		bucket_input = 1.0
 	elif Input.is_action_pressed("bucket_down"):
 		bucket_input = -1.0
@@ -127,7 +139,14 @@ func _process(_delta: float) -> void:
 
 	# === DUMPER ACTUATORS ===
 	var dumper_input: float = 0.0
-	if Input.is_action_pressed("dumper_up"):
+
+	var dumper_analog_mag: float = maxf(
+		Input.get_action_strength("dumper_analog_up"),
+		Input.get_action_strength("dumper_analog_down")
+	)
+	if dumper_analog_mag > deadzone:
+		dumper_input = -dumper_analog_mag if Input.is_action_pressed("dumper_reverse") else dumper_analog_mag
+	elif Input.is_action_pressed("dumper_up"):
 		dumper_input = 1.0
 	elif Input.is_action_pressed("dumper_down"):
 		dumper_input = -1.0
