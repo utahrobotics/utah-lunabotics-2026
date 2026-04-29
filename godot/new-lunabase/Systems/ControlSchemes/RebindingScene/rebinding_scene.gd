@@ -26,6 +26,7 @@ var pending_axis_device := -1
 var pending_axis := -1
 
 func _ready() -> void:
+	SettingsMenu.toggle_can_accept_inputs.emit(false)
 	setup()
 
 func setup():
@@ -172,6 +173,11 @@ func _on_confirm_bindings_pressed() -> void:
 	SettingsMenu.toggle_can_accept_inputs.emit(true)
 	SettingsMenu.updated_control_scheme.emit()
 	self.queue_free()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE:
+		SettingsMenu.toggle_can_accept_inputs.emit(true)
 
 func _on_save_bindings_button_pressed() -> void:
 	open_text_edit()

@@ -156,6 +156,7 @@ func _on_create_binding_button_pressed() -> void:
 	get_tree().root.add_child(bindings_scene)
 	bindings_scene.binding_saved.connect(_on_binding_saved)
 	close_settings_menu.emit()
+	SettingsMenu.toggle_can_accept_inputs.emit(false)
 
 func _on_binding_saved(saved_path: String) -> void:
 	var kb_sel: int = keyboard_scheme_option_button.selected if keyboard_scheme_option_button.item_count > 0 else 0

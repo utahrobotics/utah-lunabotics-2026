@@ -57,5 +57,6 @@ func toggle_menu_visibility(menu : Control, make_visible : bool):
 
 func _on_settings_button_toggled(toggled_on: bool = false) -> void:
 	toggle_menu_visibility(panel, toggled_on)
+	toggle_can_accept_inputs.emit(not toggled_on)
 	if toggled_on:
 		control_scheme_switcher.sync_touch_controls_from_settings()
