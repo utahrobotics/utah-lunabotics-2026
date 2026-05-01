@@ -68,6 +68,37 @@ fn set_angle_target(actuator: Actuator, target: Option<f32>) {
     }
 }
 
+
+fn clear_all_angle_targets() {
+    LIFT_ANGLE_TARGET.lock(|c| c.set(None));
+    BUCKET_ANGLE_TARGET.lock(|c| c.set(None));
+    DUMPER_ANGLE_TARGET.lock(|c| c.set(None));
+}
+/// Simple PID controller for angle-targeting actuators.
+struct PidController {
+    kp: f32,
+    ki: f32,
+    kd: f32,
+    integral: f32,
+    prev_error: f32,
+    max_integral: f32,
+}
+impl PidController {
+    const fn new(kp: f32, ki: f32, kd: f32) -> Self {
+        Self {
+            kp,
+            ki,
+            kd,
+            integral: 0.0,
+            prev_error: 0.0,
+            max_integral: 1.0,
+        }
+    }
+    fn reset(&mut self) {
+        self.integral = 0.0;
+        self.prev_error = 0.0;
+    }
+
 struct FaultDetector<'a> {
     fault: Input<'a>,
     which: Actuator,
