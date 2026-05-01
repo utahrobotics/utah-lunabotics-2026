@@ -1,8 +1,12 @@
 #![no_std]
 #![no_main]
 
+extern crate libm;
+
+use core::cell::Cell;
 use defmt::{error, info, warn};
 use embassy_executor::Spawner;
+use embassy_futures::select::{Either, select};
 use embassy_rp::{
     bind_interrupts,
     gpio::{Input, Level, Output},
@@ -11,7 +15,10 @@ use embassy_rp::{
     uart::{Async, Config as UartConfig, InterruptHandler as UartInterruptHandler, Uart},
     usb::{Driver, InterruptHandler},
 };
-use embassy_sync::{blocking_mutex::raw::CriticalSectionRawMutex, channel::Channel};
+use embassy_sync::{
+    blocking_mutex::{raw::CriticalSectionRawMutex, Mutex},
+    channel::Channel,
+};
 use embassy_time::{Duration, Timer, with_timeout};
 use embassy_usb::{
     UsbDevice,
