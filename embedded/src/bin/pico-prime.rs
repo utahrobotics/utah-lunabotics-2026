@@ -130,6 +130,23 @@ fn pid_output_to_drive(output: f32) -> (u16, Direction) {
     (speed, direction)
 }
 
+// I hope this is correct 
+fn length_to_angle(length: f32, cal: &embedded_common::ActuatorCalibration) -> f32 {
+    let a = cal.mount_a;
+    let b = cal.mount_b;
+    let c = length;
+    // Law of cosines: c² = a² + b² - 2ab·cos(C)  =>  C = acos((a² + b² - c²) / (2ab))
+    let numerator = a * a + b * b - c * c;
+    let denominator = 2.0 * a * b;
+    if denominator.abs() < 1e-9 {
+        return cal.angle_at_retracted;
+    }
+    let cos_val = (numerator / denominator).max(-1.0).min(1.0);
+    // Use libm for no_std acos
+    let angle = libm::acosf(cos_val);
+    angle + cal.angle_at_retracted
+}
+
 struct FaultDetector<'a> {
     fault: Input<'a>,
     which: Actuator,
