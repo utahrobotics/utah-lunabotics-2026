@@ -19,7 +19,9 @@ use embassy_usb::{
 };
 use embedded_common::{
     Actuator, ActuatorCommand, Direction, FromIMU, FromPico, MAX_MESSAGE_SIZE, PicoError,
-    SecondaryRequest, SecondaryResponse, SensorReading,
+    PotReading, SecondaryRequest, SecondaryResponse, SensorReading,
+    POT_MUX_LIFT, POT_MUX_BUCKET, POT_MUX_DUMPER,
+    LIFT_CAL, BUCKET_CAL, DUMPER_CAL,
 };
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
@@ -31,8 +33,40 @@ bind_interrupts!(struct Irqs {
 static PACKET_SIZE: u16 = 64;
 const POLL_INTERVAL_MS: u64 = 5;
 
+const POT_POLL_INTERVAL_MS: u64 = 1;
+/// How many pot-poll iterations between full sensor sweeps
+const SENSOR_SWEEP_DIVISOR: u32 = 10;
+
 static SENSOR_READINGS: Channel<CriticalSectionRawMutex, SensorReading, 1> = Channel::new();
+static POT_READINGS: Channel<CriticalSectionRawMutex, PotReading, 1> = Channel::new();
+
 static SECONDARY_PICO_ERRORS: Channel<CriticalSectionRawMutex, PicoError, 1> = Channel::new();
+
+static PID_COMMANDS: Channel<CriticalSectionRawMutex, (u16, Actuator, Direction), 4> = Channel::new();
+
+/// Written by usb_rx_loop on SetAngle/StopAll/SetSpeed, read by secondary_poll_loop for PID.
+static LIFT_ANGLE_TARGET: Mutex<CriticalSectionRawMutex, Cell<Option<f32>>> =
+    Mutex::new(Cell::new(None));
+static BUCKET_ANGLE_TARGET: Mutex<CriticalSectionRawMutex, Cell<Option<f32>>> =
+    Mutex::new(Cell::new(None));
+static DUMPER_ANGLE_TARGET: Mutex<CriticalSectionRawMutex, Cell<Option<f32>>> =
+    Mutex::new(Cell::new(None));
+fn get_angle_target(actuator: Actuator) -> Option<f32> {
+    match actuator {
+        Actuator::Lift => LIFT_ANGLE_TARGET.lock(|c| c.get()),
+        Actuator::Bucket => BUCKET_ANGLE_TARGET.lock(|c| c.get()),
+        Actuator::Dumper => DUMPER_ANGLE_TARGET.lock(|c| c.get()),
+        _ => None,
+    }
+}
+fn set_angle_target(actuator: Actuator, target: Option<f32>) {
+    match actuator {
+        Actuator::Lift => LIFT_ANGLE_TARGET.lock(|c| c.set(target)),
+        Actuator::Bucket => BUCKET_ANGLE_TARGET.lock(|c| c.set(target)),
+        Actuator::Dumper => DUMPER_ANGLE_TARGET.lock(|c| c.set(target)),
+        _ => {},
+    }
+}
 
 struct FaultDetector<'a> {
     fault: Input<'a>,
