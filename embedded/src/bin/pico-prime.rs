@@ -99,6 +99,37 @@ impl PidController {
         self.prev_error = 0.0;
     }
 
+        /// Returns a value that should be mapped to motor speed + direction.
+    fn update(&mut self, error: f32, dt: f32) -> f32 {
+        self.integral += error * dt;
+        // Anti-windup clamp
+        if self.integral > self.max_integral {
+            self.integral = self.max_integral;
+        } else if self.integral < -self.max_integral {
+            self.integral = -self.max_integral;
+        }
+        let derivative = if dt > 0.0 {
+            (error - self.prev_error) / dt
+        } else {
+            0.0
+        };
+        self.prev_error = error;
+        self.kp * error + self.ki * self.integral + self.kd * derivative
+    }
+}
+/// Convert a PID output to a (speed, direction) pair suitable for ActuatorDriver::drive.
+fn pid_output_to_drive(output: f32) -> (u16, Direction) {
+    let direction = if output >= 0.0 {
+        Direction::Forward
+    } else {
+        Direction::Backward
+    };
+    // Map |output| (0.0..1.0 range after clamp) to u16 duty cycle
+    let magnitude = output.abs().min(1.0);
+    let speed = (magnitude * u16::MAX as f32) as u16;
+    (speed, direction)
+}
+
 struct FaultDetector<'a> {
     fault: Input<'a>,
     which: Actuator,
