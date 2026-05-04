@@ -43,6 +43,8 @@ const POLL_INTERVAL_MS: u64 = 5;
 const POT_POLL_INTERVAL_MS: u64 = 1;
 /// How many pot-poll iterations between full sensor sweeps
 const SENSOR_SWEEP_DIVISOR: u32 = 10;
+/// Angle error (radians) below which the motor is stopped to prevent oscillation
+const ANGLE_DEADBAND_RAD: f32 = 0.02;
 
 static SENSOR_READINGS: Channel<CriticalSectionRawMutex, SensorReading, 1> = Channel::new();
 static POT_READINGS: Channel<CriticalSectionRawMutex, PotReading, 1> = Channel::new();
@@ -555,9 +557,16 @@ async fn secondary_poll_loop(uart: &'static mut Uart<'static, Async>) {
                 let length = cal.adc_to_length(raw);
                 let current_angle = length_to_angle(length, cal);
                 let error = target_angle - current_angle;
-                let output = pid.update(error, PID_DT);
-                let (speed, direction) = pid_output_to_drive(output);
-                PID_COMMANDS.try_send((speed, actuator, direction)).ok();
+
+                // Dead-band: stop motor and reset integrator when close enough
+                if error.abs() < ANGLE_DEADBAND_RAD {
+                    pid.reset();
+                    PID_COMMANDS.try_send((0, actuator, Direction::Forward)).ok();
+                } else {
+                    let output = pid.update(error, PID_DT);
+                    let (speed, direction) = pid_output_to_drive(output);
+                    PID_COMMANDS.try_send((speed, actuator, direction)).ok();
+                }
             } else {
                 pid.reset();
             }
