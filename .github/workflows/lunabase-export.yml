@@ -1,0 +1,139 @@
+name: 🚀 Lunabase Export
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'lunabase-lib/**'
+      - 'godot/new-lunabase/**'
+      - 'common/**'
+      - 'misc/quic/**'
+      - 'misc/tasker/**'
+      - '.github/workflows/lunabase-export.yml'
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'lunabase-lib/**'
+      - 'godot/new-lunabase/**'
+      - 'common/**'
+      - 'misc/quic/**'
+      - 'misc/tasker/**'
+      - '.github/workflows/lunabase-export.yml'
+  workflow_dispatch:
+
+env:
+  GODOT_VERSION: "4.6.0"
+
+jobs:
+  export:
+    name: 🎮 Export ${{ matrix.platform_name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform_name: Windows
+            os: windows-latest
+            rust_target: x86_64-pc-windows-msvc
+            export_preset: "NewLunabase-Windows"
+            export_path: godot/build/windows/new-lunabase.exe
+            artifact_name: lunabase-windows
+            lib_ext: dll
+            lib_name: lunabase_lib.dll
+
+          - platform_name: Linux
+            os: ubuntu-latest
+            rust_target: x86_64-unknown-linux-gnu
+            export_preset: "Linux"
+            export_path: godot/build/Linux/new-lunabase.x86_64
+            artifact_name: lunabase-linux
+            lib_ext: so
+            lib_name: liblunabase_lib.so
+
+          - platform_name: macOS
+            os: macos-latest
+            rust_target: aarch64-apple-darwin
+            export_preset: "macOS"
+            export_path: godot/build/macOS/new-lunabase.dmg
+            artifact_name: lunabase-macos
+            lib_ext: dylib
+            lib_name: liblunabase_lib.dylib
+
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - name: 🧾 Checkout
+        uses: actions/checkout@v4
+
+      # ── Rust Setup ──────────────────────────────────────────────
+      - name: 🦀 Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-01-18
+          targets: ${{ matrix.rust_target }}
+
+      - name: 📦 Cache Cargo Registry & Build
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-lunabase-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-lunabase-
+
+      - name: 🔨 Build lunabase-lib (Release)
+        run: cargo build --release --package lunabase-lib --target ${{ matrix.rust_target }}
+
+      # Copy the built library to `target/release/` so the .gdextension
+      # paths (`res://../../target/release/...`) resolve correctly from
+      # inside the `godot/new-lunabase/` project directory.
+      - name: 📂 Copy Library to Expected Path
+        run: |
+          mkdir -p target/release
+          cp target/${{ matrix.rust_target }}/release/${{ matrix.lib_name }} \
+             target/release/${{ matrix.lib_name }}
+
+      # ── Godot Setup ────────────────────────────────────────────
+      - name: 🤖 Setup Godot
+        uses: chickensoft-games/setup-godot@v2
+        with:
+          version: ${{ env.GODOT_VERSION }}
+          use-dotnet: false
+          include-templates: true
+
+      - name: ✅ Verify Godot
+        run: godot --version
+
+      # Import project resources so Godot generates the .godot/imported
+      # cache. Without this headless import step, exports can fail with
+      # missing resource errors.
+      - name: 📥 Import Godot Project
+        run: |
+          cd godot/new-lunabase
+          godot --headless --import || true
+        timeout-minutes: 5
+
+      # ── Export ──────────────────────────────────────────────────
+      - name: 📁 Create Export Directory
+        run: |
+          mkdir -p $(dirname ${{ matrix.export_path }})
+
+      - name: 🚀 Export ${{ matrix.platform_name }}
+        run: |
+          cd godot/new-lunabase
+          godot --headless --export-release "${{ matrix.export_preset }}" \
+                "../../${{ matrix.export_path }}"
+        timeout-minutes: 15
+
+      # ── Upload ─────────────────────────────────────────────────
+      - name: 📤 Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.export_path }}
+          if-no-files-found: error
+          retention-days: 14
