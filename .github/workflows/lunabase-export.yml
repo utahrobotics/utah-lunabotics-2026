@@ -2,7 +2,7 @@ name: 🚀 Lunabase Export
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, lunabase-ci-cd]
     paths:
       - 'lunabase-lib/**'
       - 'godot/new-lunabase/**'
