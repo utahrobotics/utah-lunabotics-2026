@@ -110,13 +110,14 @@ jobs:
       - name: ✅ Verify Godot
         run: godot --version
 
-      # Import project resources so Godot generates the .godot/imported
-      # cache. Without this headless import step, exports can fail with
-      # missing resource errors.
+      # Import project resources. We run this twice with --editor --quit 
+      # to ensure all Autoloads and dependencies are fully indexed in the 
+      # .godot/ folder before exporting.
       - name: 📥 Import Godot Project
         run: |
           cd godot/new-lunabase
-          godot --headless --import || true
+          godot --headless --editor --quit || true
+          godot --headless --editor --quit || true
         timeout-minutes: 5
 
       # ── Export ──────────────────────────────────────────────────
