@@ -14,7 +14,7 @@ use crate::{
         blackboard::LunabotBlackboard,
         jobs::{
             dig_job, direction_from_path, dump_job, find_path_job, follow_path_job, load_job,
-            rotation_shim,
+            rotation_shim, dig_macro_job, load_macro_job, dump_macro_job,
         },
     },
     utils::{rwlock_read_unpoison, rwlock_write_unpoison},
@@ -91,6 +91,10 @@ pub enum LunabotAction {
     Dig,
     Load,
     Dump,
+
+    DigMacro,
+    LoadMacro,
+    DumpMacro,
     /// Rotates to reach a target yaw. (in degrees)
     RotateTo(f32),
 
@@ -455,10 +459,73 @@ impl LunabotAction {
                     let initial_status: Status = job.get_status();
                     blackboard.dumper = Some(job);
                     println!(
-                        "Dumping job started with intial status {:?}",
+                        "Dumping job started with initial status {:?}",
                         initial_status
                     );
 
+                    initial_status
+                }
+            }
+            LunabotAction::DigMacro => {
+                if let Some(ref mut digger) = blackboard.macro_digger {
+                    while let Some(command) = digger.get_output() {
+                        blackboard.outgoing_actuator_msg_queue.push_back(command);
+                    }
+                    let status = digger.get_status();
+                    if status == Success {
+                        Success
+                    } else if status == Failure {
+                        blackboard.macro_digger = None;
+                        Failure
+                    } else {
+                        Running
+                    }
+                } else {
+                    let mut job = dig_macro_job();
+                    let initial_status: Status = job.get_status();
+                    blackboard.macro_digger = Some(job);
+                    initial_status
+                }
+            }
+            LunabotAction::LoadMacro => {
+                if let Some(ref mut loader) = blackboard.macro_loader {
+                    while let Some(command) = loader.get_output() {
+                        blackboard.outgoing_actuator_msg_queue.push_back(command);
+                    }
+                    let status = loader.get_status();
+                    if status == Success {
+                        Success
+                    } else if status == Failure {
+                        blackboard.macro_loader = None;
+                        Failure
+                    } else {
+                        Running
+                    }
+                } else {
+                    let mut job = load_macro_job();
+                    let initial_status: Status = job.get_status();
+                    blackboard.macro_loader = Some(job);
+                    initial_status
+                }
+            }
+            LunabotAction::DumpMacro => {
+                if let Some(ref mut dumper) = blackboard.macro_dumper {
+                    while let Some(command) = dumper.get_output() {
+                        blackboard.outgoing_actuator_msg_queue.push_back(command);
+                    }
+                    let status = dumper.get_status();
+                    if status == Success {
+                        Success
+                    } else if status == Failure {
+                        blackboard.macro_dumper = None;
+                        Failure
+                    } else {
+                        Running
+                    }
+                } else {
+                    let mut job = dump_macro_job();
+                    let initial_status: Status = job.get_status();
+                    blackboard.macro_dumper = Some(job);
                     initial_status
                 }
             }

@@ -1,4 +1,4 @@
-use bonsai_bt::Behavior::{self, Action, Wait, While};
+use bonsai_bt::Behavior::{self, Action, Select, Wait, While};
 
 use crate::tasks::ai::{
     action::LunabotAction,
@@ -12,15 +12,24 @@ pub fn autonomy_main(arena: Arena) -> Behavior<LunabotAction> {
             // 1. go to dig site
             navigate_behavior(NavigationGoal::DigSite(arena)),
             // 2. dig
-            Action(LunabotAction::Dig),
+            Select(vec![
+                Action(LunabotAction::DigMacro),
+                Action(LunabotAction::Dig),
+            ]),
             // 3. Load
-            Action(LunabotAction::Load),
+            Select(vec![
+                Action(LunabotAction::LoadMacro),
+                Action(LunabotAction::Load),
+            ]),
             // 4. Navigate to dump site
             navigate_behavior(NavigationGoal::DumpSite(arena)),
             back_up_for(0.5),
             Wait(5.5),
             // 5. Dump
-            Action(LunabotAction::Dump),
+            Select(vec![
+                Action(LunabotAction::DumpMacro),
+                Action(LunabotAction::Dump),
+            ]),
         ],
     )
 }

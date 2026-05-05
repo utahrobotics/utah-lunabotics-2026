@@ -76,6 +76,9 @@ pub struct LunabotBlackboard {
     pub digger: Option<Job<ActuatorCommand, ()>>,
     pub loader: Option<Job<ActuatorCommand, ()>>,
     pub dumper: Option<Job<ActuatorCommand, ()>>,
+    pub macro_digger: Option<Job<ActuatorCommand, ()>>,
+    pub macro_loader: Option<Job<ActuatorCommand, ()>>,
+    pub macro_dumper: Option<Job<ActuatorCommand, ()>>,
 
     /// rotation shim
     pub rotation_shim: Option<Job<Steering, ()>>,
@@ -121,6 +124,9 @@ impl Default for LunabotBlackboard {
             digger: None,
             loader: None,
             dumper: None,
+            macro_digger: None,
+            macro_loader: None,
+            macro_dumper: None,
             rotation_shim: None,
             obstacle_gradient_threshold_expander: 0.5,
             obstacle_gradient_threshold_pathfinder: 0.3,

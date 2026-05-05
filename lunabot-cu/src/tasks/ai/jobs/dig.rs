@@ -10,6 +10,19 @@ pub fn dig_job() -> Job<ActuatorCommand, ()> {
 
     Job::spawn(
         async move {
+            let macro_sequence: Option<Vec<(ActuatorCommand, f32)>> = None; // TODO: load macro sequence from file
+
+            if let Some(sequence) = macro_sequence {
+                for (cmd, delay) in sequence {
+                    let _ = output_tx.send(cmd).await;
+                    if delay > 0.0 {
+                        tokio::time::sleep(std::time::Duration::from_secs_f32(delay)).await;
+                    }
+                }
+                return Success;
+            }
+
+            // Fallback to old speed-based logic
             // Move the bucket down
             let _ = output_tx
                 .send(ActuatorCommand::set_speed(

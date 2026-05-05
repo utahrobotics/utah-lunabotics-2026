@@ -8,16 +8,27 @@ pub fn dump_job() -> Job<ActuatorCommand, ()> {
     let (output_tx, output_rx) = mpsc::channel(2);
     Job::spawn(
         async move {
+            let macro_sequence: Option<Vec<(ActuatorCommand, f32)>> = None; // TODO: load macro sequence from file
+
+            if let Some(sequence) = macro_sequence {
+                for (cmd, delay) in sequence {
+                    let _ = output_tx.send(cmd).await;
+                    if delay > 0.0 {
+                        tokio::time::sleep(std::time::Duration::from_secs_f32(delay)).await;
+                    }
+                }
+                return Success;
+            }
+
+            // Fallback to old speed-based logic
             // send dump command
-            output_tx
-                .send(ActuatorCommand::new(Actuator::Dumper, Direction::Positive))
-                .await
-                .unwrap();
+            let _ = output_tx
+                .send(ActuatorCommand::set_speed(1.0, Actuator::Dumper, Direction::Forward))
+                .await;
             tokio::time::sleep(std::time::Duration::from_secs_f32(1.5)).await;
-            output_tx
-                .send(ActuatorCommand::new(Actuator::Dumper, Direction::Negative))
-                .await
-                .unwrap();
+            let _ = output_tx
+                .send(ActuatorCommand::set_speed(1.0, Actuator::Dumper, Direction::Backward))
+                .await;
             Success
         },
         output_rx,
