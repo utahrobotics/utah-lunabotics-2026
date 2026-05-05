@@ -2,23 +2,23 @@ name: 🚀 Lunabase Export
 
 on:
   push:
-    branches: [main, master, lunabase-ci-cd]
+    branches: [ main, master, lunabase-ci-cd ]
     paths:
-      - 'lunabase-lib/**'
-      - 'godot/new-lunabase/**'
-      - 'common/**'
-      - 'misc/quic/**'
-      - 'misc/tasker/**'
-      - '.github/workflows/lunabase-export.yml'
+      - "lunabase-lib/**"
+      - "godot/new-lunabase/**"
+      - "common/**"
+      - "misc/quic/**"
+      - "misc/tasker/**"
+      - ".github/workflows/lunabase-export.yml"
   pull_request:
-    branches: [main, master]
+    branches: [ main, master ]
     paths:
-      - 'lunabase-lib/**'
-      - 'godot/new-lunabase/**'
-      - 'common/**'
-      - 'misc/quic/**'
-      - 'misc/tasker/**'
-      - '.github/workflows/lunabase-export.yml'
+      - "lunabase-lib/**"
+      - "godot/new-lunabase/**"
+      - "common/**"
+      - "misc/quic/**"
+      - "misc/tasker/**"
+      - ".github/workflows/lunabase-export.yml"
   workflow_dispatch:
 
 env:
@@ -86,7 +86,8 @@ jobs:
             ${{ runner.os }}-cargo-lunabase-
 
       - name: 🔨 Build lunabase-lib (Release)
-        run: cargo build --release --package lunabase-lib --target ${{ matrix.rust_target }}
+        run: cargo build --release --package lunabase-lib --target ${{
+          matrix.rust_target }}
 
       # Copy the built library to both target/release/ and target/debug/
       # so the .gdextension file can always resolve the paths during export.
@@ -131,6 +132,33 @@ jobs:
           godot --headless --export-release "${{ matrix.export_preset }}" \
                 "../../${{ matrix.export_path }}"
         timeout-minutes: 15
+
+      # -- Signing for macOS--
+      - name: 🔏 Ad-hoc Sign macOS App
+        if: matrix.platform_name == 'macOS'
+        run: |
+          DMG_PATH="${{ matrix.export_path }}"
+
+          # Mount the exported DMG
+          hdiutil attach "$DMG_PATH" -mountpoint /tmp/lunabase-mount -nobrowse -quiet
+
+          # Copy .app out (Godot names it after the project)
+          APP=$(find /tmp/lunabase-mount -maxdepth 1 -name "*.app" | head -1)
+          cp -r "$APP" /tmp/new-lunabase.app
+
+          # Unmount
+          hdiutil detach /tmp/lunabase-mount -quiet
+
+          # Ad-hoc sign — '-' means self-signed, no cert required
+          codesign --deep --force --sign - /tmp/new-lunabase.app
+
+          # Recreate the DMG
+          rm "$DMG_PATH"
+          hdiutil create \
+            -volname "Lunabase" \
+            -srcfolder /tmp/new-lunabase.app \
+            -ov -format UDZO \
+            "$DMG_PATH"
 
       # ── Upload ─────────────────────────────────────────────────
       - name: 📤 Upload Artifact
