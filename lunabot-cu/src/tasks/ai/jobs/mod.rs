@@ -1,5 +1,6 @@
 mod dig;
 mod dump;
+mod load;
 mod find_path;
 mod follow_path;
 mod job;
@@ -8,6 +9,7 @@ mod macro_replay;
 
 pub use dig::*;
 pub use dump::*;
+pub use load::*;
 pub use find_path::*;
 pub use follow_path::*;
 pub use job::*;
