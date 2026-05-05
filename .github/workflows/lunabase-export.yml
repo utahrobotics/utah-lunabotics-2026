@@ -88,14 +88,16 @@ jobs:
       - name: 🔨 Build lunabase-lib (Release)
         run: cargo build --release --package lunabase-lib --target ${{ matrix.rust_target }}
 
-      # Copy the built library to `target/release/` so the .gdextension
-      # paths (`res://../../target/release/...`) resolve correctly from
-      # inside the `godot/new-lunabase/` project directory.
-      - name: 📂 Copy Library to Expected Path
+      # Copy the built library to both target/release/ and target/debug/
+      # so the .gdextension file can always resolve the paths during export.
+      - name: 📂 Copy Library to Expected Paths
         run: |
           mkdir -p target/release
+          mkdir -p target/debug
           cp target/${{ matrix.rust_target }}/release/${{ matrix.lib_name }} \
              target/release/${{ matrix.lib_name }}
+          cp target/${{ matrix.rust_target }}/release/${{ matrix.lib_name }} \
+             target/debug/${{ matrix.lib_name }}
 
       # ── Godot Setup ────────────────────────────────────────────
       - name: 🤖 Setup Godot
