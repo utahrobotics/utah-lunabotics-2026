@@ -199,6 +199,13 @@ fn sim_callback<'a>(
                             embedded_common::Actuator::Motor4 => {}
                         }
                     }
+                    embedded_common::ActuatorCommand::SetLiftIK(angle) => {
+                        let angle_change = *angle as f64 - LIFT_TARGET.get();
+                        LIFT_TARGET.store(*angle as f64);
+                        LIFT_SPEED.store(0); // PID on pico handles speed
+                        BUCKET_TARGET.store(BUCKET_TARGET.get() - angle_change);
+                        BUCKET_SPEED.store(0);
+                    }
                     embedded_common::ActuatorCommand::Shake => {}
                     embedded_common::ActuatorCommand::StartPercuss => {}
                     embedded_common::ActuatorCommand::StopPercuss => {}
