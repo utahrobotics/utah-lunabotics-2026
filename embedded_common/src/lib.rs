@@ -18,9 +18,9 @@ pub const IMU_READING_DELAY_MS: u64 = 10;
 pub const MAX_MESSAGE_SIZE: usize = 265;
 
 /// MUX channels for actuator potentiometers on the secondary pico
-pub const POT_MUX_LIFT: u8 = 11;
-pub const POT_MUX_BUCKET: u8 = 12;
-pub const POT_MUX_DUMPER: u8 = 13;
+pub const POT_MUX_LIFT: u8 = 13;
+pub const POT_MUX_BUCKET: u8 = 14;
+pub const POT_MUX_DUMPER: u8 = 15;
 pub const POT_CHANNEL_COUNT: usize = 3;
 
 const _: () = assert!(
@@ -134,7 +134,11 @@ impl PotReading {
     }
 
     pub fn empty() -> Self {
-        Self { lift: 0, bucket: 0, dumper: 0 }
+        Self {
+            lift: 0,
+            bucket: 0,
+            dumper: 0,
+        }
     }
 }
 
@@ -531,7 +535,6 @@ impl Not for Direction {
         }
     }
 }
-
 
 impl SensorReading {
     pub const CHANNEL_COUNT: usize = 11; // 11 active mux channels
