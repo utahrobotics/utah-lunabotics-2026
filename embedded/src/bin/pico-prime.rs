@@ -426,6 +426,39 @@ async fn usb_rx_loop(
                                                     );
                                                     set_angle_target(actuator, Some(angle));
                                                 }
+                                                ActuatorCommand::SetLiftIK(angle) => {
+                                                    info!(
+                                                        "SetLiftIK: angle={}",
+                                                        angle
+                                                    );
+
+                                                    // Read current values
+                                                    let mut pot_raw = [0u16; 3];
+                                                    for (i, &ch) in POT_CHANNELS.iter().enumerate() {
+                                                        pot_raw[i] = read_mux_channel(uart, ch, RESPONSE_TIMEOUT_MS).await.unwrap_or(0);
+                                                    }
+
+                                                    let pot = PotReading {
+                                                        lift: pot_raw[0],
+                                                        bucket: pot_raw[1],
+                                                        dumper: pot_raw[2],
+                                                    };
+
+                                                    let length_lift = &LIFT_CAL.adc_to_length(pot.lift);
+                                                    let old_lift_angle = length_to_angle(old_lift_angle, &LIFT_CAL);
+
+                                                    let length_bucket = &BUCKET_CAL.adc_to_length(pot.bucket);
+                                                    let old_bucket_angle = length_to_angle(old_bucket_angle, &BUCKET_CAL);
+
+                                                    let current_lift_angle = get_angle_target(Actuator::Lift).unwarp_or(old_lift_angle);
+                                                    let current_bucket_angle = get_angle_target(Actuator::Bucket).unwarp_or(old_bucket_angle);
+
+                                                    let angle_change = angle - current_lift_angle;
+
+                                                    // Set values
+                                                    set_angle_target(Actuator::Lift, Some(angle));
+                                                    set_angle_target(Actuator::Bucket, Some(current_bucket_angle - angle_change));
+                                                }
                                                 ActuatorCommand::Shake => {
                                                     warn!("Shake unimplemented");
                                                 }

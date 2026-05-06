@@ -94,6 +94,7 @@ pub enum ActuatorCommand {
     SetSpeed(u16, Actuator, Direction),
     /// Move an actuator to a target angle (radians), PID loop on the pico handles convergence
     SetAngle(Actuator, f32),
+    SetLiftIK(f32),
     Shake,
     StartPercuss,
     StopPercuss,
