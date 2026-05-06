@@ -478,7 +478,7 @@ impl ActuatorCommand {
             ActuatorCommand::SetLiftIK(angle) => {
                 let mut bytes = [0u8; Self::SIZE];
                 bytes[0] = 7;
-                bytes[2..6].copy_from_slice(&angle.to_le_bytes());
+                bytes[1..5].copy_from_slice(&angle.to_le_bytes());
                 bytes
             }
             ActuatorCommand::Shake => {
