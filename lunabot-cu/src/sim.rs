@@ -200,10 +200,10 @@ fn sim_callback<'a>(
                         }
                     }
                     embedded_common::ActuatorCommand::SetLiftIK(angle) => {
-                        let angle_change = *angle as f64 - LIFT_TARGET.get();
+                        let angle_change = *angle as f64 - LIFT_TARGET.load();
                         LIFT_TARGET.store(*angle as f64);
                         LIFT_SPEED.store(0); // PID on pico handles speed
-                        BUCKET_TARGET.store(BUCKET_TARGET.get() - angle_change);
+                        BUCKET_TARGET.store(BUCKET_TARGET.load() - angle_change);
                         BUCKET_SPEED.store(0);
                     }
                     embedded_common::ActuatorCommand::Shake => {}
