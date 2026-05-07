@@ -245,7 +245,6 @@ size_flags_vertical = 3
 [node name="ArenaMap" parent="VBoxContainer/MainContent/HBoxContainer/CenterColumn/Map Panel" unique_id=1557496579 instance=ExtResource("6_moxsj")]
 unique_name_in_owner = true
 layout_mode = 1
-anchors_preset = 15
 
 [node name="UIAttitude" parent="VBoxContainer/MainContent/HBoxContainer/CenterColumn" unique_id=1693065779 instance=ExtResource("4_3r4oj")]
 custom_minimum_size = Vector2(0, 130)
@@ -273,7 +272,6 @@ horizontal_alignment = 1
 custom_minimum_size = Vector2(160, 0)
 layout_mode = 2
 size_flags_horizontal = 3
-size_flags_stretch_ratio = 1.0
 theme_override_constants/separation = 15
 
 [node name="LogoContainer" type="CenterContainer" parent="VBoxContainer/MainContent/HBoxContainer/RightColumn" unique_id=922206054]

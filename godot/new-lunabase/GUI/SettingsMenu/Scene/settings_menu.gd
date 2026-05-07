@@ -1,4 +1,5 @@
 class_name SettingsMenuHandler extends Node
+const ControlConfigLoaderScript = preload("res://Systems/ControlSchemes/control_config_loader.gd")
 
 @onready var panel: Panel = $Control/Panel
 @onready var control_scheme_switcher: ControlSchemeSwitcher = $Control/Panel/Panel
@@ -27,6 +28,7 @@ func set_touch_screen_controls(enabled: bool) -> void:
 	touch_screen_controls_changed.emit(enabled)
 
 func _ready() -> void:
+	ControlConfigLoaderScript.ensure_loaded()
 	if disable_ui_inputs:
 		_disable_non_pointer_ui_navigation()
 	control_scheme_switcher.updated_control_scheme.connect(_on_controls_updated)
@@ -55,5 +57,6 @@ func toggle_menu_visibility(menu : Control, make_visible : bool):
 
 func _on_settings_button_toggled(toggled_on: bool = false) -> void:
 	toggle_menu_visibility(panel, toggled_on)
+	toggle_can_accept_inputs.emit(not toggled_on)
 	if toggled_on:
 		control_scheme_switcher.sync_touch_controls_from_settings()

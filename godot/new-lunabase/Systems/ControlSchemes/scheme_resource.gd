@@ -17,6 +17,15 @@ class_name ControlSchemeResource extends Resource
 @export var bucket_down: Array[InputEvent]
 @export var dumper_up: Array[InputEvent]
 @export var dumper_down: Array[InputEvent]
+@export var lift_analog_up: Array[InputEvent]
+@export var lift_analog_down: Array[InputEvent]
+@export var lift_reverse: Array[InputEvent]
+@export var bucket_analog_up: Array[InputEvent]
+@export var bucket_analog_down: Array[InputEvent]
+@export var bucket_reverse: Array[InputEvent]
+@export var dumper_analog_up: Array[InputEvent]
+@export var dumper_analog_down: Array[InputEvent]
+@export var dumper_reverse: Array[InputEvent]
 @export var autonomy: Array[InputEvent]
 @export var increment_speed: Array[InputEvent]
 @export var decrement_speed: Array[InputEvent]
@@ -43,6 +52,15 @@ func get_all_actions() -> Dictionary:
 	all_actions["bucket_down"] = bucket_down
 	all_actions["dumper_up"] = dumper_up
 	all_actions["dumper_down"] = dumper_down
+	all_actions["lift_analog_up"] = lift_analog_up
+	all_actions["lift_analog_down"] = lift_analog_down
+	all_actions["lift_reverse"] = lift_reverse
+	all_actions["bucket_analog_up"] = bucket_analog_up
+	all_actions["bucket_analog_down"] = bucket_analog_down
+	all_actions["bucket_reverse"] = bucket_reverse
+	all_actions["dumper_analog_up"] = dumper_analog_up
+	all_actions["dumper_analog_down"] = dumper_analog_down
+	all_actions["dumper_reverse"] = dumper_reverse
 	all_actions["autonomy"] = autonomy
 	all_actions["increment_speed"] = increment_speed
 	all_actions["decrement_speed"] = decrement_speed
