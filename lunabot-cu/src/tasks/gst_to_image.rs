@@ -219,7 +219,7 @@ impl CuTask for GstToImage {
         );
 
         output.tov = input.tov;
-        output.set_payload(image);
+//        output.set_payload(image);
         Ok(())
     }
 }

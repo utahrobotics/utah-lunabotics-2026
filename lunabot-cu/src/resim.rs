@@ -248,11 +248,11 @@ fn main() {
             .expect("Failed to setup logger.");
 
             // uncomment to use with docker
-            // rerun_viz::init_rerun(rerun_viz::RerunViz::Grpc(
-            //     rerun_viz::Level::All,
-            //     "host.docker.internal".to_string(),
-            // ))
-            // .expect("Failed to initialize rerun viz.");
+            rerun_viz::init_rerun(rerun_viz::RerunViz::Grpc(
+                 rerun_viz::Level::All,
+                 "host.docker.internal".to_string(),
+             ))
+             .expect("Failed to initialize rerun viz.");
 
             rerun_viz::init_rerun(rerun_viz::RerunViz::Viz(rerun_viz::Level::All)).expect(
                 "Failed to initialize Rerun. Please check that the rerun binary is in your path.",

@@ -128,8 +128,6 @@ func handle_throttle(_delta):
 	for stream_key in ["steering", "lift", "bucket", "dumper"]:
 		if not pending_commands.has(stream_key):
 			continue
-		if not _is_stream_supported(stream_key):
-			continue
 		var command: Command = pending_commands[stream_key]
 		if _should_send(stream_key, command):
 			_execute_and_log(command)
@@ -144,8 +142,6 @@ func _send_zero_keepalives_if_needed() -> void:
 	var now_ms: int = Time.get_ticks_msec()
 	for stream_key in ["steering", "lift", "bucket", "dumper"]:
 		if not last_sent_commands.has(stream_key):
-			continue
-		if not _is_stream_supported(stream_key):
 			continue
 		var last_cmd: Command = last_sent_commands[stream_key]
 		if not _is_zero_command(last_cmd):
@@ -247,20 +243,6 @@ func _build_zero_command_for_stream(stream_key: String) -> Command:
 			return dumper
 		_:
 			return null
-
-
-func _is_stream_supported(stream_key: String) -> bool:
-	match stream_key:
-		"steering":
-			return actor != null and actor.has_method("execute_steering")
-		"lift":
-			return actor != null and actor.has_method("send_lift_actuators")
-		"bucket":
-			return actor != null and actor.has_method("send_bucket_actuators")
-		"dumper":
-			return actor != null and actor.has_method("send_dumper_actuators")
-		_:
-			return false
 
 
 func _refresh_processing_state() -> void:

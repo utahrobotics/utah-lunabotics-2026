@@ -1,31 +1,25 @@
 { // euler angles are declared in roll, pitch, yaw order, and by default applied in yaw, pitch, roll order, but you can change that order with the "euler_order" field
-// euler angles of 0,0,0 would mean sensor facing forward (pos x)
-// the cable sticks out the right side (neg y) if the sensor is facing forward with eulers of all 0
-// Left T261: (-0.01626, 0.3592, 0.2223), cable facing +x, no tilt
-// Right T261: (-0.117, -0.3213, 0.1969), cable facing +x, no tilt
-// D455: (0.5632, -0.0292, 0.2096), cable facing -z, -25 degree tilt
-// T265: (0.5385, 0.0660, 0.1721), cable facing +y, -5 degree tilt
     "free_origin": [0.0, 0.0, 0.0], 
     "free_euler": [0.0, 0.0, 0.0], 
     "children": [
         {
             //t265
             "name": Some("929122111514"),
-            "origin": [0.5385,0.0660,0.1721],
-            "euler": [180.0,5.0,0.0],
+            "origin": [0.065,0.20,0.0],
+            "euler": [180.0,0.0,90.0],
 
         },
         {
-            // t261 right
+            // t261 left
             "name": Some("142122111023"),
-            "origin": [-0.01626,0.3592,0.2223],
-            "euler": [180.0,0.0,-90.0],
+            "origin": [0,0.36,0.0],
+            "euler": [0.0,-90.0,0.0],
         },
         {
-            // t261 left
-            "name": Some("142122110508"),   
-            "origin": [-0.117,-0.3213,0.1969],
-            "euler": [0.0,180.0,90.0],
+            // t261 right
+            "name": Some("142122110508"),
+            "origin": [0,-0.36,0.0],
+            "euler": [0.0,-90.0,180.0],
         },
         {
             "name": Some("l2_front"),
@@ -36,10 +30,10 @@
             // this field determines the orders the angles are applied in
             "euler_order": ["pitch","yaw","roll"]
         },
-        { // d455
+        {
             "name": Some("upper_depth_camera"),
-            "origin": [0.5632, -0.0292, 0.2096],
-            "euler": [0.0,15.0,0.0]
+            "origin": [0.89, 0.0, 0.31],
+            "euler": [0.0, 28.0, 0.0]
         },
         {
             "name": Some("cam_laptop_front"),

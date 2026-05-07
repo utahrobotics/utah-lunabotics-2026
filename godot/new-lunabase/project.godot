@@ -94,42 +94,6 @@ dumper_down={
 "deadzone": 0.2,
 "events": []
 }
-lift_analog_up={
-"deadzone": 0.2,
-"events": []
-}
-lift_analog_down={
-"deadzone": 0.2,
-"events": []
-}
-lift_reverse={
-"deadzone": 0.2,
-"events": []
-}
-bucket_analog_up={
-"deadzone": 0.2,
-"events": []
-}
-bucket_analog_down={
-"deadzone": 0.2,
-"events": []
-}
-bucket_reverse={
-"deadzone": 0.2,
-"events": []
-}
-dumper_analog_up={
-"deadzone": 0.2,
-"events": []
-}
-dumper_analog_down={
-"deadzone": 0.2,
-"events": []
-}
-dumper_reverse={
-"deadzone": 0.2,
-"events": []
-}
 autonomy={
 "deadzone": 0.2,
 "events": []

@@ -63,7 +63,7 @@ impl Default for WarmupState {
         Self {
             done: false,
             current_pose_count: 0,
-            warmup_pose_count: 100,
+            warmup_pose_count: 200,
             world_to_odom_offset: None,
         }
     }

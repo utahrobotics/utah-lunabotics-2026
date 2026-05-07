@@ -11,7 +11,7 @@
                 "obstacle_gradient_threshold_expander": 0.9,
                 "obstacle_gradient_threshold_pathfinder": 0.3,
                 "robot_radius_meters": 0.8,
-                "arena": "artemis"
+                "arena": "ucfleft"
             },
             logging:(
                 enabled: false
@@ -51,8 +51,8 @@
             id:"realsense_subscriber",
             type: "crate::tasks::sources::RealsenseSubscriber",
             config: {
-                "serial_num": "044422250424",
-                // "serial_num": "341222301443",
+                // "serial_num": "044422250424",
+                "serial_num": "341222301443",
                 // dust protected cam
                 // "serial_num": "341222301328",
                 // "serial_num": "311322302990",
@@ -72,8 +72,8 @@
                 "t265_velocity_variance": 1.0,
                 "t265_angular_velocity_variance": 1.0,
                 "pose_variance": 0.05,
-                "left_serial": "142122111023",
-                "right_serial": "142122110508",
+                "right_serial": "142122111023",
+                "left_serial": "142122110508",
                 "rear_serial": "929122111514",
             },
             logging: (
@@ -115,7 +115,7 @@
                 "min_distance_to_clear": 1.5,
 
                 // enable permanent obstacles: artemis, ucfright, or ucfleft
-                "arena_obstacles": "artemis",
+                "arena_obstacles": "ucfleft",
 
                 // parameters for when to reset the local map
                 "max_distance_traveled_before_reset": 1.5,
@@ -228,7 +228,7 @@
             id:"v3_pico", type: "crate::tasks::V3PicoTask", config:{
                 "teri_mode": false,
                 // Float between 0 and 1. Max power would be 1.0 which is honestly too fast even for prod, 0.2 is decently slow and good for outreach events 
-                "speed_ratio": 0.4,
+                "speed_ratio": 0.2,
             }
         ),
         // handles apriltag detections from all the cameras, combining them and then sending them over to the localizer
@@ -244,7 +244,7 @@
 
         // Special apriltag detection tasks for the T265's that handle un distortion.
         (
-            id: "detector_cam_t265_left",
+            id: "detector_cam_t265_right",
             type: "cu_apriltag::AprilTags",
             config: {
                 "family": "tag36h11",
@@ -262,7 +262,7 @@
             background: true,
         ),
         (
-            id: "detector_cam_t265_right",
+            id: "detector_cam_t265_left",
             type: "cu_apriltag::AprilTags",
             config: {
                 "family": "tag36h11",

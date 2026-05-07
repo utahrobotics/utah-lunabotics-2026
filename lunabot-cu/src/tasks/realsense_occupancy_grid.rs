@@ -682,7 +682,7 @@ impl CuTask for OccupancyGridTask {
                     )
                 };
 
-                if let (Ok((_points, obstacle_map)), Some(logger)) =
+                if let (Ok((points, obstacle_map)), Some(logger)) =
                     (&process_result, RECORDER.get())
                 {
                     let depth_bytes: &[u8] = unsafe {
@@ -703,6 +703,14 @@ impl CuTask for OccupancyGridTask {
                         .with_meter(1.0 / request.depth_scale)
                         .with_depth_range([0.0, 2.0 / request.depth_scale as f64]),
                     );
+                    // let _ = logger.recorder.log(
+                    //     "realsense/pcl",
+                    //     &rerun::Points3D::new(
+                    //         points.iter().map(|p| {
+                    //             [p.x as f32, p.y as f32, p.z as f32]
+                    //         })
+                    //     )
+                    // );
 
                     let pipeline_guard = pipeline.lock().unwrap();
                     let raw_height_map = pipeline_guard.get_raw_height_map(get_device()).unwrap();

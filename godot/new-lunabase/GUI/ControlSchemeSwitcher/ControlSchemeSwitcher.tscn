@@ -5,14 +5,14 @@
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_5b5wv"]
 bg_color = Color(0.03579899, 0.076357864, 0.12015928, 1)
-corner_radius_top_left = 20
-corner_radius_top_right = 20
-corner_radius_bottom_right = 20
-corner_radius_bottom_left = 20
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
 
 [node name="Panel" type="Panel" unique_id=1001667156]
-offset_right = 906.2307
-offset_bottom = 357.0
+offset_right = 660.0
+offset_bottom = 260.0
 theme_override_styles/panel = SubResource("StyleBoxFlat_5b5wv")
 script = ExtResource("1_5b5wv")
 
@@ -25,23 +25,6 @@ grow_horizontal = 2
 grow_vertical = 2
 theme_override_constants/separation = 19
 alignment = 1
-
-[node name="HBoxContainerSource" type="HBoxContainer" parent="VBoxContainer" unique_id=1209024244]
-layout_mode = 2
-alignment = 1
-
-[node name="Label" type="Label" parent="VBoxContainer/HBoxContainerSource" unique_id=518620640]
-layout_mode = 2
-text = "Active Source:"
-
-[node name="ActiveSourceOptionButton" type="OptionButton" parent="VBoxContainer/HBoxContainerSource" unique_id=808860878]
-layout_mode = 2
-
-[node name="ActiveSchemeLabel" type="Label" parent="VBoxContainer" unique_id=524786134]
-layout_mode = 2
-text = "Active input source: "
-horizontal_alignment = 1
-autowrap_mode = 3
 
 [node name="HBoxContainer" type="HBoxContainer" parent="VBoxContainer" unique_id=1167786125]
 layout_mode = 2
@@ -121,10 +104,6 @@ grow_vertical = 0
 theme = ExtResource("2_5lhh3")
 text = "Create custom binding"
 
-[connection signal="item_selected" from="VBoxContainer/HBoxContainerSource/ActiveSourceOptionButton" to="." method="_on_active_source_option_button_item_selected"]
-[connection signal="item_selected" from="VBoxContainer/HBoxContainer/ControllerSchemeOptionButton" to="." method="_on_controller_scheme_option_button_item_selected"]
-[connection signal="item_selected" from="VBoxContainer/HBoxContainer2/KeyboardSchemeOptionButton" to="." method="_on_keyboard_scheme_option_button_item_selected"]
 [connection signal="item_selected" from="VBoxContainer/HBoxContainer4/LocalSchemeOptionButton" to="." method="_on_local_scheme_option_button_item_selected"]
 [connection signal="toggled" from="VBoxContainer/HBoxContainer3/TouchControlsCheckButton" to="." method="_on_touch_controls_check_toggled"]
-[connection signal="pressed" from="DefaultButton" to="." method="_on_default_button_pressed"]
 [connection signal="pressed" from="CreateBindingButton" to="." method="_on_create_binding_button_pressed"]

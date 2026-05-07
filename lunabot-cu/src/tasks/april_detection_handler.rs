@@ -150,6 +150,7 @@ impl CuTask for AprilDetectionHandler {
     ) -> CuResult<()> {
         output.clear_payload();
         if let Some(bb) = BLACKBOARD_SHARED.get() && !rwlock_read_unpoison(&bb).enable_apriltags {
+            eprintln!("apriltags not enabled");
             return Ok(());
         }
         let (input1, input2, input3, input4, input5, input6) = input;
@@ -170,6 +171,7 @@ impl CuTask for AprilDetectionHandler {
                     continue;
                 };
                 if observation.tag_local_isometry.translation.vector.magnitude() > self.max_distance {
+                    println!("too far: {}", observation.tag_local_isometry.translation.vector.magnitude());
                     continue;
                 }
 
