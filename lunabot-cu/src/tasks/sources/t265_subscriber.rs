@@ -1,7 +1,9 @@
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use crossbeam::channel::Receiver;
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
-use std::{collections::HashMap,sync::Arc};
+use rerun::Vector3D;
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+use std::{collections::HashMap, sync::Arc};
 
 use cu_bincode::{Decode, Encode};
 use cu_sensor_payloads::CuImage;
@@ -294,7 +296,6 @@ impl CuSrcTask for T265Subscriber {
                 } else {
                     eprintln!("[T265 SUBSCRIBER] Unknown serial on image");
                 }
-
             }
         }
 
@@ -346,11 +347,79 @@ impl CuSrcTask for T265Subscriber {
                 rotation[1],
                 rotation[2],
             ));
+
             let q_robot = coord_transform * q_t265 * coord_transform.inverse();
             let pose = Isometry3::from_parts(
                 Vector3::new(-translation[2], -translation[0], translation[1]).into(),
                 q_robot,
             );
+
+            // transforming accel vectors to  z up y left x forward
+            //see misc/t265_translations/t265_transformations.py
+
+            use nalgebra::Matrix3;
+            let x_angle = std::f64::consts::PI;
+            let z_angle = std::f64::consts::FRAC_PI_2;
+
+            let accel_rotation_matrix_x = Matrix3::new(
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                x_angle.cos(),
+                -x_angle.sin(),
+                0.0,
+                x_angle.sin(),
+                x_angle.cos(),
+            );
+
+            let accel_rotation_matrix_z = Matrix3::new(
+                z_angle.cos(),
+                -z_angle.sin(),
+                0.0,
+                z_angle.sin(),
+                z_angle.cos(),
+                0.0,
+                0.0,
+                0.0,
+                1.0,
+            );
+
+            let accel_rotation_matrix = accel_rotation_matrix_z * accel_rotation_matrix_x;
+
+            let accel_vector: Vector3<f64> = Vector3::from_row_slice(&acceleration);
+            let angular_accel_vector: Vector3<f64> = Vector3::from_row_slice(&angular_acceleration);
+            let velo_vector: Vector3<f64> = Vector3::from_row_slice(&velocity);
+            let angular_velo_vector: Vector3<f64> = Vector3::from_row_slice(&angular_velocity);
+
+            let transformed_accel = accel_rotation_matrix * accel_vector;
+            let transformed_ang_accel = accel_rotation_matrix * angular_accel_vector;
+            let transformed_velo = accel_rotation_matrix * velo_vector;
+            let transformed_ang_velo = accel_rotation_matrix * angular_velo_vector;
+
+            let accel: [f32; 3] = [
+                transformed_accel.x as f32,
+                transformed_accel.y as f32,
+                transformed_accel.z as f32,
+            ];
+
+            let angular_acceleration: [f32; 3] = [
+                transformed_ang_accel.x as f32,
+                transformed_ang_accel.y as f32,
+                transformed_ang_accel.z as f32,
+            ];
+
+            let velocity: [f32; 3] = [
+                transformed_velo.x as f32,
+                transformed_velo.y as f32,
+                transformed_velo.z as f32,
+            ];
+
+            let angular_velocity: [f32; 3] = [
+                transformed_ang_velo.x as f32,
+                transformed_ang_velo.y as f32,
+                transformed_ang_velo.z as f32,
+            ];
 
             let Some(kinematic_node) = ROBOT_STATE
                 .get()
@@ -385,7 +454,7 @@ impl CuSrcTask for T265Subscriber {
                 angular_velocity_variance: self.angular_velocity_variance,
                 node_name: device_id,
                 imu_msg: T265IMUMsg {
-                    accel: acceleration,
+                    accel: accel,
                     angular_accel: angular_acceleration,
                     velocity,
                     angular_velocity,
