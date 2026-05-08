@@ -1,4 +1,5 @@
 class_name LunabaseHumanController extends Node
+const ControlConfigLoaderScript = preload("res://Systems/ControlSchemes/control_config_loader.gd")
 
 @export var actor_path: NodePath
 @export var is_actor_lunabase_connection := true
@@ -49,6 +50,7 @@ func _ready() -> void:
 	
 	if is_equal_approx(steering_axis_deadzone, 0.2) and not is_equal_approx(deadzone, 0.2):
 		steering_axis_deadzone = deadzone
+	ControlConfigLoaderScript.apply_controller_flags(self)
 
 func set_can_send_inputs(_can_send_inputs):
 	can_send_inputs = _can_send_inputs

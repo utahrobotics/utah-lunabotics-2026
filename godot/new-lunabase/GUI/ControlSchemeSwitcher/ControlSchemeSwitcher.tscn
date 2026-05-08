@@ -121,6 +121,19 @@ grow_vertical = 0
 theme = ExtResource("2_5lhh3")
 text = "Create custom binding"
 
+[node name="ReloadConfigButton" type="Button" parent="." unique_id=1847411007]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 183.0
+offset_top = -37.0
+offset_right = 338.0
+offset_bottom = -7.0
+grow_vertical = 0
+theme = ExtResource("2_5lhh3")
+text = "Reload Config"
+
 [connection signal="item_selected" from="VBoxContainer/HBoxContainerSource/ActiveSourceOptionButton" to="." method="_on_active_source_option_button_item_selected"]
 [connection signal="item_selected" from="VBoxContainer/HBoxContainer/ControllerSchemeOptionButton" to="." method="_on_controller_scheme_option_button_item_selected"]
 [connection signal="item_selected" from="VBoxContainer/HBoxContainer2/KeyboardSchemeOptionButton" to="." method="_on_keyboard_scheme_option_button_item_selected"]
@@ -128,3 +141,4 @@ text = "Create custom binding"
 [connection signal="toggled" from="VBoxContainer/HBoxContainer3/TouchControlsCheckButton" to="." method="_on_touch_controls_check_toggled"]
 [connection signal="pressed" from="DefaultButton" to="." method="_on_default_button_pressed"]
 [connection signal="pressed" from="CreateBindingButton" to="." method="_on_create_binding_button_pressed"]
+[connection signal="pressed" from="ReloadConfigButton" to="." method="_on_reload_config_button_pressed"]

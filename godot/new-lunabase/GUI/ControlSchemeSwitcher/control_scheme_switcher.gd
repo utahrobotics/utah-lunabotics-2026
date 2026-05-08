@@ -158,6 +158,10 @@ func _on_create_binding_button_pressed() -> void:
 	close_settings_menu.emit()
 	SettingsMenu.toggle_can_accept_inputs.emit(false)
 
+
+func _on_reload_config_button_pressed() -> void:
+	_reload_config_now()
+
 func _on_binding_saved(saved_path: String) -> void:
 	var kb_sel: int = keyboard_scheme_option_button.selected if keyboard_scheme_option_button.item_count > 0 else 0
 	var ctrl_sel: int = controller_scheme_option_button.selected if controller_scheme_option_button.item_count > 0 else 0
@@ -252,8 +256,7 @@ func _apply_custom_scheme() -> void:
 
 
 func _apply_config_file() -> void:
-	ControlConfigLoaderScript.ensure_loaded()
-	updated_control_scheme.emit()
+	_reload_config_now()
 
 
 func _update_source_ui_state() -> void:
@@ -302,3 +305,11 @@ func _load_ui_state() -> void:
 	_pending_keyboard_index = int(cfg.get_value("control_scheme_switcher", "keyboard_index", 0))
 	_pending_controller_index = int(cfg.get_value("control_scheme_switcher", "controller_index", 0))
 	_pending_custom_index = int(cfg.get_value("control_scheme_switcher", "custom_index", 0))
+
+
+func _reload_config_now() -> void:
+	ControlConfigLoaderScript.ensure_loaded()
+	var human_controller: Node = get_tree().root.find_child("LunabaseHumanController", true, false)
+	if human_controller != null:
+		ControlConfigLoaderScript.apply_controller_flags(human_controller)
+	updated_control_scheme.emit()

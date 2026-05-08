@@ -4,6 +4,16 @@ extends RefCounted
 const USER_CONFIG_PATH := "user://control_config.json"
 const EXTERNAL_CONFIG_FILENAME := "control_config.json"
 const VERSION := 1
+const FLAGS_KEY := "flags"
+const DEFAULT_FLAGS := {
+	"apply_steering_axis_deadzone": true,
+	"steering_axis_deadzone": 0.2,
+	"apply_trigger_deadzone": true,
+	"trigger_deadzone": 0.05,
+	"invert_lift_default_direction": false,
+	"invert_bucket_default_direction": true,
+	"invert_dumper_default_direction": false,
+}
 
 const ACTIONS: PackedStringArray = [
 	"left_wheel_fwd",
@@ -77,11 +87,52 @@ static func _write_current_inputmap_to_file(path: String) -> void:
 	var payload := {
 		"version": VERSION,
 		"readme": "Tokens: keyboard_<key> | gamepad_button_<index> | gamepad_axis_<index>_positive|negative",
+		FLAGS_KEY: DEFAULT_FLAGS.duplicate(true),
 		"actions": actions,
 	}
 	var file := FileAccess.open(path, FileAccess.WRITE)
 	if file:
 		file.store_string(JSON.stringify(payload, "\t"))
+
+
+static func apply_controller_flags(controller: Node) -> void:
+	if controller == null:
+		return
+	var config_path := _resolve_config_path()
+	if not FileAccess.file_exists(config_path):
+		return
+	var file := FileAccess.open(config_path, FileAccess.READ)
+	if file == null:
+		return
+	var parsed = JSON.parse_string(file.get_as_text())
+	if typeof(parsed) != TYPE_DICTIONARY:
+		return
+	var flags: Dictionary = parsed.get(FLAGS_KEY, {})
+	if typeof(flags) != TYPE_DICTIONARY:
+		return
+	_apply_bool_flag(controller, flags, "apply_steering_axis_deadzone")
+	_apply_float_flag(controller, flags, "steering_axis_deadzone")
+	_apply_bool_flag(controller, flags, "apply_trigger_deadzone")
+	_apply_float_flag(controller, flags, "trigger_deadzone")
+	_apply_bool_flag(controller, flags, "invert_lift_default_direction")
+	_apply_bool_flag(controller, flags, "invert_bucket_default_direction")
+	_apply_bool_flag(controller, flags, "invert_dumper_default_direction")
+
+
+static func _apply_bool_flag(controller: Node, flags: Dictionary, key: String) -> void:
+	if not controller.has_method("get") or not controller.has_method("set"):
+		return
+	if not flags.has(key):
+		return
+	controller.set(key, bool(flags[key]))
+
+
+static func _apply_float_flag(controller: Node, flags: Dictionary, key: String) -> void:
+	if not controller.has_method("get") or not controller.has_method("set"):
+		return
+	if not flags.has(key):
+		return
+	controller.set(key, float(flags[key]))
 
 
 static func _resolve_config_path() -> String:
@@ -90,13 +141,7 @@ static func _resolve_config_path() -> String:
 	var external := _get_external_config_path()
 	if external == "":
 		return USER_CONFIG_PATH
-	if FileAccess.file_exists(external):
-		return external
-	var probe := FileAccess.open(external, FileAccess.WRITE)
-	if probe:
-		probe.close()
-		return external
-	return USER_CONFIG_PATH
+	return external
 
 
 static func _get_external_config_path() -> String:
