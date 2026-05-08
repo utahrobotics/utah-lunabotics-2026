@@ -42,6 +42,7 @@ enum LunabotStage {
 func _ready() -> void:
 	connection.stage_changed.connect(_on_stage_changed)
 	connect_button.pressed.connect(_on_connect_pressed)
+	ip_input.gui_input.connect(_on_ip_input_gui_input)
 	soft_stop_button.pressed.connect(_on_soft_stop_pressed)
 	manual_button.pressed.connect(_on_manual_pressed)
 	autonomous_button.pressed.connect(_on_autonomous_pressed)
@@ -171,3 +172,33 @@ func _on_speed_multiplier_slider_value_changed(value: float) -> void:
 
 	# Update UI
 	speed_label.text = "SpeedMultiplier set to " + str(new_weight)
+
+func _on_ip_input_gui_input(event: InputEvent) -> void:
+	if not (event is InputEventKey):
+		return
+	var key_event := event as InputEventKey
+	if not key_event.pressed or key_event.echo:
+		return
+	if key_event.keycode != KEY_BACKSPACE and key_event.keycode != KEY_DELETE:
+		return
+
+	if ip_input.has_selection():
+		ip_input.delete_text(ip_input.get_selection_from_column(), ip_input.get_selection_to_column())
+		ip_input.deselect()
+		accept_event()
+		return
+
+	var caret: int = ip_input.caret_column
+	if key_event.keycode == KEY_BACKSPACE:
+		if caret <= 0:
+			accept_event()
+			return
+		ip_input.delete_text(caret - 1, caret)
+		ip_input.caret_column = caret - 1
+		accept_event()
+		return
+
+	# KEY_DELETE
+	if caret < ip_input.text.length():
+		ip_input.delete_text(caret, caret + 1)
+	accept_event()

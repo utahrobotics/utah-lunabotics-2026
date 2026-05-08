@@ -86,8 +86,13 @@ custom_minimum_size = Vector2(150, 28)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.9, 0.95, 1, 1)
 theme_override_font_sizes/font_size = 12
+editable = true
 text = "127.0.0.1"
 placeholder_text = "127.0.0.1"
+keep_editing_on_text_submit = true
+draw_control_chars = true
+caret_blink = true
+caret_mid_grapheme = true
 
 [node name="ConnectButton" type="Button" parent="VBoxContainer/TopBar/MarginContainer/TopPanel/ConnectionGroup" unique_id=123997984]
 custom_minimum_size = Vector2(100, 28)
