@@ -5,7 +5,18 @@ class_name LunabaseHumanController extends Node
 
 @export var default_path := "res://Systems/CommandPattern/SavedHistory/lunabotHistory.tres"
 
+# Vestigial deadzone from older scenes
 @export var deadzone: float = 0.2
+
+@export var apply_steering_axis_deadzone: bool = true
+@export var steering_axis_deadzone: float = 0.2
+
+@export var apply_trigger_deadzone: bool = true
+@export var trigger_deadzone: float = 0.05
+
+@export var invert_lift_default_direction: bool = false
+@export var invert_bucket_default_direction: bool = true
+@export var invert_dumper_default_direction: bool = false
 
 @onready var speed_slider = $"../VBoxContainer/MainContent/HBoxContainer/RightColumn/SpeedControl/MarginContainer/VBox/SpeedMultiplierSlider"
 
@@ -35,6 +46,9 @@ func _ready() -> void:
 	command_recorder = CommandRecorder.new(actor, default_path)
 	add_child(command_recorder)
 	SettingsMenu.toggle_can_accept_inputs.connect(set_can_send_inputs)
+	
+	if is_equal_approx(steering_axis_deadzone, 0.2) and not is_equal_approx(deadzone, 0.2):
+		steering_axis_deadzone = deadzone
 
 func set_can_send_inputs(_can_send_inputs):
 	can_send_inputs = _can_send_inputs
@@ -52,15 +66,14 @@ func _process(_delta: float) -> void:
 	
 	var turn_input: float = Input.get_action_strength("move_right") - Input.get_action_strength("move_left")
 	
-	# apply deadzone to turn input
-	#TODO: Check if this is necessary, I think the input map already
-	# handles deadzones which can be tweaked. Right now all inputs have a
-	# deadzone of 0.2
-	if abs(turn_input) < deadzone:
+	var steer_dz: float = steering_axis_deadzone if apply_steering_axis_deadzone else 0.0
+	if abs(turn_input) < steer_dz:
 		turn_input = 0.0
 	
 	# forward backward speed
 	var forward_backward: float = forward_input - backward_input
+	if abs(forward_backward) < steer_dz:
+		forward_backward = 0.0
 	
 	# diff steering calculation
 	
@@ -68,6 +81,10 @@ func _process(_delta: float) -> void:
 	# (which clamps to 0..1) can represent the full -1..1 range, same as move_forward/backward.
 	var left_wheel: float = Input.get_action_strength("left_wheel_fwd") - Input.get_action_strength("left_wheel_back")
 	var right_wheel: float = Input.get_action_strength("right_wheel_fwd") - Input.get_action_strength("right_wheel_back")
+	if abs(left_wheel) < steer_dz:
+		left_wheel = 0.0
+	if abs(right_wheel) < steer_dz:
+		right_wheel = 0.0
 	
 	# Gets left and right wheel speed if using the forward/backward input
 	var calculated_left_speed: float = forward_backward + turn_input
@@ -89,13 +106,16 @@ func _process(_delta: float) -> void:
 	# === LIFT ACTUATORS (Keyboard Q/E + D-pad) ===
 	# Sim env doesnt have actuators yet, this will need testing in real life
 	var lift_input: float = 0.0
+	var trig_dz: float = trigger_deadzone if apply_trigger_deadzone else 0.0
 
 	var lift_analog_mag: float = maxf(
 		Input.get_action_strength("lift_analog_up"),
 		Input.get_action_strength("lift_analog_down")
 	)
-	if lift_analog_mag > deadzone:
+	if lift_analog_mag > trig_dz:
 		lift_input = -lift_analog_mag if Input.is_action_pressed("lift_reverse") else lift_analog_mag
+		if invert_lift_default_direction:
+			lift_input = -lift_input
 	elif Input.is_action_pressed("lift_up"):
 		lift_input = 1.0
 	elif Input.is_action_pressed("lift_down"):
@@ -126,8 +146,10 @@ func _process(_delta: float) -> void:
 		Input.get_action_strength("bucket_analog_up"),
 		Input.get_action_strength("bucket_analog_down")
 	)
-	if bucket_analog_mag > deadzone:
+	if bucket_analog_mag > trig_dz:
 		bucket_input = -bucket_analog_mag if Input.is_action_pressed("bucket_reverse") else bucket_analog_mag
+		if invert_bucket_default_direction:
+			bucket_input = -bucket_input
 	elif Input.is_action_pressed("bucket_up"):
 		bucket_input = 1.0
 	elif Input.is_action_pressed("bucket_down"):
@@ -144,8 +166,10 @@ func _process(_delta: float) -> void:
 		Input.get_action_strength("dumper_analog_up"),
 		Input.get_action_strength("dumper_analog_down")
 	)
-	if dumper_analog_mag > deadzone:
+	if dumper_analog_mag > trig_dz:
 		dumper_input = -dumper_analog_mag if Input.is_action_pressed("dumper_reverse") else dumper_analog_mag
+		if invert_dumper_default_direction:
+			dumper_input = -dumper_input
 	elif Input.is_action_pressed("dumper_up"):
 		dumper_input = 1.0
 	elif Input.is_action_pressed("dumper_down"):
