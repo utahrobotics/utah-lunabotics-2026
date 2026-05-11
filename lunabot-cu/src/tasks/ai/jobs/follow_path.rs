@@ -39,6 +39,8 @@ const DEFAULT_STUCK_SPEED: f32 = 0.15;
 const DEFAULT_STUCK_TIMEOUT: f32 = 5.0;
 /// How long each loop of the controller should be.
 const DT: f32 = 0.05;
+/// Experimental minimum turn radius to avoid zero points.
+const MIN_RADIUS: f32 = 0.25;
 
 /// ## Summary
 /// Uses a pursuit controller to follow a given path in 2D. Directly communicates
@@ -189,6 +191,7 @@ pub fn follow_path_job(
                 let error_angle = (error.y).atan2(error.x);
                 let angle_difference = error_angle - robot_angle;
                 let radius = target_distance / (2.0 * angle_difference.sin()); // Check if this has a sign error
+                let radius = if radius.abs() < MIN_RADIUS { MIN_RADIUS * radius.signum() } else { radius };
 
                 // Only move if the dot is far enough away
                 let steering = if error.norm_squared() > MIN_FOLLOW_DISTANCE * MIN_FOLLOW_DISTANCE {
