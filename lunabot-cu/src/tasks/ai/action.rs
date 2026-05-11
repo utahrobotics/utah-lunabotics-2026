@@ -13,16 +13,17 @@ use crate::{
         behaviors::autonomy::navigate::NavigationGoal,
         blackboard::LunabotBlackboard,
         jobs::{
-            dig_job, direction_from_path, dump_job, find_path_job, follow_path_job, rotation_shim,
+            dig_job, direction_from_path, dump_job, find_path_job, follow_path_job, load_job,
+            rotation_shim, dig_macro_job, load_macro_job, dump_macro_job,
         },
-    }, utils::{rwlock_read_unpoison, rwlock_write_unpoison},
+    },
+    utils::{rwlock_read_unpoison, rwlock_write_unpoison},
 };
 
 static _PATHFINDING_GOAL: [f32; 2] = [5.843524, 1.4796992];
 
 #[derive(Clone, Debug)]
 pub enum LunabotAction {
-
     /// Sets a status message that is sent over to the lunabase.
     /// Dont be repeatedly calling this a million times per second because it will use bandwidth.
     SetBTStatusMsg(String),
@@ -56,6 +57,14 @@ pub enum LunabotAction {
     SetLift(i8),
     SetBucket(i8),
     SetDumper(i8),
+
+    /// Set lift arm to a target angle (radians)
+    SetLiftAngle(f32),
+    /// Set bucket to a target angle (radians)
+    SetBucketAngle(f32),
+    /// Set dumper to a target angle (radians)
+    SetDumperAngle(f32),
+
     // actions for checking the lunabot stage (dig, dump, manual, soft stop, navigate)
     IsSoftStop,
     IsAutonomy,
@@ -80,7 +89,12 @@ pub enum LunabotAction {
 
     // dig up some moon dirt
     Dig,
+    Load,
     Dump,
+
+    DigMacro,
+    LoadMacro,
+    DumpMacro,
     /// Rotates to reach a target yaw. (in degrees)
     RotateTo(f32),
 
@@ -193,6 +207,24 @@ impl LunabotAction {
                 blackboard
                     .outgoing_actuator_msg_queue
                     .push_back(actuator_command_from_i8(*value, Actuator::Dumper));
+                Success
+            }
+            LunabotAction::SetLiftAngle(angle) => {
+                blackboard
+                    .outgoing_actuator_msg_queue
+                    .push_back(ActuatorCommand::set_angle(Actuator::Lift, *angle));
+                Success
+            }
+            LunabotAction::SetBucketAngle(angle) => {
+                blackboard
+                    .outgoing_actuator_msg_queue
+                    .push_back(ActuatorCommand::set_angle(Actuator::Bucket, *angle));
+                Success
+            }
+            LunabotAction::SetDumperAngle(angle) => {
+                blackboard
+                    .outgoing_actuator_msg_queue
+                    .push_back(ActuatorCommand::set_angle(Actuator::Dumper, *angle));
                 Success
             }
             LunabotAction::IsSoftStop => match blackboard.current_mission {
@@ -372,6 +404,36 @@ impl LunabotAction {
                     initial_status
                 }
             }
+            LunabotAction::Load => {
+                // Check if we already got a loading job going
+                if let Some(ref mut loader) = blackboard.loader {
+                    while let Some(command) = loader.get_output() {
+                        blackboard.outgoing_actuator_msg_queue.push_back(command);
+                    }
+                    let status = loader.get_status();
+                    if status == Success {
+                        Success
+                    } else if status == Failure {
+                        //
+                        eprintln!("Failed Loading job!");
+                        blackboard.loader = None;
+                        Failure
+                    } else {
+                        // Still digging
+                        Running
+                    }
+                } else {
+                    // Start a new loading job
+                    let mut job = load_job();
+                    let initial_status: Status = job.get_status();
+                    blackboard.loader = Some(job);
+                    println!(
+                        "Loading job started with initial status {:?}",
+                        initial_status
+                    );
+                    initial_status
+                }
+            }
             LunabotAction::Dump => {
                 // Check if we already got a dumping job going
                 if let Some(ref mut dumper) = blackboard.dumper {
@@ -392,15 +454,78 @@ impl LunabotAction {
                         Running
                     }
                 } else {
-                    // Start a new digging job
+                    // Start a new dump job
                     let mut job = dump_job();
                     let initial_status: Status = job.get_status();
                     blackboard.dumper = Some(job);
                     println!(
-                        "Dumping job started with intial status {:?}",
+                        "Dumping job started with initial status {:?}",
                         initial_status
                     );
 
+                    initial_status
+                }
+            }
+            LunabotAction::DigMacro => {
+                if let Some(ref mut digger) = blackboard.macro_digger {
+                    while let Some(command) = digger.get_output() {
+                        blackboard.outgoing_actuator_msg_queue.push_back(command);
+                    }
+                    let status = digger.get_status();
+                    if status == Success {
+                        Success
+                    } else if status == Failure {
+                        blackboard.macro_digger = None;
+                        Failure
+                    } else {
+                        Running
+                    }
+                } else {
+                    let mut job = dig_macro_job();
+                    let initial_status: Status = job.get_status();
+                    blackboard.macro_digger = Some(job);
+                    initial_status
+                }
+            }
+            LunabotAction::LoadMacro => {
+                if let Some(ref mut loader) = blackboard.macro_loader {
+                    while let Some(command) = loader.get_output() {
+                        blackboard.outgoing_actuator_msg_queue.push_back(command);
+                    }
+                    let status = loader.get_status();
+                    if status == Success {
+                        Success
+                    } else if status == Failure {
+                        blackboard.macro_loader = None;
+                        Failure
+                    } else {
+                        Running
+                    }
+                } else {
+                    let mut job = load_macro_job();
+                    let initial_status: Status = job.get_status();
+                    blackboard.macro_loader = Some(job);
+                    initial_status
+                }
+            }
+            LunabotAction::DumpMacro => {
+                if let Some(ref mut dumper) = blackboard.macro_dumper {
+                    while let Some(command) = dumper.get_output() {
+                        blackboard.outgoing_actuator_msg_queue.push_back(command);
+                    }
+                    let status = dumper.get_status();
+                    if status == Success {
+                        Success
+                    } else if status == Failure {
+                        blackboard.macro_dumper = None;
+                        Failure
+                    } else {
+                        Running
+                    }
+                } else {
+                    let mut job = dump_macro_job();
+                    let initial_status: Status = job.get_status();
+                    blackboard.macro_dumper = Some(job);
                     initial_status
                 }
             }
@@ -468,12 +593,12 @@ impl LunabotAction {
                 blackboard.latest_local_map = None;
                 rwlock_write_unpoison(&*blackboard.blackboard_shared).reset_map = true;
                 Success
-            },
+            }
             LunabotAction::ResetLocalObstacles => {
                 blackboard.latest_local_map = None;
                 rwlock_write_unpoison(&*blackboard.blackboard_shared).reset_local_map = true;
                 Success
-            },
+            }
             LunabotAction::ObstacleResetRequested => {
                 let guard = rwlock_read_unpoison(&*blackboard.blackboard_shared);
                 if guard.reset_local_map || guard.reset_map {
@@ -481,18 +606,18 @@ impl LunabotAction {
                 } else {
                     Success
                 }
-            },
+            }
             LunabotAction::LatestLocalMapReady => {
                 if blackboard.latest_local_map.is_some() {
                     Success
                 } else {
                     Running
                 }
-            },
+            }
             LunabotAction::SetBTStatusMsg(msg) => {
                 blackboard.outgoing_bt_status_msg = Some(msg.to_owned());
                 Success
-            },
+            }
         };
         (status, 0.0)
     }

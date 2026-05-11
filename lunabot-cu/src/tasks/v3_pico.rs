@@ -1,4 +1,4 @@
-#[cfg(feature = "production")]
+#[cfg(any(feature = "production", feature = "pico"))]
 mod prod_impl {
     use std::ops::Deref as _;
     use std::sync::Arc;
@@ -15,6 +15,7 @@ mod prod_impl {
     use embedded_common::ActuatorCommand;
     use embedded_common::FromPico;
     use embedded_common::IMU_READING_DELAY_MS;
+    use embedded_common::PotReading;
     use futures_util::StreamExt;
     use std::time::Instant;
     use tasker::get_tokio_handle;
@@ -73,13 +74,14 @@ mod prod_impl {
                 config.get::<f64>("speed_ratio")?.unwrap_or(1.0)
             } else {
                 1.0
-            }.clamp(0.0, 1.0);
+            }
+            .clamp(0.0, 1.0);
 
             let (path_tx, path_rx) = crossbeam_channel::bounded(1);
             let wrong_pico_msg = Arc::new(Mutex::new(None));
             let msg_clone = Arc::clone(&wrong_pico_msg);
-            // this thread monitors for device add events, and then checks the serial number and if it matches what we expect for the pico, it sends the 
-            // path to path_rx, where that path tries to be opened in pre_process. 
+            // this thread monitors for device add events, and then checks the serial number and if it matches what we expect for the pico, it sends the
+            // path to path_rx, where that path tries to be opened in pre_process.
             // this is so we can hot plug the pico and it auto reconnects.
             std::thread::spawn(move || {
                 let mut monitor = match MonitorBuilder::new() {
@@ -195,7 +197,7 @@ mod prod_impl {
                 last_reading: Instant::now(),
                 last_powercycle: Instant::now(),
                 teri_mode,
-                speed_ratio
+                speed_ratio,
             })
         }
 
@@ -276,6 +278,11 @@ mod prod_impl {
             {
                 actuator_cmd.apply_speed_factor(self.speed_ratio as f32);
                 let serialized = ActuatorCommand::serialize(&actuator_cmd);
+                println!(
+                    "[PICO TX] Sending command: {:?} ({} bytes)",
+                    actuator_cmd,
+                    serialized.len()
+                );
                 if let Err(_) = cmd_tx.try_send(serialized) {
                     eprintln!("[PICO] Command channel full or closed, dropping command");
                 }
@@ -284,7 +291,7 @@ mod prod_impl {
                 output.set_payload(reading);
                 self.last_reading = Instant::now();
                 if let FromPico::Error(e) = reading {
-                    return Err(CuError::from(format!("Pico Error: {e:?}")))
+                    return Err(CuError::from(format!("Pico Error: {e:?}")));
                 }
             } else {
                 output.clear_payload();
@@ -334,37 +341,54 @@ mod prod_impl {
                 tokio::time::sleep(std::time::Duration::from_millis(IMU_READING_DELAY_MS - 1))
                     .await;
                 let Ok(reading) = timeout(Duration::from_millis(200), reader.next()).await else {
-                    eprintln!("Pico has become unresponsive.");
+                    eprintln!("[PICO RX] Pico has become unresponsive (timeout).");
                     let _ = is_broken_tx.send(true);
                     break;
                 };
                 if let Some(Err(e)) = reading {
                     let _ = is_broken_tx.send(true);
-                    eprintln!("failed to read from pico: {}", e.to_string());
+                    eprintln!("[PICO RX] Read error: {}", e.to_string());
                     break;
                 }
                 if let None = reading {
                     no_reading_count += 1;
                     if no_reading_count <= 5 {
                         let _ = is_broken_tx.send(true);
-                        eprintln!("Pico has become unresponsive. (no reading count)");
+                        eprintln!("[PICO RX] Unresponsive (no reading count: {})", no_reading_count);
                         break;
                     }
                     continue;
                 }
                 let reading = reading.unwrap().unwrap();
+                let frame_len = reading.len();
+
+                // Handle PotReading frames (separate, smaller message)
+                if frame_len == PotReading::SIZE {
+                    if let Ok(pot_bytes) = <[u8; PotReading::SIZE]>::try_from(reading.as_ref()) {
+                        let pot = PotReading::deserialize(pot_bytes);
+                        println!("[PICO RX] PotReading: lift={} bucket={} dumper={}", pot.lift, pot.bucket, pot.dumper);
+                        if let Ok(mut file) = tasker::tokio::fs::OpenOptions::new().create(true).append(true).open("pot_log.csv").await {
+                            let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis();
+                            let _ = file.write_all(format!("{},{},{},{}\n", timestamp, pot.lift, pot.bucket, pot.dumper).as_bytes()).await;
+                        }
+                    }
+                    continue;
+                }
+
+                // Handle FromPico frames
                 let Ok(reading) = reading.try_into() else {
-                    eprintln!("not 105 bytes");
+                    eprintln!("[PICO RX] Unexpected frame size: {} bytes (expected FromPico={} or Pot={})",
+                        frame_len, FromPico::SIZE, PotReading::SIZE);
                     continue;
                 };
                 let Ok(reading) = FromPico::deserialize(reading) else {
-                    eprintln!("Failed to deserialize message from picov3 serial port");
+                    eprintln!("[PICO RX] Failed to deserialize FromPico");
                     let _ = is_broken_tx.send(true);
                     break;
                 };
+                println!("[PICO RX] FromPico: {:?}", reading);
                 if let Err(_) = from_pico.push(reading) {
-                    eprintln!("From Pico queue full, dropping reading");
-                    // is_broken_tx.send(true).unwrap();
+                    eprintln!("[PICO RX] From Pico queue full, dropping reading");
                     break;
                 }
             }
@@ -379,7 +403,7 @@ mod prod_impl {
     ) -> tokio::task::JoinHandle<()> {
         get_tokio_handle().spawn(async move {
             while let Some(data) = cmd_rx.recv().await {
-                if teri_mode{
+                if teri_mode {
                     if let Err(e) = writer.write_all(&data).await {
                         eprintln!("[PICO] Failed to write to serial port: {e}");
                         let _ = is_broken_tx.send(true);
@@ -430,13 +454,13 @@ mod prod_impl {
     }
 }
 
-#[cfg(feature = "production")]
+#[cfg(any(feature = "production", feature = "pico"))]
 pub use prod_impl::*;
 
-#[cfg(not(feature = "production"))]
+#[cfg(not(any(feature = "production", feature = "pico")))]
 pub use resim_impl::*;
 
-#[cfg(not(feature = "production"))]
+#[cfg(not(any(feature = "production", feature = "pico")))]
 mod resim_impl {
     use cu29::{cutask::CuTask, prelude::*};
     use embedded_common::FromPico;

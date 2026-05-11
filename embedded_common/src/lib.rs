@@ -17,6 +17,12 @@ pub const TERI_PICO_SERIAL: &'static str = "USR-PICO-TERI";
 pub const IMU_READING_DELAY_MS: u64 = 10;
 pub const MAX_MESSAGE_SIZE: usize = 265;
 
+/// MUX channels for actuator potentiometers on the secondary pico
+pub const POT_MUX_LIFT: u8 = 11;
+pub const POT_MUX_BUCKET: u8 = 12;
+pub const POT_MUX_DUMPER: u8 = 13;
+pub const POT_CHANNEL_COUNT: usize = 3;
+
 const _: () = assert!(
     FromIMU::SIZE <= MAX_MESSAGE_SIZE,
     "FromIMU exceeds MAX_MESSAGE_SIZE"
@@ -86,6 +92,8 @@ impl Actuator {
 
 pub enum ActuatorCommand {
     SetSpeed(u16, Actuator, Direction),
+    /// Move an actuator to a target angle (radians), PID loop on the pico handles convergence
+    SetAngle(Actuator, f32),
     Shake,
     StartPercuss,
     StopPercuss,
@@ -93,17 +101,108 @@ pub enum ActuatorCommand {
     StopAll,
 }
 
-// #[derive(Clone, Copy, Debug, PartialEq)]
-// #[cfg_attr(any(feature = "defmt", feature = "defmt-03"), derive(defmt::Format))]
-// /// adc readings
-// #[cfg_attr(
-//     feature = "std",
-//     derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
-// )]
-// pub struct ActuatorReading {
-//     pub m1_reading: u16,
-//     pub m2_reading: u16,
-// }
+/// Potentiometer readings from the 3 actuators, fast-polled message
+#[derive(Clone, Copy, Debug, PartialEq)]
+#[cfg_attr(any(feature = "defmt", feature = "defmt-03"), derive(defmt::Format))]
+#[cfg_attr(
+    feature = "std",
+    derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
+)]
+pub struct PotReading {
+    pub lift: u16,
+    pub bucket: u16,
+    pub dumper: u16,
+}
+
+impl PotReading {
+    pub const SIZE: usize = 6; // 3 x u16
+
+    pub fn serialize(&self) -> [u8; Self::SIZE] {
+        let mut bytes = [0u8; Self::SIZE];
+        bytes[0..2].copy_from_slice(&self.lift.to_le_bytes());
+        bytes[2..4].copy_from_slice(&self.bucket.to_le_bytes());
+        bytes[4..6].copy_from_slice(&self.dumper.to_le_bytes());
+        bytes
+    }
+
+    pub fn deserialize(bytes: [u8; Self::SIZE]) -> Self {
+        Self {
+            lift: u16::from_le_bytes([bytes[0], bytes[1]]),
+            bucket: u16::from_le_bytes([bytes[2], bytes[3]]),
+            dumper: u16::from_le_bytes([bytes[4], bytes[5]]),
+        }
+    }
+
+    pub fn empty() -> Self {
+        Self { lift: 0, bucket: 0, dumper: 0 }
+    }
+}
+
+const _: () = assert!(
+    PotReading::SIZE <= MAX_MESSAGE_SIZE,
+    "PotReading exceeds MAX_MESSAGE_SIZE"
+);
+
+/// Calibration constants for a single linear actuator's potentiometer
+/// converts raw ADC readings to actuator extension length, and then to joint angle
+pub struct ActuatorCalibration {
+    /// ADC reading when the actuator is fully retracted
+    pub adc_min: u16,
+    /// ADC reading when the actuator is fully extended
+    pub adc_max: u16,
+    /// Actuator stroke length in meters (max extension - min extension)
+    pub stroke_m: f32,
+    /// Retracted length of the actuator in meters (pivot-to-pivot when fully retracted)
+    pub retracted_len_m: f32,
+    /// Distance from the actuator mount pivot to the joint pivot on the fixed side (meters)
+    pub mount_a: f32,
+    /// Distance from the actuator mount pivot to the joint pivot on the moving side (meters)
+    pub mount_b: f32,
+    /// Angle offset in radians (angle of the joint when actuator is fully retracted)
+    pub angle_at_retracted: f32,
+}
+
+/// Placeholder calibration for the Lift actuator
+pub const LIFT_CAL: ActuatorCalibration = ActuatorCalibration {
+    adc_min: 100,
+    adc_max: 3900,
+    stroke_m: 0.200,
+    retracted_len_m: 0.300,
+    mount_a: 0.150,
+    mount_b: 0.200,
+    angle_at_retracted: 0.0,
+};
+
+/// Placeholder calibration for the Bucket actuator
+pub const BUCKET_CAL: ActuatorCalibration = ActuatorCalibration {
+    adc_min: 100,
+    adc_max: 3900,
+    stroke_m: 0.200,
+    retracted_len_m: 0.300,
+    mount_a: 0.150,
+    mount_b: 0.200,
+    angle_at_retracted: 0.0,
+};
+
+/// Placeholder calibration for the Dumper actuator
+pub const DUMPER_CAL: ActuatorCalibration = ActuatorCalibration {
+    adc_min: 100,
+    adc_max: 3900,
+    stroke_m: 0.200,
+    retracted_len_m: 0.300,
+    mount_a: 0.150,
+    mount_b: 0.200,
+    angle_at_retracted: 0.0,
+};
+
+impl ActuatorCalibration {
+    /// Convert a raw ADC value to actuator extension length (meters)
+    pub fn adc_to_length(&self, adc: u16) -> f32 {
+        let adc = adc.clamp(self.adc_min, self.adc_max);
+        let t = (adc - self.adc_min) as f32 / (self.adc_max - self.adc_min) as f32;
+        self.retracted_len_m + t * self.stroke_m
+    }
+}
 
 /// Channel mapping:
 ///   0  = M1_CS        (Motor 1 current sense)
@@ -308,7 +407,7 @@ impl FromIMU {
 }
 
 impl ActuatorCommand {
-    pub const SIZE: usize = 5;
+    pub const SIZE: usize = 6;
     pub fn deserialize(bytes: [u8; Self::SIZE]) -> Result<Self, &'static str> {
         match bytes[0] {
             0 => {
@@ -337,6 +436,23 @@ impl ActuatorCommand {
             3 => Ok(ActuatorCommand::StartPercuss),
             4 => Ok(ActuatorCommand::StopPercuss),
             5 => Ok(ActuatorCommand::StopAll),
+            6 => {
+                let actuator = if bytes[1] == Actuator::Lift as u8 {
+                    Actuator::Lift
+                } else if bytes[1] == Actuator::Bucket as u8 {
+                    Actuator::Bucket
+                } else if bytes[1] == Actuator::Dumper as u8 {
+                    Actuator::Dumper
+                } else {
+                    return Err("Unknown actuator specifier in SetAngle");
+                };
+                let angle = f32::from_le_bytes(
+                    bytes[2..6]
+                        .try_into()
+                        .map_err(|_| "Wrong number of bytes for angle")?,
+                );
+                Ok(ActuatorCommand::SetAngle(actuator, angle))
+            }
             _ => Err("Invalid variant tag"),
         }
     }
@@ -351,23 +467,30 @@ impl ActuatorCommand {
                 bytes[4] = *direction as u8;
                 bytes
             }
+            ActuatorCommand::SetAngle(actuator, angle) => {
+                let mut bytes = [0u8; Self::SIZE];
+                bytes[0] = 6;
+                bytes[1] = *actuator as u8;
+                bytes[2..6].copy_from_slice(&angle.to_le_bytes());
+                bytes
+            }
             ActuatorCommand::Shake => {
-                let mut bytes = [0u8; 5];
+                let mut bytes = [0u8; Self::SIZE];
                 bytes[0] = 2;
                 bytes
             }
             ActuatorCommand::StartPercuss => {
-                let mut bytes = [0u8; 5];
+                let mut bytes = [0u8; Self::SIZE];
                 bytes[0] = 3;
                 bytes
             }
             ActuatorCommand::StopPercuss => {
-                let mut bytes = [0u8; 5];
+                let mut bytes = [0u8; Self::SIZE];
                 bytes[0] = 4;
                 bytes
             }
             ActuatorCommand::StopAll => {
-                let mut bytes = [0u8; 5];
+                let mut bytes = [0u8; Self::SIZE];
                 bytes[0] = 5;
                 bytes
             }
@@ -383,13 +506,17 @@ impl ActuatorCommand {
     /// little helper method to make the actuators move slower at outreach events
     pub fn apply_speed_factor(&mut self, factor: f32) {
         match self {
-            ActuatorCommand::SetSpeed(speed, actuator, direction) => {
+            ActuatorCommand::SetSpeed(speed, _actuator, _direction) => {
                 *speed = (factor * (*speed as f32)) as u16;
-            },
-            _ => {
-
             }
+            // SetAngle targets are absolute angles, speed factor doesn't apply
+            _ => {}
         }
+    }
+
+    /// Convenience constructor for SetAngle.
+    pub fn set_angle(actuator: Actuator, angle_rad: f32) -> Self {
+        ActuatorCommand::SetAngle(actuator, angle_rad)
     }
 }
 
@@ -405,25 +532,6 @@ impl Not for Direction {
     }
 }
 
-// impl ActuatorReading {
-//     pub fn serialize(&self) -> [u8; 4] {
-//         let mut bytes = [0, 0, 0, 0u8];
-//         bytes[0..=1].copy_from_slice(&self.m1_reading.to_le_bytes());
-//         bytes[2..=3].copy_from_slice(&self.m2_reading.to_le_bytes());
-//         bytes
-//     }
-//     pub fn deserialize(bytes: [u8; 4]) -> Self {
-//         // this expect is safe
-//         let m1_reading =
-//             u16::from_le_bytes(bytes[0..=1].try_into().expect("wrong number of bytes"));
-//         let m2_reading =
-//             u16::from_le_bytes(bytes[2..=3].try_into().expect("wrong number of bytes"));
-//         Self {
-//             m1_reading,
-//             m2_reading,
-//         }
-//     }
-// }
 
 impl SensorReading {
     pub const CHANNEL_COUNT: usize = 11; // 11 active mux channels
@@ -608,7 +716,6 @@ impl SecondaryResponse {
     }
 }
 
-
 #[cfg(test)]
 #[cfg(feature = "std")]
 mod tests {
@@ -669,8 +776,16 @@ mod tests {
 
     #[test]
     fn from_imu_reading_roundtrip() {
-        let rate = AngularRate { x: 0.1, y: 0.2, z: 0.3 };
-        let accel = AccelerationNorm { x: 0.0, y: -9.81, z: 0.0 };
+        let rate = AngularRate {
+            x: 0.1,
+            y: 0.2,
+            z: 0.3,
+        };
+        let accel = AccelerationNorm {
+            x: 0.0,
+            y: -9.81,
+            z: 0.0,
+        };
         let original = FromIMU::Reading(rate, accel);
         let bytes = original.serialize();
         let result = FromIMU::deserialize(bytes).unwrap();
@@ -737,10 +852,16 @@ mod tests {
     #[test]
     fn actuator_command_percuss_roundtrip() {
         let start = ActuatorCommand::StartPercuss;
-        assert_eq!(start, ActuatorCommand::deserialize(start.serialize()).unwrap());
+        assert_eq!(
+            start,
+            ActuatorCommand::deserialize(start.serialize()).unwrap()
+        );
 
         let stop = ActuatorCommand::StopPercuss;
-        assert_eq!(stop, ActuatorCommand::deserialize(stop.serialize()).unwrap());
+        assert_eq!(
+            stop,
+            ActuatorCommand::deserialize(stop.serialize()).unwrap()
+        );
     }
 
     #[test]
@@ -753,7 +874,7 @@ mod tests {
 
     #[test]
     fn actuator_command_invalid_tag() {
-        let bytes = [255, 0, 0, 0, 0];
+        let bytes = [255, 0, 0, 0, 0, 0];
         assert!(ActuatorCommand::deserialize(bytes).is_err());
     }
 
@@ -767,15 +888,31 @@ mod tests {
 
     #[test]
     fn from_pico_v3_reading_roundtrip() {
-        let rate = AngularRate { x: 1.0, y: 2.0, z: 3.0 };
-        let accel = AccelerationNorm { x: 0.0, y: -9.81, z: 0.0 };
+        let rate = AngularRate {
+            x: 1.0,
+            y: 2.0,
+            z: 3.0,
+        };
+        let accel = AccelerationNorm {
+            x: 0.0,
+            y: -9.81,
+            z: 0.0,
+        };
         let readings = [
             FromIMU::Reading(rate, accel),
             FromIMU::NoDataReady,
             FromIMU::Error,
             FromIMU::Reading(
-                AngularRate { x: -1.0, y: 0.0, z: 0.5 },
-                AccelerationNorm { x: 1.0, y: 1.0, z: 1.0 },
+                AngularRate {
+                    x: -1.0,
+                    y: 0.0,
+                    z: 0.5,
+                },
+                AccelerationNorm {
+                    x: 1.0,
+                    y: 1.0,
+                    z: 1.0,
+                },
             ),
         ];
         let original = FromPico::Reading(readings, make_sensor_reading());
@@ -836,9 +973,17 @@ mod tests {
     fn sensor_reading_boundary_values() {
         for val in [0u16, u16::MAX] {
             let v = SensorReading {
-                m1_cs: val, m2_cs: val, m3_cs: val, m4_cs: val,
-                m1_therm: val, m2_therm: val, m3_therm: val, m4_therm: val,
-                drive1_he: val, drive2_he: val, amb_therm: val,
+                m1_cs: val,
+                m2_cs: val,
+                m3_cs: val,
+                m4_cs: val,
+                m1_therm: val,
+                m2_therm: val,
+                m3_therm: val,
+                m4_therm: val,
+                drive1_he: val,
+                drive2_he: val,
+                amb_therm: val,
             };
             assert_eq!(SensorReading::deserialize(v.serialize()), v);
         }
@@ -848,17 +993,45 @@ mod tests {
     fn sensor_reading_field_order() {
         let v = make_sensor_reading();
         let bytes = v.serialize();
-        assert_eq!(u16::from_le_bytes([bytes[0],  bytes[1]]),  100,  "ch0 m1_cs");
-        assert_eq!(u16::from_le_bytes([bytes[2],  bytes[3]]),  200,  "ch1 m2_cs");
-        assert_eq!(u16::from_le_bytes([bytes[4],  bytes[5]]),  300,  "ch2 m3_cs");
-        assert_eq!(u16::from_le_bytes([bytes[6],  bytes[7]]),  400,  "ch3 m4_cs");
-        assert_eq!(u16::from_le_bytes([bytes[8],  bytes[9]]),  500,  "ch4 m1_therm");
-        assert_eq!(u16::from_le_bytes([bytes[10], bytes[11]]), 600,  "ch5 m2_therm");
-        assert_eq!(u16::from_le_bytes([bytes[12], bytes[13]]), 700,  "ch6 m3_therm");
-        assert_eq!(u16::from_le_bytes([bytes[14], bytes[15]]), 800,  "ch7 m4_therm");
-        assert_eq!(u16::from_le_bytes([bytes[16], bytes[17]]), 900,  "ch8 drive1_he");
-        assert_eq!(u16::from_le_bytes([bytes[18], bytes[19]]), 1000, "ch9 drive2_he");
-        assert_eq!(u16::from_le_bytes([bytes[20], bytes[21]]), 1100, "ch10 amb_therm");
+        assert_eq!(u16::from_le_bytes([bytes[0], bytes[1]]), 100, "ch0 m1_cs");
+        assert_eq!(u16::from_le_bytes([bytes[2], bytes[3]]), 200, "ch1 m2_cs");
+        assert_eq!(u16::from_le_bytes([bytes[4], bytes[5]]), 300, "ch2 m3_cs");
+        assert_eq!(u16::from_le_bytes([bytes[6], bytes[7]]), 400, "ch3 m4_cs");
+        assert_eq!(
+            u16::from_le_bytes([bytes[8], bytes[9]]),
+            500,
+            "ch4 m1_therm"
+        );
+        assert_eq!(
+            u16::from_le_bytes([bytes[10], bytes[11]]),
+            600,
+            "ch5 m2_therm"
+        );
+        assert_eq!(
+            u16::from_le_bytes([bytes[12], bytes[13]]),
+            700,
+            "ch6 m3_therm"
+        );
+        assert_eq!(
+            u16::from_le_bytes([bytes[14], bytes[15]]),
+            800,
+            "ch7 m4_therm"
+        );
+        assert_eq!(
+            u16::from_le_bytes([bytes[16], bytes[17]]),
+            900,
+            "ch8 drive1_he"
+        );
+        assert_eq!(
+            u16::from_le_bytes([bytes[18], bytes[19]]),
+            1000,
+            "ch9 drive2_he"
+        );
+        assert_eq!(
+            u16::from_le_bytes([bytes[20], bytes[21]]),
+            1100,
+            "ch10 amb_therm"
+        );
     }
 
     #[test]
@@ -885,5 +1058,68 @@ mod tests {
             let v = SecondaryResponse { adc_value: val };
             assert_eq!(SecondaryResponse::deserialize(v.serialize()), v);
         }
+    }
+
+    #[test]
+    fn pot_reading_roundtrip() {
+        let v = PotReading {
+            lift: 1000,
+            bucket: 2000,
+            dumper: 3000,
+        };
+        assert_eq!(PotReading::deserialize(v.serialize()), v);
+    }
+
+    #[test]
+    fn pot_reading_boundary_values() {
+        for val in [0u16, u16::MAX] {
+            let v = PotReading {
+                lift: val,
+                bucket: val,
+                dumper: val,
+            };
+            assert_eq!(PotReading::deserialize(v.serialize()), v);
+        }
+    }
+
+    #[test]
+    fn actuator_command_set_angle_roundtrip() {
+        for actuator in [Actuator::Lift, Actuator::Bucket, Actuator::Dumper] {
+            for angle in [0.0f32, 1.5, -0.5, core::f32::consts::PI] {
+                let cmd = ActuatorCommand::SetAngle(actuator, angle);
+                let bytes = cmd.serialize();
+                let result = ActuatorCommand::deserialize(bytes).unwrap();
+                assert_eq!(cmd, result);
+            }
+        }
+    }
+
+    #[test]
+    fn actuator_command_set_angle_helper() {
+        let cmd = ActuatorCommand::set_angle(Actuator::Lift, 1.0);
+        assert_eq!(cmd, ActuatorCommand::SetAngle(Actuator::Lift, 1.0));
+        let bytes = cmd.serialize();
+        assert_eq!(ActuatorCommand::deserialize(bytes).unwrap(), cmd);
+    }
+
+    #[test]
+    fn actuator_calibration_adc_to_length() {
+        let cal = ActuatorCalibration {
+            adc_min: 0,
+            adc_max: 4000,
+            stroke_m: 0.200,
+            retracted_len_m: 0.300,
+            mount_a: 0.0,
+            mount_b: 0.0,
+            angle_at_retracted: 0.0,
+        };
+        // At min ADC, length = retracted
+        assert!((cal.adc_to_length(0) - 0.300).abs() < 1e-5);
+        // At max ADC, length = retracted + stroke
+        assert!((cal.adc_to_length(4000) - 0.500).abs() < 1e-5);
+        // At midpoint
+        assert!((cal.adc_to_length(2000) - 0.400).abs() < 1e-5);
+        // Clamped below min
+        assert!((cal.adc_to_length(0) - 0.300).abs() < 1e-5);
     }
 }
