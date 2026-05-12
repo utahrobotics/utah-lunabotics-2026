@@ -362,23 +362,9 @@ mod prod_impl {
                 let reading = reading.unwrap().unwrap();
                 let frame_len = reading.len();
 
-                // Handle PotReading frames (separate, smaller message)
-                if frame_len == PotReading::SIZE {
-                    if let Ok(pot_bytes) = <[u8; PotReading::SIZE]>::try_from(reading.as_ref()) {
-                        let pot = PotReading::deserialize(pot_bytes);
-                        println!("[PICO RX] PotReading: lift={} bucket={} dumper={}", pot.lift, pot.bucket, pot.dumper);
-                        if let Ok(mut file) = tasker::tokio::fs::OpenOptions::new().create(true).append(true).open("pot_log.csv").await {
-                            let timestamp = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis();
-                            let _ = file.write_all(format!("{},{},{},{}\n", timestamp, pot.lift, pot.bucket, pot.dumper).as_bytes()).await;
-                        }
-                    }
-                    continue;
-                }
-
-                // Handle FromPico frames
                 let Ok(reading) = reading.try_into() else {
-                    eprintln!("[PICO RX] Unexpected frame size: {} bytes (expected FromPico={} or Pot={})",
-                        frame_len, FromPico::SIZE, PotReading::SIZE);
+                    eprintln!("[PICO RX] Unexpected frame size: {} bytes (expected FromPico={})",
+                        frame_len, FromPico::SIZE);
                     continue;
                 };
                 let Ok(reading) = FromPico::deserialize(reading) else {

@@ -46,6 +46,7 @@ const SENSOR_SWEEP_DIVISOR: u32 = 10;
 /// Angle error (radians) below which the motor is stopped to prevent oscillation
 const ANGLE_DEADBAND_RAD: f32 = 0.02;
 
+
 static SENSOR_READINGS: Channel<CriticalSectionRawMutex, SensorReading, 1> = Channel::new();
 static POT_READINGS: Channel<CriticalSectionRawMutex, PotReading, 1> = Channel::new();
 
@@ -355,10 +356,9 @@ async fn usb_tx_loop(
 
             // Send pot readings as a separate COBS frame
             if let Ok(pots) = POT_READINGS.try_receive() {
-                let serialized = pots.serialize();
-                let mut pot_stuffed = [0u8; cobs::max_encoding_length(PotReading::SIZE) + 1];
-                let len = cobs::encode(&serialized, &mut pot_stuffed);
-                for chunk in pot_stuffed[..len + 1].chunks(64) {
+                let serialized = FromPico::PotReading(pots).serialize();
+                let len = cobs::encode(&serialized, &mut stuffed);
+                for chunk in stuffed[..len + 1].chunks(64) {
                     if let Err(e) = writer.write_packet(chunk).await {
                         error!("[COBS ERROR] {:?}", e);
                         break 'writer;

@@ -259,7 +259,11 @@ pub enum FromIMU {
     derive(serde::Serialize, serde::Deserialize, bincode::Encode, bincode::Decode)
 )]
 pub enum FromPico {
+    /// id 0
     Reading([FromIMU; 4], SensorReading),
+    /// id 1
+    PotReading(PotReading),
+    /// id 2
     Error(PicoError),
 }
 
@@ -609,7 +613,7 @@ impl FromPico {
                 bytes[Self::SIZE - SensorReading::SIZE..].copy_from_slice(&sensors.serialize());
             }
             FromPico::Error(err) => {
-                bytes[0] = 3;
+                bytes[0] = 2;
                 match err {
                     PicoError::Other => bytes[1] = 0,
                     PicoError::MotorDriverFault(bits) => {
@@ -623,6 +627,10 @@ impl FromPico {
                         bytes[1] = 3;
                     }
                 }
+            }
+            FromPico::PotReading(reading) => {
+                bytes[0] = 1;
+                bytes[1..PotReading::SIZE].copy_from_slice(&reading.serialize());
             }
         }
         bytes
@@ -648,7 +656,7 @@ impl FromPico {
                     SensorReading::deserialize(sensor_bytes),
                 ))
             }
-            3 => {
+            2 => {
                 let err = match bytes[1] {
                     0 => PicoError::Other,
                     1 => PicoError::MotorDriverFault(bytes[2]),
@@ -657,6 +665,11 @@ impl FromPico {
                     _ => return Err("invalid PicoError tag"),
                 };
                 Ok(FromPico::Error(err))
+            }
+            1 => {
+                let reading_bytes: [u8; PotReading::SIZE] = bytes[1..].try_into().map_err(|_| "invalid pot reading bytes len")?;
+                Ok(FromPico::PotReading(PotReading::deserialize(reading_bytes)))
+                
             }
             _ => Err("invalid FromPico tag"),
         }
