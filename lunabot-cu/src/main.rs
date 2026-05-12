@@ -51,11 +51,11 @@ fn main() {
     )
     .expect("Failed to setup logger.");
 
-    // rerun_viz::init_rerun(rerun_viz::RerunViz::Grpc(
-    //     rerun_viz::Level::All,
-    //     "127.0.0.1".to_string(),
-    // ))
-    // .expect("Failed to initialize rerun viz.");
+    rerun_viz::init_rerun(rerun_viz::RerunViz::Grpc(
+        rerun_viz::Level::All,
+        "192.168.0.107".to_string(),
+    ))
+    .expect("Failed to initialize rerun viz.");
     // rerun_viz::init_rerun(rerun_viz::RerunViz::Viz(rerun_viz::Level::All))
     //     .expect("Failed to initialize rerun viz.");
     // rerun_viz::init_rerun(rerun_viz::RerunViz::Viz(rerun_viz::Level::All))
