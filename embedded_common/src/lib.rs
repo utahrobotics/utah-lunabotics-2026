@@ -737,6 +737,7 @@ impl SecondaryResponse {
 #[cfg(test)]
 #[cfg(feature = "std")]
 mod tests {
+    use core::u16;
     use std::vec::Vec;
 
     use super::*;
@@ -963,7 +964,7 @@ mod tests {
 
     #[test]
     fn from_pico_pot_roundtrip() {
-        let original = FromPico::PotReading(PotReading { lift: 0, bucket: 0, dumper: 0 });
+        let original = FromPico::PotReading(PotReading { lift: 0, bucket: u16::MIN, dumper: u16::MAX });
         let bytes = original.serialize();
         let result = FromPico::deserialize(bytes).unwrap();
         assert_eq!(original, result);
