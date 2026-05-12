@@ -425,6 +425,8 @@ impl ActuatorCommand {
                     Actuator::Bucket
                 } else if bytes[3] == Actuator::Dumper as u8 {
                     Actuator::Dumper
+                } else if bytes[3] == Actuator::Motor4 as u8 {
+                    Actuator::Motor4
                 } else {
                     return Err("Unknown actuator specifier");
                 };
