@@ -630,7 +630,7 @@ impl FromPico {
             }
             FromPico::PotReading(reading) => {
                 bytes[0] = 1;
-                bytes[1..PotReading::SIZE].copy_from_slice(&reading.serialize());
+                bytes[1..PotReading::SIZE+1].copy_from_slice(&reading.serialize());
             }
         }
         bytes
@@ -656,6 +656,11 @@ impl FromPico {
                     SensorReading::deserialize(sensor_bytes),
                 ))
             }
+            1 => {
+                let reading_bytes: [u8; PotReading::SIZE] = bytes[1..PotReading::SIZE+1].try_into().map_err(|_| "invalid pot reading bytes len")?;
+                Ok(FromPico::PotReading(PotReading::deserialize(reading_bytes)))
+                
+            }
             2 => {
                 let err = match bytes[1] {
                     0 => PicoError::Other,
@@ -665,11 +670,6 @@ impl FromPico {
                     _ => return Err("invalid PicoError tag"),
                 };
                 Ok(FromPico::Error(err))
-            }
-            1 => {
-                let reading_bytes: [u8; PotReading::SIZE] = bytes[1..].try_into().map_err(|_| "invalid pot reading bytes len")?;
-                Ok(FromPico::PotReading(PotReading::deserialize(reading_bytes)))
-                
             }
             _ => Err("invalid FromPico tag"),
         }
@@ -957,6 +957,14 @@ mod tests {
         let original = FromPico::Error(multi);
         let bytes = original.serialize();
         assert_eq!(FromPico::deserialize(bytes).unwrap(), original);
+    }
+
+    #[test]
+    fn from_pico_pot_roundtrip() {
+        let original = FromPico::PotReading(PotReading { lift: 0, bucket: 0, dumper: 0 });
+        let bytes = original.serialize();
+        let result = FromPico::deserialize(bytes).unwrap();
+        assert_eq!(original, result);
     }
 
     #[test]
