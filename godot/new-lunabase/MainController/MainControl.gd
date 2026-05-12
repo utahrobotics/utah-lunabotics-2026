@@ -7,6 +7,7 @@ extends Control
 @onready var packet_label: Label = $VBoxContainer/TopBar/MarginContainer/TopPanel/StatusGroup/PacketLabel
 @onready var stage_label: Label = $VBoxContainer/TopBar/MarginContainer/TopPanel/StatusGroup/StageLabel
 @onready var soft_stop_button: Button = $VBoxContainer/BottomBar/MarginContainer/BottomPanel/SoftStopButton
+@onready var test_motors_button: Button = $VBoxContainer/BottomBar/MarginContainer/BottomPanel/TestMotorsButton
 @onready var manual_button: Button = $VBoxContainer/BottomBar/MarginContainer/BottomPanel/ManualButton
 @onready var autonomous_button: Button = $VBoxContainer/BottomBar/MarginContainer/BottomPanel/AutonomousButton
 @onready var errored_tasks_label: Label = $VBoxContainer/MainContent/HBoxContainer/LeftColumn/ErrorsPanel/MarginContainer/VBox/ScrollContainer/ErroredTasksLabel
@@ -37,6 +38,7 @@ enum LunabotStage {
 	MANUAL = 0,
 	SOFT_STOP = 1,
 	AUTONOMY = 2,
+	TEST_MOTORS = 3,
 }
 
 func _ready() -> void:
@@ -50,6 +52,7 @@ func _ready() -> void:
 	toggle_apriltags_button.toggled.connect(_on_toggle_apriltags_pressed)
 	sigma_spatial_input.value_changed.connect(_on_set_sigma_spatial_changed)
 	sigma_range_input.value_changed.connect(_on_set_sigma_range_changed)
+	test_motors_button.pressed.connect(_on_test_motors_pressed)
 	
 	
 	speed_slider.value = 600;
@@ -93,6 +96,9 @@ func _process(delta: float) -> void:
 		LunabotStage.AUTONOMY:
 			stage_label.text = "Stage: Autonomy"
 			stage_label.modulate = Color.CYAN
+		LunabotStage.TEST_MOTORS:
+			stage_label.text = "Stage: Test Motors"
+			stage_label.modulate = Color.RED
 			
 	
 	#location  
@@ -174,6 +180,9 @@ func _on_speed_multiplier_slider_value_changed(value: float) -> void:
 
 	# Update UI
 	speed_label.text = "SpeedMultiplier set to " + str(new_weight)
+
+func _on_test_motors_pressed() -> void:
+	controller.command_recorder.execute_and_store(TestMotorsCommand.new())
 
 func _on_ip_input_gui_input(event: InputEvent) -> void:
 	if not (event is InputEventKey):

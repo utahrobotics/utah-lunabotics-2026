@@ -3,7 +3,7 @@ use bonsai_bt::Behavior::{self, Action, AlwaysSucceed, Sequence, WaitForever};
 use crate::tasks::ai::{
     action::LunabotAction,
     behaviors::{
-        autonomy::{autonomy_main::autonomy_main, navigate::Arena}, manual_ctrl_behavior, soft_stop::soft_stop_behavior,
+        autonomy::{autonomy_main::autonomy_main, navigate::Arena}, manual_ctrl_behavior, soft_stop::soft_stop_behavior, test_motors_behavior,
     },
 };
 
@@ -16,6 +16,7 @@ pub fn teleop_behavior(arena: Arena) -> Behavior<LunabotAction> {
             AlwaysSucceed(Box::new(soft_stop_behavior(arena))),
             AlwaysSucceed(Box::new(manual_ctrl_behavior())),
             AlwaysSucceed(Box::new(autonomy_main(arena))),
+            AlwaysSucceed(Box::new(test_motors_behavior()))
         ])],
     )
 }

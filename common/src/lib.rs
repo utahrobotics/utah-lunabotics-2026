@@ -159,6 +159,7 @@ pub enum LunabotStage {
     Manual = 0,
     SoftStop = 1,
     Autonomy = 2,
+    TestMotors = 3,
 }
 
 impl TryFrom<u8> for LunabotStage {
@@ -214,6 +215,9 @@ pub enum FromLunabase {
 
     /// Obstacle Mapper settings for blurring the height map
     SetSigmaSpatial(f32),
+
+    /// command to move all the motors a little bit for testing purposes
+    TestMotors
 }
 
 impl ToString for FromLunabase {
