@@ -16,6 +16,7 @@ use crate::motors::{MotorRef, VescIDs, VescPair, enumerate_motors};
 pub struct MotorController {
     motor_ref: &'static MotorRef,
     prev_speed_multi: f32, /*  */
+    last_seen: Option<Instant>,
 }
 
 impl Freezable for MotorController {}
@@ -78,6 +79,7 @@ impl CuSinkTask for MotorController {
         Ok(Self {
             motor_ref,
             prev_speed_multi,
+            last_seen: None,
         })
     }
     fn start(&mut self, _clock: &RobotClock) -> CuResult<()> {
@@ -112,10 +114,15 @@ impl CuSinkTask for MotorController {
             } else {
                 // println!("{telemetry:?}");
             }
+            self.last_seen = Some(Instant::now());
         }
 
         if let Some(errors) = self.motor_ref.get_latest_errors() {
             return Err(CuError::from(errors.join(" | ")));
+        }
+
+        if let Some(last_seen) = self.last_seen && (Instant::now().as_nanos() - last_seen.as_nanos()) > 900_000_000 {
+            return Err(CuError::from("No telemetry seen in 900ms"));
         }
 
         Ok(())

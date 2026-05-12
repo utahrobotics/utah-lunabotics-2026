@@ -68,6 +68,8 @@ pub enum LunabotAction {
     IsSoftStop,
     IsAutonomy,
     IsManual,
+    IsTestMotors,
+
     None,
 
     /// if the robot is in an occupied cell, we should first pathfind to the nearest free cell (if a free cell is within some range)
@@ -232,7 +234,11 @@ impl LunabotAction {
             LunabotAction::IsManual => match blackboard.current_mission {
                 LunabotStage::Manual => Running,
                 _ => Success,
-            },
+            }
+            LunabotAction::IsTestMotors => match blackboard.current_mission {
+                LunabotStage::TestMotors => Running,
+                _ => Success,
+            }
             LunabotAction::None => Success,
             LunabotAction::IsInOccupiedCell => todo!(),
             LunabotAction::IsInFreeCell => todo!(),

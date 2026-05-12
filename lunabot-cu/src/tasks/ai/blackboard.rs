@@ -198,6 +198,10 @@ impl LunabotBlackboard {
                 self.current_mission = LunabotStage::Manual;
                 LUNABOT_STAGE.store(LunabotStage::Manual);
             }
+            common::FromLunabase::TestMotors => {
+                self.current_mission = LunabotStage::TestMotors;
+                LUNABOT_STAGE.store(LunabotStage::TestMotors);
+            }
             common::FromLunabase::ResetObstacles => {
                 self.latest_local_map = None;
                 rwlock_write_unpoison(self.blackboard_shared.deref()).reset_map = true;

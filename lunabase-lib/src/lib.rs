@@ -452,6 +452,11 @@ impl LunabaseConnection {
         self.send_msg(FromLunabase::SoftStop);
     }
 
+    #[func]
+    fn send_test_motors(&mut self) {
+        self.send_msg(FromLunabase::TestMotors);
+    }
+
     /// continue mission means manual
     #[func]
     fn send_continue_mission(&mut self) {
