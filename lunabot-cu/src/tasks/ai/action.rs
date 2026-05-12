@@ -56,6 +56,14 @@ pub enum LunabotAction {
     SetLift(i8),
     SetBucket(i8),
     SetDumper(i8),
+
+    /// Set lift arm to a target angle (radians)
+    SetLiftAngle(f32),
+    /// Set bucket to a target angle (radians)
+    SetBucketAngle(f32),
+    /// Set dumper to a target angle (radians)
+    SetDumperAngle(f32),
+
     // actions for checking the lunabot stage (dig, dump, manual, soft stop, navigate)
     IsSoftStop,
     IsAutonomy,
@@ -193,6 +201,24 @@ impl LunabotAction {
                 blackboard
                     .outgoing_actuator_msg_queue
                     .push_back(actuator_command_from_i8(*value, Actuator::Dumper));
+                Success
+            }
+            LunabotAction::SetLiftAngle(angle) => {
+                blackboard
+                    .outgoing_actuator_msg_queue
+                    .push_back(ActuatorCommand::set_angle(Actuator::Lift, *angle));
+                Success
+            }
+            LunabotAction::SetBucketAngle(angle) => {
+                blackboard
+                    .outgoing_actuator_msg_queue
+                    .push_back(ActuatorCommand::set_angle(Actuator::Bucket, *angle));
+                Success
+            }
+            LunabotAction::SetDumperAngle(angle) => {
+                blackboard
+                    .outgoing_actuator_msg_queue
+                    .push_back(ActuatorCommand::set_angle(Actuator::Dumper, *angle));
                 Success
             }
             LunabotAction::IsSoftStop => match blackboard.current_mission {

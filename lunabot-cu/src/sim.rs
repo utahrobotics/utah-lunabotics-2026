@@ -174,10 +174,26 @@ fn sim_callback<'a>(
                             embedded_common::Actuator::Lift => {
                                 LIFT_SPEED.store(*speed);
                                 LIFT_DIRECTION.store(*direction);
+                                LIFT_TARGET.store(f64::NAN); // clear angle target
                             }
                             embedded_common::Actuator::Bucket => {
                                 BUCKET_SPEED.store(*speed);
                                 BUCKET_DIRECTION.store(*direction);
+                                BUCKET_TARGET.store(f64::NAN); // clear angle target
+                            }
+                            embedded_common::Actuator::Dumper => {}
+                            embedded_common::Actuator::Motor4 => {}
+                        }
+                    }
+                    embedded_common::ActuatorCommand::SetAngle(actuator, angle) => {
+                        match actuator {
+                            embedded_common::Actuator::Lift => {
+                                LIFT_TARGET.store(*angle as f64);
+                                LIFT_SPEED.store(0); // PID on pico handles speed
+                            }
+                            embedded_common::Actuator::Bucket => {
+                                BUCKET_TARGET.store(*angle as f64);
+                                BUCKET_SPEED.store(0);
                             }
                             embedded_common::Actuator::Dumper => {}
                             embedded_common::Actuator::Motor4 => {}
@@ -189,6 +205,8 @@ fn sim_callback<'a>(
                     embedded_common::ActuatorCommand::StopAll => {
                         LIFT_SPEED.store(0);
                         BUCKET_SPEED.store(0);
+                        LIFT_TARGET.store(f64::NAN);
+                        BUCKET_TARGET.store(f64::NAN);
                     }
                 }
             }
