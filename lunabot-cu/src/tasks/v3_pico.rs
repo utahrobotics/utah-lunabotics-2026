@@ -372,7 +372,7 @@ mod prod_impl {
                     let _ = is_broken_tx.send(true);
                     break;
                 };
-                println!("[PICO RX] FromPico: {:?}", reading);
+                // println!("[PICO RX] FromPico: {:?}", reading);
                 if let Err(_) = from_pico.push(reading) {
                     eprintln!("[PICO RX] From Pico queue full, dropping reading");
                     break;

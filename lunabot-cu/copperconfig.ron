@@ -189,8 +189,8 @@
         (
             id:"motor_ctrl", type:"crate::tasks::sinks::MotorController", config:{
                 // little invert flags so you can quickly invert the direction without vesc tool.
-                "invert_left": false,
-                "invert_right": false,
+                "invert_left": true,
+                "invert_right": true,
                 "speed_multiplier": 1500,
                 "vesc_pairs": [
                     // the new vesc matthew G has been configuring
@@ -425,8 +425,8 @@
         (
             path:"camera_configs/camera_template_gstreamer.ron",
             params:{
-                "id":"laptop_front",
-                "port":"pci-0000:00:14.0-usb-0:4:1.0",
+                "id":"dump",
+                "port":"pci-0000:e6:00.4-usb-0:1:1.0",
                 "fx":939.93,
                 "fy":938.93,
                 "cx":640.84,
