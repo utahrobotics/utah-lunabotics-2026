@@ -197,3 +197,45 @@ fn open_loop_dump_from_zero() -> Behavior<LunabotAction> {
         ]
     )
 }
+
+
+
+// TODO move this to a common location and have open_loop_dump_from_zero call it.
+// (I do think this is better as a action creator rather than a phase, given its 
+// purpose, but do tell me if I'm wrong - HB)
+fn shake_dump() -> Behavior<LunabotAction> {
+    Sequence(
+        vec![
+            While(
+                Box::new(Wait(3.0)),
+                vec![
+                    Action(LunabotAction::SetDumper((1.0 * i8::MAX as f64) as i8)),
+                    Wait(0.1),
+                    Action(LunabotAction::SetDumper((-1.0 * i8::MAX as f64) as i8)),
+                    Wait(0.1),
+                ]
+            ),
+            Action(LunabotAction::SetDumper(0)),
+        ]
+    )
+}
+
+// TODO move this to a common location and have open_loop_dig_from_starting call it.
+// (I do think this is better as a action creator rather than a phase, given its 
+// purpose, but do tell me if I'm wrong - HB)
+fn shake_tilt() -> Behavior<LunabotAction> {
+    Sequence(
+        vec![
+            While(
+                Box::new(Wait(3.0)),
+                vec![
+                    Action(LunabotAction::SetBucket((1.0 * i8::MAX as f64) as i8)),
+                    Wait(0.1),
+                    Action(LunabotAction::SetBucket((-1.0 * i8::MAX as f64) as i8)),
+                    Wait(0.1),
+                ]
+            ),
+            Action(LunabotAction::SetBucket(0)),
+        ]
+    )
+}
