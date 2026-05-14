@@ -45,6 +45,7 @@ pub struct EncodableGetValuesResponse {
     pub vesc_id: u8,
 }
 
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 impl From<&GetValuesResponse> for EncodableGetValuesResponse {
     fn from(value: &GetValuesResponse) -> Self {
         Self {
@@ -192,8 +193,10 @@ pub struct MotorController;
 
 #[cfg(any(not(target_os = "linux"), feature = "resim", feature = "sim"))]
 
-impl CuSinkTask for MotorController {
+impl CuTask for MotorController {
     type Input<'m> = input_msg!(Steering);
+    type Output<'m> = output_msg!(EncodableGetValuesResponse);
+
     type Resources<'r> = ();
     fn new(_config: Option<&ComponentConfig>, _resources: Self::Resources<'_>) -> CuResult<Self> {
         Ok(Self {})
@@ -207,9 +210,10 @@ impl CuSinkTask for MotorController {
         Ok(())
     }
 
-    fn process(&mut self, _clock: &RobotClock, _input: &Self::Input<'_>) -> CuResult<()> {
+    fn process(&mut self, _clock: &RobotClock, _input: &Self::Input<'_>, _output: &mut Self::Output<'_>) -> CuResult<()> {
         Ok(())
     }
+
 
     fn stop(&mut self, _clock: &RobotClock) -> CuResult<()> {
         Ok(())

@@ -49,10 +49,6 @@ pub struct LunabotBlackboard {
     /// stores the last steering message recieved from the lunabase
     pub last_steering: Option<Steering>,
 
-    /// populated when the navigate command comes in
-    /// there will likely be enough pathfinding params that this will end up encapsulated by some pathfinder struct
-    pub navigate_destination: Option<(f32, f32)>,
-
     /// Queue of actuator commands to be sent to the actuator and motor control tasks
     pub outgoing_actuator_msg_queue: VecDeque<ActuatorCommand>,
     /// we only care about the latest steering msg
@@ -114,7 +110,6 @@ impl Default for LunabotBlackboard {
             path_finder: None,
             calculated_path: None,
             last_steering: None,
-            navigate_destination: None,
             yielded: false,
             path_follower: None,
             digger: None,
@@ -177,12 +172,7 @@ impl LunabotBlackboard {
 
                 self.last_steering = Some(*steering);
             }
-            common::FromLunabase::Navigate(destination) => {
-                self.current_mission = LunabotStage::Autonomy;
-                LUNABOT_STAGE.store(LunabotStage::Autonomy);
-                self.navigate_destination = Some(*destination);
-            }
-            common::FromLunabase::DigDump(..) => {
+            common::FromLunabase::Navigate => {
                 self.current_mission = LunabotStage::Autonomy;
                 LUNABOT_STAGE.store(LunabotStage::Autonomy);
             }
@@ -201,6 +191,14 @@ impl LunabotBlackboard {
             common::FromLunabase::TestMotors => {
                 self.current_mission = LunabotStage::TestMotors;
                 LUNABOT_STAGE.store(LunabotStage::TestMotors);
+            }
+            common::FromLunabase::Dig => {
+                self.current_mission = LunabotStage::Dig;
+                LUNABOT_STAGE.store(LunabotStage::Dig);
+            }
+            common::FromLunabase::Dump => {
+                self.current_mission = LunabotStage::Dump;
+                LUNABOT_STAGE.store(LunabotStage::Dump);
             }
             common::FromLunabase::ResetObstacles => {
                 self.latest_local_map = None;

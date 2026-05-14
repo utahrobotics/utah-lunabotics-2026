@@ -160,6 +160,8 @@ pub enum LunabotStage {
     SoftStop = 1,
     Autonomy = 2,
     TestMotors = 3,
+    Dig = 4,
+    Dump = 5,
 }
 
 impl TryFrom<u8> for LunabotStage {
@@ -189,8 +191,7 @@ pub enum FromLunabase {
 
     LiftShake,
     /// Start autonomous mode, starting navigating to the requested x and y values.
-    Navigate((f32, f32)),
-    DigDump((f32, f32)),
+    Navigate,
 
     /// Request software stop mode
     SoftStop,
@@ -217,7 +218,11 @@ pub enum FromLunabase {
     SetSigmaSpatial(f32),
 
     /// command to move all the motors a little bit for testing purposes
-    TestMotors
+    TestMotors,
+
+    Dig,
+
+    Dump,
 }
 
 impl ToString for FromLunabase {

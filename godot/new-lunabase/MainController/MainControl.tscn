@@ -86,7 +86,6 @@ custom_minimum_size = Vector2(150, 28)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.9, 0.95, 1, 1)
 theme_override_font_sizes/font_size = 12
-editable = true
 text = "127.0.0.1"
 placeholder_text = "127.0.0.1"
 keep_editing_on_text_submit = true
@@ -391,6 +390,18 @@ text = "AUTONOMOUS"
 [node name="TestMotorsButton" type="Button" parent="VBoxContainer/BottomBar/MarginContainer/BottomPanel" unique_id=1974030417]
 layout_mode = 2
 text = "Test Motors"
+
+[node name="DigButton" type="Button" parent="VBoxContainer/BottomBar/MarginContainer/BottomPanel" unique_id=1561773829]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8745098, 0.047058824, 0.8745098, 1)
+text = "Dig
+"
+
+[node name="DumpButton" type="Button" parent="VBoxContainer/BottomBar/MarginContainer/BottomPanel" unique_id=1592545482]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.827451, 0.14901961, 0.6509804, 1)
+text = "Dump
+"
 
 [node name="LunabaseHumanController" type="Node" parent="." unique_id=1500504990]
 script = ExtResource("2")
