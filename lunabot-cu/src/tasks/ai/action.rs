@@ -111,6 +111,9 @@ impl LunabotAction {
                     let elapsed = last_steer_pack_time.elapsed();
                     if elapsed > Duration::from_millis(200) {
                         blackboard.last_non_zero_steering_pack = None;
+                        eprintln!("[!!!MOTOR_ERROR!!!] DROPPED STEERING PACKET, SETTING TO ZERO");
+                        // currently commented out because it was working commented out and further down the line in motors.rs is the timeout safety feature so I just dont want to touch this
+                        // blackboard.outgoing_steering_msg = Some(Steering::new(0.0, 0.0, 0.0));
                         return (Success, 0.0);
                     }
                 }
@@ -123,7 +126,7 @@ impl LunabotAction {
             LunabotAction::SetLastBucket => {
                 if let Some(last_bucket_pack_time) = blackboard.last_non_zero_bucket_pack {
                     if last_bucket_pack_time.elapsed() > Duration::from_millis(200) {
-                        println!("safety: lunabase silent, forcing bucket to stop");
+                        eprintln!("safety: lunabase silent, forcing bucket to stop");
                         blackboard.last_non_zero_bucket_pack = None;
                         blackboard.last_bucket = None;
                         blackboard
@@ -144,7 +147,7 @@ impl LunabotAction {
             LunabotAction::SetLastDumper => {
                 if let Some(last_dumper_pack_time) = blackboard.last_non_zero_dumper_pack {
                     if last_dumper_pack_time.elapsed() > Duration::from_millis(200) {
-                        println!("safety: lunabase silent, forcing lift to stop");
+                        eprintln!("safety: lunabase silent, forcing lift to stop");
                         blackboard.last_non_zero_dumper_pack = None;
                         blackboard.last_dumper = None;
                         blackboard

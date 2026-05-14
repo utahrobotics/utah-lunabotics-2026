@@ -79,7 +79,7 @@
             logging: (
                 enabled: true,
                 // disable logging for images (it takes too long)
-                // disabled_slots: [1,2,3]
+                disabled_slots: [1,2,3]
             ),
             run_in_sim: false
         ),
@@ -162,6 +162,7 @@
                 "icp_position_variance": 0.8,
                 "icp_orientation_variance": 0.1,
             },
+
             logging: (
                 enabled: false
             ),
@@ -183,6 +184,11 @@
             logging: (
                 enabled: false
             )
+        ),
+
+        (
+            id: "motor_logger",
+            type: "crate::tasks::sinks::MotorLogger"
         ),
 
         // receives messages from the ai and tells the motors to move accordingly
@@ -342,12 +348,13 @@
         (src:"l2_imu",                        dst:"localizer",               msg:"crate::tasks::sources::ImuMeasurement"),
         (src:"l2_pointcloud",                 dst:"l2_kiss_icp",             msg:"iceoryx_types::IceoryxPointCloud"),
         (src:"l2_kiss_icp",                   dst:"localizer",               msg:"crate::tasks::IcpMeasurement"),
-        (src:"lunabase_bridge/from_lunabase_rx", dst:"new_ai",                  msg:"common::FromLunabase"),
-        (src:"localizer",                    dst:"lunabase_bridge/to_lunabase_pose", msg:"common::FromLunabot"),
+        (src:"lunabase_bridge/from_lunabase_rx", dst:"new_ai",               msg:"common::FromLunabase"),
+        (src:"localizer",                     dst:"lunabase_bridge/to_lunabase_pose", msg:"common::FromLunabot"),
         // copper doesn't support multiple outputs on a single task so for now we just put them in a tuple and ignore one side
         (src:"realsense_subscriber",          dst:"occupancy_grid_pipeline", msg:"crate::payloads::depth_frame::CuDepthFrame<Vec<u16>>"),
         (src:"occupancy_grid_pipeline",       dst:"new_ai",                  msg:"crate::pathfinding::OccupancyGrid"),
         (src:"new_ai",                        dst:"motor_ctrl",              msg:"common::Steering", src_port: Some(0)),
+        (src:"motor_ctrl",                    dst:"motor_logger",            msg:"crate::tasks::EncodableGetValuesResponse"),
         (src:"new_ai",                        dst:"v3_pico",                 msg:"embedded_common::ActuatorCommand", src_port: Some(1)),
         (src:"new_ai",                        dst:"lunabase_bridge/to_lunabase_bt_status", msg: "String", src_port: Some(3)),
         (src:"v3_pico",                       dst:"localizer",               msg:"embedded_common::FromPico"),

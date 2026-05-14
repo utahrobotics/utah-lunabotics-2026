@@ -2,11 +2,15 @@ use cu29::{
     CuResult,
     clock::RobotClock,
     config::ComponentConfig,
-    cutask::{CuSinkTask, Freezable},
+    cutask::{Freezable},
     prelude::*,
 };
+use bincode::{Encode, Decode};
 
 use common::Steering;
+use serde::Deserialize;
+#[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
+use vesc_translator::GetValuesResponse;
 
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use crate::motors::{MotorRef, VescIDs, VescPair, enumerate_motors};
@@ -19,12 +23,62 @@ pub struct MotorController {
     last_seen: Option<Instant>,
 }
 
+#[derive(Encode, Decode, Serialize, Deserialize, Clone, Copy, Debug, Default)]
+pub struct EncodableGetValuesResponse {
+    pub temp_mos: f32,
+    pub temp_motor: f32,
+    pub motor_current: f32,
+    pub input_current: f32,
+    pub avg_id: f32,
+    pub avg_iq: f32,
+    pub duty_cycle_now: f32,
+    pub rpm: f32,
+    pub v_in: f32,
+    pub amp_hours: f32,
+    pub amp_hours_charged: f32,
+    pub watt_hours: f32,
+    pub watt_hours_charged: f32,
+    pub tachometer: i32,
+    pub tachometer_abs: i32,
+    pub fault_code: u8,
+    pub pid_pos_now: f32,
+    pub vesc_id: u8,
+}
+
+impl From<&GetValuesResponse> for EncodableGetValuesResponse {
+    fn from(value: &GetValuesResponse) -> Self {
+        Self {
+            temp_mos: value.temp_mos,
+            temp_motor: value.temp_motor,
+            motor_current: value.motor_current,
+            input_current: value.input_current,
+            avg_id: value.avg_id,
+            avg_iq: value.avg_iq,
+            duty_cycle_now: value.duty_cycle_now,
+            rpm: value.rpm,
+            v_in: value.v_in,
+            amp_hours: value.amp_hours,
+            amp_hours_charged: value.amp_hours_charged,
+            watt_hours: value.watt_hours,
+            watt_hours_charged: value.watt_hours_charged,
+            tachometer: value.tachometer,
+            tachometer_abs: value.tachometer_abs,
+            fault_code: value.fault_code,
+            pid_pos_now: value.pid_pos_now,
+            vesc_id: value.vesc_id,
+        }
+    }
+}
+
 impl Freezable for MotorController {}
 
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
-impl CuSinkTask for MotorController {
+impl CuTask for MotorController {
     // steering, actuators (just ignore the actuators here for now)
     type Input<'m> = input_msg!(Steering);
+    type Output<'m> = output_msg!(EncodableGetValuesResponse);
+
+
     type Resources<'r> = ();
 
     fn new(config: Option<&ComponentConfig>, _resources: Self::Resources<'_>) -> CuResult<Self> {
@@ -91,7 +145,7 @@ impl CuSinkTask for MotorController {
         Ok(())
     }
 
-    fn process(&mut self, _clock: &RobotClock, input: &Self::Input<'_>) -> CuResult<()> {
+    fn process(&mut self, _clock: &RobotClock, input: &Self::Input<'_>, output: &mut Self::Output<'_>) -> CuResult<()> {
         if let Some(steering) = input.payload() {
             let new_weight: f32 = steering.get_weight() as f32;
             if (new_weight - self.prev_speed_multi).abs() > 0.0001 {
@@ -113,6 +167,7 @@ impl CuSinkTask for MotorController {
                     let _ = rec
                         .recorder
                         .log(format!("vescs/{id}"), &TextLog::new(format!("{item:?}")));
+                    output.set_payload(item.into());
                 }
             } else {
                 // println!("{telemetry:?}");
@@ -129,7 +184,7 @@ impl CuSinkTask for MotorController {
         }
 
         Ok(())
-    }
+    }    
 }
 
 #[cfg(any(not(target_os = "linux"), feature = "resim", feature = "sim"))]
