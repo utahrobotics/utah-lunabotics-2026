@@ -1,7 +1,7 @@
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
 use crossbeam::channel::Receiver;
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
-use std::{collections::HashMap,sync::Arc};
+use std::{collections::HashMap, sync::Arc};
 
 use cu_bincode::{Decode, Encode};
 use cu_sensor_payloads::CuImage;
@@ -35,8 +35,8 @@ pub struct T265Subscriber {
     pose_variance: f64,
     angular_velocity_variance: f64,
     _manager: T265Manager,
-    image_rx: Receiver<VideoFrame>,
-    pose_rx: Receiver<Pose>,
+    image_rx: Option<Receiver<VideoFrame>>,
+    pose_rx: Option<Receiver<Pose>>,
     pool: Arc<CuHostMemoryPool<Vec<u8>>>,
 
     /// serial, warmupstate
@@ -54,7 +54,7 @@ pub struct WarmupState {
     current_pose_count: usize,
     warmup_pose_count: usize,
     // the t265's pose readings have an arbitrary origin.
-    world_to_odom_offset: Option<Isometry3<f64>>, 
+    world_to_odom_offset: Option<Isometry3<f64>>,
 }
 
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
@@ -175,19 +175,29 @@ impl CuSrcTask for T265Subscriber {
             .expect("Please provide rear t261 serial");
 
         let mut manager = T265Manager::new().map_err(|e| CuError::from(e.to_string()))?;
-        manager
-            .discover_devices_with_options(true)
-            .map_err(|e| CuError::from(e.to_string()))?;
-        manager
-            .enable_all_video_streams()
-            .map_err(|e| CuError::from(e.to_string()))?;
 
-        let pose_rx = manager
-            .start_all_pose_streams()
-            .map_err(|e| CuError::from(e.to_string()))?;
-        let image_rx = manager
-            .start_all_video_streams()
-            .map_err(|e| CuError::from(e.to_string()))?;
+        let (pose_rx, image_rx) = match (|| -> cu29::CuResult<_> {
+            manager
+                .discover_devices_with_options(true)
+                .map_err(|e| CuError::from(e.to_string()))?;
+            manager
+                .enable_all_video_streams()
+                .map_err(|e| CuError::from(e.to_string()))?;
+            let pose_rx = manager
+                .start_all_pose_streams()
+                .map_err(|e| CuError::from(e.to_string()))?;
+            let image_rx = manager
+                .start_all_video_streams()
+                .map_err(|e| CuError::from(e.to_string()))?;
+            Ok((pose_rx, image_rx))
+        })() {
+            Ok((p, i)) => (Some(p), Some(i)),
+            Err(e) => {
+                eprintln!("[T265] Failed to initialize streams, running degraded: {e}");
+                (None, None)
+            }
+        };
+
         const WIDTH: usize = 848;
         const HEIGHT: usize = 800;
         let pool = CuHostMemoryPool::new("t265_imgs", 12, || vec![0u8; (WIDTH * HEIGHT) as usize])?;
@@ -232,13 +242,17 @@ impl CuSrcTask for T265Subscriber {
         new_msg.2.clear_payload();
 
         'image_rx: {
-            if self.image_rx.len() > 5 {
-                eprintln!("WARNING: t265 image backpressure: {}", self.image_rx.len());
-                while self.image_rx.len() > 1 {
-                    let _ = self.image_rx.try_recv();
+            let Some(image_rx) = &self.image_rx else {
+                break 'image_rx;
+            };
+
+            if image_rx.len() > 5 {
+                eprintln!("WARNING: t265 image backpressure: {}", image_rx.len());
+                while image_rx.len() > 1 {
+                    let _ = image_rx.try_recv();
                 }
             }
-            if let Ok(mut image) = self.image_rx.try_recv() {
+            if let Ok(mut image) = image_rx.try_recv() {
                 if image.sensor_index == 0 {
                     break 'image_rx;
                 }
@@ -294,118 +308,123 @@ impl CuSrcTask for T265Subscriber {
                 } else {
                     eprintln!("[T265 SUBSCRIBER] Unknown serial on image");
                 }
-
             }
         }
 
-        if self.pose_rx.len() > 5 {
-            eprintln!("WARNING: t265 pose backpressure: {}", self.pose_rx.len());
-            // drain off backpressure
-            while self.pose_rx.len() > 1 {
-                let _ = self.pose_rx.try_recv();
+        if let Some(pose_rx) = &self.pose_rx {
+            if pose_rx.len() > 5 {
+                eprintln!("WARNING: t265 pose backpressure: {}", pose_rx.len());
+                // drain off backpressure
+                while pose_rx.len() > 1 {
+                    let _ = pose_rx.try_recv();
+                }
             }
-        }
 
-        if let Ok(Pose {
-            translation,
-            rotation,
-            velocity,
-            angular_velocity,
-            acceleration,
-            angular_acceleration,
-            timestamp_ns: _,
-            tracker_confidence: _,
-            mapper_confidence: _,
-            tracker_state: _,
-            device_id,
-        }) = self.pose_rx.try_recv()
-        {
-            let Some(warmup_state) = self.warmup_states.get_mut(&device_id) else {
-                return Err(CuError::from(format!("Unknown serial {device_id}")));
-            };
-            if !warmup_state.done
-                && warmup_state.current_pose_count < warmup_state.warmup_pose_count
+            if let Ok(Pose {
+                translation,
+                rotation,
+                velocity,
+                angular_velocity,
+                acceleration,
+                angular_acceleration,
+                timestamp_ns: _,
+                tracker_confidence: _,
+                mapper_confidence: _,
+                tracker_state: _,
+                device_id,
+            }) = pose_rx.try_recv()
             {
-                warmup_state.current_pose_count += 1;
-                return Err(CuError::from(format!("{device_id} warming up")));
-            } else {
-                // its just nice to stop counting, not that it actually changes performance in any way
-                warmup_state.done = true;
-            }
+                let Some(warmup_state) = self.warmup_states.get_mut(&device_id) else {
+                    return Err(CuError::from(format!("Unknown serial {device_id}")));
+                };
+                if !warmup_state.done
+                    && warmup_state.current_pose_count < warmup_state.warmup_pose_count
+                {
+                    warmup_state.current_pose_count += 1;
+                    return Err(CuError::from(format!("{device_id} warming up")));
+                } else {
+                    // its just nice to stop counting, not that it actually changes performance in any way
+                    warmup_state.done = true;
+                }
 
-            use nalgebra::Quaternion;
+                use nalgebra::Quaternion;
 
-            use crate::ROBOT_STATE;
-            // Coordinate frame transform from T265 to robot (same as translation: [-z, -x, y])
-            // https://stackoverflow.com/questions/18818102/convert-quaternion-representing-rotation-from-one-coordinate-system-to-another
-            let coord_transform =
-                UnitQuaternion::from_quaternion(Quaternion::new(0.5, 0.5, -0.5, -0.5));
-            let q_t265 = UnitQuaternion::from_quaternion(Quaternion::new(
-                rotation[3],
-                rotation[0],
-                rotation[1],
-                rotation[2],
-            ));
-            let q_robot = coord_transform * q_t265 * coord_transform.inverse();
-            let pose = Isometry3::from_parts(
-                Vector3::new(-translation[2], -translation[0], translation[1]).into(),
-                q_robot,
-            );
-
-            let Some(kinematic_node) = ROBOT_STATE
-                .get()
-                .expect("robot state not initialized")
-                .kinematic_root
-                .get_node_with_name(&device_id)
-            else {
-                return Err(CuError::new_with_cause(
-                    "received pose from unknown device",
-                    std::io::Error::other("received pose from unknown device"),
+                use crate::ROBOT_STATE;
+                // Coordinate frame transform from T265 to robot (same as translation: [-z, -x, y])
+                // https://stackoverflow.com/questions/18818102/convert-quaternion-representing-rotation-from-one-coordinate-system-to-another
+                let coord_transform =
+                    UnitQuaternion::from_quaternion(Quaternion::new(0.5, 0.5, -0.5, -0.5));
+                let q_t265 = UnitQuaternion::from_quaternion(Quaternion::new(
+                    rotation[3],
+                    rotation[0],
+                    rotation[1],
+                    rotation[2],
                 ));
-            };
+                let q_robot = coord_transform * q_t265 * coord_transform.inverse();
+                let pose = Isometry3::from_parts(
+                    Vector3::new(-translation[2], -translation[0], translation[1]).into(),
+                    q_robot,
+                );
 
-            let isometry_from_base = kinematic_node.get_isometry_from_base();
-            let current_raw_pose: Isometry3<f64> = pose.cast();
+                let Some(kinematic_node) = ROBOT_STATE
+                    .get()
+                    .expect("robot state not initialized")
+                    .kinematic_root
+                    .get_node_with_name(&device_id)
+                else {
+                    return Err(CuError::new_with_cause(
+                        "received pose from unknown device",
+                        std::io::Error::other("received pose from unknown device"),
+                    ));
+                };
 
-            // Calculate or retrieve the static offset to align this sensor's odometry 
-            // origin to the robot's world origin established directly after warmup.
-            let world_to_odom = warmup_state.world_to_odom_offset.unwrap_or_else(|| {
-                let offset = isometry_from_base * current_raw_pose.inverse();
-                warmup_state.world_to_odom_offset = Some(offset);
-                offset
-            });
+                let isometry_from_base = kinematic_node.get_isometry_from_base();
+                let current_raw_pose: Isometry3<f64> = pose.cast();
 
-            // World -> Odom -> Sensor -> Base
-            let base_pose_in_world = world_to_odom * current_raw_pose * isometry_from_base.inverse();
+                // Calculate or retrieve the static offset to align this sensor's odometry
+                // origin to the robot's world origin established directly after warmup.
+                let world_to_odom = warmup_state.world_to_odom_offset.unwrap_or_else(|| {
+                    let offset = isometry_from_base * current_raw_pose.inverse();
+                    warmup_state.world_to_odom_offset = Some(offset);
+                    offset
+                });
 
-            let msg = T265Msg {
-                pose: EncodableIsometry::from_na(&base_pose_in_world),
-                pose_variance: self.pose_variance,
-                velocity_variance: self.velocity_variance,
-                angular_velocity_variance: self.angular_velocity_variance,
-                node_name: device_id,
-                imu_msg: T265IMUMsg {
-                    accel: acceleration,
-                    angular_accel: angular_acceleration,
-                    velocity,
-                    angular_velocity,
-                },
-            };
-            new_msg.0.set_payload(msg);
-            self.last_seen = clock.now().as_millis();
+                // World -> Odom -> Sensor -> Base
+                let base_pose_in_world =
+                    world_to_odom * current_raw_pose * isometry_from_base.inverse();
+
+                let msg = T265Msg {
+                    pose: EncodableIsometry::from_na(&base_pose_in_world),
+                    pose_variance: self.pose_variance,
+                    velocity_variance: self.velocity_variance,
+                    angular_velocity_variance: self.angular_velocity_variance,
+                    node_name: device_id,
+                    imu_msg: T265IMUMsg {
+                        accel: acceleration,
+                        angular_accel: angular_acceleration,
+                        velocity,
+                        angular_velocity,
+                    },
+                };
+                new_msg.0.set_payload(msg);
+                self.last_seen = clock.now().as_millis();
+            }
         }
 
-        let mut err_msg = None;
-        if clock.now().as_millis() - self.last_seen > 500 {
-            err_msg = Some("no poses seen in 500 ms".to_string());
-        }
-
-        if clock.now().as_millis() - self.last_seen_img > 500 {
-            *err_msg.get_or_insert(String::new()) += " No images seen in 500 ms";
-        }
-
-        if let Some(ref err_msg) = err_msg {
-            return Err(CuError::from(err_msg.as_str()));
+        // Only run the staleness watchdog if streams were successfully initialized,
+        // and only once we've seen at least one message (last_seen > 0) to avoid
+        // false positives on startup.
+        if self.pose_rx.is_some() {
+            let mut err_msg = None;
+            if self.last_seen > 0 && clock.now().as_millis() - self.last_seen > 500 {
+                err_msg = Some("no poses seen in 500 ms".to_string());
+            }
+            if self.last_seen_img > 0 && clock.now().as_millis() - self.last_seen_img > 500 {
+                *err_msg.get_or_insert(String::new()) += " No images seen in 500 ms";
+            }
+            if let Some(ref err_msg) = err_msg {
+                return Err(CuError::from(err_msg.as_str()));
+            }
         }
 
         Ok(())
