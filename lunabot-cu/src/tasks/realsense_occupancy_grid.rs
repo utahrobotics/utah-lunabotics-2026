@@ -592,11 +592,11 @@ impl CuTask for OccupancyGridTask {
                             }
                         }
                     }
-                    let _ = logger.recorder.log(
-                        "obstacle_mapper/global_obstacle_map",
-                        &Points2D::new(global_obstacle_map_points)
-                            .with_colors(global_obstacle_map_colors),
-                    );
+                    // let _ = logger.recorder.log(
+                    //     "obstacle_mapper/global_obstacle_map",
+                    //     &Points2D::new(global_obstacle_map_points)
+                    //         .with_colors(global_obstacle_map_colors),
+                    // );
                 }
 
                 if let Ok(mut p) = self.depth_projector_pipeline.try_lock() {
@@ -691,35 +691,35 @@ impl CuTask for OccupancyGridTask {
                             depths.len() * std::mem::size_of::<u16>(),
                         )
                     };
-                    let _ = logger.recorder.log(
-                        "realsense/depth_image",
-                        &rerun::DepthImage::new(
-                            depth_bytes,
-                            ImageFormat::depth(
-                                [DEPTH_FRAME_WIDTH as u32, DEPTH_FRAME_HEIGHT as u32],
-                                rerun::ChannelDatatype::U16,
-                            ),
-                        )
-                        .with_meter(1.0 / request.depth_scale)
-                        .with_depth_range([0.0, 2.0 / request.depth_scale as f64]),
-                    );
+                    // let _ = logger.recorder.log(
+                    //     "realsense/depth_image",
+                    //     &rerun::DepthImage::new(
+                    //         depth_bytes,
+                    //         ImageFormat::depth(
+                    //             [DEPTH_FRAME_WIDTH as u32, DEPTH_FRAME_HEIGHT as u32],
+                    //             rerun::ChannelDatatype::U16,
+                    //         ),
+                    //     )
+                    //     .with_meter(1.0 / request.depth_scale)
+                    //     .with_depth_range([0.0, 2.0 / request.depth_scale as f64]),
+                    // );
 
                     let pipeline_guard = pipeline.lock().unwrap();
-                    let raw_height_map = pipeline_guard.get_raw_height_map(get_device()).unwrap();
-                    let raw_gradient_map = pipeline_guard.get_gradient_map(get_device()).unwrap();
-                    let blur_filtered_height_map = pipeline_guard
-                        .get_blur_filtered_height_map(get_device())
-                        .unwrap();
+                    // let raw_height_map = pipeline_guard.get_raw_height_map(get_device()).unwrap();
+                    // let raw_gradient_map = pipeline_guard.get_gradient_map(get_device()).unwrap();
+                    // let blur_filtered_height_map = pipeline_guard
+                    //     .get_blur_filtered_height_map(get_device())
+                    //     .unwrap();
 
-                    log_map(
-                        layout,
-                        obstacle_map,
-                        raw_height_map,
-                        raw_gradient_map,
-                        blur_filtered_height_map,
-                        request.origin,
-                        logger,
-                    );
+                    // log_map(
+                    //     layout,
+                    //     obstacle_map,
+                    //     raw_height_map,
+                    //     raw_gradient_map,
+                    //     blur_filtered_height_map,
+                    //     request.origin,
+                    //     logger,
+                    // );
                 }
 
                 process_result
