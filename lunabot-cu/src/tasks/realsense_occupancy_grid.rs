@@ -682,15 +682,15 @@ impl CuTask for OccupancyGridTask {
                     )
                 };
 
-                if let (Ok((_points, obstacle_map)), Some(logger)) =
-                    (&process_result, RECORDER.get())
-                {
-                    let depth_bytes: &[u8] = unsafe {
-                        std::slice::from_raw_parts(
-                            depths.as_ptr() as *const u8,
-                            depths.len() * std::mem::size_of::<u16>(),
-                        )
-                    };
+                // if let (Ok((_points, obstacle_map)), Some(logger)) =
+                //     (&process_result, RECORDER.get())
+                // {
+                //     let depth_bytes: &[u8] = unsafe {
+                //         std::slice::from_raw_parts(
+                //             depths.as_ptr() as *const u8,
+                //             depths.len() * std::mem::size_of::<u16>(),
+                //         )
+                //     };
                     // let _ = logger.recorder.log(
                     //     "realsense/depth_image",
                     //     &rerun::DepthImage::new(
@@ -704,7 +704,7 @@ impl CuTask for OccupancyGridTask {
                     //     .with_depth_range([0.0, 2.0 / request.depth_scale as f64]),
                     // );
 
-                    let pipeline_guard = pipeline.lock().unwrap();
+                    // let pipeline_guard = pipeline.lock().unwrap();
                     // let raw_height_map = pipeline_guard.get_raw_height_map(get_device()).unwrap();
                     // let raw_gradient_map = pipeline_guard.get_gradient_map(get_device()).unwrap();
                     // let blur_filtered_height_map = pipeline_guard
@@ -720,7 +720,7 @@ impl CuTask for OccupancyGridTask {
                     //     request.origin,
                     //     logger,
                     // );
-                }
+                // }
 
                 process_result
             });
