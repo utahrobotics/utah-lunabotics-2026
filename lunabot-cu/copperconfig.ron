@@ -203,8 +203,8 @@
                     {
                         "id1": 100,
                         "id2": 56,
-                        "mask1": "Right",
-                        "mask2": "Left",
+                        "mask1": "Left",
+                        "mask2": "Right",
                         "command_both": true
                     },
 

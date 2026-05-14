@@ -278,11 +278,11 @@ mod prod_impl {
             {
                 actuator_cmd.apply_speed_factor(self.speed_ratio as f32);
                 let serialized = ActuatorCommand::serialize(&actuator_cmd);
-                println!(
+                /* println!(
                     "[PICO TX] Sending command: {:?} ({} bytes)",
                     actuator_cmd,
                     serialized.len()
-                );
+                ); */
                 if let Err(_) = cmd_tx.try_send(serialized) {
                     eprintln!("[PICO] Command channel full or closed, dropping command");
                 }
@@ -354,7 +354,10 @@ mod prod_impl {
                     no_reading_count += 1;
                     if no_reading_count <= 5 {
                         let _ = is_broken_tx.send(true);
-                        eprintln!("[PICO RX] Unresponsive (no reading count: {})", no_reading_count);
+                        eprintln!(
+                            "[PICO RX] Unresponsive (no reading count: {})",
+                            no_reading_count
+                        );
                         break;
                     }
                     continue;
@@ -363,8 +366,11 @@ mod prod_impl {
                 let frame_len = reading.len();
 
                 let Ok(reading) = reading.try_into() else {
-                    eprintln!("[PICO RX] Unexpected frame size: {} bytes (expected FromPico={})",
-                        frame_len, FromPico::SIZE);
+                    eprintln!(
+                        "[PICO RX] Unexpected frame size: {} bytes (expected FromPico={})",
+                        frame_len,
+                        FromPico::SIZE
+                    );
                     continue;
                 };
                 let Ok(reading) = FromPico::deserialize(reading) else {
