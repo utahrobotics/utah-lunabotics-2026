@@ -107,10 +107,13 @@ impl CuSinkTask for MotorController {
             use crate::rerun_viz::RECORDER;
 
             if let Some(rec) = RECORDER.get() {
-                use rerun::TextLog;
-                let _ = rec
-                    .recorder
-                    .log("vesc_telemetry", &TextLog::new(format!("{telemetry:?}")));
+                for item in telemetry.iter() {
+                    let id = item.vesc_id;
+                    use rerun::TextLog;
+                    let _ = rec
+                        .recorder
+                        .log(format!("vescs/{id}"), &TextLog::new(format!("{item:?}")));
+                }
             } else {
                 // println!("{telemetry:?}");
             }
