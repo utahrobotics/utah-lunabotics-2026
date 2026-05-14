@@ -200,6 +200,14 @@
                 "invert_right": true,
                 "speed_multiplier": 1500,
                 "vesc_pairs": [
+                    {
+                        "id1": 100,
+                        "id2": 56,
+                        "mask1": "Right",
+                        "mask2": "Left",
+                        "command_both": true
+                    },
+
                     // the new vesc matthew G has been configuring
                     {
                         "id1": 10,
