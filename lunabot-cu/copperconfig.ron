@@ -251,7 +251,7 @@
             type: "crate::tasks::AprilDetectionHandler",
             config: {
                 // all tags > max_distance away will be ignored
-                "max_distance": 20.5
+                "max_distance": 3.0
             }
         ),
 
