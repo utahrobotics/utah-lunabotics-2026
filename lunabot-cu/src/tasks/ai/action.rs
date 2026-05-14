@@ -15,14 +15,14 @@ use crate::{
         jobs::{
             dig_job, direction_from_path, dump_job, find_path_job, follow_path_job, rotation_shim,
         },
-    }, utils::{rwlock_read_unpoison, rwlock_write_unpoison},
+    },
+    utils::{rwlock_read_unpoison, rwlock_write_unpoison},
 };
 
 static _PATHFINDING_GOAL: [f32; 2] = [5.843524, 1.4796992];
 
 #[derive(Clone, Debug)]
 pub enum LunabotAction {
-
     /// Sets a status message that is sent over to the lunabase.
     /// Dont be repeatedly calling this a million times per second because it will use bandwidth.
     SetBTStatusMsg(String),
@@ -241,19 +241,19 @@ impl LunabotAction {
             LunabotAction::IsManual => match blackboard.current_mission {
                 LunabotStage::Manual => Running,
                 _ => Success,
-            }
+            },
             LunabotAction::IsTestMotors => match blackboard.current_mission {
                 LunabotStage::TestMotors => Running,
                 _ => Success,
-            }
+            },
             LunabotAction::IsDig => match blackboard.current_mission {
                 LunabotStage::Dig => Running,
                 _ => Success,
-            } 
+            },
             LunabotAction::IsDump => match blackboard.current_mission {
                 LunabotStage::Dump => Running,
                 _ => Success,
-            } 
+            },
             LunabotAction::None => Success,
             LunabotAction::IsInOccupiedCell => todo!(),
             LunabotAction::IsInFreeCell => todo!(),
@@ -365,8 +365,8 @@ impl LunabotAction {
                             ROBOT_STATE.get().unwrap().kinematic_root,
                             path,
                             None,
-                            0.5,
-                            0.5,
+                            0.85,
+                            0.05,
                             None,
                             None,
                             None,
@@ -515,12 +515,12 @@ impl LunabotAction {
                 blackboard.latest_local_map = None;
                 rwlock_write_unpoison(&*blackboard.blackboard_shared).reset_map = true;
                 Success
-            },
+            }
             LunabotAction::ResetLocalObstacles => {
                 blackboard.latest_local_map = None;
                 rwlock_write_unpoison(&*blackboard.blackboard_shared).reset_local_map = true;
                 Success
-            },
+            }
             LunabotAction::ObstacleResetRequested => {
                 let guard = rwlock_read_unpoison(&*blackboard.blackboard_shared);
                 if guard.reset_local_map || guard.reset_map {
@@ -528,18 +528,18 @@ impl LunabotAction {
                 } else {
                     Success
                 }
-            },
+            }
             LunabotAction::LatestLocalMapReady => {
                 if blackboard.latest_local_map.is_some() {
                     Success
                 } else {
                     Running
                 }
-            },
+            }
             LunabotAction::SetBTStatusMsg(msg) => {
                 blackboard.outgoing_bt_status_msg = Some(msg.to_owned());
                 Success
-            },
+            }
         };
         (status, 0.0)
     }

@@ -14,7 +14,7 @@ use crate::tasks::ai::jobs::Job;
 const WHEEL_BASE_SIZE: f32 = 0.6; // TODO Find real numbers
 /// Default value for adjustment to sharpness of turns. Higher values result in
 /// sharper turns, deviating from the theoretical circle to the target point.
-const DEFAULT_TURNING_RATIO_ADJUSTMENT: f32 = 15.0;
+const DEFAULT_TURNING_RATIO_ADJUSTMENT: f32 = 3.0;
 /// How fast the robot should move when following the dot by default. Error in
 /// position is also considered.
 const DEFAULT_FOLLOW_SPEED_FACTOR: f32 = 0.25;

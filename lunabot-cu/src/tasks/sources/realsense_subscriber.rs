@@ -75,7 +75,7 @@ impl CuSrcTask for RealsenseSubscriber {
             .create()
             .map_err(|e| CuError::new_with_cause("subscriber creation error", e))?;
 
-        let pool = CuHostMemoryPool::new("realsense_depth_frames", 4, || {
+        let pool = CuHostMemoryPool::new("realsense_depth_frames", 16, || {
             vec![016; (DEPTH_FRAME_HEIGHT * DEPTH_FRAME_WIDTH) as usize]
         })?;
 
