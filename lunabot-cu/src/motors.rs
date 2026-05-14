@@ -410,6 +410,7 @@ impl MotorTask {
                 match self.motor_ref.speeds.load() {
                     Some((left, right, timestamp)) => {
                         if timestamp.elapsed() > SPEED_COMMAND_EXPIRY {
+                            eprintln!("[MOTORS.RS] SETTING SPEEDS TO ZERO, SPEED COMMAND EXPIRED");
                             break (0.0, 0.0);
                         }
                         break (left, right);
