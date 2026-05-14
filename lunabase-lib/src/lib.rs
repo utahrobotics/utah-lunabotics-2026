@@ -457,6 +457,16 @@ impl LunabaseConnection {
         self.send_msg(FromLunabase::TestMotors);
     }
 
+    #[func]
+    fn send_dig(&mut self) {
+        self.send_msg(FromLunabase::Dig);
+    }
+
+    #[func]
+    fn send_dump(&mut self) {
+        self.send_msg(FromLunabase::Dump);
+    }
+
     /// continue mission means manual
     #[func]
     fn send_continue_mission(&mut self) {
@@ -465,7 +475,7 @@ impl LunabaseConnection {
 
     #[func]
     fn send_start_autonomy(&mut self) {
-        self.send_msg(FromLunabase::Navigate((0.0, 0.0)));
+        self.send_msg(FromLunabase::Navigate);
     }
 
     #[func]

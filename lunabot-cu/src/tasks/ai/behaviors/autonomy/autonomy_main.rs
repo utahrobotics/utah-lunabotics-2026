@@ -8,18 +8,18 @@ pub fn autonomy_main(arena: Arena) -> Behavior<LunabotAction> {
         Box::new(Action(LunabotAction::IsAutonomy)),
         vec![
             // 1. go to dig site
-            //navigate_behavior(NavigationGoal::DigSite(arena)),
+            navigate_behavior(NavigationGoal::DigSite(arena)),
             open_loop_dig_from_starting(),
             // 2. dig
             // Action(LunabotAction::Dig),
 
             // 3. Navigate to dump site
             navigate_behavior(NavigationGoal::DumpSite(arena)),
+            open_loop_dump_from_zero(),
             back_up_for(0.5),
             Wait(5.5),
             // 4. Dump
             // Action(LunabotAction::Dump),
-            open_loop_dump_from_zero()
         ],
     )
     // TEST DIG AND DUMP
@@ -123,7 +123,7 @@ pub fn autonomy_main(arena: Arena) -> Behavior<LunabotAction> {
 
 
 // This is terrible please don't follow in my footsteps (HB)
-fn open_loop_dig_from_starting() -> Behavior<LunabotAction> {
+pub fn open_loop_dig_from_starting() -> Behavior<LunabotAction> {
     Sequence(
         vec![
             Wait(0.25), // Safety wait
@@ -186,7 +186,7 @@ fn open_loop_dig_from_starting() -> Behavior<LunabotAction> {
 
 
 
-fn open_loop_dump_from_zero() -> Behavior<LunabotAction> {
+pub fn open_loop_dump_from_zero() -> Behavior<LunabotAction> {
     Sequence(
         vec![
             Wait(1.5),

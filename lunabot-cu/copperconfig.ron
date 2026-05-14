@@ -188,7 +188,8 @@
 
         (
             id: "motor_logger",
-            type: "crate::tasks::sinks::MotorLogger"
+            type: "crate::tasks::sinks::MotorLogger",
+            run_in_sim: false
         ),
 
         // receives messages from the ai and tells the motors to move accordingly
@@ -225,8 +226,7 @@
                         "command_both": true,
                     }
                 ],
-            },
-            run_in_sim: false,
+            }
         ),
         // uses async tasks to communicate with the pico on the v3 pcb that electrical team designed.
         // controls actuators and sends imu data to the localizer

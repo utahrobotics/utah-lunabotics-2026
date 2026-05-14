@@ -70,6 +70,10 @@ pub enum LunabotAction {
     IsManual,
     IsTestMotors,
 
+    // These are used if we manually trigger a dig or dump, they dont involve traversal
+    IsDig,
+    IsDump,
+
     None,
 
     /// if the robot is in an occupied cell, we should first pathfind to the nearest free cell (if a free cell is within some range)
@@ -242,6 +246,14 @@ impl LunabotAction {
                 LunabotStage::TestMotors => Running,
                 _ => Success,
             }
+            LunabotAction::IsDig => match blackboard.current_mission {
+                LunabotStage::Dig => Running,
+                _ => Success,
+            } 
+            LunabotAction::IsDump => match blackboard.current_mission {
+                LunabotStage::Dump => Running,
+                _ => Success,
+            } 
             LunabotAction::None => Success,
             LunabotAction::IsInOccupiedCell => todo!(),
             LunabotAction::IsInFreeCell => todo!(),

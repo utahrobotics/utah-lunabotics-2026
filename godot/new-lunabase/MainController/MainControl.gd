@@ -8,6 +8,10 @@ extends Control
 @onready var stage_label: Label = $VBoxContainer/TopBar/MarginContainer/TopPanel/StatusGroup/StageLabel
 @onready var soft_stop_button: Button = $VBoxContainer/BottomBar/MarginContainer/BottomPanel/SoftStopButton
 @onready var test_motors_button: Button = $VBoxContainer/BottomBar/MarginContainer/BottomPanel/TestMotorsButton
+@onready var dig_button: Button = $VBoxContainer/BottomBar/MarginContainer/BottomPanel/DigButton
+@onready var dump_button: Button = $VBoxContainer/BottomBar/MarginContainer/BottomPanel/DumpButton
+
+
 @onready var manual_button: Button = $VBoxContainer/BottomBar/MarginContainer/BottomPanel/ManualButton
 @onready var autonomous_button: Button = $VBoxContainer/BottomBar/MarginContainer/BottomPanel/AutonomousButton
 @onready var errored_tasks_label: Label = $VBoxContainer/MainContent/HBoxContainer/LeftColumn/ErrorsPanel/MarginContainer/VBox/ScrollContainer/ErroredTasksLabel
@@ -39,6 +43,8 @@ enum LunabotStage {
 	SOFT_STOP = 1,
 	AUTONOMY = 2,
 	TEST_MOTORS = 3,
+	DIG = 4,
+	DUMP = 5
 }
 
 func _ready() -> void:
@@ -53,6 +59,8 @@ func _ready() -> void:
 	sigma_spatial_input.value_changed.connect(_on_set_sigma_spatial_changed)
 	sigma_range_input.value_changed.connect(_on_set_sigma_range_changed)
 	test_motors_button.pressed.connect(_on_test_motors_pressed)
+	dig_button.pressed.connect(_on_dig_pressed)
+	dump_button.pressed.connect(_on_dump_pressed)
 	
 	
 	speed_slider.value = 600;
@@ -99,7 +107,12 @@ func _process(delta: float) -> void:
 		LunabotStage.TEST_MOTORS:
 			stage_label.text = "Stage: Test Motors"
 			stage_label.modulate = Color.RED
-			
+		LunabotStage.DIG:
+			stage_label.text = "Stage: Dig"
+			stage_label.modulate = Color.DARK_CYAN
+		LunabotStage.DUMP:
+			stage_label.text = "Stage: Dump"
+			stage_label.modulate = Color.DARK_CYAN
 	
 	#location  
 	var location = connection.get_location()
@@ -183,6 +196,12 @@ func _on_speed_multiplier_slider_value_changed(value: float) -> void:
 
 func _on_test_motors_pressed() -> void:
 	controller.command_recorder.execute_and_store(TestMotorsCommand.new())
+	
+func _on_dig_pressed() -> void:
+	controller.command_recorder.execute_and_store(DigCommand.new())
+
+func _on_dump_pressed() -> void:
+	controller.command_recorder.execute_and_store(DumpCommand.new())
 
 func _on_ip_input_gui_input(event: InputEvent) -> void:
 	if not (event is InputEventKey):
