@@ -1,0 +1,12 @@
+[package]
+name = "device_reset"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+
+[features]
+production = []
+
+[dependencies]
+realsense-rust = { version = "=1.1.0", features = ["buildtime-bindgen"] }
+common.workspace = true
