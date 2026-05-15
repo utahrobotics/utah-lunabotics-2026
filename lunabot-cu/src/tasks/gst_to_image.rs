@@ -166,9 +166,9 @@ impl CuTask for GstToImage {
         output: &mut Self::Output<'_>,
     ) -> CuResult<()> {
         output.clear_payload();
-  
+
         let Some(buffer_hold) = input.payload() else {
-            return Ok(());  
+            return Ok(());
         };
         let buffer_hold = buffer_hold
             .as_ref()
@@ -189,9 +189,12 @@ impl CuTask for GstToImage {
             .acquire()
             .ok_or(CuError::from("Failed to acquire buffer from pool"))?;
         {
-            let mut dst = handle
-                .write()
-                .map_err(|e| CuError::new_with_cause("Failed to lock buffer", std::io::Error::other(e.to_string())))?;
+            let mut dst = handle.write().map_err(|e| {
+                CuError::new_with_cause(
+                    "Failed to lock buffer",
+                    std::io::Error::other(e.to_string()),
+                )
+            })?;
             let dst = dst.deref_mut().deref_mut();
 
             integral_image(src, &mut self.integral_img, self.width, self.height);
@@ -219,7 +222,7 @@ impl CuTask for GstToImage {
         );
 
         output.tov = input.tov;
-        output.set_payload(image);
+        // output.set_payload(image);
         Ok(())
     }
 }

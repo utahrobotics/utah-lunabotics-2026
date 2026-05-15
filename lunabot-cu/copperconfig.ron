@@ -11,7 +11,7 @@
                 "obstacle_gradient_threshold_expander": 0.9,
                 "obstacle_gradient_threshold_pathfinder": 0.3,
                 "robot_radius_meters": 0.8,
-                "arena": "artemis"
+                "arena": "ucfleft"
             },
             logging:(
                 enabled: false
@@ -79,7 +79,7 @@
             logging: (
                 enabled: true,
                 // disable logging for images (it takes too long)
-                disabled_slots: [1,2,3]
+                // disabled_slots: [1,2,3]
             ),
             run_in_sim: false
         ),
@@ -115,7 +115,7 @@
                 "min_distance_to_clear": 1.5,
 
                 // enable permanent obstacles: artemis, ucfright, or ucfleft
-                "arena_obstacles": "artemis",
+                "arena_obstacles": "ucfleft",
 
                 // parameters for when to reset the local map
                 "max_distance_traveled_before_reset": 1.5,
@@ -325,6 +325,18 @@
                 "bitrate": 2000,
             }
         ),
+        (
+            id: "t265_back_gstreamer",
+            type: "crate::tasks::T265Streamer",
+            config: {
+                "width": 848,
+                "height": 800,
+                "fps": 30,
+                "host": "0.0.0.0",
+                "tcp_port": 5003,
+                "bitrate": 2000,
+            }
+        ),
 
         // streams fisheye lenses for t265
         (
@@ -378,6 +390,7 @@
 
         (src:"t265_subscriber", dst:"t265_left_gstreamer", msg:"cu_sensor_payloads::CuImage<Vec<u8>>", src_port: Some(1)),
         (src:"t265_subscriber", dst:"t265_right_gstreamer", msg:"cu_sensor_payloads::CuImage<Vec<u8>>", src_port: Some(2)),
+        (src:"t265_subscriber", dst:"t265_back_gstreamer", msg:"cu_sensor_payloads::CuImage<Vec<u8>>", src_port: Some(3)),
 
         (src:"occupancy_grid_pipeline",       dst: "obstacle_gstreamer",     msg:"crate::pathfinding::OccupancyGrid"),
         (src:"new_ai",                        dst: "obstacle_gstreamer",     msg:"Vec<[f32; 2]>", src_port: Some(2)),
@@ -472,7 +485,7 @@
     monitor: (type:"simple_monitor::SimpleMonitor"),
     logging:(
         // if true, each output payload of each will be logged unless a task opts out
-        enable_task_logging: true,
+        enable_task_logging: false,
         section_size_mib: 100,
         copperlist_count: 20,
     ),

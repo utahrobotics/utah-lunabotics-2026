@@ -1,14 +1,14 @@
-use std::collections::VecDeque;
-use std::ops::Deref;
-use std::sync::{Arc, OnceLock, RwLock};
-
 use crate::pathfinding::OccupancyGrid;
+use crate::rerun_viz::RECORDER;
 use crate::utils::rwlock_write_unpoison;
 use crate::{ROBOT_STATE, tasks::ai::jobs::Job};
 use common::{FromLunabase, LUNABOT_STAGE, LunabotStage, Steering};
 use embedded_common::ActuatorCommand;
 use nalgebra::Vector2;
 use simple_motion::StaticNode;
+use std::collections::VecDeque;
+use std::ops::Deref;
+use std::sync::{Arc, OnceLock, RwLock};
 use std::time::Instant;
 
 /// do not hold onto the locks for too long, it could stall the pipeline.
@@ -23,10 +23,10 @@ pub struct BlackboardShared {
     pub reset_map: bool,
     pub enable_apriltags: bool,
 
-    /// by default the params come from the config passed to the realsense occupancy grid task, but we can dynamically change them 
+    /// by default the params come from the config passed to the realsense occupancy grid task, but we can dynamically change them
     /// through the AI
     pub sigma_spatial: Option<f32>,
-    pub sigma_range: Option<f32>
+    pub sigma_range: Option<f32>,
 }
 
 #[derive(Debug)]
@@ -88,7 +88,6 @@ pub struct LunabotBlackboard {
     pub last_non_zero_bucket_pack: Option<Instant>,
     pub last_non_zero_dumper_pack: Option<Instant>,
 
-
     /// don't hold onto guards for too long (longer than 200 microseconds is bad)
     pub blackboard_shared: Arc<RwLock<BlackboardShared>>,
 }
@@ -129,7 +128,7 @@ impl Default for LunabotBlackboard {
                 reset_map: false,
                 enable_apriltags: true,
                 sigma_range: None,
-                sigma_spatial: None
+                sigma_spatial: None,
             })),
         }
     }
@@ -152,7 +151,7 @@ impl LunabotBlackboard {
                 } else {
                     self.last_non_zero_dumper_pack = None;
                 }
-                self.last_dumper = Some(*val);   
+                self.last_dumper = Some(*val);
             }
             common::FromLunabase::BucketActuators(val) => {
                 if *val != 0 {
@@ -163,6 +162,10 @@ impl LunabotBlackboard {
                 self.last_bucket = Some(*val);
             }
             common::FromLunabase::Steering(steering) => {
+                if let Some(rec) = RECORDER.get() {
+                    rec.recorder
+                        .log("steering", &rerun::TextLog::new(format!("{steering:?}")));
+                }
                 let (left, right) = steering.get_left_and_right();
                 if left != 0.0 || right != 0.0 {
                     self.last_non_zero_steering_pack = Some(Instant::now());

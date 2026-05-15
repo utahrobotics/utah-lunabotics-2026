@@ -207,18 +207,20 @@ pub mod implementation {
                 let height = vframe.height() as usize;
                 let dest = vframe.plane_data_mut(0).unwrap();
 
-                img.buffer_handle.with_inner(|buf: &CuHandleInner<Vec<u8>>| {
-                    let src: &[u8] = buf.deref();
-                    if src_stride == dest_stride {
-                        dest[..height * dest_stride]
-                            .copy_from_slice(&src[..height * src_stride]);
-                    } else {
-                        for row in 0..height {
-                            dest[row * dest_stride..row * dest_stride + width]
-                                .copy_from_slice(&src[row * src_stride..row * src_stride + width]);
+                img.buffer_handle
+                    .with_inner(|buf: &CuHandleInner<Vec<u8>>| {
+                        let src: &[u8] = buf.deref();
+                        if src_stride == dest_stride {
+                            dest[..height * dest_stride]
+                                .copy_from_slice(&src[..height * src_stride]);
+                        } else {
+                            for row in 0..height {
+                                dest[row * dest_stride..row * dest_stride + width].copy_from_slice(
+                                    &src[row * src_stride..row * src_stride + width],
+                                );
+                            }
                         }
-                    }
-                });
+                    });
             }
 
             self.frame_count += 1;
@@ -264,3 +266,4 @@ pub mod implementation {
         }
     }
 }
+
