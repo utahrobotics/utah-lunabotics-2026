@@ -38,17 +38,17 @@ fn default_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::UdevMonitor(_) => SimOverride::ExecutedBySim,
         default::SimStep::CamSide(_) => SimOverride::ExecutedBySim,
         default::SimStep::CamBack(_) => SimOverride::ExecutedBySim,
-        default::SimStep::CamLaptopFront(_) => SimOverride::ExecutedBySim,
+        default::SimStep::CamDump(_) => SimOverride::ExecutedBySim,
         default::SimStep::GstConvertBack(_) => SimOverride::ExecutedBySim,
         default::SimStep::GstConvertSide(_) => SimOverride::ExecutedBySim,
-        default::SimStep::GstConvertLaptopFront(_) => SimOverride::ExecutedBySim,
+        default::SimStep::GstConvertDump(_) => SimOverride::ExecutedBySim,
         default::SimStep::L2Pointcloud(_) => SimOverride::ExecutedBySim,
         default::SimStep::L2Imu(_) => SimOverride::ExecutedBySim,
         default::SimStep::V3Pico(_) => SimOverride::ExecutedBySim,
         default::SimStep::MotorCtrl(_) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamBack(_) => SimOverride::ExecutedBySim,
         default::SimStep::DetectorCamSide(_) => SimOverride::ExecutedBySim,
-        default::SimStep::DetectorCamLaptopFront(_) => SimOverride::ExecutedBySim,
+        default::SimStep::DetectorCamDump(_) => SimOverride::ExecutedBySim,
         default::SimStep::RealsenseSubscriber(_) => SimOverride::ExecutedBySim,
         default::SimStep::T265Subscriber(_) => SimOverride::ExecutedBySim,
         default::SimStep::ObstacleGstreamer(..) => SimOverride::ExecutedBySim,
@@ -92,10 +92,10 @@ fn run_one_copperlist(
             default::SimStep::UdevMonitor(..) => SimOverride::ExecutedBySim,
             default::SimStep::CamSide(..) => SimOverride::ExecutedBySim,
             default::SimStep::CamBack(..) => SimOverride::ExecutedBySim,
-            default::SimStep::CamLaptopFront(..) => SimOverride::ExecutedBySim,
+            default::SimStep::CamDump(..) => SimOverride::ExecutedBySim,
             default::SimStep::GstConvertBack(..) => SimOverride::ExecutedBySim,
             default::SimStep::GstConvertSide(..) => SimOverride::ExecutedBySim,
-            default::SimStep::GstConvertLaptopFront(..) => SimOverride::ExecutedBySim,
+            default::SimStep::GstConvertDump(..) => SimOverride::ExecutedBySim,
             default::SimStep::ObstacleGstreamer(..) => SimOverride::ExecutedBySim,
             default::SimStep::T265LeftGstreamer(..) => SimOverride::ExecutedBySim,
             default::SimStep::T265RightGstreamer(..) => SimOverride::ExecutedBySim,
@@ -172,8 +172,8 @@ fn run_one_copperlist(
             }
             default::SimStep::DetectorCamT265Rear(..) => SimOverride::ExecutedBySim,
             default::SimStep::DetectorCamSide(..) => SimOverride::ExecutedBySim,
-            default::SimStep::DetectorCamLaptopFront(CuTaskCallbackState::Process(_, output)) => {
-                *output = msgs.get_detector_cam_laptop_front_output().clone();
+            default::SimStep::DetectorCamDump(CuTaskCallbackState::Process(_, output)) => {
+                *output = msgs.get_detector_cam_dump_output().clone();
                 output.tov = robot_clock.now().into();
                 SimOverride::ExecutedBySim
             }
@@ -197,7 +197,7 @@ fn run_one_copperlist(
             }
             default::SimStep::T265Subscriber(..) => SimOverride::ExecutedBySim,
             default::SimStep::RealsenseSubscriber(..) => SimOverride::ExecutedBySim,
-            default::SimStep::DetectorCamLaptopFront(..) => SimOverride::ExecutedBySim,
+            default::SimStep::DetectorCamDump(..) => SimOverride::ExecutedBySim,
             default::SimStep::LunabaseBridgeRxFromLunabaseRx { channel: _, msg } => {
                 *msg = msgs.get_lunabase_bridge_rx_from_lunabase_rx().clone();
                 msg.tov = robot_clock.now().into();
@@ -211,7 +211,7 @@ fn run_one_copperlist(
             default::SimStep::L2KissIcp(..) => SimOverride::ExecuteByRuntime,
             default::SimStep::OccupancyGridPipeline(..) => SimOverride::ExecuteByRuntime,
             default::SimStep::Localizer(..) => SimOverride::ExecuteByRuntime,
-            default::SimStep::CamD456Rgb(_) | default::SimStep::CamD456RgbNull(_) => {
+            default::SimStep::CamD456Rgb(_) | default::SimStep::CamD456RgbNull(_) | default::SimStep::MotorLogger(..)=> {
                 SimOverride::ExecutedBySim
             }
 
