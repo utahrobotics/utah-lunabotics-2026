@@ -1,5 +1,12 @@
- (
+// UCF LEFT (from mission control perspective, i.e. robot to berm perspective)
+(
     tag_id: 70,
-    origin: (0.68, 0.0, 0.0),
+    origin: (1.0, 0.0, 0.1),
     euler: (0.0, 0.0, 90.0),
 )
+// UCF RIGHT
+// (
+//     tag_id: 70,
+//     origin: (1.0, 0.0, 0.1),
+//     euler: (0.0, 0.0, -90.0),
+// )
