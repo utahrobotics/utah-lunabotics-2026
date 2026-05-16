@@ -31,6 +31,8 @@ var command_recorder: CommandRecorder
 # When touch UI is active skip this node's processing.
 var suppress_for_touch_ui: bool = false
 
+var oscillation_time: float = 0.0
+
 
 func _ready() -> void:
 	if actor_path:
@@ -55,7 +57,7 @@ func _ready() -> void:
 func set_can_send_inputs(_can_send_inputs):
 	can_send_inputs = _can_send_inputs
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if suppress_for_touch_ui or not actor or not can_send_inputs:
 		return
 	
@@ -148,7 +150,15 @@ func _process(_delta: float) -> void:
 		Input.get_action_strength("bucket_analog_up"),
 		Input.get_action_strength("bucket_analog_down")
 	)
-	if bucket_analog_mag > trig_dz:
+	if Input.is_action_pressed("bucket_shake"):
+		oscillation_time += delta
+		if oscillation_time > 0.2:
+			oscillation_time = 0.0
+		if oscillation_time > 0.1:
+			bucket_input = 1.0
+		else:
+			bucket_input = -1.0
+	elif bucket_analog_mag > trig_dz:
 		bucket_input = -bucket_analog_mag if Input.is_action_pressed("bucket_reverse") else bucket_analog_mag
 		if invert_bucket_default_direction:
 			bucket_input = -bucket_input
@@ -168,7 +178,15 @@ func _process(_delta: float) -> void:
 		Input.get_action_strength("dumper_analog_up"),
 		Input.get_action_strength("dumper_analog_down")
 	)
-	if dumper_analog_mag > trig_dz:
+	if Input.is_action_pressed("dumper_shake"):
+		oscillation_time += delta
+		if oscillation_time > 0.2:
+			oscillation_time = 0.0
+		if oscillation_time > 0.1:
+			dumper_input = 1.0
+		else:
+			dumper_input = -1.0
+	elif dumper_analog_mag > trig_dz:
 		dumper_input = -dumper_analog_mag if Input.is_action_pressed("dumper_reverse") else dumper_analog_mag
 		if invert_dumper_default_direction:
 			dumper_input = -dumper_input
