@@ -118,6 +118,10 @@ bucket_reverse={
 "deadzone": 0.2,
 "events": []
 }
+bucket_shake={
+"deadzone": 0.2,
+"events": []
+}
 dumper_analog_up={
 "deadzone": 0.2,
 "events": []
@@ -128,6 +132,10 @@ dumper_analog_down={
 }
 dumper_reverse={
 "deadzone": 0.2,
+"events": []
+}
+dumper_shake={
+"deadzone": 0.2, 
 "events": []
 }
 autonomy={
