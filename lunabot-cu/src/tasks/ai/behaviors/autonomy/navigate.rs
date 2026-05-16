@@ -5,7 +5,7 @@ use common::Steering;
 use nalgebra::Vector2;
 use serde::Deserialize;
 
-use crate::tasks::ai::action::LunabotAction;
+use crate::tasks::ai::{action::LunabotAction, behaviors::with_timeout};
 
 #[derive(Deserialize, Debug, Clone, Copy)]
 #[serde(rename_all = "lowercase")]
@@ -110,7 +110,7 @@ pub fn navigate_behavior(goal: NavigationGoal) -> Behavior<LunabotAction> {
                     Action(LunabotAction::SetBTStatusMsg(
                         "Fine Positioning...".to_string(),
                     )),
-                    Action(LunabotAction::RotateTo(target_yaw)),
+                    with_timeout(Action(LunabotAction::RotateTo(target_yaw)), 5.0)
                 ])
             } else {
                 Action(LunabotAction::None)
@@ -121,7 +121,7 @@ pub fn navigate_behavior(goal: NavigationGoal) -> Behavior<LunabotAction> {
 
 pub fn back_up_for(seconds: f64) -> Behavior<LunabotAction> {
     While(Box::new(Wait(seconds)), vec![
-        Action(LunabotAction::SetSteering(Steering::new(-0.5, -0.5, 2000.0))),
+        Action(LunabotAction::SetSteering(Steering::new(2.0, 2.0, 1000.0))),
         Action(LunabotAction::Yield)
     ])
 }
@@ -147,7 +147,7 @@ fn calculate_path_behavior(goal: NavigationGoal) -> Behavior<LunabotAction> {
     ])
 }
 
-fn wait_for_new_frame() -> Behavior<LunabotAction> {
+pub fn wait_for_new_frame() -> Behavior<LunabotAction> {
     While(
         Box::new(Sequence(vec![
             Action(LunabotAction::ObstacleResetRequested),

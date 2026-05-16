@@ -1,7 +1,7 @@
 use bonsai_bt::Behavior::{self, Action, Sequence, Wait, While};
 use common::Steering;
 
-use crate::tasks::ai::{action::LunabotAction, behaviors::{autonomy::navigate::{Arena, NavigationGoal, back_up_for, navigate_behavior}, steer_for_n_seconds}};
+use crate::tasks::ai::{action::LunabotAction, behaviors::{autonomy::navigate::{Arena, NavigationGoal, back_up_for, navigate_behavior, wait_for_new_frame}, steer_for_n_seconds, with_timeout}};
 const DIG_TRAVERSAL_TIME: f64 = 4.0;
 pub fn autonomy_main(arena: Arena) -> Behavior<LunabotAction> {
     While(
@@ -14,6 +14,9 @@ pub fn autonomy_main(arena: Arena) -> Behavior<LunabotAction> {
             // navigate_behavior(NavigationGoal::DigSite(arena)),
             Action(LunabotAction::SetBTStatusMsg(format!("DIGGING"))),
             open_loop_dig_from_starting(),
+            Action(LunabotAction::ResetLocalObstacles),
+            with_timeout(wait_for_new_frame(), 5.0),
+            // Action()
             // 2. dig
             // Action(LunabotAction::Dig),
 
