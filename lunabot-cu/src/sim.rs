@@ -77,6 +77,7 @@ fn default_callback(step: default::SimStep) -> SimOverride {
         default::SimStep::T265LeftGstreamer(..) => SimOverride::ExecutedBySim,
         default::SimStep::T265RightGstreamer(..) => SimOverride::ExecutedBySim,
         default::SimStep::MotorLogger(..) => SimOverride::ExecutedBySim,
+        default::SimStep::T265BackGstreamer(..) => SimOverride::ExecutedBySim,
         default::SimStep::CamD456Rgb(_) | default::SimStep::CamD456RgbNull(_) => {
             SimOverride::ExecutedBySim
         }
@@ -155,6 +156,7 @@ fn sim_callback<'a>(
         default::SimStep::GstConvertBack(_) => SimOverride::ExecutedBySim,
         default::SimStep::GstConvertSide(_) => SimOverride::ExecutedBySim,
         default::SimStep::GstConvertDump(_) => SimOverride::ExecutedBySim,
+        default::SimStep::T265BackGstreamer(..) => SimOverride::ExecutedBySim,
         default::SimStep::L2Pointcloud(_) => SimOverride::ExecutedBySim,
         default::SimStep::T265LeftGstreamer(..) => SimOverride::ExecutedBySim,
         default::SimStep::T265RightGstreamer(..) => SimOverride::ExecutedBySim,
