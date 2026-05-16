@@ -8,3 +8,7 @@ build/*
 .DS_Store
 godot/new-lunabase/liblunabase_lib.so
 godot/build/*
+copper-rs/
+*.dll
+*.exe
+*.zip

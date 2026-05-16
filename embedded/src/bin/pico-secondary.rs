@@ -1,8 +1,11 @@
 #![no_std]
 #![no_main]
+mod comms;
 
+use crate::comms::{uart_read_cobs, uart_write_cobs};
 use defmt::*;
 use embassy_executor::Spawner;
+use embassy_futures::yield_now;
 use embassy_rp::{
     adc::{Adc, Channel, Config as AdcConfig, InterruptHandler as AdcInterruptHandler},
     bind_interrupts,
@@ -12,6 +15,7 @@ use embassy_rp::{
 };
 use embassy_time::{Duration, Timer, with_timeout};
 use embedded_common::{SecondaryRequest, SecondaryResponse};
+
 use {defmt_rtt as _, panic_probe as _};
 
 bind_interrupts!(struct Irqs {
@@ -54,31 +58,37 @@ async fn main(_spawner: Spawner) {
     let mut mux_s2 = Output::new(p.PIN_21, Level::Low); // physical pin 27= GPIO 21
     let mut mux_s3 = Output::new(p.PIN_22, Level::Low); // physical pin 29 = GPIO22
 
+    // Decoded request bytes
     let mut rx_buf = [0u8; SecondaryRequest::SIZE];
 
     loop {
+        // ---------------- Read COBS request ----------------
+
         match with_timeout(
             Duration::from_millis(UART_IDLE_TIMEOUT_MS),
-            uart.read(&mut rx_buf),
+            uart_read_cobs(&mut uart, &mut rx_buf),
         )
         .await
         {
-            Err(_timeout) => {
-                // Primary is idle or disconnected
+            Err(_) => {
+                yield_now().await;
                 continue;
             }
-            Ok(Err(e)) => {
-                // UART error, next byte will correct
-                error!("UART read error: {:?}", e);
+
+            Ok(false) => {
+                error!("COBS decode failed");
+                yield_now().await;
                 continue;
             }
-            Ok(Ok(_)) => {}
+
+            Ok(true) => {}
         }
 
         let req = match SecondaryRequest::deserialize(rx_buf) {
             Ok(r) => r,
+
             Err(e) => {
-                error!("Invalid request byte 0x{:02X}: {}", rx_buf[0], e);
+                error!("Invalid request: {}", e);
                 continue;
             }
         };
@@ -92,19 +102,24 @@ async fn main(_spawner: Spawner) {
             &mut mux_s2,
             &mut mux_s3,
         );
+
         Timer::after(Duration::from_micros(MUX_SETTLE_US)).await;
 
-        match adc.read(&mut adc_pin).await {
-            Ok(value) => {
-                info!("ADC ch{} = {}", req.mux_address, value);
-                let tx_buf = SecondaryResponse { adc_value: value }.serialize();
-                if let Err(e) = uart.write(&tx_buf).await {
-                    error!("UART write error: {:?}", e);
-                }
-            }
+        let value = match adc.read(&mut adc_pin).await {
+            Ok(v) => v,
+
             Err(_) => {
-                error!("adc read failed for channel {}", req.mux_address);
+                error!("ADC read failed for channel {}", req.mux_address);
+                continue;
             }
+        };
+
+        info!("ADC ch{} = {}", req.mux_address, value);
+
+        let tx_buf = SecondaryResponse { adc_value: value }.serialize();
+
+        if !uart_write_cobs(&mut uart, &tx_buf).await {
+            error!("UART write failed");
         }
     }
 }

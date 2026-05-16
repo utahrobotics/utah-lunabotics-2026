@@ -2,7 +2,9 @@
 #![no_main]
 
 extern crate libm;
+mod comms;
 
+use crate::comms::{uart_read_cobs, uart_write_cobs};
 use core::cell::Cell;
 use defmt::{error, info, warn};
 use embassy_executor::Spawner;
@@ -16,7 +18,7 @@ use embassy_rp::{
     usb::{Driver, InterruptHandler},
 };
 use embassy_sync::{
-    blocking_mutex::{raw::CriticalSectionRawMutex, Mutex},
+    blocking_mutex::{Mutex, raw::CriticalSectionRawMutex},
     channel::Channel,
 };
 use embassy_time::{Duration, Timer, with_timeout};
@@ -25,12 +27,12 @@ use embassy_usb::{
     class::cdc_acm::{CdcAcmClass, Receiver, Sender, State},
 };
 use embedded_common::{
-    Actuator, ActuatorCommand, Direction, FromIMU, FromPico, MAX_MESSAGE_SIZE, PicoError,
-    PotReading, SecondaryRequest, SecondaryResponse, SensorReading,
-    POT_MUX_LIFT, POT_MUX_BUCKET, POT_MUX_DUMPER,
-    LIFT_CAL, BUCKET_CAL, DUMPER_CAL,
+    Actuator, ActuatorCommand, BUCKET_CAL, DUMPER_CAL, Direction, FromIMU, FromPico, LIFT_CAL,
+    MAX_MESSAGE_SIZE, POT_MUX_BUCKET, POT_MUX_DUMPER, POT_MUX_LIFT, PicoError, PotReading,
+    SecondaryRequest, SecondaryResponse, SensorReading,
 };
 use static_cell::StaticCell;
+
 use {defmt_rtt as _, panic_probe as _};
 bind_interrupts!(struct Irqs {
     USBCTRL_IRQ => InterruptHandler<USB>;
@@ -40,19 +42,19 @@ bind_interrupts!(struct Irqs {
 static PACKET_SIZE: u16 = 64;
 const POLL_INTERVAL_MS: u64 = 5;
 
-const POT_POLL_INTERVAL_MS: u64 = 1;
+const POT_POLL_INTERVAL_MS: u64 = 10;
 /// How many pot-poll iterations between full sensor sweeps
-const SENSOR_SWEEP_DIVISOR: u32 = 10;
+const SENSOR_SWEEP_DIVISOR: u32 = 2;
 /// Angle error (radians) below which the motor is stopped to prevent oscillation
 const ANGLE_DEADBAND_RAD: f32 = 0.02;
-
 
 static SENSOR_READINGS: Channel<CriticalSectionRawMutex, SensorReading, 1> = Channel::new();
 static POT_READINGS: Channel<CriticalSectionRawMutex, PotReading, 1> = Channel::new();
 
 static SECONDARY_PICO_ERRORS: Channel<CriticalSectionRawMutex, PicoError, 1> = Channel::new();
 
-static PID_COMMANDS: Channel<CriticalSectionRawMutex, (u16, Actuator, Direction), 4> = Channel::new();
+static PID_COMMANDS: Channel<CriticalSectionRawMutex, (u16, Actuator, Direction), 4> =
+    Channel::new();
 
 /// Written by usb_rx_loop on SetAngle/StopAll/SetSpeed, read by secondary_poll_loop for PID.
 static LIFT_ANGLE_TARGET: Mutex<CriticalSectionRawMutex, Cell<Option<f32>>> =
@@ -74,10 +76,9 @@ fn set_angle_target(actuator: Actuator, target: Option<f32>) {
         Actuator::Lift => LIFT_ANGLE_TARGET.lock(|c| c.set(target)),
         Actuator::Bucket => BUCKET_ANGLE_TARGET.lock(|c| c.set(target)),
         Actuator::Dumper => DUMPER_ANGLE_TARGET.lock(|c| c.set(target)),
-        _ => {},
+        _ => {}
     }
 }
-
 
 fn clear_all_angle_targets() {
     LIFT_ANGLE_TARGET.lock(|c| c.set(None));
@@ -109,7 +110,7 @@ impl PidController {
         self.prev_error = 0.0;
     }
 
-        /// Returns a value that should be mapped to motor speed + direction.
+    /// Returns a value that should be mapped to motor speed + direction.
     fn update(&mut self, error: f32, dt: f32) -> f32 {
         self.integral += error * dt;
         // Anti-windup clamp
@@ -140,7 +141,7 @@ fn pid_output_to_drive(output: f32) -> (u16, Direction) {
     (speed, direction)
 }
 
-// I hope this is correct 
+// I hope this is correct
 fn length_to_angle(length: f32, cal: &embedded_common::ActuatorCalibration) -> f32 {
     let a = cal.mount_a;
     let b = cal.mount_b;
@@ -387,12 +388,7 @@ async fn usb_rx_loop(
         reader.wait_connection().await;
         'connected: loop {
             // Wait for either a USB packet or a PID drive command
-            match select(
-                reader.read_packet(&mut encoded_buf),
-                PID_COMMANDS.receive(),
-            )
-            .await
-            {
+            match select(reader.read_packet(&mut encoded_buf), PID_COMMANDS.receive()).await {
                 // USB packet arrived
                 Either::First(Ok(n)) => {
                     let mut remaining = &encoded_buf[..n];
@@ -480,31 +476,27 @@ async fn usb_rx_loop(
                 }
             }
         }
-        
     }
 }
 
 /// Read a single MUX channel from the secondary pico. Returns None on UART error or timeout.
-async fn read_mux_channel(
-    uart: &mut Uart<'static, Async>,
-    ch: u8,
-    timeout_ms: u64,
-) -> Option<u16> {
-    let req = SecondaryRequest { mux_address: ch }.serialize();
-    if uart.write(&req).await.is_err() {
-        error!("failed to write to secondary pico ch {}", ch);
+async fn read_mux_channel(uart: &mut Uart<'static, Async>, ch: u8, timeout_ms: u64) -> Option<u16> {
+    let req_bytes = SecondaryRequest { mux_address: ch }.serialize();
+    if !uart_write_cobs(uart, &req_bytes).await {
+        error!("UART write failed for ch {}", ch);
         return None;
     }
-    let mut response_buf = [0u8; SecondaryResponse::SIZE];
+
+    let mut decode_buf = [0u8; SecondaryResponse::SIZE];
     match with_timeout(
         Duration::from_millis(timeout_ms),
-        uart.read(&mut response_buf),
+        uart_read_cobs(uart, &mut decode_buf),
     )
     .await
     {
-        Ok(Ok(_)) => Some(SecondaryResponse::deserialize(response_buf).adc_value),
-        Ok(Err(e)) => {
-            error!("secondary UART read error ch {}: {:?}", ch, e);
+        Ok(true) => Some(SecondaryResponse::deserialize(decode_buf).adc_value),
+        Ok(false) => {
+            error!("COBS decode error from secondary ch {}", ch);
             let _ = SECONDARY_PICO_ERRORS.try_send(PicoError::SecondaryPicoUartError);
             None
         }
@@ -534,11 +526,16 @@ async fn secondary_poll_loop(uart: &'static mut Uart<'static, Async>) {
     let mut sensor_ch_idx: u8 = 0;
     let mut iteration: u32 = 0;
 
-    loop {
+    'main_loop: loop {
         // --- Always: read pot channels (3 UART roundtrips) ---
         let mut pot_raw = [0u16; 3];
         for (i, &ch) in POT_CHANNELS.iter().enumerate() {
-            pot_raw[i] = read_mux_channel(uart, ch, RESPONSE_TIMEOUT_MS).await.unwrap_or(0);
+            let value = read_mux_channel(uart, ch, RESPONSE_TIMEOUT_MS).await;
+            if let Some(value) = value {
+                pot_raw[i] = value;
+            } else {
+                continue 'main_loop;
+            }
         }
 
         let pot = PotReading {
@@ -546,7 +543,10 @@ async fn secondary_poll_loop(uart: &'static mut Uart<'static, Async>) {
             bucket: pot_raw[1],
             dumper: pot_raw[2],
         };
-        info!("POT lift={} bucket={} dumper={}", pot_raw[0], pot_raw[1], pot_raw[2]);
+        info!(
+            "POT lift={} bucket={} dumper={}",
+            pot_raw[0], pot_raw[1], pot_raw[2]
+        );
         POT_READINGS.try_send(pot).ok();
 
         // --- Run PID for each actuator that has an angle target ---
@@ -563,7 +563,9 @@ async fn secondary_poll_loop(uart: &'static mut Uart<'static, Async>) {
                 // Dead-band: stop motor and reset integrator when close enough
                 if error.abs() < ANGLE_DEADBAND_RAD {
                     pid.reset();
-                    PID_COMMANDS.try_send((0, actuator, Direction::Forward)).ok();
+                    PID_COMMANDS
+                        .try_send((0, actuator, Direction::Forward))
+                        .ok();
                 } else {
                     let output = pid.update(error, PID_DT);
                     let (speed, direction) = pid_output_to_drive(output);
