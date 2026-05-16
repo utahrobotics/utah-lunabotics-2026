@@ -7,6 +7,7 @@ pub fn autonomy_main(arena: Arena) -> Behavior<LunabotAction> {
     While(
         Box::new(Action(LunabotAction::IsAutonomy)),
         vec![
+            Action(LunabotAction::ResetAllObstacles),
             // 1. go to dig site
             Action(LunabotAction::SetBTStatusMsg(format!("Moving to dig site for {:?}", arena))),
             steer_for_n_seconds(Steering::new(1.0, 1.0, 1000.0), DIG_TRAVERSAL_TIME),
