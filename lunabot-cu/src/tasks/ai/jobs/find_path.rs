@@ -49,7 +49,7 @@ pub fn find_path_job(
                 // Merge local into global before expanding so obstacle inflation
                 // propagates seamlessly across the local/global boundary.
                 let mut combined = global_map_guard.clone();
-                let _ = latest_local_map.append_to(&mut combined);
+                let _ = latest_local_map.append_to(&mut combined, false);
                 let Some(expanded) =
                     combined.expand_obstacles(robot_radius, max_acceptable_gradient_expander)
                 else {

@@ -262,7 +262,7 @@ pub mod implementation {
                     let gy = py * grid_h / vid_h;
                     let grid_idx = gx + gy * grid_w;
                     if grid_idx >= global.gradient_map.len() { continue; }
-                    let gradient = global.gradient_map[grid_idx];
+                    let gradient = global.gradient_map[grid_idx].as_float();
                     if gradient == f32::MIN { continue; }
                     let normalized = gradient.clamp(0.0, 1.0);
                     img[px + py * vid_w] = (normalized * 255.0) as u8;
@@ -276,7 +276,7 @@ pub mod implementation {
             for lx in 0..local_w {
                 let local_idx = lx + ly * local_w;
                 if local_idx >= local_grid.gradient_map.len() { continue; }
-                let gradient = local_grid.gradient_map[local_idx];
+                let gradient = local_grid.gradient_map[local_idx].as_float();
                 if gradient == f32::MIN { continue; }
 
                 let Ok((world_x, world_y)) = local_grid.cell_to_world(lx, ly) else { continue; };

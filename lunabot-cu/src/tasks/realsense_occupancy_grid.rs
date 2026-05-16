@@ -35,7 +35,7 @@ use wgsl_pcl::wgsl_setup::{get_device, init_gpu_blocking, is_gpu_initialized};
 
 use serde::Deserialize;
 
-use crate::ROBOT_STATE;
+use crate::{ROBOT_STATE, pathfinding::Gradient};
 use crate::pathfinding::OccupancyGrid;
 use crate::payloads::depth_frame::CuDepthFrame;
 use crate::rerun_viz::RECORDER;
@@ -121,7 +121,7 @@ fn paint_permanent_obstacles(grid: &mut OccupancyGrid, obstacles: &ArenaObstacle
         for x in x1..=x2 {
             for y in y1..=y2 {
                 if x < grid.cells_x() && y < grid.cells_y() {
-                    let _ = grid.set_gradient_at(x, y, PERMANENT_GRADIENT);
+                    let _ = grid.set_gradient_at(x, y, PERMANENT_GRADIENT, true);
                 }
             }
         }
@@ -429,7 +429,7 @@ impl CuTask for OccupancyGridTask {
         GLOBAL_MAP.get_or_init(|| {
             let mut grid = OccupancyGrid {
                 layout: global_layout.clone(),
-                gradient_map: vec![f32::MIN; global_layout.cells_x() * global_layout.cells_y()],
+                gradient_map: vec![f32::MIN.into(); global_layout.cells_x() * global_layout.cells_y()],
                 origin: (0.0, 0.0),
             };
             if let Some(arena_obstacles) = arena_obstacles
@@ -514,7 +514,7 @@ impl CuTask for OccupancyGridTask {
                 if let Some(global) = GLOBAL_MAP.get()
                     && let Ok(mut global_guard) = global.try_write()
                 {
-                    global_guard.gradient_map.fill(f32::MIN);
+                    global_guard.gradient_map.fill(f32::MIN.into());
                     if let Some(arena_obstacles) = self.arena_obstacles
                         && let Some(obstacles) = load_arena_obstacles(arena_obstacles)
                     {
@@ -561,7 +561,7 @@ impl CuTask for OccupancyGridTask {
             {
                 drop(output_buf);
 
-                grid.append_to(&mut *write_guard).map_err(|e| {
+                grid.append_to(&mut *write_guard, false).map_err(|e| {
                     CuError::new_with_cause(
                         "failed to append local map to global",
                         std::io::Error::other(e),
@@ -575,7 +575,7 @@ impl CuTask for OccupancyGridTask {
                         for cell_x in 0..write_guard.cells_x() {
                             let idx = cell_x + cell_y * write_guard.cells_x();
                             if idx < write_guard.gradient_map.len() {
-                                let gradient = write_guard.gradient_map[idx];
+                                let gradient = write_guard.gradient_map[idx].as_float();
                                 if gradient != f32::MIN {
                                     if let Ok((world_x, world_y)) =
                                         write_guard.cell_to_world(cell_x, cell_y)
@@ -592,11 +592,11 @@ impl CuTask for OccupancyGridTask {
                             }
                         }
                     }
-                    // let _ = logger.recorder.log(
-                    //     "obstacle_mapper/global_obstacle_map",
-                    //     &Points2D::new(global_obstacle_map_points)
-                    //         .with_colors(global_obstacle_map_colors),
-                    // );
+                    let _ = logger.recorder.log(
+                        "obstacle_mapper/global_obstacle_map",
+                        &Points2D::new(global_obstacle_map_points)
+                            .with_colors(global_obstacle_map_colors),
+                    );
                 }
 
                 if let Ok(mut p) = self.depth_projector_pipeline.try_lock() {
@@ -731,12 +731,12 @@ impl CuTask for OccupancyGridTask {
                     if map_generation.load(Ordering::SeqCst) == request.generation {
                         *buf = Some(OccupancyGrid {
                             layout,
-                            gradient_map: obstacle_map,
+                            gradient_map: obstacle_map.iter().copied().map(Gradient::from).collect(),
                             origin: request.origin,
                         });
                     } else {
                         eprintln!(
-                            "[OccupancyGrid] Discarding stale result    (map was reset during GPU processing)"
+                            "[OccupancyGrid] Discarding stale result (map was reset during GPU processing)"
                         );
                     }
                 }
