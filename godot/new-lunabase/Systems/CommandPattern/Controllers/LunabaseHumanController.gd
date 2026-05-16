@@ -31,6 +31,7 @@ var command_recorder: CommandRecorder
 # When touch UI is active skip this node's processing.
 var suppress_for_touch_ui: bool = false
 
+# Hacky version of dump and tilt shakers.
 var oscillation_time: float = 0.0
 
 
@@ -132,8 +133,8 @@ func _process(delta: float) -> void:
 	#=====Speed Slider increment and decrement
 	const SPEED_SLIDER_STEP := 100
 	if Input.is_action_pressed("increment_speed"):
-		speed_slider.value = clamp(speed_slider.value + 
-		SPEED_SLIDER_STEP, 
+		speed_slider.value = clamp(speed_slider.value +
+		SPEED_SLIDER_STEP,
 		speed_slider.min_value,speed_slider.max_value)
 	
 	if Input.is_action_pressed("decrement_speed"):

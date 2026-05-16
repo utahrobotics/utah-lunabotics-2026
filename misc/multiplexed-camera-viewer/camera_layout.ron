@@ -5,7 +5,7 @@ GridLayout(
         CameraFeed (
             id: "Front",
             address: "192.168.0.100:4002",
-            rotation: Cw90,
+            // rotation: Cw9,
         ),
         CameraFeed (
             id: "ObstacleMap",
@@ -33,7 +33,7 @@ GridLayout(
         CameraFeed (
             id: "Dig",
             address: "192.168.0.100:4000",
-            rotation: Cw90
+            // rotation: Cw90
         )
     ]
 )
