@@ -5,11 +5,19 @@ use std::thread;
 use egui::{ColorImage, Vec2};
 use ffmpeg_next as ffmpeg;
 
+use crate::config::Rotation;
+
 pub type SharedFrame = Arc<Mutex<Option<ColorImage>>>;
 
 /// Spawns a background thread that connects to a tcpserversink serving MPEG-TS/H.264.
 /// Exits when `active` is set to false.
-pub fn spawn_receiver(address: &str, frame: SharedFrame, active: Arc<AtomicBool>, ctx: egui::Context) {
+pub fn spawn_receiver(
+    address: &str,
+    frame: SharedFrame,
+    active: Arc<AtomicBool>,
+    ctx: egui::Context,
+    rotation: Rotation,
+) {
     let address = address.to_string();
     thread::spawn(move || {
         ffmpeg::init().expect("Failed to init ffmpeg");
@@ -96,7 +104,12 @@ pub fn spawn_receiver(address: &str, frame: SharedFrame, active: Arc<AtomicBool>
                 let mut rgb_frame = ffmpeg::frame::Video::empty();
                 scaler.run(&decoded_frame, &mut rgb_frame).expect("Failed to scale");
 
-                last_frame = Some(frame_to_color_image(&rgb_frame, src_w as usize, src_h as usize));
+                last_frame = Some(frame_to_color_image(
+                    &rgb_frame,
+                    src_w as usize,
+                    src_h as usize,
+                    rotation,
+                ));
             }
 
             if let Some(image) = last_frame {
@@ -112,7 +125,12 @@ pub fn spawn_receiver(address: &str, frame: SharedFrame, active: Arc<AtomicBool>
 const MAX_TEX_WIDTH: usize = 426 * 3;
 const MAX_TEX_HEIGHT: usize = 240 * 3;
 
-fn frame_to_color_image(rgb_frame: &ffmpeg::frame::Video, src_w: usize, src_h: usize) -> ColorImage {
+fn frame_to_color_image(
+    rgb_frame: &ffmpeg::frame::Video,
+    src_w: usize,
+    src_h: usize,
+    rotation: Rotation,
+) -> ColorImage {
     let rgb_data = rgb_frame.data(0);
     let stride = rgb_frame.stride(0);
 
@@ -151,9 +169,71 @@ fn frame_to_color_image(rgb_frame: &ffmpeg::frame::Video, src_w: usize, src_h: u
         (src_w, src_h, pixels)
     };
 
-    ColorImage {
+    let image = ColorImage {
         size: [dst_w, dst_h],
         source_size: Vec2::new(src_w as f32, src_h as f32),
         pixels,
+    };
+
+    rotate_image(image, rotation)
+}
+
+/// Rotates a ColorImage by the given Rotation. Returns a new image;
+/// width and height are swapped for 90° rotations.
+fn rotate_image(src: ColorImage, rotation: Rotation) -> ColorImage {
+    if rotation == Rotation::None {
+        return src;
+    }
+
+    let [w, h] = src.size;
+    let pixels = &src.pixels;
+
+    match rotation {
+        Rotation::None => src,
+
+        Rotation::R180 => {
+            let rotated: Vec<egui::Color32> = pixels.iter().rev().cloned().collect();
+            ColorImage {
+                size: [w, h],
+                source_size: src.source_size,
+                pixels: rotated,
+            }
+        }
+
+        Rotation::Cw90 => {
+            // (x, y) -> dst_x = (h-1-y), dst_y = x  — new size: h×w
+            let mut rotated = vec![egui::Color32::BLACK; w * h];
+            for y in 0..h {
+                for x in 0..w {
+                    let src_idx = y * w + x;
+                    let dst_x = h - 1 - y;
+                    let dst_y = x;
+                    rotated[dst_y * h + dst_x] = pixels[src_idx];
+                }
+            }
+            ColorImage {
+                size: [h, w],
+                source_size: Vec2::new(src.source_size.y, src.source_size.x),
+                pixels: rotated,
+            }
+        }
+
+        Rotation::Ccw90 => {
+            // (x, y) -> dst_x = y, dst_y = (w-1-x)  — new size: h×w
+            let mut rotated = vec![egui::Color32::BLACK; w * h];
+            for y in 0..h {
+                for x in 0..w {
+                    let src_idx = y * w + x;
+                    let dst_x = y;
+                    let dst_y = w - 1 - x;
+                    rotated[dst_y * h + dst_x] = pixels[src_idx];
+                }
+            }
+            ColorImage {
+                size: [h, w],
+                source_size: Vec2::new(src.source_size.y, src.source_size.x),
+                pixels: rotated,
+            }
+        }
     }
 }

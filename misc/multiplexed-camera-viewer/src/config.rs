@@ -1,28 +1,35 @@
 use serde::{Deserialize, Serialize};
 
-static CONFIG_STR: &'static str = include_str!("../camera_layout.ron");
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct GridLayout {
-    pub dimensions: (usize, usize),
-    pub feed_descriptors: Vec<CameraFeed>,
+#[derive(Debug, Deserialize, Serialize, Clone, Copy, Default, PartialEq)]
+pub enum Rotation {
+    #[default]
+    None,
+    Cw90,
+    Ccw90,
+    R180,
 }
 
-#[derive(Serialize, Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct CameraFeed {
     pub id: String,
     pub address: String,
+    #[serde(default)]
+    pub rotation: Rotation,
 }
 
-pub fn get_config() -> Result<GridLayout, ron::Error> {
-    Ok(ron::from_str(CONFIG_STR)?)
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct GridLayout {
+    pub dimensions: (usize, usize),
+    pub feeds: Vec<CameraFeed>,
 }
 
-impl Default for GridLayout {
-    fn default() -> Self {
-        Self {
-            dimensions: (2, 2),
-            feed_descriptors: vec![],
-        }
-    }
+pub fn get_config() -> Result<GridLayout, Box<dyn std::error::Error>> {
+    let path = std::env::args()
+        .nth(1)
+        .unwrap_or_else(|| "camera_layout.ron".to_string());
+    let s = std::fs::read_to_string(&path)
+        .map_err(|e| format!("Failed to read config at {path:?}: {e}"))?;
+    let config: GridLayout = ron::from_str(&s)
+        .map_err(|e| format!("Failed to parse config: {e}"))?;
+    Ok(config)
 }

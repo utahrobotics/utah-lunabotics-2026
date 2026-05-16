@@ -1,10 +1,11 @@
 GridLayout(
     // layout of camera feeds to display
     dimensions: (2,2),
-    feed_descriptors: [
+    feeds: [
         CameraFeed (
             id: "Front",
             address: "192.168.0.100:4002",
+            rotation: Cw90,
         ),
         CameraFeed (
             id: "ObstacleMap",
@@ -13,10 +14,12 @@ GridLayout(
         CameraFeed (
             id: "T265Left",
             address: "192.168.0.100:5001",
+            rotation: R180
         ),
         CameraFeed (
             id: "T265Right",
             address: "192.168.0.100:5002",
+            rotation: R180
         ),
         CameraFeed (
             id: "RealsenseFront",
@@ -25,6 +28,12 @@ GridLayout(
         CameraFeed (
             id: "T265Front",
             address: "192.168.0.100:5003",
+            rotation: R180
+        ),
+        CameraFeed (
+            id: "Dig",
+            address: "192.168.0.100:4000",
+            rotation: Cw90
         )
     ]
 )

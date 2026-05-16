@@ -77,7 +77,7 @@ struct FeedState {
     active: Arc<AtomicBool>,
     frame: SharedFrame,
     texture: Option<TextureHandle>,
-    last_frame_time: Option<Instant>
+    last_frame_time: Option<Instant>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -102,12 +102,12 @@ impl<'a> egui_tiles::Behavior<CameraPane> for CameraBehavior<'a> {
     ) -> egui_tiles::UiResponse {
         let i = pane.feed_index;
         let feed = &self.feeds[i];
-        let descriptor = &self.config.feed_descriptors[i];
+        let camera = &self.config.feeds[i];
 
         let label = if feed.enabled {
-            format!("[{}] {} (ON)", i + 1, descriptor.id)
+            format!("[{}] {} (ON)", i + 1, camera.id)
         } else {
-            format!("[{}] {} (OFF)", i + 1, descriptor.id)
+            format!("[{}] {} (OFF)", i + 1, camera.id)
         };
 
         let mut drag_started = false;
@@ -162,7 +162,7 @@ impl<'a> egui_tiles::Behavior<CameraPane> for CameraBehavior<'a> {
                     ui.painter().text(
                         rect.center(),
                         egui::Align2::CENTER_CENTER,
-                        format!("Waiting for feed...\n{}", descriptor.address),
+                        format!("Waiting for feed...\n{}", camera.address),
                         egui::FontId::proportional(14.0),
                         Color32::from_gray(140),
                     );
@@ -189,10 +189,7 @@ impl<'a> egui_tiles::Behavior<CameraPane> for CameraBehavior<'a> {
     }
 
     fn tab_title_for_pane(&mut self, pane: &CameraPane) -> egui::WidgetText {
-        self.config.feed_descriptors[pane.feed_index]
-            .id
-            .clone()
-            .into()
+        self.config.feeds[pane.feed_index].id.clone().into()
     }
 
     fn grid_auto_column_count(
@@ -231,16 +228,17 @@ pub struct CameraMultiplexerApp {
 impl CameraMultiplexerApp {
     fn new(config: GridLayout, ctx: egui::Context) -> Self {
         let feeds: Vec<FeedState> = config
-            .feed_descriptors
+            .feeds
             .iter()
-            .map(|feed| {
+            .map(|camera| {
                 let frame: SharedFrame = Arc::new(Mutex::new(None));
                 let active = Arc::new(AtomicBool::new(true));
                 spawn_receiver(
-                    &feed.address,
+                    &camera.address,
                     Arc::clone(&frame),
                     Arc::clone(&active),
                     ctx.clone(),
+                    camera.rotation,
                 );
                 FeedState {
                     enabled: true,
@@ -268,7 +266,7 @@ impl CameraMultiplexerApp {
 
     fn build_tree(config: &GridLayout) -> egui_tiles::Tree<CameraPane> {
         let mut tiles = Tiles::default();
-        let n = config.feed_descriptors.len();
+        let n = config.feeds.len();
 
         let pane_ids: Vec<TileId> = (0..n)
             .map(|i| tiles.insert_pane(CameraPane { feed_index: i }))
@@ -293,10 +291,11 @@ impl CameraMultiplexerApp {
             feed.frame = Arc::new(Mutex::new(None));
             feed.texture = None;
             spawn_receiver(
-                &self.config.feed_descriptors[i].address,
-                Arc::clone(&feed.frame),
-                Arc::clone(&feed.active),
+                &self.config.feeds[i].address,
+                Arc::clone(&self.feeds[i].frame),
+                Arc::clone(&self.feeds[i].active),
                 self.ctx.clone(),
+                self.config.feeds[i].rotation,
             );
         } else {
             feed.active.store(false, Ordering::Relaxed);
@@ -312,10 +311,11 @@ impl CameraMultiplexerApp {
                 self.feeds[i].frame = Arc::new(Mutex::new(None));
                 self.feeds[i].texture = None;
                 spawn_receiver(
-                    &self.config.feed_descriptors[i].address,
+                    &self.config.feeds[i].address,
                     Arc::clone(&self.feeds[i].frame),
                     Arc::clone(&self.feeds[i].active),
                     self.ctx.clone(),
+                    self.config.feeds[i].rotation,
                 );
             }
         }
@@ -387,7 +387,7 @@ impl eframe::App for CameraMultiplexerApp {
             }
             if let Ok(mut lock) = feed.frame.try_lock() {
                 if let Some(image) = lock.take() {
-                    self.frame_count += 1; 
+                    self.frame_count += 1;
                     feed.last_frame_time = Some(Instant::now());
                     match &mut feed.texture {
                         Some(tex) => tex.set(image, TextureOptions::NEAREST),
