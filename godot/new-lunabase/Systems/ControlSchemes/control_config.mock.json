@@ -42,11 +42,17 @@
 		"bucket_down": [
 			"keyboard_c"
 		],
+		"bucket_shake": [
+			"keyboard_x"
+		],
 		"dumper_up": [
 			"keyboard_r"
 		],
 		"dumper_down": [
 			"keyboard_f"
+		],
+		"dumper_shake": [
+			"keyboard_t"
 		],
 		"lift_analog_up": [
 			"gamepad_axis_4_positive"

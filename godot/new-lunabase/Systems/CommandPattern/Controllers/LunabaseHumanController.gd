@@ -31,6 +31,8 @@ var command_recorder: CommandRecorder
 # When touch UI is active skip this node's processing.
 var suppress_for_touch_ui: bool = false
 
+# Hacky version of dump and tilt shakers.
+var oscillation_time := 0.0
 
 func _ready() -> void:
 	if actor_path:
@@ -130,8 +132,8 @@ func _process(_delta: float) -> void:
 	#=====Speed Slider increment and decrement
 	const SPEED_SLIDER_STEP := 100
 	if Input.is_action_pressed("increment_speed"):
-		speed_slider.value = clamp(speed_slider.value + 
-		SPEED_SLIDER_STEP, 
+		speed_slider.value = clamp(speed_slider.value +
+		SPEED_SLIDER_STEP,
 		speed_slider.min_value,speed_slider.max_value)
 	
 	if Input.is_action_pressed("decrement_speed"):
@@ -145,10 +147,18 @@ func _process(_delta: float) -> void:
 	var bucket_input: float = 0.0
 
 	var bucket_analog_mag: float = maxf(
+		
 		Input.get_action_strength("bucket_analog_up"),
 		Input.get_action_strength("bucket_analog_down")
 	)
-	if bucket_analog_mag > trig_dz:
+	if Input.is_action_pressed("bucket_shake"):
+		if oscillation_time > 0.2:
+			oscillation_time = 0.0
+		if oscillation_time > 0.1:
+			bucket_input = 1.0
+		else:
+			bucket_input = -1.0
+	elif bucket_analog_mag > trig_dz:
 		bucket_input = -bucket_analog_mag if Input.is_action_pressed("bucket_reverse") else bucket_analog_mag
 		if invert_bucket_default_direction:
 			bucket_input = -bucket_input
@@ -168,7 +178,14 @@ func _process(_delta: float) -> void:
 		Input.get_action_strength("dumper_analog_up"),
 		Input.get_action_strength("dumper_analog_down")
 	)
-	if dumper_analog_mag > trig_dz:
+	if Input.is_action_pressed("dumper_shake"):
+		if oscillation_time > 0.2:
+			oscillation_time = 0.0
+		if oscillation_time > 0.1:
+			dumper_input = 1.0
+		else:
+			dumper_input = -1.0
+	elif dumper_analog_mag > trig_dz:
 		dumper_input = -dumper_analog_mag if Input.is_action_pressed("dumper_reverse") else dumper_analog_mag
 		if invert_dumper_default_direction:
 			dumper_input = -dumper_input
