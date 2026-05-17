@@ -476,6 +476,10 @@ impl LunabotAction {
                     pathfollower.cancel();
                     blackboard.path_follower = None;
                 }
+                if let Some(ref mut rotate_to) = blackboard.rotation_shim {
+                    rotate_to.cancel();
+                    blackboard.rotation_shim = None;
+                }
                 Success
             }
             LunabotAction::RotateTo(target_yaw) => {
