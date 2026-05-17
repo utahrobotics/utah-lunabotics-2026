@@ -110,7 +110,7 @@ pub fn navigate_behavior(goal: NavigationGoal) -> Behavior<LunabotAction> {
                     Action(LunabotAction::SetBTStatusMsg(
                         "Fine Positioning...".to_string(),
                     )),
-                    with_timeout(Action(LunabotAction::RotateTo(target_yaw)), 5.0)
+                    with_timeout(Action(LunabotAction::RotateTo(target_yaw)), 7.0)
                 ])
             } else {
                 Action(LunabotAction::None)

@@ -3,7 +3,7 @@ use std::time::Duration;
 use bonsai_bt::Status::{self, *};
 use common::{LUNABOT_STAGE, LunabotStage, Steering};
 use embedded_common::{Actuator, ActuatorCommand, Direction};
-use nalgebra::Vector2;
+use nalgebra::{Rotation2, Vector2};
 use rerun::Boxes2D;
 
 use crate::{
@@ -13,7 +13,7 @@ use crate::{
         behaviors::autonomy::navigate::NavigationGoal,
         blackboard::LunabotBlackboard,
         jobs::{
-            dig_job, direction_from_path, dump_job, find_path_job, follow_path_job, rotation_shim,
+            dig_job, direction_from_path, dump_job, find_path_job, follow_path_job, multipoint_rotation_shim, rotation_shim
         },
     },
     utils::{rwlock_read_unpoison, rwlock_write_unpoison},
@@ -98,6 +98,10 @@ pub enum LunabotAction {
     /// Rotates to reach a target yaw. (in degrees)
     RotateTo(f32),
 
+    /// Rotates to reach a target yaw. (in degrees), second float is the tolerance, third float is the turning factor, 
+    /// see long running job description
+    RotateMultipointTo(f32, f32, f32),
+
     /// Cancels long running jobs like pathfinding and path following
     CancelJobs,
 }
@@ -169,7 +173,6 @@ impl LunabotAction {
 
                 Success
             }
-
             LunabotAction::SetLastLift => {
                 if let Some(last_lift_pack_time) = blackboard.last_non_zero_lift_pack {
                     if last_lift_pack_time.elapsed() > Duration::from_millis(200) {
@@ -480,6 +483,10 @@ impl LunabotAction {
                     rotate_to.cancel();
                     blackboard.rotation_shim = None;
                 }
+                if let Some(ref mut rotate_to) = blackboard.multi_point_rotation_shim {
+                    rotate_to.cancel();
+                    blackboard.multi_point_rotation_shim = None;
+                }
                 Success
             }
             LunabotAction::RotateTo(target_yaw) => {
@@ -508,6 +515,39 @@ impl LunabotAction {
                     let mut rotation_shim = rotation_shim(*target_yaw, 0.1, None, None, None);
                     let job_initial_status = rotation_shim.get_status();
                     blackboard.rotation_shim = Some(rotation_shim);
+                    println!(
+                        "Face path job started with initial status: {:?}",
+                        job_initial_status
+                    );
+                    job_initial_status
+                }
+            }
+            LunabotAction::RotateMultipointTo(target_yaw, tolerance, agression) => {
+                if ROBOT_STATE.get().is_none() {
+                    eprintln!(
+                        "Cannot start multi path rotation shim job because ROBOT_STATE is not initialized"
+                    );
+                    Failure
+                } else if let Some(ref mut rotation_shim) = blackboard.multi_point_rotation_shim {
+                    blackboard.outgoing_steering_msg = rotation_shim.get_output();
+                    let status = rotation_shim.get_status();
+                    if status == Success || status == Failure {
+                        println!(
+                            "multipoint rotate job completed with status: {:?}",
+                            status
+                        );
+                        blackboard.multi_point_rotation_shim = None;
+                    }
+                    status
+                } else {
+                    // uncomment to get yaw to face general direction the path wants you to go
+                    // let Some(target_yaw) = direction_from_path(path) else {
+                    //     eprintln!("Calculated path has < 2 nodes");
+                    //     return (Failure, 0.0);
+                    // };
+                    let mut rotation_shim = multipoint_rotation_shim(*target_yaw, *tolerance, *agression as f64,50);
+                    let job_initial_status = rotation_shim.get_status();
+                    blackboard.multi_point_rotation_shim = Some(rotation_shim);
                     println!(
                         "Face path job started with initial status: {:?}",
                         job_initial_status
