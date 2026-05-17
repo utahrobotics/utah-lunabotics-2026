@@ -58,9 +58,8 @@ pub fn rotation_shim(
             previous_error = error;
 
             let output = kp * error + ki * integral + kd*derivative;
-
             output_tx
-                .send(Steering::new_ik(0.0, output, Steering::DEFAULT_WEIGHT))
+                .send(Steering::new_ik(0.0, output, 1700.0))
                 .await
                 .expect("failed to send");
 
