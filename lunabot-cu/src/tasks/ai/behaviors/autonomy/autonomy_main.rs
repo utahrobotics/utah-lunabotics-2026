@@ -9,10 +9,12 @@ use crate::tasks::ai::{
     },
 };
 const DIG_TRAVERSAL_TIME: f64 = 15.0;
+
 pub fn autonomy_main(arena: Arena) -> Behavior<LunabotAction> {
     While(
         Box::new(Action(LunabotAction::IsAutonomy)),
         vec![
+            Action(LunabotAction::ResetAllObstacles),
             // 1. go to dig site
             Action(LunabotAction::SetBTStatusMsg(format!(
                 "Moving to dig site for {:?}",
@@ -22,6 +24,9 @@ pub fn autonomy_main(arena: Arena) -> Behavior<LunabotAction> {
             // navigate_behavior(NavigationGoal::DigSite(arena)),
             Action(LunabotAction::SetBTStatusMsg(format!("DIGGING"))),
             open_loop_dig_from_starting(),
+            Action(LunabotAction::ResetLocalObstacles),
+            with_timeout(wait_for_new_frame(), 5.0),
+            // Action()
             // 2. dig
             // Action(LunabotAction::Dig),
 

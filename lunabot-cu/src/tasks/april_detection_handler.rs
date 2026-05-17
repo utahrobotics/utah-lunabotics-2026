@@ -256,13 +256,13 @@ impl CuTask for AprilDetectionHandler {
     }
 
     fn start(&mut self, _clock: &RobotClock) -> CuResult<()> {
-        let axes =
-            rerun::Arrows3D::from_vectors([[0.5, 0.0, 0.0], [0.0, 0.5, 0.0], [0.0, 0.0, 0.5]])
-                .with_colors([[255, 0, 0], [0, 255, 0], [0, 0, 255]])
-                .with_labels(vec!["x", "y", "z"]);
-        if let Some(recorder) = RECORDER.get() {
-            let _ = recorder.recorder.log("apriltags/xyz", &axes);
-        }
+        // let axes =
+        //     rerun::Arrows3D::from_vectors([[0.5, 0.0, 0.0], [0.0, 0.5, 0.0], [0.0, 0.0, 0.5]])
+        //         .with_colors([[255, 0, 0], [0, 255, 0], [0, 0, 255]])
+        //         .with_labels(vec!["x", "y", "z"]);
+        // if let Some(recorder) = RECORDER.get() {
+        //     let _ = recorder.recorder.log("apriltags/xyz", &axes);
+        // }
         Ok(())
     }
 
@@ -276,17 +276,17 @@ impl CuTask for AprilDetectionHandler {
             let Some(iso) = measurement.estimated_isometry.to_na() else {
                 continue;
             };
-            if let Some(recorder) = RECORDER.get() {
-                let _ = recorder.recorder.log(
-                    "apriltags",
-                    &rerun::Transform3D::from_translation_rotation(
-                        iso.translation.vector.cast::<f32>().data.0[0],
-                        rerun::Quaternion::from_xyzw(
-                            iso.rotation.as_vector().cast::<f32>().data.0[0],
-                        ),
-                    ),
-                );
-            }
+            // if let Some(recorder) = RECORDER.get() {
+            //     let _ = recorder.recorder.log(
+            //         "apriltags",
+            //         &rerun::Transform3D::from_translation_rotation(
+            //             iso.translation.vector.cast::<f32>().data.0[0],
+            //             rerun::Quaternion::from_xyzw(
+            //                 iso.rotation.as_vector().cast::<f32>().data.0[0],
+            //             ),
+            //         ),
+            //     );
+            // }
         }
         Ok(())
     }

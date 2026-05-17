@@ -34,7 +34,7 @@
             type: "cu_apriltag::AprilTags",
             config: {
                 "family": "tag36h11",
-                "tag_size": 0.2032,
+                "tag_size": 0.25,
                 "fx": {{fx}},
                 "fy": {{fy}},
                 "cx": {{cx}},

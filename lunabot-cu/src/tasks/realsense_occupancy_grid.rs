@@ -136,25 +136,25 @@ impl CuTask for OccupancyGridTask {
     type Resources<'r> = ();
 
     fn start(&mut self, _clock: &RobotClock) -> CuResult<()> {
-        let center = [
-            (self.global_layout.max_x + self.global_layout.min_x) / 2.0,
-            (self.global_layout.max_y + self.global_layout.min_y) / 2.0,
-            0.0,
-        ];
-        let half_size = [
-            (self.global_layout.max_x - self.global_layout.min_x) / 2.0,
-            (self.global_layout.max_y - self.global_layout.min_y) / 2.0,
-            0.1,
-        ];
-        if let Some(logger) = RECORDER.get() {
-            logger
-                .recorder
-                .log_static(
-                    "arena",
-                    &rerun::Boxes3D::from_centers_and_half_sizes(vec![center], vec![half_size]),
-                )
-                .unwrap();
-        }
+        // let center = [
+        //     (self.global_layout.max_x + self.global_layout.min_x) / 2.0,
+        //     (self.global_layout.max_y + self.global_layout.min_y) / 2.0,
+        //     0.0,
+        // ];
+        // let half_size = [
+        //     (self.global_layout.max_x - self.global_layout.min_x) / 2.0,
+        //     (self.global_layout.max_y - self.global_layout.min_y) / 2.0,
+        //     0.1,
+        // ];
+        // if let Some(logger) = RECORDER.get() {
+        //     logger
+        //         .recorder
+        //         .log_static(
+        //             "arena",
+        //             &rerun::Boxes3D::from_centers_and_half_sizes(vec![center], vec![half_size]),
+        //         )
+        //         .unwrap();
+        // }
         Ok(())
     }
 
@@ -568,36 +568,36 @@ impl CuTask for OccupancyGridTask {
                     )
                 })?;
 
-                if let Some(logger) = RECORDER.get() {
-                    let mut global_obstacle_map_points = vec![];
-                    let mut global_obstacle_map_colors = vec![];
-                    for cell_y in 0..write_guard.cells_y() {
-                        for cell_x in 0..write_guard.cells_x() {
-                            let idx = cell_x + cell_y * write_guard.cells_x();
-                            if idx < write_guard.gradient_map.len() {
-                                let gradient = write_guard.gradient_map[idx].as_float();
-                                if gradient != f32::MIN {
-                                    if let Ok((world_x, world_y)) =
-                                        write_guard.cell_to_world(cell_x, cell_y)
-                                    {
-                                        global_obstacle_map_points.push([world_x, world_y]);
-                                        let normalized = ((gradient + 1.0) / 4.0).clamp(0.0, 1.0);
-                                        global_obstacle_map_colors.push([
-                                            (normalized * 255.0) as u8,
-                                            50,
-                                            ((1.0 - normalized) * 255.0) as u8,
-                                        ]);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    let _ = logger.recorder.log(
-                        "obstacle_mapper/global_obstacle_map",
-                        &Points2D::new(global_obstacle_map_points)
-                            .with_colors(global_obstacle_map_colors),
-                    );
-                }
+                // if let Some(logger) = RECORDER.get() {
+                //     let mut global_obstacle_map_points = vec![];
+                //     let mut global_obstacle_map_colors = vec![];
+                //     for cell_y in 0..write_guard.cells_y() {
+                //         for cell_x in 0..write_guard.cells_x() {
+                //             let idx = cell_x + cell_y * write_guard.cells_x();
+                //             if idx < write_guard.gradient_map.len() {
+                //                 let gradient = write_guard.gradient_map[idx].as_float();
+                //                 if gradient != f32::MIN {
+                //                     if let Ok((world_x, world_y)) =
+                //                         write_guard.cell_to_world(cell_x, cell_y)
+                //                     {
+                //                         global_obstacle_map_points.push([world_x, world_y]);
+                //                         let normalized = ((gradient + 1.0) / 4.0).clamp(0.0, 1.0);
+                //                         global_obstacle_map_colors.push([
+                //                             (normalized * 255.0) as u8,
+                //                             50,
+                //                             ((1.0 - normalized) * 255.0) as u8,
+                //                         ]);
+                //                     }
+                //                 }
+                //             }
+                //         }
+                //     }
+                //     let _ = logger.recorder.log(
+                //         "obstacle_mapper/global_obstacle_map",
+                //         &Points2D::new(global_obstacle_map_points)
+                //             .with_colors(global_obstacle_map_colors),
+                //     );
+                // }
 
                 if let Ok(mut p) = self.depth_projector_pipeline.try_lock() {
                     p.clear_map(get_device());
@@ -798,10 +798,10 @@ fn log_map(
             }
         }
     }
-    let _ = logger.recorder.log(
-        "obstacle_mapper/local_obstacle_map",
-        &Points2D::new(local_obstacle_points).with_colors(local_obstacle_colors),
-    );
+    // let _ = logger.recorder.log(
+    //     "obstacle_mapper/local_obstacle_map",
+    //     &Points2D::new(local_obstacle_points).with_colors(local_obstacle_colors),
+    // );
 
     let mut raw_height_points = Vec::new();
     let mut raw_height_colors = Vec::new();

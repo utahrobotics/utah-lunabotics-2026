@@ -177,33 +177,33 @@ impl OccupancyGrid {
             origin: self.origin,
         };
 
-        if let Some(logger) = RECORDER.get() {
-            // Color by decayed gradient: bright red = high decay value, dark purple = low decay value
-            let decay_range = {
-                let max_d = new_obstacles.iter().map(|(_, d)| *d).fold(f32::NEG_INFINITY, f32::max);
-                if max_d > 0.0 { max_d } else { 1.0 }
-            };
-            let _ = logger.recorder.log(
-                "ai/expanded_obstacles",
-                &Points2D::new(
-                    new_obstacles
-                        .iter()
-                        .map(|(index, _)| expanded.linear_cell_to_world(*index))
-                        .flatten(),
-                )
-                .with_colors(new_obstacles.iter().map(|(_, decayed)| {
-                    let t = (*decayed / decay_range).clamp(0.0, 1.0);
-                    let r = (60.0 + 195.0 * t) as u8;
-                    let g = 0u8;
-                    let b = (120.0 * (1.0 - t)) as u8;
-                    Color::from_rgb(r, g, b)
-                })).with_labels(
-                    new_obstacles
-                        .iter()
-                        .map(|(index, _)| expanded.gradient_map[*index].as_float().to_string()),
-                ),
-            );
-        }
+        // if let Some(logger) = RECORDER.get() {
+        //     // Color by decayed gradient: bright red = high decay value, dark purple = low decay value
+        //     let decay_range = {
+        //         let max_d = new_obstacles.iter().map(|(_, d)| *d).fold(f32::NEG_INFINITY, f32::max);
+        //         if max_d > 0.0 { max_d } else { 1.0 }
+        //     };
+        //     let _ = logger.recorder.log(
+        //         "ai/expanded_obstacles",
+        //         &Points2D::new(
+        //             new_obstacles
+        //                 .iter()
+        //                 .map(|(index, _)| expanded.linear_cell_to_world(*index))
+        //                 .flatten(),
+        //         )
+        //         .with_colors(new_obstacles.iter().map(|(_, decayed)| {
+        //             let t = (*decayed / decay_range).clamp(0.0, 1.0);
+        //             let r = (60.0 + 195.0 * t) as u8;
+        //             let g = 0u8;
+        //             let b = (120.0 * (1.0 - t)) as u8;
+        //             Color::from_rgb(r, g, b)
+        //         })).with_labels(
+        //             new_obstacles
+        //                 .iter()
+        //                 .map(|(index, _)| expanded.gradient_map[*index].as_float().to_string()),
+        //         ),
+        //     );
+        // }
 
         Some(expanded)
     }

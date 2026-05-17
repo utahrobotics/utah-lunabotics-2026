@@ -75,6 +75,9 @@ pub struct LunabotBlackboard {
     /// rotation shim
     pub rotation_shim: Option<Job<Steering, ()>>,
 
+    /// multi point rotation shim
+    pub multi_point_rotation_shim: Option<Job<Steering, ()>>,
+
     /// the calculated path from the path finder job
     pub calculated_path: Option<Vec<Vector2<f32>>>,
     /// any cell with a greater gradient will be expanded
@@ -114,6 +117,7 @@ impl Default for LunabotBlackboard {
             digger: None,
             dumper: None,
             rotation_shim: None,
+            multi_point_rotation_shim: None,
             obstacle_gradient_threshold_expander: 0.5,
             obstacle_gradient_threshold_pathfinder: 0.3,
             robot_radius: 0.5,

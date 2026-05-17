@@ -23,9 +23,11 @@ class_name ControlSchemeResource extends Resource
 @export var bucket_analog_up: Array[InputEvent]
 @export var bucket_analog_down: Array[InputEvent]
 @export var bucket_reverse: Array[InputEvent]
+@export var bucket_shake: Array[InputEvent]
 @export var dumper_analog_up: Array[InputEvent]
 @export var dumper_analog_down: Array[InputEvent]
 @export var dumper_reverse: Array[InputEvent]
+@export var dumper_shake: Array[InputEvent]
 @export var autonomy: Array[InputEvent]
 @export var increment_speed: Array[InputEvent]
 @export var decrement_speed: Array[InputEvent]
@@ -58,9 +60,11 @@ func get_all_actions() -> Dictionary:
 	all_actions["bucket_analog_up"] = bucket_analog_up
 	all_actions["bucket_analog_down"] = bucket_analog_down
 	all_actions["bucket_reverse"] = bucket_reverse
+	all_actions["bucket_shake"] = bucket_shake
 	all_actions["dumper_analog_up"] = dumper_analog_up
 	all_actions["dumper_analog_down"] = dumper_analog_down
 	all_actions["dumper_reverse"] = dumper_reverse
+	all_actions["dumper_shake"] = dumper_shake
 	all_actions["autonomy"] = autonomy
 	all_actions["increment_speed"] = increment_speed
 	all_actions["decrement_speed"] = decrement_speed
