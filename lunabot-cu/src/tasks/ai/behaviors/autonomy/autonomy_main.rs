@@ -10,7 +10,7 @@ use crate::tasks::ai::{
         steer_for_n_seconds,
     },
 };
-const DIG_TRAVERSAL_TIME: f64 = 15.0;
+const DIG_TRAVERSAL_TIME: f64 = 7.0;
 
 pub fn autonomy_main(arena: Arena) -> Behavior<LunabotAction> {
     While(
