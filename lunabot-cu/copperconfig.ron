@@ -25,18 +25,21 @@
             type:"crate::tasks::UdevMonitor",
             config:{},
             // task is stubbed out in sim mode
-            run_in_sim: false
+            run_in_sim: false,
+            logging:(
+                enabled: false
+            )
         ),
         // subscribes to  point clouds from iceoryx2, published from c++ by the unilidar_iceoryx_publisher
         (
             id:"l2_pointcloud",
             type:"crate::tasks::sources::PointCloudIceoryxReceiver",
             config:{},
-            logging: (
-                enabled: true
-            ),
             // task is stubbed in sim mode
             run_in_sim: false,
+            logging:(
+                enabled: false,
+            )
         ),
         // subscribes to imu information from the unilidar_iceoryx_publisher
         (
@@ -45,6 +48,9 @@
             config:{},
             // task gets stubbed out in sim mode
             run_in_sim: false,
+            logging:(
+                enabled: false,
+            )
         ),
         // subscribes to depth frames and imu data from the external_tasks/realsense process
         (
@@ -79,7 +85,7 @@
             logging: (
                 enabled: true,
                 // disable logging for images (it takes too long)
-                // disabled_slots: [1,2,3]
+                disabled_slots: [1,2,3]
             ),
             run_in_sim: false
         ),
@@ -243,7 +249,10 @@
                 "teri_mode": false,
                 // Float between 0 and 1. Max power would be 1.0 which is honestly too fast even for prod, 0.2 is decently slow and good for outreach events 
                 "speed_ratio": 0.4,
-            }
+            },
+            logging:(
+                enabled: false
+            )
         ),
         // handles apriltag detections from all the cameras, combining them and then sending them over to the localizer
         (
@@ -252,7 +261,10 @@
             config: {
                 // all tags > max_distance away will be ignored
                 "max_distance": 3.0
-            }
+            },
+            logging:(
+                enabled: false
+            )
         ),
 
 
@@ -271,7 +283,7 @@
                 "distortion_path": "camera_configs/t265_distortion.ron",
             },
             logging: (
-                enabled: true
+                enabled: false
             ),
             background: true,
         ),
@@ -289,7 +301,7 @@
                 "distortion_path": "camera_configs/t265_distortion.ron",
             },
             logging: (
-                enabled: true
+                enabled: false
             ),
             background: true,
         ),
@@ -307,7 +319,7 @@
                 "distortion_path": "camera_configs/t265_distortion.ron",
             },
             logging: (
-                enabled: true
+                enabled: false
             ),
             background: true,
         ),
@@ -323,7 +335,10 @@
                 "host": "0.0.0.0",
                 "port": 5000,
                 "bitrate": 2000,
-            }
+            },
+            logging:(
+                enabled: false
+            )
         ),
         (
             id: "t265_back_gstreamer",
@@ -335,7 +350,10 @@
                 "host": "0.0.0.0",
                 "tcp_port": 5003,
                 "bitrate": 2000,
-            }
+            },
+            logging:(
+                enabled: false
+            )
         ),
 
         // streams fisheye lenses for t265
@@ -349,7 +367,10 @@
                 "host": "0.0.0.0",
                 "tcp_port": 5001,
                 "bitrate": 2000,
-            }
+            },
+            logging:(
+                enabled: false
+            )
         ),
         (
             id: "t265_right_gstreamer",
@@ -361,7 +382,10 @@
                 "host": "0.0.0.0",
                 "tcp_port": 5002,
                 "bitrate": 2000,
-            }
+            },
+            logging:(
+                enabled: false
+            )
         )
     ],
     cnx:[
@@ -485,7 +509,7 @@
     monitor: (type:"simple_monitor::SimpleMonitor"),
     logging:(
         // if true, each output payload of each will be logged unless a task opts out
-        enable_task_logging: false,
+        enable_task_logging: true,
         section_size_mib: 100,
         copperlist_count: 20,
     ),

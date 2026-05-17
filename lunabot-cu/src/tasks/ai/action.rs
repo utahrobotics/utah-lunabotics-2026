@@ -263,15 +263,15 @@ impl LunabotAction {
             LunabotAction::IsInUnknownCell => todo!(),
             LunabotAction::CalculatePath(navigation_goal) => {
                 let (center, hw, hh) = navigation_goal.to_center_and_halfsizes();
-                if let Some(rec) = RECORDER.get() {
-                    let _ = rec.recorder.log(
-                        "ai/goal",
-                        &Boxes2D::from_centers_and_half_sizes(
-                            vec![(center.x, center.y)],
-                            vec![(hw, hh)],
-                        ),
-                    );
-                }
+                // if let Some(rec) = RECORDER.get() {
+                //     let _ = rec.recorder.log(
+                //         "ai/goal",
+                //         &Boxes2D::from_centers_and_half_sizes(
+                //             vec![(center.x, center.y)],
+                //             vec![(hw, hh)],
+                //         ),
+                //     );
+                // }
                 if let Some(ref local_map) = blackboard.latest_local_map {
                     // if the kinematic root is not initialized, we might as well just blow up because nothing will work anyways
                     let current_translation = ROBOT_STATE

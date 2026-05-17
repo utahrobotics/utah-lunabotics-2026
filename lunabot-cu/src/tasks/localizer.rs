@@ -367,15 +367,15 @@ impl CuTask for Localizer {
     }
 
     fn start(&mut self, _clock: &cu29::prelude::RobotClock) -> cu29::CuResult<()> {
-        if let Some(logger) = RECORDER.get() {
-            let axes =
-                rerun::Arrows3D::from_vectors([[0.5, 0.0, 0.0], [0.0, 0.5, 0.0], [0.0, 0.0, 0.5]])
-                    .with_colors([[255, 0, 0], [0, 255, 0], [0, 0, 255]])
-                    .with_labels(vec!["x", "y", "z"]);
+        // if let Some(logger) = RECORDER.get() {
+        //     let axes =
+        //         rerun::Arrows3D::from_vectors([[0.5, 0.0, 0.0], [0.0, 0.5, 0.0], [0.0, 0.0, 0.5]])
+        //             .with_colors([[255, 0, 0], [0, 255, 0], [0, 0, 255]])
+        //             .with_labels(vec!["x", "y", "z"]);
 
-            let _ = logger.recorder.log_static("localizer/robot_base_seen_by_t265", &axes);
-            let _ = logger.recorder.log_static("localizer/icp_raw", &axes);
-        }
+        //     let _ = logger.recorder.log_static("localizer/robot_base_seen_by_t265", &axes);
+        //     let _ = logger.recorder.log_static("localizer/icp_raw", &axes);
+        // }
         Ok(())
     }
 
@@ -506,40 +506,40 @@ impl CuTask for Localizer {
                 .kalman_variances
                 .store(Some(*self.local_filter.covariance()));
 
-            if let Some(logger) = RECORDER.get() {
-                let _ = logger.recorder.log(
-                    "localizer/velocity",
-                    &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(
-                        local_state[3] as f32,
-                        local_state[4] as f32,
-                        local_state[5] as f32,
-                    )]),
-                );
+            // if let Some(logger) = RECORDER.get() {
+            //     let _ = logger.recorder.log(
+            //         "localizer/velocity",
+            //         &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(
+            //             local_state[3] as f32,
+            //             local_state[4] as f32,
+            //             local_state[5] as f32,
+            //         )]),
+            //     );
 
-                let _ = logger.recorder.log(
-                    "localizer/angular_velocity",
-                    &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(
-                        local_state[9] as f32,
-                        local_state[10] as f32,
-                        local_state[11] as f32,
-                    )]),
-                );
+            //     let _ = logger.recorder.log(
+            //         "localizer/angular_velocity",
+            //         &rerun::Arrows3D::from_vectors([rerun::Vec3D::new(
+            //             local_state[9] as f32,
+            //             local_state[10] as f32,
+            //             local_state[11] as f32,
+            //         )]),
+            //     );
 
-                if let Err(e) = logger.recorder.log(
-                    rerun_viz::ROBOT_STRUCTURE,
-                    &rerun::Transform3D::from_translation_rotation(
-                        current_iso.translation.vector.cast::<f32>().data.0[0],
-                        rerun::Quaternion::from_xyzw(
-                            current_iso.rotation.as_vector().cast::<f32>().data.0[0],
-                        ),
-                    ),
-                ) {
-                    return Err(CuError::new_with_cause(
-                        &format!("Failed to log robot transform: {e}"),
-                        std::io::Error::new(std::io::ErrorKind::Other, "Rerun logging failed"),
-                    ));
-                }
-            }
+            //     if let Err(e) = logger.recorder.log(
+            //         rerun_viz::ROBOT_STRUCTURE,
+            //         &rerun::Transform3D::from_translation_rotation(
+            //             current_iso.translation.vector.cast::<f32>().data.0[0],
+            //             rerun::Quaternion::from_xyzw(
+            //                 current_iso.rotation.as_vector().cast::<f32>().data.0[0],
+            //             ),
+            //         ),
+            //     ) {
+            //         return Err(CuError::new_with_cause(
+            //             &format!("Failed to log robot transform: {e}"),
+            //             std::io::Error::new(std::io::ErrorKind::Other, "Rerun logging failed"),
+            //         ));
+            //     }
+            // }
 
             output.set_payload(FromLunabot::RobotIsometry {
                 origin: current_iso.translation.vector.cast::<f32>().data.0[0],
