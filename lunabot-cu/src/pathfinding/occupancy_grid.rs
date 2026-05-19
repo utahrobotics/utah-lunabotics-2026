@@ -9,6 +9,8 @@ use wgsl_pcl::map_layout::MapLayout;
 
 use crate::rerun_viz::RECORDER;
 
+const SOFT_RADIUS_FACTOR: f32 = 1.0;
+
 #[derive(
     Copy, Clone, cu_bincode::Decode, Encode, Deserialize, Debug, Serialize,
 )]
@@ -134,7 +136,7 @@ impl OccupancyGrid {
                 let dy_cells = my as f32 - sy as f32;
                 let distance =
                     (dx_cells * dx_cells + dy_cells * dy_cells).sqrt() * self.layout.cell_size;
-                let decayed = obstacle_threshold * (1.0 - distance / robot_radius).max(0.0);
+                let decayed = obstacle_threshold * (1.0 - distance / robot_radius / SOFT_RADIUS_FACTOR).max(0.0);
                 if output[index].as_float() == f32::MIN || output[index].as_float() < decayed {
                     output[index] = decayed.into();
                     new_obstacles.push((index, decayed));
