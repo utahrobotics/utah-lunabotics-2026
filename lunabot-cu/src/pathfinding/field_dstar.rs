@@ -206,7 +206,7 @@ pub fn find_path_dstar(
             }
 
             let move_dist = distance(current, neighbor_pos);
-            let tentative_g = current_g + move_dist;
+            let tentative_g = current_g + move_dist + map.gradient_closest_to(neighbor_pos.0, neighbor_pos.1);
 
             let existing_g = *g_score.get(&neighbor_key).unwrap_or(&f32::INFINITY);
 
