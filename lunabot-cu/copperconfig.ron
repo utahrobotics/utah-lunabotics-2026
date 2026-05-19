@@ -455,7 +455,8 @@
                 "height":1200,
                 "tcp_host":"0.0.0.0",
                 "tcp_port":4000,
-                "desired_index": "0"
+                "desired_index": "0",
+                "enabled": false,
             },
         ),
         (
@@ -471,7 +472,8 @@
                 "height":480,
                 "tcp_host":"0.0.0.0",
                 "tcp_port":4001,
-                "desired_index": "0"
+                "desired_index": "0",
+                "enabled": false,
             },
         ),
         (
@@ -487,7 +489,8 @@
                 "height":720,
                 "tcp_host":"0.0.0.0",
                 "tcp_port":4002,
-                "desired_index": "0"
+                "desired_index": "0",
+                "enabled": false,
             }
         ),
         // the lite version doesnt include apriltags

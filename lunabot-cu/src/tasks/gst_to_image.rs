@@ -126,6 +126,7 @@ pub struct GstToImage {
     height: u32,
     width: u32,
     block_radius: u32,
+    enabled: bool,
 }
 
 #[cfg(all(target_os = "linux", not(any(feature = "resim", feature = "sim"))))]
@@ -144,6 +145,7 @@ impl CuTask for GstToImage {
         let config = config.expect("No config provided");
         let width = config.get::<u32>("width")?.expect("No width provided");
         let height = config.get::<u32>("height")?.expect("No height provided");
+        let enabled = config.get::<bool>("enabled")?.unwrap_or(false);
         let block_radius = config
             .get::<u32>("block_radius")?
             .expect("No block_radius provided");
@@ -156,6 +158,7 @@ impl CuTask for GstToImage {
             width,
             height,
             block_radius,
+            enabled,
         })
     }
 
@@ -222,7 +225,9 @@ impl CuTask for GstToImage {
         );
 
         output.tov = input.tov;
-        // output.set_payload(image);
+        if self.enabled {
+            output.set_payload(image);
+        }
         Ok(())
     }
 }
