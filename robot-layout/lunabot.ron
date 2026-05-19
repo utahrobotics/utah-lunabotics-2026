@@ -37,8 +37,8 @@
         },
         {
             "name": Some("cam_dump"),
-            "origin": [-0.2, 0.0, 0.3],
-            "euler": [0.0, 0.0, 180.0]
+            "origin": [0,-0.36,0.0],
+            "euler": [90.0,0.0,90.0],
         },
         {
             "name": Some("cam_side"),
