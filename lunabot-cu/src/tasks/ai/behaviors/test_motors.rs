@@ -4,7 +4,7 @@ use common::Steering;
 use crate::tasks::ai::action::LunabotAction;
 
 pub fn test_motors_behavior() -> Behavior<LunabotAction> {
-    Behavior::WhileAll(
+    Behavior::While(
         Box::new(Action(LunabotAction::IsTestMotors)),
         vec![
             Action(LunabotAction::CancelJobs),
@@ -56,9 +56,7 @@ pub fn test_motors_behavior() -> Behavior<LunabotAction> {
             ),
             set_zeros(),
             Behavior::Wait(2.0),
-            Action(LunabotAction::SetBTStatusMsg(String::from(
-                "TEST LIFT",
-            ))),
+            Action(LunabotAction::SetBTStatusMsg(String::from("TEST LIFT"))),
             While(
                 Box::new(Behavior::Wait(0.2)),
                 vec![
@@ -75,9 +73,7 @@ pub fn test_motors_behavior() -> Behavior<LunabotAction> {
             ),
             set_zeros(),
             Behavior::Wait(2.0),
-            Action(LunabotAction::SetBTStatusMsg(String::from(
-                "TEST BUCKET",
-            ))),
+            Action(LunabotAction::SetBTStatusMsg(String::from("TEST BUCKET"))),
             While(
                 Box::new(Behavior::Wait(0.2)),
                 vec![
@@ -94,9 +90,7 @@ pub fn test_motors_behavior() -> Behavior<LunabotAction> {
             ),
             set_zeros(),
             Behavior::Wait(2.0),
-            Action(LunabotAction::SetBTStatusMsg(String::from(
-                "TEST DUMPER",
-            ))),
+            Action(LunabotAction::SetBTStatusMsg(String::from("TEST DUMPER"))),
             While(
                 Box::new(Behavior::Wait(0.2)),
                 vec![
@@ -117,7 +111,6 @@ pub fn test_motors_behavior() -> Behavior<LunabotAction> {
         ],
     )
 }
-
 
 fn set_zeros() -> Behavior<LunabotAction> {
     Sequence(vec![
