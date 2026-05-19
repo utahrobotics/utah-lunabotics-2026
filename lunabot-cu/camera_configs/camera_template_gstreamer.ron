@@ -23,6 +23,7 @@
                 "height": {{height}},
                 "pixel_format": "GRAY",
                 "block_radius": 50,
+                "enabled": {{enabled}}
             },
             logging: (
                 enabled: false
