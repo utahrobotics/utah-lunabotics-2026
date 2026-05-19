@@ -204,6 +204,8 @@ pub fn enumerate_motors(
         std::thread::spawn(move || {
             loop {
                 task.motor_task();
+                std::thread::sleep(Duration::from_secs(1));
+                std::process::Command::new("usb-reset").arg("vesc");
             }
         });
     }

@@ -11,6 +11,7 @@ enum TargetDevice {
     T265,
     RealsenseDepth,
     V3Pico,
+    Vesc,
 }
 
 impl TargetDevice {
@@ -19,6 +20,7 @@ impl TargetDevice {
             TargetDevice::RealsenseDepth => "Depth",
             TargetDevice::V3Pico => "USR_V3PICO",
             TargetDevice::T265 => "Movidius",
+            TargetDevice::Vesc => "STMicroelectronics_ChibiOS_RT_Virtual_COM_Port_304"
         }
     }
 }
@@ -35,6 +37,7 @@ fn main() {
         "depth" => TargetDevice::RealsenseDepth,
         "v3pico" => TargetDevice::V3Pico,
         "t265" | "T265" => TargetDevice::T265,
+        "vesc" => TargetDevice::Vesc,
         _ => {
             panic!("unknown arg. options: depth, v3pico, t265");
         }
