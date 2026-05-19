@@ -9,8 +9,8 @@
             type: "crate::tasks::ai::lunabot_ai::LunabotAi",
             config: {
                 "obstacle_gradient_threshold_expander": 0.9,
-                "obstacle_gradient_threshold_pathfinder": 0.3,
-                "robot_radius_meters": 0.8,
+                "obstacle_gradient_threshold_pathfinder": 0.633,
+                "robot_radius_meters": 1.6,
                 "arena": "artemis"
             },
             logging:(
