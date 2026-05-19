@@ -22,8 +22,7 @@ pub fn autonomy_main(arena: Arena) -> Behavior<LunabotAction> {
                 "Moving to dig site for {:?}",
                 arena
             ))),
-            steer_for_n_seconds(Steering::new(1.0, 1.0, 1800.0), DIG_TRAVERSAL_TIME),
-            // navigate_behavior(NavigationGoal::DigSite(arena)),
+            navigate_behavior(NavigationGoal::DigSite(arena)),
             Action(LunabotAction::SetBTStatusMsg(format!("DIGGING"))),
             open_loop_dig_from_starting(),
             Action(LunabotAction::ResetLocalObstacles),
