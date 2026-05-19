@@ -113,11 +113,80 @@ pub fn open_loop_dig_from_starting() -> Behavior<LunabotAction> {
 
 pub fn open_loop_dump_from_zero() -> Behavior<LunabotAction> {
     Sequence(vec![
-        Wait(1.5),
+        Wait(0.25),
         Action(LunabotAction::SetDumper((0.75 * i8::MAX as f64) as i8)),
-        Wait(5.0),
+        Wait(2.5),
         Action(LunabotAction::SetDumper(0)),
-        Wait(10.0),
+    ])
+}
+
+pub fn open_loop_dig_from_finished() -> Behavior<LunabotAction> {
+    Sequence(vec![
+        Wait(0.25), // Safety wait
+        Action(LunabotAction::SetBucket((0.9 * i8::MAX as f64) as i8)),
+        Action(LunabotAction::SetLift((-0.75 * i8::MAX as f64) as i8)),
+        Wait(1.5),
+        Action(LunabotAction::SetLift(0)),
+        Wait(1.0),
+        Action(LunabotAction::SetBucket(0)),
+        Action(LunabotAction::SetDumper((-0.9 * i8::MAX as f64) as i8)),
+        Wait(2.0),
+        Action(LunabotAction::SetDumper(0)),
+        Action(LunabotAction::SetLift((-0.1 * i8::MAX as f64) as i8)),
+        Wait(3.0),
+        Action(LunabotAction::SetLift(0)),
+        Action(LunabotAction::SetLift((-0.2 * i8::MAX as f64) as i8)),
+        Action(LunabotAction::SetBucket((0.2 * i8::MAX as f64) as i8)),
+        While(
+            Box::new(Wait(3.0)),
+            vec![
+                Action(LunabotAction::SetSteering(Steering::new_ik(
+                    -0.25, 0.0, 8000.0,
+                ))),
+                Wait(0.01),
+            ],
+        ),
+        Action(LunabotAction::SetLift(0)),
+        Action(LunabotAction::SetBucket(0)),
+        Action(LunabotAction::SetSteering(Steering::new_ik(
+            0.0, 0.0, 8000.0,
+        ))),
+        Action(LunabotAction::SetBucket((-0.1 * i8::MAX as f64) as i8)),
+        While(
+            Box::new(Wait(0.75)),
+            vec![
+                Action(LunabotAction::SetSteering(Steering::new_ik(
+                    -0.25, 0.0, 8000.0,
+                ))),
+                Wait(0.01),
+            ],
+        ),
+        Action(LunabotAction::SetSteering(Steering::new_ik(
+            0.0, 0.0, 8000.0,
+        ))),
+        Wait(0.75),
+        Action(LunabotAction::SetBucket((-0.75 * i8::MAX as f64) as i8)),
+        Wait(2.5),
+        Action(LunabotAction::SetBucket(0)),
+        Action(LunabotAction::SetLift((0.9 * i8::MAX as f64) as i8)),
+        Action(LunabotAction::SetBucket((0.5 * i8::MAX as f64) as i8)),
+        Wait(6.0),
+        Action(LunabotAction::SetLift(0)),
+        Action(LunabotAction::SetBucket(0)),
+        Action(LunabotAction::SetLift((0.1 * i8::MAX as f64) as i8)),
+        Action(LunabotAction::SetBucket((-0.8 * i8::MAX as f64) as i8)),
+        Wait(3.0),
+        Action(LunabotAction::SetLift(0)),
+        Action(LunabotAction::SetBucket(0)),
+        Wait(4.0), // wait for regolith to pour
+        Action(LunabotAction::SetBucket((0.9 * i8::MAX as f64) as i8)),
+        Wait(2.0),
+        Action(LunabotAction::SetBucket(0)),
+        Action(LunabotAction::SetLift((-0.35 * i8::MAX as f64) as i8)),
+        Action(LunabotAction::SetBucket((0.9 * i8::MAX as f64) as i8)),
+        Wait(2.0),
+        Action(LunabotAction::SetLift(0)),
+        Action(LunabotAction::SetBucket(0)),
     ])
 }
 
