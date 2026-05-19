@@ -1,3 +1,5 @@
+use rerun::external::re_log::ResultExt;
+
 use crate::pathfinding::OccupancyGrid;
 
 use crate::pathfinding::flood_fill_escape;
@@ -47,7 +49,6 @@ pub fn find_path_dstar(
     goal: [f32; 2],
     max_acceptable_gradient: f32,
 ) -> Option<Vec<(f32, f32)>> {
-
     // Helper to check gradient from both maps (prioritize local)
     let get_gradient = |x: f32, y: f32| -> Option<f32> {
         Some(
@@ -70,9 +71,7 @@ pub fn find_path_dstar(
         .flatten()
         .is_none()
     {
-        if let Some(valid_cell) =
-            flood_fill_escape(map, start, max_acceptable_gradient, 200)
-        {
+        if let Some(valid_cell) = flood_fill_escape(map, start, max_acceptable_gradient, 200) {
             initial_path.push(valid_cell);
         } else {
             return None;
@@ -104,8 +103,10 @@ pub fn find_path_dstar(
     let goal_gradient = get_gradient(goal[0], goal[1]);
     let goal_is_free = is_free(goal[0], goal[1]);
     if !goal_is_free {
-        eprintln!("[PathFinding] FAILED: Goal is blocked (gradient: {:?}, max acceptable: {})",
-                 goal_gradient, max_acceptable_gradient);
+        eprintln!(
+            "[PathFinding] FAILED: Goal is blocked (gradient: {:?}, max acceptable: {})",
+            goal_gradient, max_acceptable_gradient
+        );
         return None;
     }
 
@@ -206,7 +207,12 @@ pub fn find_path_dstar(
             }
 
             let move_dist = distance(current, neighbor_pos);
-            let tentative_g = current_g + move_dist + map.gradient_closest_to(neighbor_pos.0, neighbor_pos.1);
+            let tentative_g = current_g
+                + move_dist
+                + map
+                    .gradient_closest_to(neighbor_pos.0, neighbor_pos.1)
+                    .unwrap_or(Some(f32::INFINITY))
+                    .unwrap_or(0.0);
 
             let existing_g = *g_score.get(&neighbor_key).unwrap_or(&f32::INFINITY);
 
@@ -222,7 +228,10 @@ pub fn find_path_dstar(
         }
     }
 
-    eprintln!("[PathFinding] FAILED: No path found (explored {} cells)", closed_set.len());
+    eprintln!(
+        "[PathFinding] FAILED: No path found (explored {} cells)",
+        closed_set.len()
+    );
     None
 }
 
