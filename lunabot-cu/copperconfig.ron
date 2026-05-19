@@ -11,7 +11,7 @@
                 "obstacle_gradient_threshold_expander": 0.9,
                 "obstacle_gradient_threshold_pathfinder": 0.3,
                 "robot_radius_meters": 0.8,
-                "arena": "ucfleft"
+                "arena": "artemis"
             },
             logging:(
                 enabled: false
@@ -121,7 +121,7 @@
                 "min_distance_to_clear": 1.5,
 
                 // enable permanent obstacles: artemis, ucfright, or ucfleft
-                "arena_obstacles": "ucfleft",
+                "arena_obstacles": "artemis",
 
                 // parameters for when to reset the local map
                 "max_distance_traveled_before_reset": 1.5,
