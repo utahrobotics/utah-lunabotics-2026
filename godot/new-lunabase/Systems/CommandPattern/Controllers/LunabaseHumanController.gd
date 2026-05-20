@@ -113,10 +113,17 @@ func _process(delta: float) -> void:
 	var lift_input: float = 0.0
 	var trig_dz: float = trigger_deadzone if apply_trigger_deadzone else 0.0
 
-	var lift_analog_mag: float = maxf(
-		Input.get_action_strength("lift_analog_up"),
-		Input.get_action_strength("lift_analog_down")
-	)
+	var lift_analog_mag: float = 0.0
+	if Input.is_action_pressed("dumper_swap"):
+		lift_analog_mag = maxf(
+			Input.get_action_strength("dumper_analog_up"),
+			Input.get_action_strength("dumper_analog_down")
+		)
+	else:
+		lift_analog_mag = maxf(
+			Input.get_action_strength("lift_analog_up"),
+			Input.get_action_strength("lift_analog_down")
+		)
 	if lift_analog_mag > trig_dz:
 		lift_input = -lift_analog_mag if Input.is_action_pressed("lift_reverse") else lift_analog_mag
 		if invert_lift_default_direction:
@@ -175,10 +182,17 @@ func _process(delta: float) -> void:
 	# === DUMPER ACTUATORS ===
 	var dumper_input: float = 0.0
 
-	var dumper_analog_mag: float = maxf(
-		Input.get_action_strength("dumper_analog_up"),
-		Input.get_action_strength("dumper_analog_down")
-	)
+	var dumper_analog_mag: float = 0.0
+	if Input.is_action_pressed("dumper_swap"):
+		dumper_analog_mag = maxf(
+			Input.get_action_strength("lift_analog_up"),
+			Input.get_action_strength("lift_analog_down")
+		)
+	else:
+		dumper_analog_mag = maxf(
+			Input.get_action_strength("dumper_analog_up"),
+			Input.get_action_strength("dumper_analog_down")
+		)
 	if Input.is_action_pressed("dumper_shake"):
 		oscillation_time += delta
 		if oscillation_time > 0.2:

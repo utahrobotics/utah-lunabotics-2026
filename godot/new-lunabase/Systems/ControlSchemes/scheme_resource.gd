@@ -28,6 +28,7 @@ class_name ControlSchemeResource extends Resource
 @export var dumper_analog_down: Array[InputEvent]
 @export var dumper_reverse: Array[InputEvent]
 @export var dumper_shake: Array[InputEvent]
+@export var dumper_swap: Array[InputEvent]
 @export var autonomy: Array[InputEvent]
 @export var increment_speed: Array[InputEvent]
 @export var decrement_speed: Array[InputEvent]
@@ -65,6 +66,7 @@ func get_all_actions() -> Dictionary:
 	all_actions["dumper_analog_down"] = dumper_analog_down
 	all_actions["dumper_reverse"] = dumper_reverse
 	all_actions["dumper_shake"] = dumper_shake
+	all_actions["dumper_swap"] = dumper_swap
 	all_actions["autonomy"] = autonomy
 	all_actions["increment_speed"] = increment_speed
 	all_actions["decrement_speed"] = decrement_speed

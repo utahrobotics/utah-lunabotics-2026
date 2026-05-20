@@ -43,6 +43,7 @@ const ACTIONS: PackedStringArray = [
 	"dumper_analog_down",
 	"dumper_reverse",
 	"dumper_shake",
+	"dumper_swap",
 	"autonomy",
 	"increment_speed",
 	"decrement_speed",

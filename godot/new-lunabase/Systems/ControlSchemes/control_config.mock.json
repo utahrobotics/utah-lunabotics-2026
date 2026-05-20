@@ -54,6 +54,9 @@
 		"dumper_shake": [
 			"keyboard_t"
 		],
+		"dumper_swap": [
+			"keyboard_k"
+		],
 		"lift_analog_up": [
 			"gamepad_axis_4_positive"
 		],
