@@ -59,6 +59,7 @@ pub mod implementation {
                 .and_then(|c| c.get("tcp_port").expect("failed to deserialize port"))
                 .expect("Provide tcp_port for T265Streamer");
 
+
             let video_info = gstreamer_video::VideoInfo::builder(
                 gstreamer_video::VideoFormat::Gray8,
                 width,
@@ -97,6 +98,7 @@ pub mod implementation {
                 .map_err(|e| CuError::from(e.message.to_string()))?;
             let encoder = ElementFactory::make("vaapih264enc")
                 .property("bitrate", bitrate)
+                .property_from_str("rate-control", "cbr")
                 .build()
                 .map_err(|e| CuError::from(e.message.to_string()))?;
             let muxer = ElementFactory::make("mpegtsmux")
