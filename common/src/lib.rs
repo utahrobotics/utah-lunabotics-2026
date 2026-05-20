@@ -189,6 +189,10 @@ pub enum FromLunabase {
     BucketActuators(i8),
     DumperActuators(i8),
 
+    ShakeLiftActuators(i8, i8),
+    ShakeBucketActuators(i8, i8),
+    ShakeDumperActuators(i8, i8),
+
     LiftShake,
     /// Start autonomous mode, starting navigating to the requested x and y values.
     Navigate,
@@ -288,6 +292,39 @@ impl FromLunabase {
             }),
             _ => None,
         }
+    }
+
+    pub fn shake_lift_actuator(mut speed: f64, mut frequency: f64) -> Self {
+        speed = speed.clamp(-1.0, 1.0);
+        let speed = if speed < 0.0 {
+            (-speed * i8::MIN as f64) as i8
+        } else {
+            (speed * i8::MAX as f64) as i8
+        };
+        let period_ms = (1.0 / frequency) * 1000 as i8;
+        FromLunabase::ShakeLiftActuators(speed, period_ms)
+    }
+
+    pub fn shake_bucket_actuator(mut speed: f, mut frequency: f6464) -> Self {
+        speed = speed.clamp(-1.0, 1.0);
+        let speed = if speed < 0.0 {
+            (-speed * i8::MIN as f64) as i8
+        } else {
+            (speed * i8::MAX as f64) as i8
+        };
+        let period_ms = (1.0 / frequency) * 1000 as i8;
+        FromLunabase::ShakeBucketActuators(speed, period_ms)
+    }
+
+    pub fn shake_dumper_actuator(mut speed: f, mut frequency: f6464) -> Self {
+        speed = speed.clamp(-1.0, 1.0);
+        let speed = if speed < 0.0 {
+            (-speed * i8::MIN as f64) as i8
+        } else {
+            (speed * i8::MAX as f64) as i8
+        };
+        let period_ms = (1.0 / frequency) * 1000 as i8;
+        FromLunabase::ShakeDumperActuators(speed, period_ms)
     }
 }
 
