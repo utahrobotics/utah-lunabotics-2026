@@ -11,7 +11,7 @@
                 "camera_id": "cam_{{id}}",
                 "device_port": "{{port}}",
                 "desired_index": "{{desired_index}}",
-                "pipeline": "v4l2src device=<devpath> ! decodebin ! videoconvert ! videoscale ! videorate ! video/x-raw,width={{width}},height={{height}},framerate=30/1 ! tee name=t ! queue leaky=upstream ! videoconvert ! video/x-raw,format=GRAY8 ! appsink name=copper_cam_{{id}} t. ! queue leaky=upstream ! videoconvert ! video/x-raw,format=NV12 ! vaapih264enc bitrate=2000 ! mpegtsmux ! tcpserversink host={{tcp_host}} port={{tcp_port}} sync=false",
+                "pipeline": "v4l2src device=<devpath> ! decodebin ! videoconvert ! videoscale ! videorate ! video/x-raw,width={{width}},height={{height}},framerate=30/1 ! tee name=t ! queue leaky=upstream ! videoconvert ! video/x-raw,format=GRAY8 ! appsink name=copper_cam_{{id}} t. ! queue leaky=upstream ! videoconvert ! video/x-raw,format=NV12 ! vaapih264enc bitrate={{bitrate}} rate-control=cbr ! mpegtsmux ! tcpserversink host={{tcp_host}} port={{tcp_port}} sync=false",
                 "caps": "video/x-raw, format=GRAY8, width={{width}}, height={{height}}",
                 "timeout_ms": 5000,
             },
