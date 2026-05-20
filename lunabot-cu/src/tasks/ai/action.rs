@@ -421,7 +421,168 @@ impl LunabotAction {
 
                     initial_status
                 }
+            },
+            LunabotAction::CalculatePath(navigation_goal) => {
+                let (center, hw, hh) = navigation_goal.to_center_and_halfsizes();
+                // if let Some(rec) = RECORDER.get() {
+                //     let _ = rec.recorder.log(
+                //         "ai/goal",
+                //         &Boxes2D::from_centers_and_half_sizes(
+                //             vec![(center.x, center.y)],
+                //             vec![(hw, hh)],
+                //         ),
+                //     );
+                // }
+                if let Some(ref local_map) = blackboard.latest_local_map {
+                    // if the kinematic root is not initialized, we might as well just blow up because nothing will work anyways
+                    let current_translation = ROBOT_STATE
+                        .get()
+                        .unwrap()
+                        .kinematic_root
+                        .get_global_isometry()
+                        .translation;
+
+                    let start =
+                        Vector2::new(current_translation.x as f32, current_translation.y as f32);
+
+                    // Get destination from blackboard, or use default PATHFINDING_GOAL
+                    // PATHFINDING_GOAL is just for testing for now.
+
+                    // Check if we already have a path finder job running
+                    if let Some(ref mut path_finder) = blackboard.path_finder {
+                        let status = path_finder.get_status();
+                        if status == Success {
+                            // Job completed successfully, get the path
+                            if let Some(path) = path_finder.get_output() {
+                                println!(
+                                    "Path calculation completed with {} waypoints",
+                                    path.len()
+                                );
+                                blackboard.calculated_path = Some(path.clone());
+                                blackboard.path_finder = None;
+                                if let Some(ref follower) = blackboard.path_follower {
+                                    if let Err(e) = follower.send_to_job(path) {
+                                        eprintln!(
+                                            "Failed to send new path to existing follower: {e}"
+                                        );
+                                    }
+                                }
+                                Success
+                            } else {
+                                eprintln!("Path finder job succeeded but produced no output.");
+                                blackboard.path_finder = None;
+                                Failure
+                            }
+                        } else if status == Failure {
+                            eprintln!("Path finder job failed.");
+                            blackboard.path_finder = None;
+                            Failure
+                        } else {
+                            // Still running
+                            Running
+                        }
+                    } else {
+                        // Start a new path finder job
+                        // println!("Starting path finder job from {:?} to {:?}.", start, end);
+                        let mut job = find_path_job(
+                            local_map.clone(),
+                            start,
+                            blackboard.obstacle_gradient_threshold_expander,
+                            blackboard.obstacle_gradient_threshold_pathfinder,
+                            blackboard.robot_radius,
+                            *navigation_goal,
+                        );
+                        let initial_status = job.get_status();
+                        blackboard.path_finder = Some(job);
+                        println!(
+                            "Path finder job started with initial status: {:?}",
+                            initial_status
+                        );
+                        initial_status
+                    }
+                } else {
+                    eprintln!("Cannot calculate path: no local map available");
+                    Failure
+                }
             }
+            LunabotAction::FollowPath => {
+                if ROBOT_STATE.get().is_none() {
+                    eprintln!(
+                        "Cannot start follow path job because ROBOT_STATE is not initialized"
+                    );
+                    Failure
+                } else if let Some(ref mut path_follower) = blackboard.path_follower {
+                    blackboard.outgoing_steering_msg = path_follower.get_output();
+                    let status = path_follower.get_status();
+                    if status == Success || status == Failure {
+                        println!("Follow path job completed with status: {:?}", status);
+                        // ensure the task is no longer running just in case
+                        path_follower.cancel();
+                        blackboard.path_follower = None;
+                    }
+                    status
+                } else {
+                    // Use the calculated path from CalculatePath action
+                    if let Some(path) = blackboard.calculated_path.take() {
+                        println!("Starting new follow path job with {} waypoints", path.len());
+                        let mut follower_job = follow_path_job(
+                            ROBOT_STATE.get().unwrap().kinematic_root,
+                            path,
+                            None,
+                            0.85,
+                            0.05,
+                            None,
+                            None,
+                            None,
+                        );
+                        let job_initial_status = follower_job.get_status();
+                        blackboard.path_follower = Some(follower_job);
+                        println!(
+                            "Follow path job started with initial status: {:?}",
+                            job_initial_status
+                        );
+                        job_initial_status
+                    } else {
+                        eprintln!("Cannot follow path: no calculated path available");
+                        Failure
+                    }
+                }
+            }
+            LunabotAction::CheckNavigation => Running,
+            LunabotAction::GetUnstuck => todo!(),
+            LunabotAction::Dig => {
+                // Check if we already got a digging job going
+                if let Some(ref mut digger) = blackboard.digger {
+                    while let Some(command) = digger.get_output() {
+                        blackboard.outgoing_actuator_msg_queue.push_back(command);
+                    }
+
+                    let status = digger.get_status();
+                    if status == Success {
+                        // We (hopefully) have a bucket full of moon dirt now
+                        Success
+                    } else if status == Failure {
+                        // Somehow we managed to fuck this one up too
+                        eprintln!("Failed Digging job!");
+                        blackboard.digger = None;
+                        Failure
+                    } else {
+                        // Still digging
+                        Running
+                    }
+                } else {
+                    // Start a new digging job
+                    let mut job = dig_job();
+                    let initial_status: Status = job.get_status();
+                    blackboard.digger = Some(job);
+                    println!(
+                        "Digging job started with intial status {:?}",
+                        initial_status
+                    );
+
+                    initial_status
+                }
+            }`
             LunabotAction::Dump => {
                 // Check if we already got a dumping job going
                 if let Some(ref mut dumper) = blackboard.dumper {
