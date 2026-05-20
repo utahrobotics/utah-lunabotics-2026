@@ -135,7 +135,7 @@ dumper_reverse={
 "events": []
 }
 dumper_shake={
-"deadzone": 0.2, 
+"deadzone": 0.2,
 "events": []
 }
 autonomy={

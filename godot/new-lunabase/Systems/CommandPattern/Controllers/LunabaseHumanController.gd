@@ -151,15 +151,7 @@ func _process(delta: float) -> void:
 		Input.get_action_strength("bucket_analog_up"),
 		Input.get_action_strength("bucket_analog_down")
 	)
-	if Input.is_action_pressed("bucket_shake"):
-		oscillation_time += delta
-		if oscillation_time > 0.2:
-			oscillation_time = 0.0
-		if oscillation_time > 0.1:
-			bucket_input = 1.0
-		else:
-			bucket_input = -1.0
-	elif bucket_analog_mag > trig_dz:
+	if bucket_analog_mag > trig_dz:
 		bucket_input = -bucket_analog_mag if Input.is_action_pressed("bucket_reverse") else bucket_analog_mag
 		if invert_bucket_default_direction:
 			bucket_input = -bucket_input
@@ -171,6 +163,12 @@ func _process(delta: float) -> void:
 	var bucket_cmd := BucketActuatorsCommand.new()
 	bucket_cmd.bucket = int(bucket_input * 127.0)
 	command_recorder.execute_and_store(bucket_cmd)
+	
+	if Input.is_action_pressed("bucket_shake"):
+		var bucket_shake_cmd := BucketShakeActuatorsCommand.new()
+		bucket_shake_cmd.bucket = 16
+		bucket_shake_cmd.period = 10
+		command_recorder.execute_and_store(bucket_shake_cmd)
 
 	# === DUMPER ACTUATORS ===
 	var dumper_input: float = 0.0
@@ -179,15 +177,7 @@ func _process(delta: float) -> void:
 		Input.get_action_strength("dumper_analog_up"),
 		Input.get_action_strength("dumper_analog_down")
 	)
-	if Input.is_action_pressed("dumper_shake"):
-		oscillation_time += delta
-		if oscillation_time > 0.2:
-			oscillation_time = 0.0
-		if oscillation_time > 0.1:
-			dumper_input = 1.0
-		else:
-			dumper_input = -1.0
-	elif dumper_analog_mag > trig_dz:
+	if dumper_analog_mag > trig_dz:
 		dumper_input = -dumper_analog_mag if Input.is_action_pressed("dumper_reverse") else dumper_analog_mag
 		if invert_dumper_default_direction:
 			dumper_input = -dumper_input
@@ -199,6 +189,12 @@ func _process(delta: float) -> void:
 	var dumper_cmd := DumperActuatorCommand.new()
 	dumper_cmd.dumper = int(dumper_input * 127.0)
 	command_recorder.execute_and_store(dumper_cmd)
+	
+	if Input.is_action_pressed("dumper_shake"):
+		var dumper_shake_cmd := DumperShakeActuatorCommand.new()
+		dumper_shake_cmd.dumper = 16
+		dumper_shake_cmd.period = 10
+		command_recorder.execute_and_store(dumper_shake_cmd)
 	
 	if Input.is_action_just_pressed("continue_mission"):
 		command_recorder.execute_and_store(ContinueMissionCommand.new())

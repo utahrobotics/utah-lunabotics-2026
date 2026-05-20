@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use bonsai_bt::Status::{self, *};
 use common::{LUNABOT_STAGE, LunabotStage, Steering};
@@ -145,9 +145,22 @@ impl LunabotAction {
                 }
 
                 if let Some(value) = blackboard.last_bucket.take() {
-                    blackboard
-                        .outgoing_actuator_msg_queue
-                        .push_back(actuator_command_from_i8(value, Actuator::Bucket));
+                    if (value.1 == 0) {
+                        blackboard
+                            .outgoing_actuator_msg_queue
+                            .push_back(actuator_command_from_i8(value.0, Actuator::Bucket));
+                    } else {
+                        let time_ms = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
+                        if ((time_ms % value.1) * 2 > value.1) {
+                            blackboard
+                                .outgoing_actuator_msg_queue
+                                .push_back(actuator_command_from_i8(value.0, Actuator::Bucket));
+                        } else {
+                            blackboard
+                                .outgoing_actuator_msg_queue
+                                .push_back(actuator_command_from_i8(-value.0, Actuator::Bucket));
+                        }
+                    }
                 }
 
                 Success
@@ -166,9 +179,22 @@ impl LunabotAction {
                 }
 
                 if let Some(value) = blackboard.last_dumper.take() {
-                    blackboard
-                        .outgoing_actuator_msg_queue
-                        .push_back(actuator_command_from_i8(value, Actuator::Dumper));
+                    if (value.1 == 0) {
+                        blackboard
+                            .outgoing_actuator_msg_queue
+                            .push_back(actuator_command_from_i8(value.0, Actuator::Dumper));
+                    } else {
+                        let time_ms = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
+                        if ((time_ms % value.1) * 2 > value.1) {
+                            blackboard
+                                .outgoing_actuator_msg_queue
+                                .push_back(actuator_command_from_i8(value.0, Actuator::Dumper));
+                        } else {
+                            blackboard
+                                .outgoing_actuator_msg_queue
+                                .push_back(actuator_command_from_i8(-value.0, Actuator::Dumper));
+                        }
+                    }
                 }
 
                 Success
@@ -187,9 +213,22 @@ impl LunabotAction {
                 }
 
                 if let Some(value) = blackboard.last_lift.take() {
-                    blackboard
-                        .outgoing_actuator_msg_queue
-                        .push_back(actuator_command_from_i8(value, Actuator::Lift));
+                    if (value.1 == 0) {
+                        blackboard
+                            .outgoing_actuator_msg_queue
+                            .push_back(actuator_command_from_i8(value.0, Actuator::Lift));
+                    } else {
+                        let time_ms = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
+                        if ((time_ms % value.1) * 2 > value.1) {
+                            blackboard
+                                .outgoing_actuator_msg_queue
+                                .push_back(actuator_command_from_i8(value.0, Actuator::Lift));
+                        } else {
+                            blackboard
+                                .outgoing_actuator_msg_queue
+                                .push_back(actuator_command_from_i8(-value.0, Actuator::Lift));
+                        }
+                    }
                 }
 
                 Success

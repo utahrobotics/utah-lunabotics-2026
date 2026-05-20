@@ -38,13 +38,13 @@ pub struct LunabotBlackboard {
     pub latest_local_map: Option<OccupancyGrid>,
 
     /// stores the last lift actuator message received from lunabase
-    pub last_lift: Option<i8>,
+    pub last_lift: Option<(i8, u8)>,
 
     /// stores the last bucket actuator message received from lunabase
-    pub last_bucket: Option<i8>,
+    pub last_bucket: Option<(i8, u8)>,
 
     /// stores the last bucket actuator message received from lunabase
-    pub last_dumper: Option<i8>,
+    pub last_dumper: Option<(i8, u8)>,
 
     /// stores the last steering message recieved from the lunabase
     pub last_steering: Option<Steering>,
@@ -147,7 +147,7 @@ impl LunabotBlackboard {
                 } else {
                     self.last_non_zero_lift_pack = None;
                 }
-                self.last_lift = Some(*val);
+                self.last_lift = Some((*val, 0));
             }
             common::FromLunabase::DumperActuators(val) => {
                 if *val != 0 {
@@ -155,7 +155,7 @@ impl LunabotBlackboard {
                 } else {
                     self.last_non_zero_dumper_pack = None;
                 }
-                self.last_dumper = Some(*val);
+                self.last_dumper = Some((*val, 0));
             }
             common::FromLunabase::BucketActuators(val) => {
                 if *val != 0 {
@@ -163,7 +163,31 @@ impl LunabotBlackboard {
                 } else {
                     self.last_non_zero_bucket_pack = None;
                 }
-                self.last_bucket = Some(*val);
+                self.last_bucket = Some((*val, 0));
+            }
+            common::FromLunabase::ShakeLiftActuators(val, period) => {
+                if *val != 0 {
+                    self.last_non_zero_lift_pack = Some(Instant::now());
+                } else {
+                    self.last_non_zero_lift_pack = None;
+                }
+                self.last_lift = Some(*val, *period);
+            }
+            common::FromLunabase::ShakeDumperActuators(val, period) => {
+                if *val != 0 {
+                    self.last_non_zero_dumper_pack = Some(Instant::now());
+                } else {
+                    self.last_non_zero_dumper_pack = None;
+                }
+                self.last_dumper = Some(*val, *period);
+            }
+            common::FromLunabase::ShakeBucketActuators(val, period) => {
+                if *val != 0 {
+                    self.last_non_zero_bucket_pack = Some(Instant::now());
+                } else {
+                    self.last_non_zero_bucket_pack = None;
+                }
+                self.last_bucket = Some(*val, *period);
             }
             common::FromLunabase::Steering(steering) => {
                 if let Some(rec) = RECORDER.get() {

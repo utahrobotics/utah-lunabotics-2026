@@ -448,6 +448,21 @@ impl LunabaseConnection {
     }
 
     #[func]
+    fn send_shake_lift_actuators(&mut self, speed: f64, frequency: f64) {
+        self.send_msg(FromLunabase::shake_lift_actuator(speed, frequency));
+    }
+
+    #[func]
+    fn send_shake_bucket_actuators(&mut self, speed: f64, frequency: f64) {
+        self.send_msg(FromLunabase::shake_bucket_actuator(speed, frequency));
+    }
+
+    #[func]
+    fn send_shake_dumper_actuators(&mut self, speed: f64, frequency: f64) {
+        self.send_msg(FromLunabase::shake_dumper_actuator(speed, frequency));
+    }
+
+    #[func]
     fn send_soft_stop(&mut self) {
         self.send_msg(FromLunabase::SoftStop);
     }
