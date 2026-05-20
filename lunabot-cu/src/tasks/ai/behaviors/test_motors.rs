@@ -4,7 +4,7 @@ use common::Steering;
 use crate::tasks::ai::action::LunabotAction;
 
 pub fn test_motors_behavior() -> Behavior<LunabotAction> {
-    Behavior::WhileAll(
+    Behavior::While(
         Box::new(Action(LunabotAction::IsTestMotors)),
         vec![
             Action(LunabotAction::CancelJobs),
