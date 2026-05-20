@@ -171,7 +171,7 @@ impl LunabotBlackboard {
                 } else {
                     self.last_non_zero_lift_pack = None;
                 }
-                self.last_lift = Some(*val, *period);
+                self.last_lift = Some((*val, *period));
             }
             common::FromLunabase::ShakeDumperActuators(val, period) => {
                 if *val != 0 {
@@ -179,7 +179,7 @@ impl LunabotBlackboard {
                 } else {
                     self.last_non_zero_dumper_pack = None;
                 }
-                self.last_dumper = Some(*val, *period);
+                self.last_dumper = Some((*val, *period));
             }
             common::FromLunabase::ShakeBucketActuators(val, period) => {
                 if *val != 0 {
@@ -187,7 +187,7 @@ impl LunabotBlackboard {
                 } else {
                     self.last_non_zero_bucket_pack = None;
                 }
-                self.last_bucket = Some(*val, *period);
+                self.last_bucket = Some((*val, *period));
             }
             common::FromLunabase::Steering(steering) => {
                 if let Some(rec) = RECORDER.get() {

@@ -305,7 +305,7 @@ impl FromLunabase {
         FromLunabase::ShakeLiftActuators(speed, period_ms)
     }
 
-    pub fn shake_bucket_actuator(mut speed: f, mut frequency: f64) -> Self {
+    pub fn shake_bucket_actuator(mut speed: f64, mut frequency: f64) -> Self {
         speed = speed.clamp(-1.0, 1.0);
         let speed = if speed < 0.0 {
             (-speed * i8::MIN as f64) as i8
@@ -316,7 +316,7 @@ impl FromLunabase {
         FromLunabase::ShakeBucketActuators(speed, period_ms)
     }
 
-    pub fn shake_dumper_actuator(mut speed: f, mut frequency: f64) -> Self {
+    pub fn shake_dumper_actuator(mut speed: f64, mut frequency: f64) -> Self {
         speed = speed.clamp(-1.0, 1.0);
         let speed = if speed < 0.0 {
             (-speed * i8::MIN as f64) as i8

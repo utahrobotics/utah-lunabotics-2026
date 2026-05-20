@@ -114,6 +114,7 @@ impl CuTask for LunabotAi {
             .outgoing_actuator_msg_queue
             .pop_front()
         {
+            println!("{actuator_cmd:?}");
             output.1.set_payload(actuator_cmd);
         }
         if let Some(steering_cmd) = self.bt.blackboard_mut().outgoing_steering_msg.take() {
@@ -128,9 +129,7 @@ impl CuTask for LunabotAi {
             );
         }
         if let Some(outgoing_status) = self.bt.blackboard_mut().outgoing_bt_status_msg.take() {
-            output.3.set_payload(
-                outgoing_status
-            )
+            output.3.set_payload(outgoing_status)
         }
         Ok(())
     }

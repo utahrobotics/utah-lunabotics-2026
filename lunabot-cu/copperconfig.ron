@@ -334,7 +334,7 @@
                 "fps": 30,
                 "host": "0.0.0.0",
                 "port": 5000,
-                "bitrate": 500,
+                "bitrate": 200,
             },
             logging:(
                 enabled: false
@@ -349,7 +349,7 @@
                 "fps": 30,
                 "host": "0.0.0.0",
                 "tcp_port": 5003,
-                "bitrate": 500,
+                "bitrate": 200,
             },
             logging:(
                 enabled: false
@@ -366,7 +366,7 @@
                 "fps": 30,
                 "host": "0.0.0.0",
                 "tcp_port": 5001,
-                "bitrate": 500,
+                "bitrate": 200,
             },
             logging:(
                 enabled: false
@@ -381,7 +381,7 @@
                 "fps": 30,
                 "host": "0.0.0.0",
                 "tcp_port": 5002,
-                "bitrate": 500,
+                "bitrate": 200,
             },
             logging:(
                 enabled: false
@@ -471,7 +471,7 @@
                 "cy":604.28,
                 "width":640,
                 "height":480,
-                "bitrate": 500,
+                "bitrate": 200,
                 "tcp_host":"0.0.0.0",
                 "tcp_port":4001,
                 "desired_index": "0",
@@ -482,14 +482,14 @@
             path:"camera_configs/camera_template_gstreamer.ron",
             params:{
                 "id":"dump",
-                "port":"pci-0000:00:14.0-usb-0:4:1.0",
+                "port":"pci-0000:e5:00.4-usb-0:1.1:1.0",
                 "fx":939.93,
                 "fy":938.93,
                 "cx":640.84,
                 "cy":340.819,
                 "width":1280,
                 "height":720,
-                "bitrate": 500,
+                "bitrate": 200,
                 "tcp_host":"0.0.0.0",
                 "tcp_port":4002,
                 "desired_index": "0",
@@ -506,7 +506,7 @@
                 "height":480,
                 "tcp_host":"0.0.0.0",
                 "tcp_port":4003,
-                "bitrate": 500,
+                "bitrate": 200,
                 "desired_index": "0"
             }
         ),
@@ -516,7 +516,7 @@
     monitor: (type:"simple_monitor::SimpleMonitor"),
     logging:(
         // if true, each output payload of each will be logged unless a task opts out
-        enable_task_logging: true,
+        enable_task_logging: false,
         section_size_mib: 100,
         copperlist_count: 20,
     ),

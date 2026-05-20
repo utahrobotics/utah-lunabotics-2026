@@ -120,6 +120,7 @@ pub fn enumerate_depth_cameras() {
                         Ok(x) => x,
                         Err(e) => {
                             eprintln!("Failed to start pipeline for {serial}: {e}");
+                            std::process::Command::new("device_reset").spawn();
                             continue;
                         }
                     };

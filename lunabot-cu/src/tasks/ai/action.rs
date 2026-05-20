@@ -151,7 +151,7 @@ impl LunabotAction {
                             .push_back(actuator_command_from_i8(value.0, Actuator::Bucket));
                     } else {
                         let time_ms = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
-                        if ((time_ms % value.1) * 2 > value.1) {
+                        if ((time_ms % value.1 as u128) * 2 > value.1 as u128) {
                             blackboard
                                 .outgoing_actuator_msg_queue
                                 .push_back(actuator_command_from_i8(value.0, Actuator::Bucket));
@@ -184,8 +184,9 @@ impl LunabotAction {
                             .outgoing_actuator_msg_queue
                             .push_back(actuator_command_from_i8(value.0, Actuator::Dumper));
                     } else {
+			eprintln!("Dumper shake running");
                         let time_ms = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
-                        if ((time_ms % value.1) * 2 > value.1) {
+                        if ((time_ms % value.1 as u128) * 2 > value.1 as u128) {
                             blackboard
                                 .outgoing_actuator_msg_queue
                                 .push_back(actuator_command_from_i8(value.0, Actuator::Dumper));
@@ -219,7 +220,7 @@ impl LunabotAction {
                             .push_back(actuator_command_from_i8(value.0, Actuator::Lift));
                     } else {
                         let time_ms = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_millis();
-                        if ((time_ms % value.1) * 2 > value.1) {
+                        if ((time_ms % value.1 as u128) * 2 > value.1 as u128) {
                             blackboard
                                 .outgoing_actuator_msg_queue
                                 .push_back(actuator_command_from_i8(value.0, Actuator::Lift));

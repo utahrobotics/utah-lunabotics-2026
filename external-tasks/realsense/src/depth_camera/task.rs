@@ -123,10 +123,9 @@ impl DepthCameraTask {
                         "Failed to get frame from RealSense Camera {}: {e}",
                         self.serial
                     );
-                    if matches!(e, FrameWaitError::DidTimeoutBeforeFrameArrival) {
-                        let _ = Command::new("usb-reset").arg("depth").spawn();
-                        // device.hardware_reset();
-                    }
+                    // if matches!(e, FrameWaitError::DidTimeoutBeforeFrameArrival) {
+                    let _ = Command::new("device_reset").spawn();
+                    // }
                     break;
                 }
             };

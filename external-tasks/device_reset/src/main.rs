@@ -9,7 +9,7 @@ fn main() {
 
     let mut product_mask = HashSet::new();
     product_mask.insert(Rs2ProductLine::Depth);
-    product_mask.insert(Rs2ProductLine::T200);
+    // product_mask.insert(Rs2ProductLine::T200);
 
     let devices = context.query_devices(product_mask);
 
@@ -17,6 +17,7 @@ fn main() {
     //     .into_iter()
     //     .next()
     //     .expect("No RealSense depth device found");
+    // while let Some(device) = devices.iter().next_chunk()
 
     for device in devices {
         let name = device
