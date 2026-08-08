@@ -13,34 +13,35 @@ use crate::tasks::ai::{
 const DIG_TRAVERSAL_TIME: f64 = 7.0;
 
 pub fn autonomy_main(arena: Arena) -> Behavior<LunabotAction> {
-    While(
-        Box::new(Action(LunabotAction::IsAutonomy)),
-        vec![
-            // Action(LunabotAction::ResetAllObstacles),
-            // 1. go to dig site
-            Action(LunabotAction::SetBTStatusMsg(format!(
-                "Moving to dig site for {:?}",
-                arena
-            ))),
-            navigate_behavior(NavigationGoal::DigSite(arena)),
-            Action(LunabotAction::SetBTStatusMsg(format!("DIGGING"))),
-            open_loop_dig_from_starting(),
-            // Action(LunabotAction::ResetLocalObstacles),
-            // with_timeout(wait_for_new_frame(), 5.0),
-            // Action()
-            // 2. dig
-            // Action(LunabotAction::Dig),
+    open_loop_dance()
+    // While(
+    //     Box::new(Action(LunabotAction::IsAutonomy)),
+    //     vec![
+    //         // Action(LunabotAction::ResetAllObstacles),
+    //         // 1. go to dig site
+    //         Action(LunabotAction::SetBTStatusMsg(format!(
+    //             "Moving to dig site for {:?}",
+    //             arena
+    //         ))),
+    //         navigate_behavior(NavigationGoal::DigSite(arena)),
+    //         Action(LunabotAction::SetBTStatusMsg(format!("DIGGING"))),
+    //         open_loop_dig_from_starting(),
+    //         // Action(LunabotAction::ResetLocalObstacles),
+    //         // with_timeout(wait_for_new_frame(), 5.0),
+    //         // Action()
+    //         // 2. dig
+    //         // Action(LunabotAction::Dig),
 
-            // 3. Navigate to dump site
-            navigate_behavior(NavigationGoal::DumpSite(arena)),
-            Action(LunabotAction::SetBTStatusMsg(format!("DUMPING"))),
-            open_loop_dump_from_zero(),
-            back_up_for(0.5),
-            Wait(5.5),
-            // 4. Dump
-            // Action(LunabotAction::Dump),
-        ],
-    )
+    //         // 3. Navigate to dump site
+    //         navigate_behavior(NavigationGoal::DumpSite(arena)),
+    //         Action(LunabotAction::SetBTStatusMsg(format!("DUMPING"))),
+    //         open_loop_dump_from_zero(),
+    //         back_up_for(0.5),
+    //         Wait(5.5),
+    //         // 4. Dump
+    //         // Action(LunabotAction::Dump),
+    //     ],
+    // )
 }
 
 // This is terrible please don't follow in my footsteps (HB)
@@ -151,6 +152,37 @@ fn shake_tilt() -> Behavior<LunabotAction> {
                 Wait(0.1),
                 Action(LunabotAction::SetBucket((-1.0 * i8::MAX as f64) as i8)),
                 Wait(0.1),
+            ],
+        ),
+        Action(LunabotAction::SetBucket(0)),
+    ])
+}
+
+const eighth: f32 = 0.5;
+fn open_loop_dance() -> Behavior<LunabotAction> {
+    Sequence(vec![
+        While(
+            Box::new(Wait(120.0)),
+            vec![
+                Action(LunabotAction::SetDumper((1.0 * i8::MAX as f64) as i8)), // 1 of 1st
+                Action(LunabotAction::SetSteering(Steering::new_ik(
+                    1.0, -1.0, 2000.0,
+                ))),
+                Wait(eighth*2),
+                Action(LunabotAction::SetSteering(Steering::new_ik(
+                    0.5, -0.5, 2000.0,
+                ))),
+                Wait(eighth*2),
+                Action(LunabotAction::SetSteering(Steering::new_ik(
+                    -0.5, 0.5, 2000.0,
+                ))),
+                Wait(eighth*2),
+                Action(LunabotAction::SetSteering(Steering::new_ik(
+                    -1.0, 1.0, 2000.0,
+                ))),
+                Wait(eighth),
+                Action(LunabotAction::SetDumper((-1.0 * i8::MAX as f64) as i8)), // end on 1 of 2nd
+                Wait(eighth),
             ],
         ),
         Action(LunabotAction::SetBucket(0)),
