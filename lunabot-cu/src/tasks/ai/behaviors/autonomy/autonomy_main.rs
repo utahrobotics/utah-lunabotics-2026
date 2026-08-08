@@ -13,7 +13,12 @@ use crate::tasks::ai::{
 const DIG_TRAVERSAL_TIME: f64 = 7.0;
 
 pub fn autonomy_main(arena: Arena) -> Behavior<LunabotAction> {
-    open_loop_dance()
+    While(
+        Box::new(Action(LunabotAction::IsAutonomy)),
+        vec![
+            open_loop_dance()
+        ]
+    )
     // While(
     //     Box::new(Action(LunabotAction::IsAutonomy)),
     //     vec![
@@ -158,7 +163,7 @@ fn shake_tilt() -> Behavior<LunabotAction> {
     ])
 }
 
-const eighth: f32 = 0.5;
+const eighth: f64 = 0.1;
 fn open_loop_dance() -> Behavior<LunabotAction> {
     Sequence(vec![
         While(
@@ -168,15 +173,17 @@ fn open_loop_dance() -> Behavior<LunabotAction> {
                 Action(LunabotAction::SetSteering(Steering::new_ik(
                     1.0, -1.0, 2000.0,
                 ))),
-                Wait(eighth*2),
+                Wait(eighth*1.0),
+                Action(LunabotAction::SetDumper((0.0 * i8::MAX as f64) as i8)),
+                Wait(eighth*1.0),
                 Action(LunabotAction::SetSteering(Steering::new_ik(
                     0.5, -0.5, 2000.0,
                 ))),
-                Wait(eighth*2),
+                Wait(eighth*2.0),
                 Action(LunabotAction::SetSteering(Steering::new_ik(
                     -0.5, 0.5, 2000.0,
                 ))),
-                Wait(eighth*2),
+                Wait(eighth*2.0),
                 Action(LunabotAction::SetSteering(Steering::new_ik(
                     -1.0, 1.0, 2000.0,
                 ))),
