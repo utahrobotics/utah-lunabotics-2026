@@ -171,21 +171,21 @@ fn open_loop_dance() -> Behavior<LunabotAction> {
             vec![
                 Action(LunabotAction::SetDumper((1.0 * i8::MAX as f64) as i8)), // 1 of 1st
                 Action(LunabotAction::SetSteering(Steering::new_ik(
-                    1.0, -1.0, 2000.0,
+                    0.0, 1.0, 2000.0,
                 ))),
                 Wait(eighth*1.0),
                 Action(LunabotAction::SetDumper((0.0 * i8::MAX as f64) as i8)),
                 Wait(eighth*1.0),
                 Action(LunabotAction::SetSteering(Steering::new_ik(
-                    0.5, -0.5, 2000.0,
+                    0.0, 0.5, 2000.0,
                 ))),
                 Wait(eighth*2.0),
                 Action(LunabotAction::SetSteering(Steering::new_ik(
-                    -0.5, 0.5, 2000.0,
+                    0.0, -0.5, 2000.0,
                 ))),
                 Wait(eighth*2.0),
                 Action(LunabotAction::SetSteering(Steering::new_ik(
-                    -1.0, 1.0, 2000.0,
+                    0.0, -1.0, 2000.0,
                 ))),
                 Wait(eighth),
                 Action(LunabotAction::SetDumper((-1.0 * i8::MAX as f64) as i8)), // end on 1 of 2nd
